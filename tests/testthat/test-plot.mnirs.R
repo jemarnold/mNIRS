@@ -183,6 +183,28 @@ test_that("format_hmmss handles NA values", {
     expect_true(is.na(result[2]))
 })
 
+test_that("format_hmmss handles fractional seconds", {
+    ## scalar fractional
+    expect_equal(format_hmmss(2.1), "00:02.10")
+    expect_equal(format_hmmss(90.5), "01:30.50")
+    expect_equal(format_hmmss(-2.1), "-00:02.10")
+
+    ## fractional crossing hours -> uses h:mm:ss.ff
+    expect_equal(format_hmmss(3661.25), "1:01:01.25")
+
+    ## vector with at least one fractional uses fractional format throughout
+    expect_equal(
+        format_hmmss(seq(2, 7, 2.5)),
+        c("00:02.00", "00:04.50", "00:07.00")
+    )
+
+    ## fractional vector with NA
+    result <- format_hmmss(c(2.1, NA, 4.2))
+    expect_length(result, 3)
+    expect_true(is.na(result[2]))
+    expect_equal(result[c(1, 3)], c("00:02.10", "00:04.20"))
+})
+
 
 ## as_plot_data() =============================================
 # Helper to create mock mNIRS object

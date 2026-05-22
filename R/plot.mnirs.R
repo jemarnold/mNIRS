@@ -555,10 +555,18 @@ format_hmmss <- function(x) {
     mins <- as.integer((abs(x) %% 3600) %/% 60)
     secs <- abs(x) %% 60
 
-    hmmss_string <- if (any(hrs > 0, na.rm = TRUE)) {
-        sprintf("%s%d:%02d:%02d", sign, hrs, mins, secs)
+    ## use fractional seconds format when any non-integer present
+    if (any(secs %% 1 != 0, na.rm = TRUE)) {
+        secs_fmt <- "%05.2f"
     } else {
-        sprintf("%s%02d:%02d", sign, mins, secs)
+        secs_fmt <- "%02d"
+        secs <- as.integer(secs)
+    }
+
+    hmmss_string <- if (any(hrs > 0, na.rm = TRUE)) {
+        sprintf(paste0("%s%d:%02d:", secs_fmt), sign, hrs, mins, secs)
+    } else {
+        sprintf(paste0("%s%02d:", secs_fmt), sign, mins, secs)
     }
 
     ## return y to original x length with NAs if handled
