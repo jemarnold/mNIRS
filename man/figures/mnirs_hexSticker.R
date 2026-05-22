@@ -10,17 +10,18 @@ showtext_auto()
 
 hexSticker::sticker(
     ## imported image
-    subplot = r"(C:\Users\Jem\Downloads\mnirs-transparent.png)",
+    subplot = r"(C:\R-Projects\mnirs\man\figures\mnirs-hex-transparent-dark3.png)",
     s_x = 1, # centred horizontally
-    s_y = 0.95, # slightly below centre to leave room for text
-    s_width = 1.0, # fill most of the hex width
+    s_y = 0.9, # slightly below centre to leave room for text
+    s_width = 0.84, # fill most of the hex width
     s_height = 0.7, # constrain height proportionally
 
     ## package name parameters
     package = "mnirs",
     p_x = 1,
     p_y = 1.4,
-    p_size = 12,
+    # p_size = 12, ## for .svg
+    p_size = 35, ## for .png
     p_color = "#004992",
     p_family = "merriweather_sans",
     p_fontface = 2, # "plain", "bold", "italic", "bolditalic"
@@ -40,6 +41,6 @@ hexSticker::sticker(
 
     ## ggsave
     ## `*mnirs-hex*.png` will be gitignored
-    filename = "man/figures/mnirs-hex.svg",
+    filename = "man/figures/mnirs-hex-temp.png",
     dpi = 300
 )

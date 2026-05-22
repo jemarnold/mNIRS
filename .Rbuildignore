@@ -20,6 +20,7 @@
 ^cran-comments\.md$
 ^mnirs_hexSticker\.R$
 mnirs-hex.*\.png$
+mnirs-hex-v*\.svg$
 ^CLAUDE\.md$
 ^AGENTS\.md$
 ^tests/testthat/testdata$

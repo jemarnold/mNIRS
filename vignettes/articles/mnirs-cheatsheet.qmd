@@ -52,7 +52,7 @@ execute:
         [
           #text(size: 20pt, weight: "bold", fill: white)[mnirs]
           #h(0.6em)
-          #text(size: 10pt, fill: white.transparentize(30%))[v0.4.2.2]
+          #text(size: 10pt, fill: white.transparentize(30%))[v0.6.5]
           #linebreak()
           #text(size: 9pt, weight: "bold", fill: white)[
             Muscle Near-Infrared Spectroscopy Processing and Analysis
