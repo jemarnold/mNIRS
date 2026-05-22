@@ -4,14 +4,7 @@
 \alias{plot.mnirs}
 \title{Plot \emph{{mnirs}} objects}
 \usage{
-\method{plot}{mnirs}(
-  x,
-  points = FALSE,
-  time_labels = FALSE,
-  n.breaks = 5,
-  na.omit = FALSE,
-  ...
-)
+\method{plot}{mnirs}(x, points = FALSE, time_labels = FALSE, na.omit = FALSE, ...)
 }
 \arguments{
 \item{x}{Data frame or list of data frames of class \emph{"mnirs"} (e.g. from
@@ -24,9 +17,6 @@ panel per element.}
 \item{time_labels}{Logical. Default is \code{FALSE}. If \code{TRUE} displays x-axis
 time values formatted as \emph{"hh:mm:ss"} using \code{\link[=format_hmmss]{format_hmmss()}}. Otherwise,
 x-axis values are displayed as numeric.}
-
-\item{n.breaks}{A numeric value specifying the number of breaks in both
-x- and y-axes. Default is \code{5}.}
 
 \item{na.omit}{Logical. Default is \code{FALSE}. If \code{TRUE} omits missing (\code{NA})
 and non-finite \code{c(Inf, -Inf, NaN)} from display.}
@@ -45,8 +35,9 @@ When \code{x} is a named list of \emph{"mnirs"} data frames, elements are bound 
 single data frame and displayed as faceted panels via
 \code{\link[ggplot2:facet_wrap]{ggplot2::facet_wrap()}}.
 
-Arguments in \code{...} are currently passed to \code{\link[ggplot2:facet_wrap]{ggplot2::facet_wrap()}}
-formals, such as \code{nrow}, \code{ncol}, and \code{scales} for more precise control.
+Accepts some arguments in \code{...}, such as \code{nrow}, \code{ncol}, and \code{scales}
+passed to \code{\link[ggplot2:facet_wrap]{ggplot2::facet_wrap()}}. \code{n.breaks} overrides the default number
+of y-axis breaks. \code{breaks} overrides the x-axis breaks directly.
 }
 \examples{
 \dontshow{if (rlang::is_installed(c("ggplot2", "scales"))) withAutoprint(\{ # examplesIf}

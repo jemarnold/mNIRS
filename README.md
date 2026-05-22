@@ -112,7 +112,6 @@ data_raw
 plot(
     data_raw,
     time_labels = TRUE,
-    n.breaks = 5,
     na.omit = FALSE
 )
 ```

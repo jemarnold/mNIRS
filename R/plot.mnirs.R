@@ -11,8 +11,6 @@
 #' @param time_labels Logical. Default is `FALSE`. If `TRUE` displays x-axis
 #'   time values formatted as *"hh:mm:ss"* using [format_hmmss()]. Otherwise,
 #'   x-axis values are displayed as numeric.
-#' @param n.breaks A numeric value specifying the number of breaks in both
-#'   x- and y-axes. Default is `5`.
 #' @param na.omit Logical. Default is `FALSE`. If `TRUE` omits missing (`NA`)
 #'   and non-finite `c(Inf, -Inf, NaN)` from display.
 #' @param ... Additional arguments.
@@ -22,8 +20,9 @@
 #' single data frame and displayed as faceted panels via
 #' [ggplot2::facet_wrap()].
 #'
-#' Arguments in `...` are currently passed to [ggplot2::facet_wrap()]
-#' formals, such as `nrow`, `ncol`, and `scales` for more precise control.
+#' Accepts some arguments in `...`, such as `nrow`, `ncol`, and `scales` 
+#' passed to [ggplot2::facet_wrap()]. `n.breaks` overrides the default number
+#' of y-axis breaks. `breaks` overrides the x-axis breaks directly.
 #'
 #' @returns A [ggplot2][ggplot2::ggplot()] object.
 #'
@@ -53,7 +52,6 @@ plot.mnirs <- function(
     x,
     points = FALSE,
     time_labels = FALSE,
-    n.breaks = 5,
     na.omit = FALSE,
     ...
 ) {
@@ -75,10 +73,12 @@ plot.mnirs <- function(
     } else {
         ggplot2::waiver()
     }
-    x_breaks <- if (time_labels) {
-        breaks_timespan(n = n.breaks)
+    x_breaks <- if (!is.null(args[["breaks"]])) {
+        args[["breaks"]]
+    } else if (time_labels) {
+        breaks_timespan()
     } else if (rlang::is_installed("scales")) {
-        scales::breaks_pretty(n = n.breaks)
+        scales::breaks_pretty()
     } else {
         ggplot2::waiver()
     }
@@ -88,7 +88,7 @@ plot.mnirs <- function(
         ggplot2::waiver()
     }
     y_breaks <- if (rlang::is_installed("scales")) {
-        scales::breaks_pretty(n = n.breaks)
+        scales::breaks_pretty(n = args[["n.breaks"]] %||% 5)
     } else {
         ggplot2::waiver()
     }
@@ -120,22 +120,22 @@ plot.mnirs <- function(
         ch_aes <- ggplot2::aes(y = .data[[ch]], colour = ch)
         c(
             list(ggplot2::geom_line(ch_aes, data = ch_data)),
-            if (points) list(
-                ggplot2::geom_point(ch_aes, data = ch_data, size = 3)
-            )
+            if (points) {
+                list(ggplot2::geom_point(ch_aes, data = ch_data, size = 3))
+            }
         )
     })
 
     ## facet when plotting multiple mnirs data frames
-    if (".id" %in% names(x)) {
+    if ("interval" %in% names(x)) {
         facet_args <- intersect(
-            names(args),
-            names(formals(ggplot2::facet_wrap))
+            names(args), names(formals(ggplot2::facet_wrap))
         )
+        scales_arg <- args[["scales"]] %||% "free_x"
         plot <- plot + do.call(
             ggplot2::facet_wrap,
             c(
-                list(facets = ~.id, scales = args[["scales"]] %||% "free_x"),
+                list(facets = ~interval, scales = scales_arg),
                 args[setdiff(facet_args, "scales")]
             )
         )
@@ -203,14 +203,14 @@ as_plot_data <- function(x) {
         .df
     })
 
-    ## add .id column to each element, then row-bind
+    ## add interval column to each element, then row-bind
     x <- Map(\(.df, .nm) {
-        .df[[".id"]] <- .nm
+        .df[["interval"]] <- .nm
         .df
     }, x, names(x))
     plot_data <- do.call(rbind, unname(x))
-    plot_data[[".id"]] <- factor(
-        plot_data[[".id"]], levels = unique(plot_data[[".id"]])
+    plot_data[["interval"]] <- factor(
+        plot_data[["interval"]], levels = unique(plot_data[["interval"]])
     )
     attr(plot_data, "nirs_channels") <- nirs_channels
     attr(plot_data, "time_channel") <- time_channels[[1L]]

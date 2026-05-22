@@ -233,13 +233,13 @@ test_that("as_plot_data unwraps single-element list", {
     expect_identical(result, x)
 })
 
-test_that("as_plot_data row-binds named list with .id factor", {
+test_that("as_plot_data row-binds named list with interval factor", {
     a <- mock_mnirs()
     b <- mock_mnirs()
     result <- as_plot_data(list(pre = a, post = b))
-    expect_true(".id" %in% names(result))
-    expect_s3_class(result[[".id"]], "factor")
-    expect_equal(levels(result[[".id"]]), c("pre", "post"))
+    expect_true("interval" %in% names(result))
+    expect_s3_class(result[["interval"]], "factor")
+    expect_equal(levels(result[["interval"]]), c("pre", "post"))
     expect_equal(nrow(result), nrow(a) + nrow(b))
     expect_equal(attr(result, "time_channel"), "time")
     expect_equal(attr(result, "nirs_channels"), c("HHb", "O2Hb"))
@@ -249,7 +249,7 @@ test_that("as_plot_data auto-names unnamed list with sequential integers", {
     a <- mock_mnirs()
     b <- mock_mnirs()
     result <- as_plot_data(list(a, b))
-    expect_equal(levels(result[[".id"]]), c("interval_1", "interval_2"))
+    expect_equal(levels(result[["interval"]]), c("interval_1", "interval_2"))
 })
 
 test_that("as_plot_data unions nirs_channels across elements", {
@@ -297,25 +297,6 @@ test_that("time_labels controls x-axis name and formatting", {
     p2 <- plot(x, time_labels = TRUE)
     expect_equal(p2$labels$x, "time (h:mm:ss)")
     expect_false(ggplot2::is_waiver(p2$scales$get_scales("x")$labels))
-})
-
-test_that("n.breaks controls number of breaks", {
-    x <- mock_mnirs()
-
-    # Extract breaks by building plot
-    get_breaks <- function(p, axis = "x") {
-        built <- ggplot2::ggplot_build(p)
-        built$layout$panel_params[[1]]$x$breaks
-    }
-
-    p1 <- plot(x, n.breaks = 3)
-    p2 <- plot(x, n.breaks = 10)
-
-    breaks1 <- get_breaks(p1)
-    breaks2 <- get_breaks(p2)
-
-    # More n should generally produce more breaks
-    expect_true(length(breaks2) >= length(breaks1))
 })
 
 test_that("plot.mnirs groups and facets", {
@@ -429,6 +410,47 @@ test_that("plot.mnirs() returns ggplot2 warnings for missing values", {
         warning = \(w) conditionMessage(w)
     )
     expect_match(w, "Removed.*containing missing")
+})
+
+test_that("n.breaks overrides y-axis break count", {
+    skip_if_not_installed("scales")
+    x <- mock_mnirs()
+
+    ## default n = 5
+    p_default <- plot(x)
+    y_breaks_default <- p_default$scales$get_scales("y")$breaks
+    expect_type(y_breaks_default, "closure")
+
+    ## n.breaks alters break count on built scale
+    p_custom <- plot(x, n.breaks = 10)
+    built <- ggplot2::ggplot_build(p_custom)
+    built_default <- ggplot2::ggplot_build(p_default)
+    y_breaks_custom <- built$layout$panel_params[[1L]]$y$breaks
+    y_breaks_def <- built_default$layout$panel_params[[1L]]$y$breaks
+    expect_gt(
+        length(y_breaks_custom[!is.na(y_breaks_custom)]),
+        length(y_breaks_def[!is.na(y_breaks_def)])
+    )
+})
+
+test_that("breaks overrides x-axis breaks directly", {
+    x <- mock_mnirs()
+    custom <- seq(2.1, 8.4, 2.1)
+
+    p <- plot(x, breaks = custom)
+    built <- ggplot2::ggplot_build(p)
+    x_breaks <- built$layout$panel_params[[1L]]$x$breaks
+    expect_equal(x_breaks[!is.na(x_breaks)], custom)
+})
+
+test_that("breaks overrides x-axis with time_labels = TRUE", {
+    x <- mock_mnirs()
+    custom <- seq(2.1, 8.4, 2.1)
+
+    p <- plot(x, time_labels = TRUE, breaks = custom)
+    built <- ggplot2::ggplot_build(p)
+    x_breaks <- built$layout$panel_params[[1L]]$x$breaks
+    expect_equal(x_breaks[!is.na(x_breaks)], custom)
 })
 
 test_that("plot.mnirs moxy.perfpro works", {

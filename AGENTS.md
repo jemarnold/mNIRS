@@ -331,7 +331,7 @@ response_time(x, t = seq_along(x), t0 = 0, fraction = 0.5,
 ### 3.8 Plot and Print
 
 ```r
-plot.mnirs(x, points = FALSE, time_labels = FALSE, n.breaks = 5, na.omit = FALSE)
+plot.mnirs(x, points = FALSE, time_labels = FALSE, na.omit = FALSE)
 ## requires {ggplot2}; called via plot(data); returns ggplot2 object
 ## na.omit = TRUE connects lines across NAs
 
