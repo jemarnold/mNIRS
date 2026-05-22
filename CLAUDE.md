@@ -10,15 +10,19 @@
 - Input validation lives in [R/validate_mnirs.R](R/validate_mnirs.R).
 - Don't run devtool commands.
 - Don't search for or read previous git commits, only look at current state.
-- Don't run git commands which will change the current state.
 
 ## Formatting
 
 - 80-character per line limit.
-- Comments: `## lower case comment`.
-- Comments: briefly explain the purpose of the operation
-- Comments: don't describe refactoring changes or reference prompt decisions.
 - Use explicit `return()` for custom functions.
+
+## Comments/annotations
+- `## lower case comment`.
+- Briefly explain the purpose of the operation
+- Focus on user-facing information. Write for the caller, not the implementer.
+- Focus on the 'what' and 'why', not the 'how' when annotating code
+- Don't describe refactoring changes or reference prompt decisions.
+- Balance jargon and technical language so both a novice and an expert R user will be able to understand well.
 
 ### Documentation
 

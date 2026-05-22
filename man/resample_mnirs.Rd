@@ -46,7 +46,7 @@ missing samples with the most recent valid non-\code{NA} value to the left,
 or the nearest valid value to the right for leading \code{NA}s. Safe for
 numeric, integer, and character columns.}
 \item{\code{"linear"}}{Fills new and missing samples via linear interpolation
-using \code{\link[stats:approxfun]{stats::approx()}}. Suitable for numeric columns only; non-numeric
+using \code{\link[stats:approx]{stats::approx()}}. Suitable for numeric columns only; non-numeric
 columns will fall back to \code{"locf"} behaviour.}
 }}
 
@@ -63,7 +63,7 @@ Up- or down-sample an \emph{"mnirs"} data frame to a new sample rate, filling
 new samples via nearest-neighbour matching or interpolation.
 }
 \details{
-This function uses \code{\link[=replace_missing]{replace_missing()}} (based on \code{\link[stats:approxfun]{stats::approx()}}) to
+This function uses \code{\link[=replace_missing]{replace_missing()}} (based on \code{\link[stats:approx]{stats::approx()}}) to
 interpolate across new samples in the resampled data range.
 \subsection{Sample rate and time channel}{
 

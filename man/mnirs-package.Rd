@@ -20,5 +20,10 @@ Useful links:
 \author{
 \strong{Maintainer}: Jem Arnold \email{jem.arnold@gmail.com} (\href{https://orcid.org/0000-0003-3908-9447}{ORCID}) [copyright holder]
 
+Authors:
+\itemize{
+  \item Jem Arnold \email{jem.arnold@gmail.com} (\href{https://orcid.org/0000-0003-3908-9447}{ORCID}) [copyright holder]
+}
+
 }
 \keyword{internal}

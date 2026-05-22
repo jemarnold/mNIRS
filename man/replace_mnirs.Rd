@@ -104,13 +104,13 @@ centred on \code{idx}, between
 replacement (see \emph{Details}):
 \describe{
 \item{\code{"linear"}}{Replaces \code{NA}s via linear interpolation (the
-\emph{default}) using \code{\link[stats:approxfun]{stats::approx()}}.}
+\emph{default}) using \code{\link[stats:approx]{stats::approx()}}.}
 \item{\code{"median"}}{Replaces \code{NA}s with the local median of valid
 values within a centred window defined by \code{width} or \code{span}.}
 \item{\code{"locf"}}{\emph{"Last observation carried forward"}. Replaces
 \code{NA}s with the most recent valid value to the left for trailing
 \code{NA}s or to the right for leading \code{NA}s, using
-\code{\link[stats:approxfun]{stats::approx()}}.}
+\code{\link[stats:approx]{stats::approx()}}.}
 \item{\code{"none"}}{Returns \code{NA}s without replacement.}
 }}
 
@@ -215,7 +215,7 @@ replaced by local median).
 
 \subsection{Interpolation with replace_missing()}{
 
-\code{method = "linear"} and \code{method = "locf"} use \code{\link[stats:approxfun]{stats::approx()}} with
+\code{method = "linear"} and \code{method = "locf"} use \code{\link[stats:approx]{stats::approx()}} with
 \code{rule = 2}, so leading \code{NA}s are filled by \emph{"nocb"}
 (\emph{"next observation carried backward"}) and trailing \code{NA}s by \emph{"locf"}.
 
