@@ -79,6 +79,35 @@ test_that("by_label validates input", {
     expect_error(by_label(123), "valid.*character")
 })
 
+test_that("by_label stores ignore_case and fixed", {
+    result <- by_label("start")
+    expect_false(result$ignore_case)
+    expect_false(result$fixed)
+    
+    result <- by_label("start", ignore_case = TRUE, fixed = TRUE)
+    expect_true(result$ignore_case)
+    expect_true(result$fixed)
+})
+
+test_that("by_label validates ignore_case and fixed flags", {
+    ## non-logical
+    expect_error(by_label("a", ignore_case = "yes"), "ignore_case.*TRUE.*FALSE")
+    expect_error(by_label("a", fixed = "yes"), "fixed.*TRUE.*FALSE")
+    ## length != 1
+    expect_error(by_label("a", ignore_case = c(TRUE, FALSE)),
+                 "ignore_case.*TRUE.*FALSE")
+    expect_error(by_label("a", fixed = c(TRUE, FALSE)),
+                 "fixed.*TRUE.*FALSE")
+    ## NA
+    expect_error(by_label("a", ignore_case = NA), "ignore_case.*TRUE.*FALSE")
+    expect_error(by_label("a", fixed = NA), "fixed.*TRUE.*FALSE")
+    ## both invalid — single combined error naming both args
+    expect_error(
+        by_label("a", ignore_case = "yes", fixed = NA),
+        "ignore_case.*fixed.*TRUE.*FALSE"
+    )
+})
+
 test_that("by_lap creates mnirs_interval with correct structure", {
     result <- by_lap(1, 3, 5)
     expect_s3_class(result, "mnirs_interval")
@@ -195,6 +224,55 @@ test_that("find_interval_time errors when no labels match", {
         ),
         "No events detected"
     )
+})
+
+test_that("find_interval_time matches case-insensitively with ignore_case", {
+    time_vec <- seq(0.1, 1, by = 0.1)
+    event_vec <- c("start", rep("", 4), "MID", rep("", 4))
+
+    ## default case-sensitive — "START" must not match "start"
+    expect_error(
+        find_interval_time(by_label("START"), time_vec, event_vec),
+        "No events detected"
+    )
+
+    ## ignore_case = TRUE matches both cases
+    result <- find_interval_time(
+        by_label("START", "mid", ignore_case = TRUE),
+        time_vec,
+        event_vec
+    )
+    expect_equal(result, time_vec[c(1, 6)])
+})
+
+test_that("find_interval_time treats labels as literal with fixed = TRUE", {
+    time_vec <- seq(0.1, 0.4, by = 0.1)
+    event_vec <- c("lap.1", "lapX1", "lap.1", "lapX1")
+
+    ## default regex — "lap.1" matches both "lap.1" and "lapX1"
+    regex_result <- find_interval_time(
+        by_label("lap.1"), time_vec, event_vec
+    )
+    expect_equal(regex_result, time_vec[1:4])
+
+    ## fixed = TRUE — "lap.1" matches only literal "lap.1"
+    fixed_result <- find_interval_time(
+        by_label("lap.1", fixed = TRUE), time_vec, event_vec
+    )
+    expect_equal(fixed_result, time_vec[c(1, 3)])
+})
+
+test_that("find_interval_time fixed = TRUE works with multiple labels", {
+    ## grepl(fixed = TRUE) rejects "a|b" — verifies Reduce path
+    time_vec <- seq(0.1, 0.4, by = 0.1)
+    event_vec <- c("lap.1", "lap.2", "lap.3", "lap.4")
+
+    result <- find_interval_time(
+        by_label("lap.1", "lap.3", fixed = TRUE),
+        time_vec,
+        event_vec
+    )
+    expect_equal(result, time_vec[c(1, 3)])
 })
 
 test_that("find_interval_time resolves laps with position = first", {

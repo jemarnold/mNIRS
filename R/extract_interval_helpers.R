@@ -7,12 +7,18 @@
 #'   \describe{
 #'     \item{`by_time(...)`}{Numeric time values in units of `time_channel`.}
 #'     \item{`by_label(...)`}{Character strings to match in `event_channel`.
-#'     All matching occurrences are returned.}
+#'     Matched as regular expressions by default; see `ignore_case` and
+#'     `fixed`. All matching occurrences are returned.}
 #'     \item{`by_lap(...)`}{Integer lap numbers to match in `event_channel`.
 #'     For `start`, resolves to the first sample of each lap. For `end`,
 #'     resolves to the last sample.}
 #'     \item{`by_sample(...)`}{Integer sample indices (row numbers).}
 #'   }
+#' @param ignore_case For `by_label()`. If `TRUE`, match case-insensitive
+#'   labels. Default `FALSE`.
+#' @param fixed For `by_label()`. If `TRUE`, treat labels as fixed strings
+#'   rather than regular expressions. Useful when labels contain regex
+#'   metacharacters (`.`, `*`, `(`, etc.). Default `FALSE`.
 #'
 #' @details
 #' These helpers can be used explicitly for arguments `start`/`end`, or raw
@@ -53,8 +59,16 @@
 #' ## start by label, end by time
 #' extract_intervals(data, start = by_label("start"), end = by_time(1500))
 #'
+#' ## case-insensitive label match
+#' extract_intervals(data, start = by_label("START", ignore_case = TRUE))
+#'
+#' ## literal-string label match (regex metacharacters treated as text)
+#' data$event[1000] <- "lap.1"
+#' data <- create_mnirs_data(data, event_channel = "event")
+#' extract_intervals(data, start = by_label("lap.1", fixed = TRUE))
+#'
 #' ## multiple intervals by sample index
-#' extract_intervals(data, start = by_sample(1000, 1500), end = by_sample(2000, 2600))
+#' extract_intervals(data, start = by_sample(1000, 1500))
 #'
 #' @export
 by_time <- function(...) {
@@ -69,13 +83,35 @@ by_time <- function(...) {
 
 #' @rdname by_time
 #' @export
-by_label <- function(...) {
+by_label <- function(..., ignore_case = FALSE, fixed = FALSE) {
     by_label <- c(...)
     if (!is.character(by_label) || length(by_label) == 0L) {
-        cli_abort("{.fn by_label} must be a valid {.cls character} vector.")
+        cli_abort(c(
+            "x" = "{.fn by_label} must be a valid {.cls character} vector."
+        ))
     }
+    ## collect any invalid logical flags, report together
+    is_bad_flag <- function(x) {
+        !is.logical(x) || length(x) != 1L || is.na(x)
+    }
+    bad <- c(
+        if (is_bad_flag(ignore_case)) "ignore_case",
+        if (is_bad_flag(fixed)) "fixed"
+    )
+    if (length(bad) > 0L) {
+        cli_abort(c(
+            "x" = "{.fn by_label} {cli::qty(bad)}arg{?s} {.arg {bad}} \\
+            must be {.val {TRUE}} or {.val {FALSE}}."
+        ))
+    }
+
     structure(
-        list(type = "label", by_label = by_label),
+        list(
+            type = "label",
+            by_label = by_label,
+            ignore_case = ignore_case,
+            fixed = fixed
+        ),
         class = "mnirs_interval"
     )
 }
@@ -162,13 +198,18 @@ find_interval_time <- function(
         time = interval$by_time,
         sample = time_vec[interval$by_sample],
         label = {
-            pattern <- paste(interval$by_label, collapse = "|")
-            matches <- which(grepl(pattern, event_vec))
+            ## OR per-label matches; grepl(fixed = TRUE) can't take a|b
+            matches <- which(Reduce(`|`, lapply(interval$by_label, \(.p) {
+                grepl(
+                    .p, event_vec, ignore.case = interval$ignore_case, fixed = interval$fixed
+                )
+            })))
             if (length(matches) == 0L) {
                 cli_abort(c(
                     "x" = "No events detected matching \\
                     {.val {interval$by_label}}.",
-                    "i" = "Must match contents of {.arg event_channel} exactly."
+                    "i" = "Check {.arg event_channel} contents; see \\
+                    {.arg ignore_case} and {.arg fixed} in {.fn by_label}."
                 ))
             }
             time_vec[matches]
