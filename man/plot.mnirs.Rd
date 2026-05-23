@@ -40,7 +40,7 @@ passed to \code{\link[ggplot2:facet_wrap]{ggplot2::facet_wrap()}}. \code{n.break
 of y-axis breaks. \code{breaks} overrides the x-axis breaks directly.
 }
 \examples{
-\dontshow{if (rlang::is_installed(c("ggplot2", "scales"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (rlang::is_installed("ggplot2")) withAutoprint(\{ # examplesIf}
 data <- read_mnirs(
     example_mnirs("train.red"),
     nirs_channels = c(smo2 = "SmO2"),

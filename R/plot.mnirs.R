@@ -26,7 +26,7 @@
 #'
 #' @returns A [ggplot2][ggplot2::ggplot()] object.
 #'
-#' @examplesIf rlang::is_installed(c("ggplot2", "scales"))
+#' @examplesIf rlang::is_installed("ggplot2")
 #' data <- read_mnirs(
 #'     example_mnirs("train.red"),
 #'     nirs_channels = c(smo2 = "SmO2"),
@@ -252,7 +252,7 @@ as_plot_data <- function(x) {
 #'
 #' @seealso [palette_mnirs()], [scale_colour_mnirs()]
 #'
-#' @examplesIf rlang::is_installed(c("ggplot2", "scales"))
+#' @examplesIf rlang::is_installed("ggplot2")
 #' ## plot example data
 #' read_mnirs(
 #'     file_path = example_mnirs("moxy_ramp"),
@@ -395,7 +395,7 @@ palette_mnirs <- function(...) {
 #'
 #' @seealso [theme_mnirs()], [palette_mnirs()]
 #'
-#' @examplesIf rlang::is_installed(c("ggplot2", "scales"))
+#' @examplesIf rlang::is_installed("ggplot2")
 #' ## plot example data
 #' data <- read_mnirs(
 #'     file_path = example_mnirs("moxy_ramp"),
@@ -407,7 +407,7 @@ palette_mnirs <- function(...) {
 #'
 #' ggplot2::ggplot(data, ggplot2::aes(x = time)) +
 #'     theme_mnirs() +
-#'     scale_colour_mnirs(name = NULL) +
+#'     scale_colour_mnirs() +
 #'     ggplot2::geom_line(ggplot2::aes(y = smo2_left, colour = "smo2_left")) +
 #'     ggplot2::geom_line(ggplot2::aes(y = smo2_right, colour = "smo2_right"))
 #'
