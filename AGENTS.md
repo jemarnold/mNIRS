@@ -310,8 +310,7 @@ monoexponential(t, A, B, tau, TD)
 ## 3-parameter equation: `A + (B - A) * (1 - exp(-t / tau))`
 ## 4-parameter equation: `ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))`
 
-nls(x ~ SS_monoexp3(t, A, B, tau), data = df)
-nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = df)
+nls(x ~ SSmonoexp(t, A, B, tau, TD), data = df)
 
 peak_slope(x, t = seq_along(x), width = NULL, span = NULL,
     align = c("centre", "left", "right"),
@@ -402,7 +401,7 @@ format_hmmss(x)              # numeric seconds → "mm:ss" or "h:mm:ss"
 | `R/extract_intervals.R` | `extract_intervals()`, `by_time()`, `by_label()`, `by_lap()`, `by_sample()` |
 | `R/analyse_kinetics.R` | `analyse_kinetics()`, `compute_diagnostics()` |
 | `R/analyse_peak_slope.R` | `peak_slope()`, `rolling_slope()` |
-| `R/analyse_monoexponential.R` | `monoexponential()`, `SS_monoexp3()`, `SS_monoexp4()` |
+| `R/analyse_monoexponential.R` | `monoexponential()`, `SSmonoexp()` |
 | `R/analyse_response_time.R` | `response_time()` |
 | `R/plot.mnirs.R` | `plot.mnirs()`, `theme_mnirs()`, `palette_mnirs()`, scale functions |
 | `R/validate_mnirs.R` | input validation |

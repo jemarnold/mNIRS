@@ -329,6 +329,7 @@ test_that("correct_blood_volume preserves metadata", {
         oxy_channel = "o2hb",
         deoxy_channel = "hhb",
         total_channel = NULL,
+        verbose = FALSE
     )
 
     expect_equal(

@@ -84,9 +84,9 @@ This is useful when a certain event is labelled in `event_channel`, or a list of
 The segment of an mNIRS signal with the steepest slope is often interpreted to represent the point of greatest mismatch between O<sub>2</sub> supply and O<sub>2</sub> demand, such as for muscle OxCap testing. See `?peak_slope` for more details.
 
 
-* `monoexponential()`: specifies the equation for an exponential function. Two self-starting functions are available for non-linear curve fitting; `SS_monoexp4()` fits a 4-parameter monoexponential model, while `SS_monoexp3()` fits a reduced 3-parameter model without a time delay parameter, where monoexponential response is expected to be instantaneous. \
+* `monoexponential()`: specifies the equation for an exponential function. Two self-starting functions are available for non-linear curve fitting; `SSmonoexp()` fits either a 4-parameter monoexponential model, or a reduced 3-parameter model without a time delay parameter, where monoexponential response is expected to be instantaneous. \
 \
-Calling these functions in non-linear curve fitting functions (e.g. `nls()`) will return model coefficients for the three or four parameters. See `?monoexponential` and `?SS_monoexp` for more details.
+Calling these functions in non-linear curve fitting functions (e.g. `nls()`) will return model coefficients for the three or four parameters. See `?monoexponential` and `?SSmonoexp` for more details.
 
 
 
@@ -402,7 +402,7 @@ The rate constant (*k*) is the inverse of the time constant (`k = 1 / tau`) and 
 \
 Often during repeated occlusions after exercise, the first occlusions may not conform to monoexponential behaviour, if the oxygen saturation is too low and limiting to mV̇O<sub>2</sub>. In these cases, a time delay parameter may be required to accurately capture the true monoexponential response. This example protocol was designed to avoid this potential delay and so a time delay parameter was not required.
 
-### `SS_monoexp3()`, `SS_monoexp4()`
+### `SSmonoexp()`
 
 * These self-starting non-linear curve functions allow for optimising monoexponential fit coefficients on existing data, with either a 3- or 4-parameter model using `nls()` or another non-linear optimiser function. They return a model with three or four coefficients and associated fit parameters.
 
@@ -421,7 +421,7 @@ pred_df <- slopes_df |>
     mutate(
         ## apply self-starting monoexp model to each trial
         model = purrr::map(data, \(.df) {
-            nls(slope ~ SS_monoexp3(time, A, B, tau), data = .df)
+            nls(slope ~ SSmonoexp(time, A, B, tau), data = .df)
         }),
         ## return tau coefficient for each trial model
         tau = purrr::map_dbl(model, \(.m) coef(.m)[["tau"]]),

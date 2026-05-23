@@ -71,8 +71,8 @@ test_that("monoexponential() handles zero and negative TD", {
 })
 
 
-## SS_monoexp4() ========================================================
-test_that("SS_monoexp4() converges on known parameters", {
+## SSmonoexp() ========================================================
+test_that("SSmonoexp() converges on known parameters", {
     set.seed(13)
     t <- 1:60
     A_true <- 10
@@ -89,7 +89,7 @@ test_that("SS_monoexp4() converges on known parameters", {
     #     ggplot2::geom_point() #+
         # ggplot2::geom_line(ggplot2::aes(y = y))
 
-    model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
 
     expect_s3_class(model, "nls")
     expect_named(coef(model), c("A", "B", "tau", "TD"))
@@ -109,21 +109,21 @@ test_that("SS_monoexp4() converges on known parameters", {
     )
 })
 
-test_that("SS_monoexp4() handles falling exponentials", {
+test_that("SSmonoexp() handles falling exponentials", {
     set.seed(456)
     t <- 1:60
     x <- monoexponential(t, A = 100, B = 10, tau = 8, TD = 15) +
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
     coefs <- coef(model)
 
     expect_true(coefs[["A"]] > coefs[["B"]])
     expect_s3_class(model, "nls")
 })
 
-test_that("SS_monoexp4() works with short time series", {
+test_that("SSmonoexp() works with short time series", {
     set.seed(789)
     t <- 1:20
     x <- monoexponential(t, A = 10, B = 100, tau = 3, TD = 5) +
@@ -131,26 +131,26 @@ test_that("SS_monoexp4() works with short time series", {
     data <- data.frame(t, x)
 
     expect_no_error(
-        model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+        model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
     )
     expect_s3_class(model, "nls")
 })
 
-test_that("SS_monoexp4() predict() returns correct length", {
+test_that("SSmonoexp() predict() returns correct length", {
     set.seed(202)
     t <- 1:60
     x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
     predictions <- predict(model, data)
 
     expect_length(predictions, nrow(data))
 })
 
-## SS_monoexp3() ========================================================
-test_that("SS_monoexp3() converges on known parameters", {
+## SSmonoexp() ========================================================
+test_that("SSmonoexp() converges on known parameters", {
     set.seed(13)
     t <- 1:60-1
     A_true <- 10
@@ -162,7 +162,7 @@ test_that("SS_monoexp3() converges on known parameters", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
     
-    model <- nls(x ~ SS_monoexp3(t, A, B, tau), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau), data = data)
     
     ## visual check
     # y <- fitted(model)
@@ -187,14 +187,14 @@ test_that("SS_monoexp3() converges on known parameters", {
     expect_disjoint(names(coefs), "TD")
 })
 
-test_that("SS_monoexp3() handles falling exponentials", {
+test_that("SSmonoexp() handles falling exponentials", {
     set.seed(456)
     t <- 1:60
     x <- monoexponential(t, A = 100, B = 10, tau = 8, TD = NULL) +
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SS_monoexp3(t, A, B, tau), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau), data = data)
     coefs <- coef(model)
 
     expect_true(coefs[["A"]] > coefs[["B"]])
@@ -202,7 +202,7 @@ test_that("SS_monoexp3() handles falling exponentials", {
     expect_disjoint(names(coefs), "TD")
 })
 
-test_that("SS_monoexp3() handles data with TD near zero", {
+test_that("SSmonoexp() handles data with TD near zero", {
     set.seed(101)
     t <- 1:60
     x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 1) +
@@ -213,9 +213,9 @@ test_that("SS_monoexp3() handles data with TD near zero", {
     #     theme_mnirs() +
     #     ggplot2::geom_point()
 
-    ## TODO SS_monoexp4() fails for this test. Would a better initialisation succeed?
+    ## TODO SSmonoexp4() fails for this test. Would a better initialisation succeed?
     expect_no_error(
-        model <- nls(x ~ SS_monoexp3(t, A, B, tau), data = data)
+        model <- nls(x ~ SSmonoexp(t, A, B, tau), data = data)
     )
 
     expect_s3_class(model, "nls")
@@ -224,7 +224,7 @@ test_that("SS_monoexp3() handles data with TD near zero", {
 })
 
 ## OxCap modelling ===================================================
-test_that("SS_monoexp3() handles OxCap with few data points same as SSasymp", {
+test_that("SSmonoexp() handles OxCap with few data points same as SSasymp", {
     # fmt: skip
     df <- data.frame(
         time = c(
@@ -239,7 +239,7 @@ test_that("SS_monoexp3() handles OxCap with few data points same as SSasymp", {
 
     expect_no_error(
         model <- nls(
-            slope ~ SS_monoexp3(time, A, B, tau),
+            slope ~ SSmonoexp(time, A, B, tau),
             data = df,
         )
     )
@@ -267,7 +267,7 @@ test_that("SS_monoexp3() handles OxCap with few data points same as SSasymp", {
     ))
 })
 
-test_that("SS_monoexp3() handles OxCap with few data points better than SSasymp", {
+test_that("SSmonoexp() handles OxCap with few data points better than SSasymp", {
     # fmt: skip
     df <- data.frame(
         time = c(0, 15.9, 30.9, 46, 60.9, 76, 91.5, 106.3, 121.2, 136.2, 151, 
@@ -280,7 +280,7 @@ test_that("SS_monoexp3() handles OxCap with few data points better than SSasymp"
 
     expect_no_error(
         model <- nls(
-            slope ~ SS_monoexp3(time, A, B, tau),
+            slope ~ SSmonoexp(time, A, B, tau),
             data = df,
         )
     )
@@ -554,7 +554,7 @@ test_that("analyse_monoexponential() falls back from 4-param to 3-param", {
             use_time_delay = TRUE,
             verbose = TRUE
         ),
-        "SS_monoexp4.*fit failed"
+        "SSmonoexp.*fit failed"
     )
 
     ## should still return a valid result via 3-param fallback
@@ -670,7 +670,7 @@ test_that("fix_coefs() fixes single parameter correctly", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
     model_fixed <- fix_coefs(model, TD = 15)
 
     expect_s3_class(model_fixed, "nls")
@@ -691,7 +691,7 @@ test_that("fix_coefs() fixes multiple parameters", {
     #     theme_mnirs() +
     #     ggplot2::geom_point()
 
-    model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
     model_fixed <- fix_coefs(
         model,
         A = 10,
@@ -713,7 +713,7 @@ test_that("fix_coefs() errors when all parameters fixed", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
 
     expect_error(
         fix_coefs(
@@ -734,7 +734,7 @@ test_that("fix_coefs() warns for invalid parameter names", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
 
     expect_warning(
         fix_coefs(model, INVALID = 99, verbose = TRUE),
@@ -753,7 +753,7 @@ test_that("fix_coefs() accepts explicit data argument", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
 
     expect_no_error(
         model_fixed <- fix_coefs(model, TD = 15, data = data)
@@ -768,7 +768,7 @@ test_that("fix_coefs() predictions differ from original model", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
     model_fixed <- fix_coefs(model, TD = 20, data = data, verbose = FALSE)
 
     pred_orig <- predict(model, data)
@@ -787,7 +787,7 @@ test_that("extract model coefs", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
     tau <- coef(model)[["tau"]]
     expect_true(all.equal(tau, 8, tolerance = 1, scale = 1))
 

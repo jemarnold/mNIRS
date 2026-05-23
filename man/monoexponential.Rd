@@ -29,8 +29,7 @@ predictor variable \code{t}.
 \description{
 Calculate a 3- or 4-parameter monoexponential curve. This is the model
 family fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "monoexponential"},
-and by \code{\link[stats:nls]{stats::nls()}} via the self-starting wrappers \code{\link[=SS_monoexp3]{SS_monoexp3()}} and
-\code{\link[=SS_monoexp4]{SS_monoexp4()}}.
+and by \code{\link[stats:nls]{stats::nls()}} via the self-starting wrapper \code{\link[=SSmonoexp]{SSmonoexp()}}.
 }
 \details{
 \subsection{Model equations}{
@@ -47,20 +46,17 @@ time \code{MRT = TD + tau} and the half-response time \code{HRT = TD + tau * log
 }
 }
 \examples{
+## create an exponential curve with random noise
 set.seed(13)
 t <- 1:60
-
-## create an exponential curve with random noise
 x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
     rnorm(length(t), 0, 3)
 data <- data.frame(t, x)
 
-model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
-
+model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
 model
 
 y <- predict(model, data)
-
 y
 
 \donttest{
@@ -74,6 +70,6 @@ y
 
 }
 \seealso{
-\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=SS_monoexp3]{SS_monoexp3()}}, \code{\link[=SS_monoexp4]{SS_monoexp4()}},
-\code{\link[=response_time]{response_time()}}, \code{\link[=peak_slope]{peak_slope()}}
+\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=SSmonoexp]{SSmonoexp()}}, \code{\link[=response_time]{response_time()}},
+\code{\link[=peak_slope]{peak_slope()}}
 }

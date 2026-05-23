@@ -138,8 +138,8 @@
 #' Aliases: `method = c("monoexp", "exponential", "tau", "MRT")`.
 #'
 #' A parametric approach fitting a self-starting monoexponential function to
-#' the response curve using [stats::nls()] with [SS_monoexp4()] (4-parameter:
-#' A, B, tau, TD), or [SS_monoexp3()] (3-parameter: A, B, tau).
+#' the response curve using [stats::nls()] with [SSmonoexp()] for either
+#' a 4-parameter (A, B, tau, TD) or 3-parameter (A, B, tau) model.
 #' 
 #' Model equations:
 #'
@@ -150,15 +150,15 @@
 #' derived as the reciprocal (`k = 1 / tau`). The *mean response time* 
 #' `MRT = TD + tau` and the *half-response time* `HRT = TD + tau * log(2)`
 #' can also be derived. See [monoexponential()] for the model family and
-#' [SS_monoexp3()] / [SS_monoexp4()] for self-start initialisation.
+#' [SSmonoexp()] for self-start initialisation.
 #'
 #' Additional arguments (`...`) accepted when `method = "monoexponential"`:
 #'
 #' \describe{
 #'   \item{`use_time_delay`}{Logical; default is `TRUE` to attempt to fit a
-#'       4-parameter [SS_monoexp4()] model with a time delay (`TD`). If the
+#'       4-parameter [SSmonoexp()] model with a time delay (`TD`). If the
 #'       4-parameter fit fails, or if `use_time_delay = FALSE`, fits a
-#'       reduced 3-parameter [SS_monoexp3()] model.}
+#'       reduced 3-parameter model.}
 #'   \item{`...`}{Other arguments passed to [stats::nls()] 
 #'       `<NOT YET IMPLEMENTED>`.} 
 #' }
@@ -469,180 +469,4 @@ analyze_kinetics <- function(
     call <- match.call()
     call[[1L]] <- quote(analyse_kinetics)
     eval(call, envir = parent.frame())
-}
-
-
-
-#' Coerce `data` input to a named list of data frames
-#' @keywords internal
-as_data_list <- function(data) {
-    ## grouped data frame → split by groups
-    if (inherits(data, "grouped_df")) {
-        if (!requireNamespace("dplyr", quietly = TRUE)) {
-            cli_abort(c(
-                "x" = "{.pkg dplyr} is required for grouped data frame input.",
-                "i" = "Install with {.code install.packages(\"dplyr\")}."
-            ))
-        }
-
-        ## refactor grouping variables to order of appearance
-        group_vars <- dplyr::group_vars(data)
-        df_grp <- data |>
-            dplyr::ungroup() |>
-            dplyr::mutate(
-                dplyr::across(dplyr::all_of(group_vars), \(.x) {
-                    factor(.x, levels = unique(.x))
-                })
-            ) |>
-            dplyr::group_by(dplyr::across(dplyr::all_of(group_vars)))
-        keys <- do.call(paste, c(dplyr::group_keys(df_grp), list(sep = "_")))
-        data_list <- dplyr::group_split(df_grp, .keep = TRUE)
-
-        ## copy mnirs metadata down to each df in the list
-        ## ! need to test when a list has been rbinded and has vectors from original list
-        data_list <- lapply(data_list, \(.df) {
-            create_mnirs_data(.df, attributes(data)[mnirs_metadata])
-        })
-        names(data_list) <- keys
-
-        return(data_list)
-    }
-
-    ## single data frame → length-1 list
-    if (is.data.frame(data)) {
-        return(stats::setNames(list(data), "interval_1"))
-    }
-
-    ## list of data frames — validate
-    if (!is.list(data) || !all(vapply(data, is.data.frame, logical(1)))) {
-        cli_abort(
-            "{.arg data} must be a list of data frames, or a single grouped \\
-            or ungrouped data frame."
-        )
-    }
-
-    if (is.null(names(data))) {
-        names(data) <- paste0("interval_", seq_along(data))
-    }
-
-    return(data)
-}
-
-
-
-
-#' Compute model diagnostics
-#'
-#' @param fitted A numeric vector of the predicted values.
-#' @param n_params Integer; number of estimated parameters in the model,
-#'   excluding the intercept (default `1L`). Used to compute `adj_r2`.
-#'   For non-linear models (`"monoexponential"`, `"sigmoidal"`), pass the
-#'   number of free parameters fit by the solver.
-#' @inheritParams peak_slope
-#'
-#' @details
-#' 
-#' ## adj_r2
-#' 
-#' Adjusted `R^2` penalised by `n_params`. Appropriate for OLS linear models;
-#'   interpret with caution for non-linear fits.
-#' 
-#' ## pseudo_r2
-#' 
-#' Squared Pearson correlation between observed and fitted values. Equivalent
-#'   to `R^2` for OLS but well-defined for non-linear and multivariate models.
-#'   Preferred for `"monoexponential"` and `"sigmoidal"` methods.
-#' 
-#' @returns A 1-row `data.frame` with columns `n_obs`, `r2`, `adj_r2`,
-#'   `pseudo_r2`, `rmse`, `snr`, and `cv_rmse`.
-#'
-#' @keywords internal
-compute_diagnostics <- function(
-    x,
-    t,
-    fitted,
-    n_params = 1L,
-    verbose = TRUE
-) {
-    ## ! check redundant validity check
-    complete_cases <- which(is.finite(x) & is.finite(t))
-    x <- x[complete_cases]
-    t <- t[complete_cases]
-    fitted <- fitted[is.finite(fitted)]
-    n_obs <- length(fitted)
-
-    return_na <- data.frame(
-        n_obs = n_obs,
-        r2 = NA_real_,
-        adj_r2 = NA_real_,
-        pseudo_r2 = NA_real_,
-        rmse = NA_real_,
-        snr = NA_real_,
-        cv_rmse = NA_real_
-    )
-
-    if (n_params < 1L || n_obs < 2L) {
-        return(return_na)
-    }
-
-    if (length(x) != length(t) || length(x) != n_obs) {
-        if (verbose) {
-            cli_warn(c(
-                "!" = "{.arg x}, {.arg t}, and {.arg fitted} must be \\
-                {.cls numeric} vectors of equal lengths to return model \\
-                diagnostics."
-            ))
-        }
-        return(return_na)
-    }
-
-    ## residuals
-    resid <- x - fitted
-    ss_res <- sum(resid^2)
-    ss_tot <- sum((x - mean(x))^2)
-
-    ## R²
-    r2 <- if (ss_tot == 0) NA_real_ else 1 - ss_res / ss_tot
-
-    ## adjusted R²: penalised by n_params; valid for OLS linear models
-    adj_r2 <- if (is.na(r2) || n_obs <= (n_params + 1L)) {
-        NA_real_
-    } else {
-        1 - (1 - r2) * (n_obs - 1L) / (n_obs - n_params - 1L)
-    }
-
-    ## pseudo-R²: cor(observed, fitted)² — valid for linear and non-linear
-    ## models; equals R² for OLS, preferred for monoexponential/sigmoidal
-    pseudo_r2 <- if (stats::sd(x) == 0 || stats::sd(fitted) == 0) {
-        NA_real_
-    } else {
-        stats::cor(x, fitted)^2
-    }
-    ## ! confirm redundant r2 and pseudo-r2 for lm and nls?
-
-    ## RMSE
-    rmse <- sqrt(mean(resid^2))
-
-    ## SNR: signal variance to residual variance, in dB
-    var_signal <- ss_tot / (n_obs - 1L)
-    var_resid <- ss_res / (n_obs - 1L)
-    snr <- if (is.na(var_signal) || var_resid == 0) {
-        NA_real_
-    } else {
-        10 * log10(var_signal / var_resid)
-    }
-
-    ## CV-RMSE: RMSE normalised by the absolute mean of observed values
-    x_mean <- mean(x)
-    cv_rmse <- if (x_mean == 0) NA_real_ else rmse / abs(x_mean)
-
-    return(data.frame(
-        n_obs = n_obs,
-        r2 = r2,
-        adj_r2 = adj_r2,
-        pseudo_r2 = pseudo_r2,
-        rmse = rmse,
-        snr = snr,
-        cv_rmse = cv_rmse
-    ))
 }

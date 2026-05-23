@@ -17,7 +17,7 @@ monoexp_init(mCall, data, LHS, ...)
 }
 \value{
 \code{\link[=monoexp_init]{monoexp_init()}}: Initial starting estimates for parameters in the
-model called by \code{\link[=SS_monoexp3]{SS_monoexp3()}} and \code{\link[=SS_monoexp4]{SS_monoexp4()}}.
+model called by \code{\link[=SSmonoexp]{SSmonoexp()}}.
 }
 \description{
 \code{\link[=monoexp_init]{monoexp_init()}}: Returns initial values for the parameters in a \code{selfStart}

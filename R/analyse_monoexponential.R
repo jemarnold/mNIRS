@@ -2,8 +2,7 @@
 #'
 #' Calculate a 3- or 4-parameter monoexponential curve. This is the model
 #' family fit by [analyse_kinetics()] when `method = "monoexponential"`,
-#' and by [stats::nls()] via the self-starting wrappers [SS_monoexp3()] and
-#' [SS_monoexp4()].
+#' and by [stats::nls()] via the self-starting wrapper [SSmonoexp()].
 #'
 #' @param t A numeric vector of the predictor variable; time or sample number.
 #' @param A A numeric parameter for the starting (baseline) value of the
@@ -32,24 +31,21 @@
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
 #'
-#' @seealso [analyse_kinetics()], [SS_monoexp3()], [SS_monoexp4()],
-#'   [response_time()], [peak_slope()]
+#' @seealso [analyse_kinetics()], [SSmonoexp()], [response_time()],
+#'   [peak_slope()]
 #'
 #' @examples
+#' ## create an exponential curve with random noise
 #' set.seed(13)
 #' t <- 1:60
-#'
-#' ## create an exponential curve with random noise
 #' x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
 #'     rnorm(length(t), 0, 3)
 #' data <- data.frame(t, x)
 #'
-#' model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
-#'
+#' model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
 #' model
 #'
 #' y <- predict(model, data)
-#'
 #' y
 #'
 #' \donttest{
@@ -75,12 +71,6 @@ monoexponential <- function(t, A, B, tau, TD = NULL) {
 }
 
 
-#' @keywords internal
-monoexp3 <- function(t, A, B, tau) {
-    A + (B - A) * (1 - exp(-t / tau))
-}
-
-
 #' Initiate self-starting monoexponential model
 #'
 #' [monoexp_init()]: Returns initial values for the parameters in a `selfStart`
@@ -92,7 +82,7 @@ monoexp3 <- function(t, A, B, tau) {
 #' @param ... Additional arguments.
 #'
 #' @returns [monoexp_init()]: Initial starting estimates for parameters in the
-#'   model called by [SS_monoexp3()] and [SS_monoexp4()].
+#'   model called by [SSmonoexp()].
 #'
 #' @keywords internal
 monoexp_init <- function(mCall, data, LHS, ...) {
@@ -151,83 +141,65 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 }
 
 
-#' Self-starting monoexponential models
+#' Self-starting monoexponential model
 #'
-#' [SS_monoexp3()]: Creates initial coefficient estimates for a `selfStart`
-#' model for a 3-parameter [monoexponential()] function (A, B, tau).
+#' Creates initial coefficient estimates for a `selfStart` wrapper around
+#' [monoexponential()], for use with [stats::nls()]. Supports both the
+#' 3-parameter form (A, B, tau) and the 4-parameter form (A, B, tau, TD);
+#' arity is inferred from the formula passed to [stats::nls()].
 #'
 #' @usage
-#' SS_monoexp3(t, A, B, tau)
+#' SSmonoexp(t, A, B, tau, TD)
 #'
 #' @inheritParams monoexponential
 #'
 #' @details
-#' For 3-parameter model: `y ~ SS_monoexp3(t, A, B, tau)`
+#' 3-parameter model: `y ~ SSmonoexp(t, A, B, tau)`
 #'
-#' For 4-parameter model: `y ~ SS_monoexp4(t, A, B, tau, TD)`
+#' 4-parameter model: `y ~ SSmonoexp(t, A, B, tau, TD)`
 #'
-#' The 3-parameter model is recommended for small samples or when no obvious
-#'   time delay exists, as it converges more reliably.
+#' The 3-parameter form is recommended for small samples or when no obvious
+#'   time delay is expected, as it converges more reliably. [stats::nls()] 
+#'   reads the free parameters from the formula right-hand side, so omitting
+#'   `TD` incurs no degrees-of-freedom penalty.
 #'
-#' @returns [SS_monoexp3()] and [SS_monoexp4()]: A numeric vector of predicted
-#'   values the same length as the predictor variable `t`.
+#' @returns A numeric vector of predicted values the same length as the
+#'   predictor variable `t`.
 #'
 #' @seealso [monoexponential()], [stats::nls()], [stats::selfStart()],
-#'   [SSasymp()]
+#'   [stats::SSasymp()]
 #'
 #' @examples
+#' ## create an exponential curve with random noise
 #' set.seed(13)
 #' t <- 1:60
-#'
-#' ## create an exponential curve with random noise
 #' x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
 #'     rnorm(length(t), 0, 3)
 #' data <- data.frame(t, x)
 #'
-#' model <- nls(x ~ SS_monoexp4(t, A, B, tau, TD), data = data)
+#' ## 4-parameter fit
+#' model4 <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+#' model4
 #'
-#' model
+#' ## 3-parameter fit on the same data
+#' model3 <- nls(x ~ SSmonoexp(t, A, B, tau), data = data)
+#' model3
 #'
-#' y <- predict(model, data)
-#'
-#' y
+#' y4 <- predict(model4, data)
+#' y3 <- predict(model3, data)
 #'
 #' \donttest{
 #'     if (requireNamespace("ggplot2", quietly = TRUE)) {
 #'         ggplot2::ggplot(data, ggplot2::aes(t, x)) +
 #'             theme_mnirs() +
 #'             ggplot2::geom_point() +
-#'             ggplot2::geom_line(ggplot2::aes(y = y))
+#'             ggplot2::geom_line(ggplot2::aes(y = y4, colour = "4-param")) + 
+#'             ggplot2::geom_line(ggplot2::aes(y = y3, colour = "3-param"))
 #'     }
 #' }
 #'
-#' @name SS_monoexp
-#' @rdname SS_monoexp
-#' @order 1
 #' @export
-SS_monoexp3 <- selfStart(
-    model = monoexp3,
-    initial = monoexp_init,
-    parameters = c("A", "B", "tau")
-)
-
-
-#' Self-starting monoexponential models
-#'
-#' [SS_monoexp4()] supports a 4-parameter [monoexponential()] function
-#' (A, B, tau, TD).
-#'
-#' @param TD A numeric parameter for the time delay before the onset of
-#'   exponential response, in units of the predictor variable `t`.
-#'
-#' @usage
-#' SS_monoexp4(t, A, B, tau, TD)
-#'
-#' @name SS_monoexp
-#' @rdname SS_monoexp
-#' @order 2
-#' @export
-SS_monoexp4 <- selfStart(
+SSmonoexp <- selfStart(
     model = monoexponential,
     initial = monoexp_init,
     parameters = c("A", "B", "tau", "TD")
@@ -242,9 +214,9 @@ SS_monoexp4 <- selfStart(
 #' [analyse_kinetics()] for user-facing documentation.
 #'
 #' @param use_time_delay Logical; default is `TRUE` to attempt to fit a
-#'   4-parameter [SS_monoexp4()] model (A, B, tau, TD) with a time delay.
-#'   If the 4-parameter fit fails, or if `use_time_delay = FALSE`, fits a
-#'   reduced 3-parameter [SS_monoexp3()] model (A, B, tau).
+#'   4-parameter [SSmonoexp()] model (A, B, tau, TD) with a time delay.
+#'   If the 4-parameter fit fails, or if `use_time_delay = FALSE`, attempts to
+#'   fit a reduced 3-parameter [SSmonoexp()] model (A, B, tau).
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
 #'
@@ -261,8 +233,7 @@ SS_monoexp4 <- selfStart(
 #'   - `"channel_args"`: a `data.frame` with one row per `nirs_channel`
 #'     recording the resolved arguments used.
 #'
-#' @seealso [analyse_kinetics()], [monoexponential()], [SS_monoexp3()],
-#'   [SS_monoexp4()]
+#' @seealso [analyse_kinetics()], [monoexponential()], [SSmonoexp()]
 #'
 #' @keywords internal
 analyse_monoexponential <- function(
@@ -328,20 +299,17 @@ analyse_monoexponential <- function(
     )
 
     ## construct warning messages for fit failure
-    fit_failed_warning <- function(.nirs, n, e, verbose) {
+    fit_failed_warning <- function(.nirs, n_params, e, verbose) {
         if (!verbose) {
             return(invisible(NULL))
         }
         msg <- c(
-            "x" = "{n}-parameter {.fn SS_monoexp{n}} fit failed for \\
+            "x" = "{n_params}-parameter {.fn SSmonoexp} fit failed for \\
             {.field {(.nirs)}} in {.field {interval_names}}.",
             "!" = "{conditionMessage(e)}"
         )
-        if (n == "3") {
-            msg <- c(
-                msg,
-                "i" = "Attempting 3-parameter fit with {.fn SS_monoexp3}."
-            )
+        if (n_params == 4L) {
+            msg <- c(msg, "i" = "Attempting 3-parameter {.fn SSmonoexp} fit.")
         }
         cli_warn(msg)
         return(invisible(NULL))
@@ -369,9 +337,9 @@ analyse_monoexponential <- function(
         model <- NULL
         if (n_params == 4L) {
             model <- tryCatch(
-                stats::nls(.x ~ SS_monoexp4(.t, A, B, tau, TD), fit_data),
+                stats::nls(.x ~ SSmonoexp(.t, A, B, tau, TD), fit_data),
                 error = \(e) {
-                    fit_failed_warning(.nirs, "4", e, verbose)
+                    fit_failed_warning(.nirs, n_params, e, verbose)
                     NULL
                 }
             )
@@ -380,15 +348,15 @@ analyse_monoexponential <- function(
 
         if (n_params == 3L) {
             model <- tryCatch(
-                stats::nls(.x ~ SS_monoexp3(.t, A, B, tau), fit_data),
+                stats::nls(.x ~ SSmonoexp(.t, A, B, tau), fit_data),
                 error = \(e) {
-                    fit_failed_warning(.nirs, "3", e, verbose)
+                    fit_failed_warning(.nirs, n_params, e, verbose)
                     NULL
                 }
             )
         }
 
-        ## ! implement fallback HRT method
+        ## ! implement fallback HRT method?
         if (is.null(model)) {
             return(build_na_results(.nirs, na_coefs, all_args, n_params))
         }
@@ -441,79 +409,4 @@ analyse_monoexponential <- function(
     })
 
     return(build_channel_results(results, nirs_channels, t0, verbose))
-}
-
-
-#' Update a model object with Fixed coefficients
-#'
-#' Re-fit a model with fixed coefficients provided as additional arguments.
-#' Fixed coefficients are not modified when optimising for best fit.
-#'
-#' @param model An existing model object from `lm`, `nls`, `glm`, and others.
-#' @param data An *optional* data frame to supply manually if original data
-#'   frame is unavailable from a different parent environment.
-#' @param ... Named model coefficients to fix.
-#' @inheritParams validate_mnirs
-#'
-#' @details
-#' If no fixed coefficients are supplied, or if a coefficient does not exist
-#'   in the model, the model will be returned unchanged (with a warning).
-#'
-#' The function cannot update if all model coefficients are supplied as fixed,
-#'   and will abort.
-#'
-#' @returns An updated model object with remaining free coefficients.
-#'
-#' @keywords internal
-fix_coefs <- function(model, data = NULL, verbose = TRUE, ...) {
-    current_coefs <- coef(model)
-    fixed_coefs <- list(...)
-    fixed_names <- names(fixed_coefs)
-    current_names <- names(current_coefs)
-
-    ## validate coefs
-    invalid <- setdiff(fixed_names, current_names)
-    if (verbose && length(invalid) > 0) {
-        cli_warn(c(
-            "x" = "Unknown model coefficient{?s}: {.val {invalid}}.",
-            "i" = "Returning model with known coefficients."
-        ))
-    }
-
-    ## extract data from the model environment
-    if (is.null(data)) {
-        data <- tryCatch(
-            eval(model$call$data, envir = environment(stats::formula(model))),
-            error = \(e) {
-                ## fallback: try parent frames
-                eval(model$call$data, envir = parent.frame(3))
-            }
-        )
-
-        if (is.null(data)) {
-            cli_abort(c("x" = "Cannot retrieve original model data frame."))
-        }
-    }
-
-    ## get coef list from model and update in place from fixed coefs
-    ## remove fixed coef from the start list
-    start_coefs <- current_coefs[!current_names %in% fixed_names]
-
-    if (length(start_coefs) == 0) {
-        cli_abort(c(
-            "x" = "Cannot update the model if all parameters are fixed. \\
-            Nothing to estimate."
-        ))
-    }
-
-    ## substitute fixed params into model_formula
-    new_formula <- do.call(substitute, list(stats::formula(model), fixed_coefs))
-
-    ## update the model
-    return(stats::update(
-        model,
-        formula = new_formula,
-        start = start_coefs,
-        data = data
-    ))
 }

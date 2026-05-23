@@ -36,9 +36,9 @@ used.
 }}
 
 \item{use_time_delay}{Logical; default is \code{TRUE} to attempt to fit a
-4-parameter \code{\link[=SS_monoexp4]{SS_monoexp4()}} model (A, B, tau, TD) with a time delay.
-If the 4-parameter fit fails, or if \code{use_time_delay = FALSE}, fits a
-reduced 3-parameter \code{\link[=SS_monoexp3]{SS_monoexp3()}} model (A, B, tau).}
+4-parameter \code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau, TD) with a time delay.
+If the 4-parameter fit fails, or if \code{use_time_delay = FALSE}, attempts to
+fit a reduced 3-parameter \code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau).}
 
 \item{t0}{A numeric value specifying the start of the kinetics response
 in units of \code{time_channel}. Observations where \code{time_channel <= t0}
@@ -88,7 +88,6 @@ curve to each \code{nirs_channel} within a single \emph{"mnirs"} data frame. See
 \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing documentation.
 }
 \seealso{
-\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=monoexponential]{monoexponential()}}, \code{\link[=SS_monoexp3]{SS_monoexp3()}},
-\code{\link[=SS_monoexp4]{SS_monoexp4()}}
+\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=monoexponential]{monoexponential()}}, \code{\link[=SSmonoexp]{SSmonoexp()}}
 }
 \keyword{internal}

@@ -232,8 +232,8 @@ processes available valid samples within the local window.}
 Aliases: \code{method = c("monoexp", "exponential", "tau", "MRT")}.
 
 A parametric approach fitting a self-starting monoexponential function to
-the response curve using \code{\link[stats:nls]{stats::nls()}} with \code{\link[=SS_monoexp4]{SS_monoexp4()}} (4-parameter:
-A, B, tau, TD), or \code{\link[=SS_monoexp3]{SS_monoexp3()}} (3-parameter: A, B, tau).
+the response curve using \code{\link[stats:nls]{stats::nls()}} with \code{\link[=SSmonoexp]{SSmonoexp()}} for either
+a 4-parameter (A, B, tau, TD) or 3-parameter (A, B, tau) model.
 
 Model equations:
 \itemize{
@@ -245,15 +245,15 @@ Model equations:
 derived as the reciprocal (\code{k = 1 / tau}). The \emph{mean response time}
 \code{MRT = TD + tau} and the \emph{half-response time} \code{HRT = TD + tau * log(2)}
 can also be derived. See \code{\link[=monoexponential]{monoexponential()}} for the model family and
-\code{\link[=SS_monoexp3]{SS_monoexp3()}} / \code{\link[=SS_monoexp4]{SS_monoexp4()}} for self-start initialisation.
+\code{\link[=SSmonoexp]{SSmonoexp()}} for self-start initialisation.
 
 Additional arguments (\code{...}) accepted when \code{method = "monoexponential"}:
 
 \describe{
 \item{\code{use_time_delay}}{Logical; default is \code{TRUE} to attempt to fit a
-4-parameter \code{\link[=SS_monoexp4]{SS_monoexp4()}} model with a time delay (\code{TD}). If the
+4-parameter \code{\link[=SSmonoexp]{SSmonoexp()}} model with a time delay (\code{TD}). If the
 4-parameter fit fails, or if \code{use_time_delay = FALSE}, fits a
-reduced 3-parameter \code{\link[=SS_monoexp3]{SS_monoexp3()}} model.}
+reduced 3-parameter model.}
 \item{\code{...}}{Other arguments passed to \code{\link[stats:nls]{stats::nls()}}
 \verb{<NOT YET IMPLEMENTED>}.}
 }
