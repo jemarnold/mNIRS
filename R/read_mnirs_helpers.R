@@ -10,7 +10,7 @@ read_file <- function(file_path) {
     }
 
     ## import data_raw from either excel or csv
-    if (grepl("\\.csv$", file_path, ignore.case = TRUE)) {
+    if (grepl("\\.(csv|tsv|txt)$", file_path, ignore.case = TRUE)) {
         ## sample lines for separator and column count detection
         lines <- readLines(file_path, warn = FALSE)
         nrows <- length(lines)
@@ -28,15 +28,13 @@ read_file <- function(file_path) {
 
         ## read with explicit sep and column count to handle
         ## irregular header rows with fewer columns than data
-        data_raw <- data.frame(
-            data.table::fread(
-                text = lines,
-                header = FALSE,
-                fill = Inf,
-                sep = sep,
-                colClasses = "character",
-            )[-1, ]
-        )
+        data_raw <- data.table::fread(
+            text = lines,
+            header = FALSE,
+            fill = Inf,
+            sep = sep,
+            colClasses = "character",
+        )[-1, ]
     } else if (grepl("\\.xls(x)?$", file_path, ignore.case = TRUE)) {
         ## report error when file is open and cannot be accessed by readxl
         data_raw <- tryCatch(
@@ -49,27 +47,26 @@ read_file <- function(file_path) {
             error = \(e) {
                 if (grepl("cannot be opened", e$message)) {
                     cli_abort(c(
-                        "{e}",
                         "x" = "File cannot be opened.",
-                        "i" = "Check the file is not in use by another \\
-                        application."
+                        "i" = "Check file is not in use by another \\
+                        application.",
+                        "i" = "{e$message}"
                     ))
                 } else {
                     cli_abort(e$message)
                 }
             }
         )
-        data_raw <- data.frame(data_raw)
     } else {
         ## validation: check file types
         cli_abort(c(
-            "i" = "{.arg file_path} = {.path {file_path}}",
             "x" = "Unsupported file type.",
-            "i" = "Only {.var .csv} or {.var .xls(x)} supported."
+            "i" = "{.arg file_path} = {.path {file_path}}",
+            "i" = "Only {.var .csv}, {.var .txt}, and {.var .xls(x)} supported."
         ))
     }
 
-    return(data_raw)
+    return(data.frame(data_raw))
 }
 
 

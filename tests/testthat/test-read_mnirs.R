@@ -133,7 +133,7 @@ test_that("read_file() errors", {
         "File not found"
     )
 
-    temp_file <- tempfile(fileext = ".txt")
+    temp_file <- tempfile(fileext = ".docx")
     writeLines("test", temp_file)
     on.exit(unlink(temp_file))
 

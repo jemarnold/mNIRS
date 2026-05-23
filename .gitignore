@@ -19,3 +19,4 @@ docs
 ^CLAUDE\.md$
 .vscode/
 tests/testthat/Rplots.pdf
+~$*
