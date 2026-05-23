@@ -152,6 +152,14 @@ detect_mnirs_device <- function(data) {
         !is.null(find_row(data_strings[matched_row], .d$pattern, .d$fixed))
     }, names(device_patterns))
 
+    ## require "oxysoft" match for Artinis pattern
+    if (identical(device_name, "Artinis")) {
+        above_strings <- data_strings[seq_len(matched_row)]
+        if (!any(grepl("oxysoft", above_strings, ignore.case = TRUE))) {
+            return(list(nirs_device = NULL, header_row = 1L))
+        }
+    }
+
     return(list(nirs_device = device_name, header_row = matched_row))
 }
 

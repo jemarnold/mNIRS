@@ -246,6 +246,32 @@ test_that("detect_mnirs_device() returns NULL when no match", {
     )
 })
 
+test_that("detect_mnirs_device() requires 'oxysoft' for Artinis match", {
+    ## bare numeric rows match Artinis regex, but no 'oxysoft' above
+    data <- data.frame(
+        V1 = c("some", "1", "2"),
+        V2 = c("header", "2", "3"),
+        V3 = c("info", "3", "4")
+    )
+
+    expect_equal(
+        detect_mnirs_device(data),
+        list(nirs_device = NULL, header_row = 1)
+    )
+
+    ## 'oxysoft' present above numeric row — case-insensitive
+    data <- data.frame(
+        V1 = c("Exported from OxySoft", "more", "1", "2"),
+        V2 = c("v1", "info", "2", "3"),
+        V3 = c("", "", "3", "4")
+    )
+
+    expect_equal(
+        detect_mnirs_device(data),
+        list(nirs_device = "Artinis", header_row = 3)
+    )
+})
+
 
 ## detect_device_channels() ============================================
 test_that("detect_device_channels() returns user channels when provided", {
