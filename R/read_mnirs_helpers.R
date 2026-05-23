@@ -75,48 +75,32 @@ read_file <- function(file_path) {
 device_patterns <- list(
     Artinis = list(
         ## keep `time_channel = NULL` to force `detect_time_channel` message
+        ## also requires matching "oxysoft" string
         time_channel = NULL,
-        nirs_channels = c("2"),
         pattern = "^(\\d+ )+(\\d+|NA) ?$",
         fixed = FALSE
     ),
     Train.Red = list(
-        time_channel = c("Timestamp (seconds passed)"),
-        nirs_channels = c("SmO2"),
+        time_channel = "Timestamp (seconds passed)",
         pattern = c("Timestamp (seconds passed)", "SmO2"),
         fixed = TRUE
     ),
     Moxy = list(
-        time_channel = c("hh:mm:ss"),
-        nirs_channels = c("SmO2 Live"),
+        time_channel = "hh:mm:ss",
         pattern = c("hh:mm:ss", "SmO2 Live"),
         fixed = TRUE
     ),
     VO2master = list(
-        time_channel = c("Time[s]"),
-        nirs_channels = c("SmO2[%]"),
+        time_channel = "Time[s]",
         pattern = c("Time[s]", "SmO2[%]"),
         fixed = TRUE
     ),
+    ## matches `nirs_channels` with "SmO2" below
     PerfPro = list(
-        time_channel = c("Time"),
-        nirs_channels = NULL,
+        time_channel = "Time",
         pattern = c("Time.*SmO2"),
         fixed = FALSE
     )
-)
-
-
-#' Datetime format strings for POSIXct parsing
-#' @keywords internal
-datetime_formats <- c(
-    "%H:%M:%OS",
-    "%Y-%m-%dT%H:%M:%OS",
-    "%Y-%m-%dT%H:%M:%OS%z",
-    "%Y-%m-%d %H:%M:%OS",
-    "%Y/%m/%d %H:%M:%OS",
-    "%d-%m-%Y %H:%M:%OS",
-    "%d/%m/%Y %H:%M:%OS"
 )
 
 
@@ -185,28 +169,36 @@ detect_device_channels <- function(
         ))
     }
 
-    ## need device detection when is.null(nirs_channel)
-    if (is.null(nirs_device)) {
+    ## scan header row for cols starting with "SmO2" ignore case, ignore NA
+    header <- Filter(Negate(is_empty), as.character(data[header_row, ]))
+
+    nirs_channels <- if (identical(nirs_device, "Artinis")) {
+        ## Artinis Oxysoft exports use numeric channel ids, not "SmO2"
+        header[startsWith(header, "2")]
+    } else {
+        header[startsWith(toupper(header), "SMO2")]
+    }
+
+    ## drop redundant unfiltered Train.Red, and Averaged Moxy channels
+    nirs_channels <- nirs_channels[
+        !grepl("unfiltered|Averaged", nirs_channels, ignore.case = TRUE)
+    ]
+
+    if (length(nirs_channels) == 0L) {
         cli_abort(c(
             "x" = "{.arg nirs_channels} cannot be determined automatically.",
             "i" = "Define {.arg nirs_channels} explicitly."
         ))
     }
 
-    ## successfully detected `nirs_device` with `nirs_channels = NULL`
-    ch_list <- device_patterns[[nirs_device]]
-    
-    ## TODO need more robust solution for PerfPro channels
-    if (nirs_device == "PerfPro") {
-        ch_list$nirs_channels <- Find(\(.x) {
-            startsWith(.x, "SmO2")
-        }, data[header_row, ])
-    }
-    
+    ## check for NULL
+    nirs_device <- nirs_device %||% "Unknown"
+
     ch_list <- list(
-        ## user-specified `time_channel` takes priority here
-        time_channel = time_channel %||% ch_list$time_channel,
-        nirs_channels = ch_list$nirs_channels,
+        ## priority: user `time_channel` -> device default -> NULL
+        time_channel = time_channel %||%
+            device_patterns[[nirs_device]]$time_channel,
+        nirs_channels = nirs_channels,
         keep_all = TRUE ## return all cols to view potential nirs_channels
     )
 
@@ -226,8 +218,8 @@ detect_device_channels <- function(
 #' @keywords internal
 read_data_table <- function(
     data,
-    nirs_channels = NULL,
-    header_row = 1L
+    header_row = 1L,
+    nirs_channels = NULL
 ) {
     nrows <- nrow(data)
     ## find the first row where ALL nirs_channels match
@@ -255,6 +247,19 @@ read_data_table <- function(
         data_table = data_table
     ))
 }
+
+
+#' Datetime format strings for POSIXct parsing
+#' @keywords internal
+datetime_formats <- c(
+    "%H:%M:%OS",
+    "%Y-%m-%dT%H:%M:%OS",
+    "%Y-%m-%dT%H:%M:%OS%z",
+    "%Y-%m-%d %H:%M:%OS",
+    "%Y/%m/%d %H:%M:%OS",
+    "%d-%m-%Y %H:%M:%OS",
+    "%d/%m/%Y %H:%M:%OS"
+)
 
 
 #' Extract earliest POSIXct value from file header metadata

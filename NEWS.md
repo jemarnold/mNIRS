@@ -1,3 +1,21 @@
+# mnirs 0.6.5
+
+## `read_mnirs()` automatic channel detection
+
+* `read_mnirs(nirs_channels = NULL)` will now automatically return **all** channels starting with "SmO2" (case insensitive), which is the most common NIRS channel name for wearable mNIRS devices. Previously, only the first detected nirs channel was returned.
+
+## Core function updates
+
+* `extract_intervals()` helper function `by_label()` matches character strings as regular expressions (regex) by default. Now accepts arguments for better handling character strings, which are both `FALSE` be default and must be explicitly opted into:
+
+    * `by_label(ignore_case = TRUE)` ignore case when evaluating strings.
+
+    * `by_label(fixed = TRUE)` treat labels as fixed strings rather than regular expressions. Useful when labels contain regex metacharacters (`.`, `*`, `(`, etc.).
+
+* `plot.mnirs` internal update to pass additional arguments `n.breaks` to y-axis breaks, and `breaks` to x-axis breaks.
+
+* `format_hmmss` can now display fractional seconds values.
+
 # mnirs 0.6.4
 
 ## Bug fix
