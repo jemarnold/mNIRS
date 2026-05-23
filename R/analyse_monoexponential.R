@@ -1,10 +1,10 @@
 #' Monoexponential function
 #'
-#' Calculate a 3- or 4-parameter monoexponential curve. This is the model
-#' family fit by [analyse_kinetics()] when `method = "monoexponential"`,
-#' and by [stats::nls()] via the self-starting wrapper [SSmonoexp()].
+#' Calculate a 3- or 4-parameter monoexponential curve. This model family is
+#' fit by [analyse_kinetics()] when `method = "monoexponential"`, and by
+#' [stats::nls()] via the self-starting wrapper [SSmonoexp()].
 #'
-#' @param t A numeric vector of the predictor variable; time or sample number.
+#' @param t A numeric vector of the predictor variable (time).
 #' @param A A numeric parameter for the starting (baseline) value of the
 #'   response variable.
 #' @param B A numeric parameter for the ending (asymptote) value of the
@@ -88,51 +88,55 @@ monoexponential <- function(t, A, B, tau, TD = NULL) {
 monoexp_init <- function(mCall, data, LHS, ...) {
     ## self-start parameters for nls of monoexponential fit function
     ## uses base R `SSasymp()` initialisation approach
-    xy <- stats::sortedXyData(mCall[["t"]], LHS, data)
-    y <- xy[["y"]]
-    x <- xy[["x"]]
-    n <- length(y)
+    tx <- stats::sortedXyData(mCall[["t"]], LHS, data)
+    x <- tx[["y"]]
+    t <- tx[["x"]]
+    n <- length(x)
 
     ## check if TD parameter exists in the call
     has_TD <- "TD" %in% names(mCall)
 
     ## fit linear model to log-transformed differences from estimated asymptote
-    ## initial asymptote guess from last values
-    n_tail <- max(1, ceiling(n / 5))
-    B_init <- mean(y[seq(n - n_tail + 1, n)])
-
-    ## initial baseline from first values
-    n_head <- max(1, ceiling(n / 5))
-    A_init <- mean(y[seq_len(n_head)])
+    ## asymptotes from 1/5 response signal
+    n_asymp <- max(1, ceiling(n / 5))
+    A_init <- mean(x[seq_len(n_asymp)])
+    B_init <- mean(x[seq(n - n_asymp + 1, n)])
 
     ## estimate rate constant via linearisation (SSasymp method)
-    ## log(B - y) ~ log(B - A) - t/tau
-    ## use shifted y to avoid log of negative/zero
-    y_shifted <- B_init - y
-    y_shifted[y_shifted <= 0] <- min(y_shifted[y_shifted > 0]) / 2
+    ## sign +ve for upward (B > A); -ve for downward (B < A).
+    ## linearised: log(sign * (B - x)) ~ log(B - A) - t/tau,
+    #! doesn't work as well on current tests as current implementation
+    # x_shifted <- sign(B_init - A_init) * (B_init - x)
 
-    if (sum(y_shifted > 0) >= 3) {
-        lm_fit <- stats::lm(log(y_shifted) ~ x)
+    ## estimate rate constant via linearisation (SSasymp method)
+    ## log(B - x) ~ log(B - A) - t/tau
+    ## use shifted x to avoid log of negative/zero
+    x_shifted <- B_init - x
+    x_pos <- x_shifted > 0
+    x_shifted[!x_pos] <- min(x_shifted[x_pos]) / 2
+
+    if (sum(x_pos) >= 3) {
+        lm_fit <- stats::lm(log(x_shifted) ~ t)
         rate <- -coef(lm_fit)[2L]
         tau_init <- if (is.finite(rate) && rate > 0) {
             1 / rate
         } else {
-            diff(range(x)) / 3
+            diff(range(t)) / 3
         }
     } else {
-        ## fallback: tau from 63.2% rise point
+        ## fallback: tau from 63.2% rise point (sign agnostic)
         target <- A_init + 0.632 * (B_init - A_init)
-        tau_init <- x[which.min(abs(y - target))]
-        tau_init <- max(tau_init, diff(range(x)) / 10)
+        tau_init <- t[which.min(abs(x - target))]
+        tau_init <- max(tau_init, diff(range(t)) / 10)
     }
 
     tau_init <- max(tau_init, .Machine$double.eps)
 
     if (has_TD) {
         ## 4-parameter: estimate time delay from derivative changepoint
-        dy_dx <- abs(diff(y) / diff(x))
-        td_idx <- which.max(dy_dx)
-        TD_init <- max(x[td_idx] - tau_init * 0.1, 0)
+        dx_dt <- abs(diff(x) / diff(t))
+        td_idx <- which.max(dx_dt)
+        TD_init <- max(t[td_idx] - tau_init * 0.1, 0)
         return(c(A = A_init, B = B_init, tau = tau_init, TD = TD_init))
     } else {
         ## 3-parameter: no time delay
@@ -154,9 +158,9 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #' @inheritParams monoexponential
 #'
 #' @details
-#' 3-parameter model: `y ~ SSmonoexp(t, A, B, tau)`
+#' 3-parameter model: `x ~ SSmonoexp(t, A, B, tau)`
 #'
-#' 4-parameter model: `y ~ SSmonoexp(t, A, B, tau, TD)`
+#' 4-parameter model: `x ~ SSmonoexp(t, A, B, tau, TD)`
 #'
 #' The 3-parameter form is recommended for small samples or when no obvious
 #'   time delay is expected, as it converges more reliably. [stats::nls()] 

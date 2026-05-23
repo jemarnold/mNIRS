@@ -205,8 +205,7 @@ test_that("SSmonoexp() handles falling exponentials", {
 test_that("SSmonoexp() handles data with TD near zero", {
     set.seed(101)
     t <- 1:60
-    x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 1) +
-        rnorm(length(t), 0, 3)
+    x <- monoexponential(t, 10, 100, 8, 1) + rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
     # ggplot2::ggplot(data, ggplot2::aes(t, x)) +
