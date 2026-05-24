@@ -46,7 +46,6 @@
 #' model
 #'
 #' y <- predict(model, data)
-#' y
 #'
 #' \donttest{
 #'     if (requireNamespace("ggplot2", quietly = TRUE)) {
