@@ -17,7 +17,7 @@
 #'      \item{`"monoexponential"`}{Monoexponential curve fit via
 #'      [stats::nls()]. Additional arguments: `use_time_delay`. See
 #'      [monoexponential()].}
-#'      \item{`"sigmoidal"`}{`<under development>`.}
+#'      \item{`"logistic"`}{`<under development>`.}
 #'   }
 #' @param t0 A numeric value specifying the start of the kinetics response
 #'   in units of `time_channel`. Observations where `time_channel <= t0`
@@ -163,11 +163,39 @@
 #'       `<NOT YET IMPLEMENTED>`.} 
 #' }
 #'
-#' ## method = "sigmoidal"
+#' ## method = "logistic"
 #'
-#' Aliases: `method = c("logistic", "xmid")`.
+#' Aliases: `method = c("sigmoidal", "xmid")`.
 #'
-#' `<under development>`.
+#' A parametric approach fitting a self-starting logistic function to the
+#' response curve using [stats::nls()] with [SSlogistic()] for either a
+#' 5-parameter (A, B, xmid, slope, asym) or 4-parameter symmetric
+#' (A, B, xmid, slope) model.
+#'
+#' Model equations:
+#'
+#' - 4-parameter: `A + (B - A) / (1 + exp(-4 * slope * (t - xmid) / (B - A)))`
+#' - 5-parameter: Richards re-parameterisation so `asym` is the
+#'   inflection-height fraction `(y(xmid) - A) / (B - A)`, bounded in
+#'   `(0, 1)`. `asym = 0.5` collapses to the 4-parameter symmetric form.
+#'
+#' `xmid` is the time at the inflection (steepest) point of the response,
+#' reported relative to `t0`. `slope` is the response rate `dx/dt` at the
+#' inflection. `asym` is the inflection-height fraction; values `< 0.5`
+#' indicate an early-acceleration curve and `> 0.5` a late-acceleration
+#' curve. See [logistic()] for the model family and [SSlogistic()] for
+#' self-start initialisation.
+#'
+#' Additional arguments (`...`) accepted when `method = "logistic"`:
+#'
+#' \describe{
+#'   \item{`use_asym`}{Logical; default is `TRUE` to attempt to fit a
+#'       5-parameter [SSlogistic()] model with an asymmetry parameter
+#'       (`asym`). If the 5-parameter fit fails, or if `use_asym = FALSE`,
+#'       fits a reduced 4-parameter symmetric model.}
+#'   \item{`...`}{Other arguments passed to [stats::nls()]
+#'       `<NOT YET IMPLEMENTED>`.}
+#' }
 #'
 #' ## Per-channel argument overrides
 #'
@@ -256,7 +284,7 @@ analyse_kinetics <- function(
     data,
     nirs_channels = NULL,
     time_channel = NULL,
-    method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
+    method = c("response_time", "peak_slope", "monoexponential", "logistic"),
     t0 = NULL,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
@@ -284,8 +312,8 @@ analyse_kinetics <- function(
         ignore.case = TRUE
     )
     method <- gsub(
-        "^logistic$|^xmid$",
-        "sigmoidal",
+        "^sigmoidal$|^xmid$",
+        "logistic",
         method,
         ignore.case = TRUE
     )
@@ -453,12 +481,62 @@ analyse_kinetics.monoexponential <- function(
 
 
 #' @rdname analyse_kinetics
+#' @usage NULL
+#' @export
+analyse_kinetics.logistic <- function(
+    data,
+    nirs_channels = NULL,
+    time_channel = NULL,
+    method,
+    t0 = NULL,
+    direction = c("auto", "positive", "negative"),
+    end_fit_span = Inf,
+    channel_args = list(),
+    verbose = TRUE,
+    ...
+) {
+    ## ! implement stats::nls() additional args
+    ## ! implement `direction`
+    args <- list(...)
+    ## normalise input to named list of data frames
+    data_list <- as_data_list(data)
+
+    ## iterate over each interval
+    result_list <- lapply(seq_along(data_list), \(.i) {
+        result <- analyse_logistic(
+            data = data_list[[.i]],
+            nirs_channels = !!enquo(nirs_channels),
+            time_channel = !!enquo(time_channel),
+            use_asym = args$use_asym %||% TRUE,
+            end_fit_span = end_fit_span,
+            channel_args = channel_args,
+            verbose = verbose,
+            interval_names = names(data_list),
+            bypass_checks = TRUE
+        )
+
+        result$interval <- names(data_list)[[.i]]
+        result
+    })
+
+    ## collate and return mnirs_kinetics object
+    return(build_kinetics_results(
+        data_list,
+        result_list,
+        names(data_list),
+        method = "logistic",
+        match.call()
+    ))
+}
+
+
+#' @rdname analyse_kinetics
 #' @export
 analyze_kinetics <- function(
     data,
     nirs_channels = NULL,
     time_channel = NULL,
-    method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
+    method = c("response_time", "peak_slope", "monoexponential", "logistic"),
     t0 = NULL,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,

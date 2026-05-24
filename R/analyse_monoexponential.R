@@ -340,7 +340,7 @@ analyse_monoexponential <- function(
         model <- NULL
         if (n_params == 4L) {
             model <- tryCatch(
-                stats::nls(.x ~ SSmonoexp(.t, A, B, tau, TD), fit_data),
+                nls(.x ~ SSmonoexp(.t, A, B, tau, TD), fit_data),
                 error = \(e) {
                     fit_failed_warning(.nirs, n_params, e, verbose)
                     NULL
@@ -351,7 +351,7 @@ analyse_monoexponential <- function(
 
         if (n_params == 3L) {
             model <- tryCatch(
-                stats::nls(.x ~ SSmonoexp(.t, A, B, tau), fit_data),
+                nls(.x ~ SSmonoexp(.t, A, B, tau), fit_data),
                 error = \(e) {
                     fit_failed_warning(.nirs, n_params, e, verbose)
                     NULL

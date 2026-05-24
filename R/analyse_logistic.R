@@ -52,10 +52,10 @@
 #'
 #' @examples
 #' ## create a logistic curve with random noise
-#' set.seed(13)
+#' set.seed(15)
 #' t <- 1:60
 #' x <- logistic(t, A = 10, B = 100, xmid = 30, slope = 4, asym = 0.3) +
-#'     rnorm(length(t), 0, 3)
+#'     rnorm(length(t), 0, 2)
 #' data <- data.frame(x, t)
 #'
 #' model <- nls(x ~ SSlogistic(t, A, B, xmid, slope, asym), data = data)
@@ -219,10 +219,10 @@ logistic_init <- function(mCall, data, LHS, ...) {
 #'
 #' @examples
 #' ## create a logistic curve with random noise
-#' set.seed(13)
+#' set.seed(15)
 #' t <- 1:60
 #' x <- logistic(t, A = 10, B = 100, xmid = 30, slope = 4, asym = 0.3) +
-#'     rnorm(length(t), 0, 3)
+#'     rnorm(length(t), 0, 2)
 #' data <- data.frame(t, x)
 #'
 #' ## 5-parameter fit
@@ -252,3 +252,200 @@ SSlogistic <- selfStart(
     initial = logistic_init,
     parameters = c("A", "B", "xmid", "slope", "asym")
 )
+
+
+#' Analyse logistic kinetics across NIRS channels
+#'
+#' Internal channel-level dispatch for
+#' `analyse_kinetics(method = "logistic")`. Fits a logistic curve to each
+#' `nirs_channel` within a single *"mnirs"* data frame. See
+#' [analyse_kinetics()] for user-facing documentation.
+#'
+#' @param use_asym Logical; default is `TRUE` to attempt to fit a 5-parameter
+#'   [SSlogistic()] model (A, B, xmid, slope, asym) with an asymmetry
+#'   parameter. If the 5-parameter fit fails, or if `use_asym = FALSE`,
+#'   attempts to fit a reduced 4-parameter symmetric [SSlogistic()] model
+#'   (A, B, xmid, slope).
+#' @inheritParams validate_mnirs
+#' @inheritParams analyse_kinetics
+#'
+#' @returns A `data.frame` with one row per `nirs_channel` and columns
+#'   `nirs_channels`, `A`, `B`, `xmid`, `slope`, `asym`, `xmid_fitted`.
+#'   Per-channel metadata are attached as attributes:
+#'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
+#'     where fitting failed.
+#'   - `"fitted_data"`: a named list of per-channel data frames with
+#'     columns `window_idx` and `fitted`.
+#'   - `"diagnostics"`: a `data.frame` with one row per `nirs_channel`
+#'     containing model fit diagnostics.
+#'   - `"channel_args"`: a `data.frame` with one row per `nirs_channel`
+#'     recording the resolved arguments used.
+#'
+#' @seealso [analyse_kinetics()], [logistic()], [SSlogistic()]
+#'
+#' @keywords internal
+analyse_logistic <- function(
+    data,
+    nirs_channels = NULL,
+    time_channel = NULL,
+    use_asym = TRUE,
+    t0 = NULL,
+    direction = c("auto", "positive", "negative"),
+    end_fit_span = Inf,
+    channel_args = list(),
+    verbose = TRUE,
+    ...
+) {
+    ## validation ==================================================
+    validate_mnirs_data(data)
+    args <- list(...)
+    direction <- match.arg(direction)
+
+    if (!(args$bypass_checks %||% FALSE)) {
+        if (missing(verbose)) {
+            verbose <- getOption("mnirs.verbose", default = TRUE)
+        }
+    }
+    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
+    time_channel <- validate_time_channel(enquo(time_channel), data)
+    if (!is.logical(use_asym) || length(use_asym) != 1L) {
+        cli_abort(c(
+            "x" = "{.arg use_asym} must be a {.cls logical} \\
+            either {.val {TRUE}} or {.val {FALSE}}."
+        ))
+    }
+    validate_numeric(
+        end_fit_span, 1, c(0, Inf), msg1 = "one-element positive"
+    )
+    time_vec <- data[[time_channel]]
+    t0 <- validate_t0(t0, data, time_vec, verbose)
+    interval_names <- args$interval_names %||% substitute(data)
+
+    default_args <- list(
+        use_asym = use_asym,
+        t0 = t0,
+        direction = direction,
+        end_fit_span = end_fit_span,
+        verbose = verbose,
+        args
+    )
+
+    ## NA scaffold for convergence failure
+    na_coefs <- data.frame(
+        nirs_channels = NA_character_,
+        time_channel = time_channel,
+        A = NA_real_,
+        B = NA_real_,
+        xmid = NA_real_,
+        slope = NA_real_,
+        asym = NA_real_,
+        xmid_fitted = NA_real_
+    )
+
+    ## construct warning messages for fit failure
+    fit_failed_warning <- function(.nirs, n_params, e, verbose) {
+        if (!verbose) {
+            return(invisible(NULL))
+        }
+        msg <- c(
+            "x" = "{n_params}-parameter {.fn SSlogistic} fit failed for \\
+            {.field {(.nirs)}} in {.field {interval_names}}.",
+            "!" = "{conditionMessage(e)}"
+        )
+        if (n_params == 5L) {
+            msg <- c(msg, "i" = "Attempting 4-parameter {.fn SSlogistic} fit.")
+        }
+        cli_warn(msg)
+        return(invisible(NULL))
+    }
+
+    ## process per-channel ============================================
+    results <- lapply(nirs_channels, \(.nirs) {
+        all_args <- utils::modifyList(
+            default_args, channel_args[[.nirs]] %||% list()
+        )
+        ## derive n_params from use_asym for internal use
+        n_params <- if (all_args$use_asym) 5L else 4L
+
+        ## filter for valid finite idx before first extreme + end_fit_span
+        valid <- find_kinetics_idx(
+            data[[.nirs]], time_vec, all_args$end_fit_span, all_args$direction
+        )
+        all_args$direction <- valid$direction
+        x_fit <- data[[.nirs]][valid$idx]
+        t_fit <- time_vec[valid$idx]
+
+        fit_data <- data.frame(.x = x_fit, .t = t_fit)
+
+        ## attempt nls fit on 5-param then fall back to 4-param on failure
+        model <- NULL
+        if (n_params == 5L) {
+            model <- tryCatch(
+                nls(.x ~ SSlogistic(.t, A, B, xmid, slope, asym), fit_data),
+                error = \(e) {
+                    fit_failed_warning(.nirs, n_params, e, verbose)
+                    NULL
+                }
+            )
+            if (is.null(model)) n_params <- 4L
+        }
+
+        if (n_params == 4L) {
+            model <- tryCatch(
+                nls(.x ~ SSlogistic(.t, A, B, xmid, slope), fit_data),
+                error = \(e) {
+                    fit_failed_warning(.nirs, n_params, e, verbose)
+                    NULL
+                }
+            )
+        }
+
+        if (is.null(model)) {
+            return(build_na_results(.nirs, na_coefs, all_args, n_params))
+        }
+
+        fitted_vals <- stats::predict(model)
+        coefs <- stats::coef(model)
+        asym_arg <- if (n_params == 5L) coefs[["asym"]] else NULL
+        asym_val <- asym_arg %||% NA_real_
+        xmid_offset <- coefs[["xmid"]] - t0
+
+        ## predict response at the inflection point xmid
+        xmid_fitted <- logistic(
+            t = coefs[["xmid"]],
+            A = coefs[["A"]],
+            B = coefs[["B"]],
+            xmid = coefs[["xmid"]],
+            slope = coefs[["slope"]],
+            asym = asym_arg
+        )
+
+        coefs <- data.frame(
+            nirs_channels = .nirs,
+            time_channel  = time_channel,
+            A             = coefs[["A"]],
+            B             = coefs[["B"]],
+            xmid          = xmid_offset,
+            slope         = coefs[["slope"]],
+            asym          = asym_val,
+            xmid_fitted   = xmid_fitted
+        )
+
+        diag <- compute_diagnostics(
+            x_fit, t_fit, fitted_vals, n_params, verbose
+        )
+
+        list(
+            coefficients = coefs,
+            model = model,
+            fitted_data = data.frame(
+                window_idx = valid$idx,
+                fitted     = fitted_vals
+            ),
+            diagnostics = cbind(data.frame(nirs_channels = .nirs), diag),
+            channel_args = build_channel_args(.nirs, all_args)
+        )
+    })
+
+    return(build_channel_results(results, nirs_channels, t0, verbose))
+}

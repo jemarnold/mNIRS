@@ -5,6 +5,7 @@
 \alias{analyse_kinetics.response_time}
 \alias{analyse_kinetics.peak_slope}
 \alias{analyse_kinetics.monoexponential}
+\alias{analyse_kinetics.logistic}
 \alias{analyze_kinetics}
 \title{Analyse kinetics across mNIRS channels and intervals}
 \usage{
@@ -12,7 +13,7 @@ analyse_kinetics(
   data,
   nirs_channels = NULL,
   time_channel = NULL,
-  method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
+  method = c("response_time", "peak_slope", "monoexponential", "logistic"),
   t0 = NULL,
   direction = c("auto", "positive", "negative"),
   end_fit_span = Inf,
@@ -25,7 +26,7 @@ analyze_kinetics(
   data,
   nirs_channels = NULL,
   time_channel = NULL,
-  method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
+  method = c("response_time", "peak_slope", "monoexponential", "logistic"),
   t0 = NULL,
   direction = c("auto", "positive", "negative"),
   end_fit_span = Inf,
@@ -63,7 +64,7 @@ arguments: \code{width} or \code{span}, \code{align}, \code{partial}, \code{na.r
 \item{\code{"monoexponential"}}{Monoexponential curve fit via
 \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_time_delay}. See
 \code{\link[=monoexponential]{monoexponential()}}.}
-\item{\code{"sigmoidal"}}{\verb{<under development>}.}
+\item{\code{"logistic"}}{\verb{<under development>}.}
 }}
 
 \item{t0}{A numeric value specifying the start of the kinetics response
@@ -259,11 +260,40 @@ reduced 3-parameter model.}
 }
 }
 
-\subsection{method = "sigmoidal"}{
+\subsection{method = "logistic"}{
 
-Aliases: \code{method = c("logistic", "xmid")}.
+Aliases: \code{method = c("sigmoidal", "xmid")}.
 
-\verb{<under development>}.
+A parametric approach fitting a self-starting logistic function to the
+response curve using \code{\link[stats:nls]{stats::nls()}} with \code{\link[=SSlogistic]{SSlogistic()}} for either a
+5-parameter (A, B, xmid, slope, asym) or 4-parameter symmetric
+(A, B, xmid, slope) model.
+
+Model equations:
+\itemize{
+\item 4-parameter: \code{A + (B - A) / (1 + exp(-4 * slope * (t - xmid) / (B - A)))}
+\item 5-parameter: Richards re-parameterisation so \code{asym} is the
+inflection-height fraction \code{(y(xmid) - A) / (B - A)}, bounded in
+\verb{(0, 1)}. \code{asym = 0.5} collapses to the 4-parameter symmetric form.
+}
+
+\code{xmid} is the time at the inflection (steepest) point of the response,
+reported relative to \code{t0}. \code{slope} is the response rate \code{dx/dt} at the
+inflection. \code{asym} is the inflection-height fraction; values \verb{< 0.5}
+indicate an early-acceleration curve and \verb{> 0.5} a late-acceleration
+curve. See \code{\link[=logistic]{logistic()}} for the model family and \code{\link[=SSlogistic]{SSlogistic()}} for
+self-start initialisation.
+
+Additional arguments (\code{...}) accepted when \code{method = "logistic"}:
+
+\describe{
+\item{\code{use_asym}}{Logical; default is \code{TRUE} to attempt to fit a
+5-parameter \code{\link[=SSlogistic]{SSlogistic()}} model with an asymmetry parameter
+(\code{asym}). If the 5-parameter fit fails, or if \code{use_asym = FALSE},
+fits a reduced 4-parameter symmetric model.}
+\item{\code{...}}{Other arguments passed to \code{\link[stats:nls]{stats::nls()}}
+\verb{<NOT YET IMPLEMENTED>}.}
+}
 }
 
 \subsection{Per-channel argument overrides}{

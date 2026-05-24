@@ -7,7 +7,7 @@
 monoexponential(t, A, B, tau, TD = NULL)
 }
 \arguments{
-\item{t}{A numeric vector of the predictor variable; time or sample number.}
+\item{t}{A numeric vector of the predictor variable (time).}
 
 \item{A}{A numeric parameter for the starting (baseline) value of the
 response variable.}
@@ -27,9 +27,9 @@ A numeric vector of predicted values the same length as the
 predictor variable \code{t}.
 }
 \description{
-Calculate a 3- or 4-parameter monoexponential curve. This is the model
-family fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "monoexponential"},
-and by \code{\link[stats:nls]{stats::nls()}} via the self-starting wrapper \code{\link[=SSmonoexp]{SSmonoexp()}}.
+Calculate a 3- or 4-parameter monoexponential curve. This model family is
+fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "monoexponential"}, and by
+\code{\link[stats:nls]{stats::nls()}} via the self-starting wrapper \code{\link[=SSmonoexp]{SSmonoexp()}}.
 }
 \details{
 \subsection{Model equations}{
@@ -57,7 +57,6 @@ model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
 model
 
 y <- predict(model, data)
-y
 
 \donttest{
     if (requireNamespace("ggplot2", quietly = TRUE)) {

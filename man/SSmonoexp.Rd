@@ -7,7 +7,7 @@
 SSmonoexp(t, A, B, tau, TD)
 }
 \arguments{
-\item{t}{A numeric vector of the predictor variable; time or sample number.}
+\item{t}{A numeric vector of the predictor variable (time).}
 
 \item{A}{A numeric parameter for the starting (baseline) value of the
 response variable.}
@@ -33,9 +33,9 @@ Creates initial coefficient estimates for a \code{selfStart} wrapper around
 arity is inferred from the formula passed to \code{\link[stats:nls]{stats::nls()}}.
 }
 \details{
-3-parameter model: \code{y ~ SSmonoexp(t, A, B, tau)}
+3-parameter model: \code{x ~ SSmonoexp(t, A, B, tau)}
 
-4-parameter model: \code{y ~ SSmonoexp(t, A, B, tau, TD)}
+4-parameter model: \code{x ~ SSmonoexp(t, A, B, tau, TD)}
 
 The 3-parameter form is recommended for small samples or when no obvious
 time delay is expected, as it converges more reliably. \code{\link[stats:nls]{stats::nls()}}
