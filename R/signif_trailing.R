@@ -266,48 +266,48 @@ signif_pvalue <- function(
 
 #' Generate numeric sequence from range of a vector
 #'
-#' Creates a numeric sequence spanning the range of input data with specified
-#' step size and direction. Optionally rounds the range endpoints before
-#' generating the sequence.
+#' Creates a numeric sequence spanning the range of input vector with either a
+#' specified step size or a desired output length.
 #'
 #' @param x A numeric vector.
-#' @param by A numeric step size for the sequence. *Default* is `1`.
-#' @param direction A character string specifying sequence direction. Either
-#'   *"up"* (the *default*) for ascending or *"down"* for descending sequence.
-#' @param digits An integer specifying number of decimal places to round range
-#'   endpoints, or `NA` (the *default*) for no rounding.
+#' @param by A numeric step size for the output sequence. *Default* is `1`. 
+#'   Sign determines order of returned vector (negative `by` returns a
+#'   descending sequence). `direction` takes precedence over `by` sign.
+#' @param length.out A positive integer giving the desired length of the
+#'   sequence. *Default* is `NULL`. If supplied, takes precedence over `by`.
+#' @param direction Order of returned vector. Either `"up"` for ascending or
+#'   `"down"` for descending. If supplied, takes precedence over the `by` sign.
 #'
 #' @details
-#' The output vector will likely be a different length than the input vector.
+#' The output vector will likely be a different length than the input `x`.
 #'
-#' The function:
-#' - Calculates the range of `x` (ignoring NA values).
-#' - Optionally rounds the range endpoints if `digits` is specified.
-#' - Generates a sequence with the specified step size.
-#' - Reverses the sequence if `direction = "down"`.
-#'
-#' @returns A numeric vector spanning the range of the input data.
+#' @returns A numeric vector spanning the range of the input `x`.
 #'
 #' @seealso [seq()], [range()]
 #'
 #' @keywords internal
-seq_range <- function(x, by = 1, direction = c("up", "down"), digits = NA) {
-    direction <- match.arg(direction)
-    validate_numeric(x)
-    validate_numeric(by, 1)
-
-    x_range <- range(x, na.rm = TRUE)
-    if (!is.na(digits)) {
-        validate_numeric(digits, 1)
-        x_range <- round(x_range, digits)
+seq_range <- function(
+    x,
+    by = 1,
+    length.out = NULL,
+    direction = c("up", "down")
+) {
+    if (!is.null(length.out) && !missing(by)) {
+        cli_inform(c("i" = "{.arg length.out} overrides {.arg by}."))
     }
-
-    sequence <- seq(x_range[1L], x_range[2L], by = by)
-    if (direction == "down") {
-        return(rev(sequence))
+    ## explicit `direction` wins; otherwise infer from sign of `by`
+    direction <- if (missing(direction)) {
+        if (by < 0) "down" else "up"
     } else {
-        return(sequence)
+        match.arg(direction)
     }
+    x_range <- range(x, na.rm = TRUE)
+    if (direction == "down") x_range <- rev(x_range)
+    if (!is.null(length.out)) {
+        return(seq(x_range[1L], x_range[2L], length.out = length.out))
+    }
+    by <- if (direction == "down") -abs(by) else abs(by)
+    return(seq(x_range[1L], x_range[2L], by = by))
 }
 
 

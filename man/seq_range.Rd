@@ -4,37 +4,30 @@
 \alias{seq_range}
 \title{Generate numeric sequence from range of a vector}
 \usage{
-seq_range(x, by = 1, direction = c("up", "down"), digits = NA)
+seq_range(x, by = 1, length.out = NULL, direction = c("up", "down"))
 }
 \arguments{
 \item{x}{A numeric vector.}
 
-\item{by}{A numeric step size for the sequence. \emph{Default} is \code{1}.}
+\item{by}{A numeric step size for the output sequence. \emph{Default} is \code{1}.
+Sign determines order of returned vector (negative \code{by} returns a
+descending sequence). \code{direction} takes precedence over \code{by} sign.}
 
-\item{direction}{A character string specifying sequence direction. Either
-\emph{"up"} (the \emph{default}) for ascending or \emph{"down"} for descending sequence.}
+\item{length.out}{A positive integer giving the desired length of the
+sequence. \emph{Default} is \code{NULL}. If supplied, takes precedence over \code{by}.}
 
-\item{digits}{An integer specifying number of decimal places to round range
-endpoints, or \code{NA} (the \emph{default}) for no rounding.}
+\item{direction}{Order of returned vector. Either \code{"up"} for ascending or
+\code{"down"} for descending. If supplied, takes precedence over the \code{by} sign.}
 }
 \value{
-A numeric vector spanning the range of the input data.
+A numeric vector spanning the range of the input \code{x}.
 }
 \description{
-Creates a numeric sequence spanning the range of input data with specified
-step size and direction. Optionally rounds the range endpoints before
-generating the sequence.
+Creates a numeric sequence spanning the range of input vector with either a
+specified step size or a desired output length.
 }
 \details{
-The output vector will likely be a different length than the input vector.
-
-The function:
-\itemize{
-\item Calculates the range of \code{x} (ignoring NA values).
-\item Optionally rounds the range endpoints if \code{digits} is specified.
-\item Generates a sequence with the specified step size.
-\item Reverses the sequence if \code{direction = "down"}.
-}
+The output vector will likely be a different length than the input \code{x}.
 }
 \seealso{
 \code{\link[=seq]{seq()}}, \code{\link[=range]{range()}}

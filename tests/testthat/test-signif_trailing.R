@@ -385,7 +385,7 @@ test_that("signif_pvalue handles edge case p-values", {
 
 
 ## seq_range() =========================================================
-test_that("seq_range generates correct ascending sequence", {
+test_that("seq_range generates correct sequence", {
     x <- c(1.2, 3.7, 2.1, 4.9, 2.8)
 
     result <- seq_range(x, by = 1)
@@ -404,32 +404,60 @@ test_that("seq_range respects by argument", {
     expect_equal(result2, c(1, 3, 5))
 })
 
-test_that("seq_range generates descending sequence", {
-    x <- c(1, 5)
-
-    result <- seq_range(x, direction = "down")
-    expect_equal(result, 5:1)
-})
-
-test_that("seq_range rounds endpoints correctly", {
-    x <- c(1.23, 4.87)
-
-    result <- seq_range(x, by = 1, digits = 0)
-    expect_equal(result[1], 1)
-    expect_equal(result[length(result)], 5)
-
-    result2 <- seq_range(x, by = 0.5, digits = 1)
-    expect_equal(result2[1], 1.2)
-    expect_equal(result2[length(result2)], 4.7)
-})
-
 test_that("seq_range handles edge cases", {
     ## NA values in input
     expect_equal(seq_range(c(1, NA, 5, NA)), 1:5)
     ## single value input
     expect_equal(seq_range(5, by = 1), 5)
     ## negative values
-    expect_equal(seq_range(c(-5, -1)), -5:-1)
+    expect_equal(seq_range(c(-5, -1)), -(5:1))
+})
+
+test_that("seq_range respects length.out argument", {
+    x <- c(1, 5)
+
+    expect_length(seq_range(x, length.out = 10), 10)
+    expect_equal(seq_range(x, length.out = 5), seq(1, 5, length.out = 5))
+    expect_equal(seq_range(x, length.out = 9), seq(1, 5, length.out = 9))
+})
+
+test_that("seq_range length.out overrides by with message", {
+    expect_message(
+        result <- seq_range(c(1, 5), by = 0.5, length.out = 3),
+        "length.out"
+    )
+    expect_equal(result, c(1, 3, 5))
+})
+
+test_that("seq_range respects direction argument", {
+    ## ascending input, descending output
+    expect_equal(seq_range(c(1, 5), direction = "down"), 5:1)
+    ## unordered input, both directions
+    x <- c(3, 1, 5, 2, 4)
+    expect_equal(seq_range(x, direction = "up"), 1:5)
+    expect_equal(seq_range(x, direction = "down"), 5:1)
+    ## direction with by
+    expect_equal(seq_range(c(1, 5), by = 2, direction = "down"), c(5, 3, 1))
+    ## direction with length.out
+    expect_equal(
+        seq_range(c(1, 5), length.out = 5, direction = "down"),
+        seq(5, 1, length.out = 5)
+    )
+})
+
+test_that("seq_range infers direction from sign of by", {
+    #TODO should it respect ordered x?
+    ## descending input, ascending output
+    expect_equal(seq_range(c(5, 1)), 1:5)
+    ## negative `by` alone -> descending
+    expect_equal(seq_range(c(1, 5), by = -2), c(5, 3, 1))
+})
+
+test_that("seq_range direction wins over sign of by", {
+    ## explicit `direction = "up"` overrides negative `by`
+    expect_equal(seq_range(c(1, 5), by = -2, direction = "up"), c(1, 3, 5))
+    ## explicit `direction = "down"` overrides positive `by`
+    expect_equal(seq_range(c(1, 5), by = 2, direction = "down"), c(5, 3, 1))
 })
 
 
