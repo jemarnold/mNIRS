@@ -65,15 +65,14 @@ compute_local_windows <- function(
             left = c(0, 1),
             right = c(-1, 0)
         ) * span
-        # fmt: skip
-        start_idx <- findInterval(
+        start_idx <- findInt_mnirs(
             t[idx] + offsets[1L], t, left.open = TRUE
         ) + 1L
-        end_idx <- findInterval(t[idx] + offsets[2L], t)
+        end_idx <- findInt_mnirs(t[idx] + offsets[2L], t)
     }
 
     ## inclusive of x[i] for detect outliers
-    Map(`:`, start_idx, end_idx)
+    return(Map(`:`, start_idx, end_idx))
 }
 
 
@@ -174,7 +173,7 @@ compute_valid_neighbours <- function(
 
     if (!is.null(width)) {
         ## find position to the left of each NA in valid_idx sequence
-        pos <- findInterval(na_idx, valid_idx)
+        pos <- findInt_mnirs(na_idx, valid_idx)
         half_width <- floor(width / 2L)
 
         window_idx <- vector("list", n_na)
@@ -195,10 +194,12 @@ compute_valid_neighbours <- function(
     ## build per-NA valid neighbours with binary search on sorted `t_valid`
     ## falls back to naerest bracketing pair when no valid samples within `span`
     window_idx <- lapply(seq_len(n_na), \(.i) {
-        lo <- findInterval(t_na[.i] - half_span, t_valid, left.open = TRUE) + 1L
-        hi <- findInterval(t_na[.i] + half_span, t_valid)
+        lo <- findInt_mnirs(
+            t_na[.i] - half_span, t_valid, left.open = TRUE
+        ) + 1L
+        hi <- findInt_mnirs(t_na[.i] + half_span, t_valid)
         if (lo > hi) {
-            pos <- findInterval(na_idx[.i], valid_idx)
+            pos <- findInt_mnirs(na_idx[.i], valid_idx)
             return(unique(valid_idx[c(pos, min(n_valid, pos + 1L))]))
         }
         valid_idx[lo:hi]

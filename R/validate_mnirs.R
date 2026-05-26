@@ -568,3 +568,14 @@ validate_t0 <- function(t0, data, time_vec, verbose = TRUE) {
 
     return(t0)
 }
+
+
+
+#' wrap findInterval: relabel base R's 'vec' as 'time_channel' on error
+#' @keywords internal
+findInt_mnirs <- function(...) {
+    withCallingHandlers(findInterval(...), error = \(e) {
+        msg <- sub("vec", "time_channel", conditionMessage(e), fixed = TRUE)
+        cli_abort(msg, call = NULL)
+    })
+}

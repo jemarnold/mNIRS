@@ -156,7 +156,7 @@ find_kinetics_idx <- function(
 
     ## break t_valid into mod_span-width bins
     bin_breaks <- seq(t_valid[1L], t_valid[n_valid] + mod_span, mod_span)
-    bin_idx <- findInterval(t_valid, bin_breaks, rightmost.closed = TRUE)
+    bin_idx <- findInt_mnirs(t_valid, bin_breaks, rightmost.closed = TRUE)
 
     ## extreme index per bin (first occurrence for ties)
     bin_extreme_idx <- unname(tapply(seq_len(n_valid), bin_idx, \(.idx) {

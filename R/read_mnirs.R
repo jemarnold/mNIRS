@@ -362,5 +362,5 @@ example_mnirs <- function(file = NULL) {
     }
 
     file <- match.arg(file, choices = dir_files)
-    system.file("extdata", file, package = "mnirs", mustWork = TRUE)
+    return(system.file("extdata", file, package = "mnirs", mustWork = TRUE))
 }

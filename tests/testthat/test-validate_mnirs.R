@@ -761,3 +761,11 @@ test_that("validate_t0() errors when t0 exceeds time range", {
         "No observations.*before"
     )
 })
+
+## findInt_mnirs() ==================================
+test_that("findInt_mnirs relabels 'vec' as 'time_channel' on error", {
+    expect_error(findInt_mnirs(1, c(3, 1, 2)), "time_channel.*sorted")
+    expect_error(findInt_mnirs(1, c(1, NA, 2)), "time_channel.*sorted")
+    ## valid input passes through to findInterval()
+    expect_equal(findInt_mnirs(2.5, 1:5), findInterval(2.5, 1:5))
+})
