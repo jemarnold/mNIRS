@@ -24,7 +24,7 @@ test_that("palettes returns correct colour vector", {
     all_colours <- palette_mnirs()
     expect_type(all_colours, "character")
     expect_length(all_colours, 12)
-    expect_true(all(grepl("^#[0-9A-Fa-f]{6}", all_colours)))
+    expect_all_true(grepl("^#[0-9A-Fa-f]{6}", all_colours))
 })
 
 test_that("palettes subset by number works", {
@@ -38,12 +38,12 @@ test_that("palettes subset by name works", {
     red <- palette_mnirs("red")
     expect_named(red, "red")
     expect_equal(red[["red"]], "#ED0000FF")
-    expect_error(palette_mnirs("invalid"), "should be one of")
+    expect_error(palette_mnirs("invalid"), "unrecognised")
 
     multi <- palette_mnirs("red", "blue")
     expect_length(multi, 2)
     expect_named(multi, c("red", "blue"))
-    expect_equal(palette_mnirs("red", "invalid"), red)
+    expect_error(palette_mnirs("red", "invalid"), "unrecognised")
 
     ## mixed types error
     expect_error(palette_mnirs(TRUE), "expects")

@@ -380,8 +380,16 @@ palette_mnirs <- function(...) {
             for the number of colours to return, or character colour names."
         ))
     }
-    names <- match.arg(names, choices = names(colours), several.ok = TRUE)
-    return(colours[names])
+
+    idx <- match(tolower(names), tolower(names(colours)))
+    if (anyNA(idx)) {
+        cli_abort(c(
+            "x" = "{.fn palette_mnirs} unrecognised colour name{?s}: \\
+            {.val {names[is.na(idx)]}}.",
+            "i" = "Valid names: {.val {names(colours)}}."
+        ))
+    }
+    return(colours[idx])
 }
 
 
