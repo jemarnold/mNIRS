@@ -569,6 +569,20 @@ test_that("analyse_monoexponential() returns NA for failed fit", {
     expect_true(is.na(result$k))
 })
 
+test_that("analyse_monoexponential() suppresses fit-failure warning when verbose = FALSE", {
+    ## only 3 observations for a 3-param model — guaranteed fit failure
+    custom_name <- create_monoexp_data(n = 3, noise_sd = 0.1)
+
+    expect_no_warning(
+        analyse_monoexponential(
+            custom_name,
+            nirs_channels = "smo2",
+            use_time_delay = FALSE,
+            verbose = FALSE
+        )
+    )
+})
+
 test_that("analyse_monoexponential() works with multiple channels", {
     nirs_channels <- c("smo2_left", "smo2_right")
     data <- create_monoexp_data(channels = nirs_channels)

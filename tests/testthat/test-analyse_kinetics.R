@@ -1627,8 +1627,6 @@ create_monoexp_data <- function(
     )
 }
 
-## structure, data formats, grouped data covered by generic tests above
-
 
 test_that("analyse_kinetics.monoexponential dispatches multiple channels", {
     nirs_channels <- c("smo2_left", "smo2_right")
@@ -1667,6 +1665,82 @@ test_that("analyse_kinetics.monoexponential uses custom interval name", {
     expect_true(is.na(result$coefficients$A))
     expect_true(is.na(result$coefficients$tau))
     expect_true(is.na(result$coefficients$k))
+})
+
+## analyse_kinetics.logistic ============================================
+## helper: create logistic test data with known parameters
+create_logistic_data <- function(
+    A = 10,
+    B = 100,
+    xmid = 30,
+    slope = 4,
+    asym = NULL,
+    n = 60,
+    sample_rate = 1,
+    noise_sd = 2,
+    channels = "smo2"
+) {
+    set.seed(13)
+    t <- seq(0, (n - 1) / sample_rate, length.out = n)
+    x <- logistic(t, A, B, xmid, slope, asym) + rnorm(n, 0, noise_sd)
+
+    df <- stats::setNames(
+        data.frame(t, x),
+        c("time", channels[1])
+    )
+    if (length(channels) > 1) {
+        for (ch in channels[-1]) {
+            df[[ch]] <- logistic(t, A + 5, B + 5, xmid, slope, asym) +
+                rnorm(n, 0, noise_sd)
+        }
+    }
+
+    create_mnirs_data(
+        df,
+        nirs_channels = channels,
+        time_channel = "time",
+        sample_rate = sample_rate
+    )
+}
+
+
+test_that("analyse_kinetics.logistic dispatches multiple channels", {
+    nirs_channels <- c("smo2_left", "smo2_right")
+    data <- create_logistic_data(channels = nirs_channels)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = nirs_channels,
+        method = "logistic",
+        use_asym = FALSE,
+        verbose = FALSE
+    )
+
+    expect_equal(nrow(result$coefficients), 2L)
+    expect_equal(result$coefficients$nirs_channels, nirs_channels)
+    expect_named(
+        result$data[[1]],
+        c("time", nirs_channels, paste0(nirs_channels, "_fitted"))
+    )
+})
+
+test_that("analyse_kinetics.logistic uses custom interval name", {
+    ## only 3 observations for a 4-param model
+    data <- create_logistic_data(n = 10, noise_sd = 0.1)
+
+    expect_warning(
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = "smo2",
+            method = "logistic",
+            use_asym = FALSE
+        ),
+        "fit failed for.*smo2.*interval_1" ## call custom interval name
+    )
+
+    expect_true(is.na(result$coefficients$A))
+    expect_true(is.na(result$coefficients$xmid))
+    expect_true(is.na(result$coefficients$slope))
 })
 
 ## analyze_kinetics (US spelling alias) ================================
