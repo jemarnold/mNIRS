@@ -447,7 +447,7 @@ analyse_peak_slope <- function(
             x               = x_fit[slopes$window_idx],
             t               = t_fit[slopes$window_idx],
             fitted          = slopes$fitted,
-            n_params        = 1L,
+            n_params        = 2L,
             verbose         = verbose
         )
 

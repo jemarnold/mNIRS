@@ -339,10 +339,12 @@ build_na_results <- function(
         n_obs = 0L,
         r2 = NA_real_,
         adj_r2 = NA_real_,
-        pseudo_r2 = NA_real_,
         rmse = NA_real_,
         snr = NA_real_,
-        cv_rmse = NA_real_
+        cv_rmse = NA_real_,
+        aic = NA_real_,
+        aicc = NA_real_,
+        bic = NA_real_
     )
     na_coefs$nirs_channels <- nirs_channel
     return(list(
@@ -461,27 +463,38 @@ as_data_list <- function(data) {
 #' Compute model diagnostics
 #'
 #' @param fitted A numeric vector of the predicted values.
-#' @param n_params Integer; number of estimated parameters in the model,
-#'   excluding the intercept (default `1L`). Used to compute `adj_r2`.
-#'   For non-linear models (`"monoexponential"`, `"sigmoidal"`), pass the
-#'   number of free parameters fit by the solver.
+#' @param n_params Integer; total number of estimated coefficients in the
+#'   model (default `1L`). For linear models pass the number of regression
+#'   coefficients (e.g. `2L` for `lm(x ~ t)`). For non-linear models
+#'   (`"monoexponential"`, `"sigmoidal"`), pass the number of free parameters
+#'   fit by the solver.
 #' @inheritParams peak_slope
 #'
 #' @details
-#' 
+#'
+#' ## r2
+#'
+#' Squared Pearson correlation between observed and fitted values. Equals
+#'   the classic `1 - SSres / SStot` for OLS linear fits (matches
+#'   `summary(lm)$r.squared`); a bounded `[0, 1]` pseudo-R² for non-linear
+#'   fits such as `"monoexponential"` and `"sigmoidal"`.
+#'
 #' ## adj_r2
-#' 
+#'
 #' Adjusted `R^2` penalised by `n_params`. Appropriate for OLS linear models;
 #'   interpret with caution for non-linear fits.
-#' 
-#' ## pseudo_r2
-#' 
-#' Squared Pearson correlation between observed and fitted values. Equivalent
-#'   to `R^2` for OLS but well-defined for non-linear and multivariate models.
-#'   Preferred for `"monoexponential"` and `"sigmoidal"` methods.
-#' 
+#'
+#' ## aic, aicc, bic
+#'
+#' Information criteria derived from a Gaussian log-likelihood with the
+#'   maximum-likelihood residual variance `sigma_hat^2 = SSres / n_obs`. The
+#'   effective parameter count is `k = n_params + 1` (the `+1` accounts for
+#'   the estimated residual variance). Values match `stats::AIC()` and
+#'   `stats::BIC()` for `lm` and `nls` fits. `aicc` is the small-sample
+#'   correction and is `NA` when `n_obs - k - 1 <= 0`.
+#'
 #' @returns A 1-row `data.frame` with columns `n_obs`, `r2`, `adj_r2`,
-#'   `pseudo_r2`, `rmse`, `snr`, and `cv_rmse`.
+#'   `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, and `bic`.
 #'
 #' @keywords internal
 compute_diagnostics <- function(
@@ -491,21 +504,18 @@ compute_diagnostics <- function(
     n_params = 1L,
     verbose = TRUE
 ) {
-    ## ! check redundant validity check
-    complete_cases <- which(is.finite(x) & is.finite(t))
-    x <- x[complete_cases]
-    t <- t[complete_cases]
-    fitted <- fitted[is.finite(fitted)]
     n_obs <- length(fitted)
 
     return_na <- data.frame(
         n_obs = n_obs,
         r2 = NA_real_,
         adj_r2 = NA_real_,
-        pseudo_r2 = NA_real_,
         rmse = NA_real_,
         snr = NA_real_,
-        cv_rmse = NA_real_
+        cv_rmse = NA_real_,
+        aic = NA_real_,
+        aicc = NA_real_,
+        bic = NA_real_
     )
 
     if (n_params < 1L || n_obs < 2L) {
@@ -523,54 +533,68 @@ compute_diagnostics <- function(
         return(return_na)
     }
 
-    ## residuals
+    ## residuals and sums of squares (reused throughout)
+    x_mean <- mean(x)
     resid <- x - fitted
     ss_res <- sum(resid^2)
-    ss_tot <- sum((x - mean(x))^2)
+    ss_tot <- sum((x - x_mean)^2)
+    ss_fit <- sum((fitted - mean(fitted))^2)
 
-    ## R²
-    r2 <- if (ss_tot == 0) NA_real_ else 1 - ss_res / ss_tot
-
-    ## adjusted R²: penalised by n_params; valid for OLS linear models
-    adj_r2 <- if (is.na(r2) || n_obs <= (n_params + 1L)) {
-        NA_real_
-    } else {
-        1 - (1 - r2) * (n_obs - 1L) / (n_obs - n_params - 1L)
-    }
-
-    ## pseudo-R²: cor(observed, fitted)² — valid for linear and non-linear
-    ## models; equals R² for OLS, preferred for monoexponential/sigmoidal
-    pseudo_r2 <- if (stats::sd(x) == 0 || stats::sd(fitted) == 0) {
+    ## R²: squared Pearson correlation; equals 1 - SSres/SStot for OLS,
+    ## bounded [0, 1] pseudo-R² for non-linear fits
+    r2 <- if (ss_tot == 0 || ss_fit == 0) {
         NA_real_
     } else {
         stats::cor(x, fitted)^2
     }
-    ## ! confirm redundant r2 and pseudo-r2 for lm and nls?
 
-    ## RMSE
-    rmse <- sqrt(mean(resid^2))
-
-    ## SNR: signal variance to residual variance, in dB
-    var_signal <- ss_tot / (n_obs - 1L)
-    var_resid <- ss_res / (n_obs - 1L)
-    snr <- if (is.na(var_signal) || var_resid == 0) {
+    ## adjusted R²: penalised by n_params; valid for OLS linear models
+    adj_r2 <- if (is.na(r2) || n_obs <= n_params) {
         NA_real_
     } else {
-        10 * log10(var_signal / var_resid)
+        1 - (1 - r2) * (n_obs - 1L) / (n_obs - n_params)
+    }
+
+    ## RMSE
+    rmse <- sqrt(ss_res / n_obs)
+
+    ## SNR: signal variance to residual variance, in dB
+    snr <- if (ss_tot == 0 || ss_res == 0) {
+        NA_real_
+    } else {
+        10 * log10(ss_tot / ss_res)
     }
 
     ## CV-RMSE: RMSE normalised by the absolute mean of observed values
-    x_mean <- mean(x)
     cv_rmse <- if (x_mean == 0) NA_real_ else rmse / abs(x_mean)
+
+    ## information criteria from Gaussian log-likelihood; k includes the
+    ## estimated residual variance, so matches stats::AIC()/BIC() for
+    ## lm and nls fits
+    k <- n_params + 1L
+    if (ss_res <= 0) {
+        aic <- aicc <- bic <- NA_real_
+    } else {
+        log_lik <- -n_obs / 2 * (log(2 * pi) + log(ss_res / n_obs) + 1)
+        aic <- -2 * log_lik + 2 * k
+        bic <- -2 * log_lik + log(n_obs) * k
+        aicc <- if (n_obs - k - 1L <= 0L) {
+            NA_real_
+        } else {
+            aic + 2 * k * (k + 1L) / (n_obs - k - 1L)
+        }
+    }
 
     return(data.frame(
         n_obs = n_obs,
         r2 = r2,
         adj_r2 = adj_r2,
-        pseudo_r2 = pseudo_r2,
         rmse = rmse,
         snr = snr,
-        cv_rmse = cv_rmse
+        cv_rmse = cv_rmse,
+        aic = aic,
+        aicc = aicc,
+        bic = bic
     ))
 }
 

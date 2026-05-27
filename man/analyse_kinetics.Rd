@@ -111,8 +111,8 @@ with one row per \code{nirs_channel} per interval, containing columns
 \code{nirs_channel} per interval, supplied from \code{\link[=extract_intervals]{extract_intervals()}} if
 present in the metadata.}
 \item{\code{diagnostics}}{A data frame of model diagnostics (\code{n_obs}, \code{r2},
-\code{adj_r2}, \code{pseudo_r2}, \code{rmse}, \code{snr}, \code{cv_rmse}) with one row per
-\code{nirs_channel} per interval.}
+\code{adj_r2}, \code{rmse}, \code{snr}, \code{cv_rmse}, \code{aic}, \code{aicc}, \code{bic}) with one
+row per \code{nirs_channel} per interval.}
 \item{\code{channel_args}}{A data frame of the resolved arguments used for
 each \code{nirs_channel} with one row per \code{nirs_channel} per interval.}
 \item{\code{call}}{The matched call.}

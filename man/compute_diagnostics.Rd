@@ -14,10 +14,11 @@ Default is \code{seq_along(x)}.}
 
 \item{fitted}{A numeric vector of the predicted values.}
 
-\item{n_params}{Integer; number of estimated parameters in the model,
-excluding the intercept (default \code{1L}). Used to compute \code{adj_r2}.
-For non-linear models (\code{"monoexponential"}, \code{"sigmoidal"}), pass the
-number of free parameters fit by the solver.}
+\item{n_params}{Integer; total number of estimated coefficients in the
+model (default \code{1L}). For linear models pass the number of regression
+coefficients (e.g. \code{2L} for \code{lm(x ~ t)}). For non-linear models
+(\code{"monoexponential"}, \code{"sigmoidal"}), pass the number of free parameters
+fit by the solver.}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
@@ -25,23 +26,34 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 A 1-row \code{data.frame} with columns \code{n_obs}, \code{r2}, \code{adj_r2},
-\code{pseudo_r2}, \code{rmse}, \code{snr}, and \code{cv_rmse}.
+\code{rmse}, \code{snr}, \code{cv_rmse}, \code{aic}, \code{aicc}, and \code{bic}.
 }
 \description{
 Compute model diagnostics
 }
 \details{
+\subsection{r2}{
+
+Squared Pearson correlation between observed and fitted values. Equals
+the classic \code{1 - SSres / SStot} for OLS linear fits (matches
+\code{summary(lm)$r.squared}); a bounded \verb{[0, 1]} pseudo-R² for non-linear
+fits such as \code{"monoexponential"} and \code{"sigmoidal"}.
+}
+
 \subsection{adj_r2}{
 
 Adjusted \code{R^2} penalised by \code{n_params}. Appropriate for OLS linear models;
 interpret with caution for non-linear fits.
 }
 
-\subsection{pseudo_r2}{
+\subsection{aic, aicc, bic}{
 
-Squared Pearson correlation between observed and fitted values. Equivalent
-to \code{R^2} for OLS but well-defined for non-linear and multivariate models.
-Preferred for \code{"monoexponential"} and \code{"sigmoidal"} methods.
+Information criteria derived from a Gaussian log-likelihood with the
+maximum-likelihood residual variance \code{sigma_hat^2 = SSres / n_obs}. The
+effective parameter count is \code{k = n_params + 1} (the \code{+1} accounts for
+the estimated residual variance). Values match \code{stats::AIC()} and
+\code{stats::BIC()} for \code{lm} and \code{nls} fits. \code{aicc} is the small-sample
+correction and is \code{NA} when \code{n_obs - k - 1 <= 0}.
 }
 }
 \keyword{internal}

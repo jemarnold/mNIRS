@@ -234,8 +234,8 @@
 #'       `nirs_channel` per interval, supplied from [extract_intervals()] if
 #'       present in the metadata.}
 #'   \item{`diagnostics`}{A data frame of model diagnostics (`n_obs`, `r2`,
-#'       `adj_r2`, `pseudo_r2`, `rmse`, `snr`, `cv_rmse`) with one row per
-#'       `nirs_channel` per interval.}
+#'       `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, `bic`) with one
+#'       row per `nirs_channel` per interval.}
 #'   \item{`channel_args`}{A data frame of the resolved arguments used for
 #'       each `nirs_channel` with one row per `nirs_channel` per interval.}
 #'   \item{`call`}{The matched call.}
