@@ -16,8 +16,8 @@
 #' @param asym A numeric parameter for the asymmetry index of the curve, 
 #'   equal to the fraction of the response where the inflection point `xmid` 
 #'   occurs, bounded in `c(0, 1)` for `(y(xmid) - A) / (B - A)`. `asym = 0.5` 
-#'   is symmetric and equivalent to the 4-parameter form. If `NULL` (*default*), a
-#'   symmetric 4-parameter model is used.
+#'   is symmetric and equivalent to the 4-parameter form. If `NULL`
+#'   (*default*), a symmetric 4-parameter model is used.
 #'
 #' @details
 #' ## Model equations
@@ -105,30 +105,24 @@ logistic <- function(t, A, B, xmid, slope, asym = NULL) {
 #'
 #' @keywords internal
 logistic_init <- function(mCall, data, LHS, ...) {
-    ## self-start parameters for nls of logistic fit function;
-    ## uses base R `SSfpl()` linearisation approach
     tx <- stats::sortedXyData(mCall[["t"]], LHS, data)
     x <- tx[["y"]]
     t <- tx[["x"]]
     n <- length(x)
-
     has_asym <- "asym" %in% names(mCall)
 
-    ## asymptotes from 1/5 response signal; tail order preserves direction
-    n_asymp <- max(1, ceiling(n / 5))
+    ## asymptotes from first and last ceiling(n/5) values
+    n_asymp <- max(1L, ceiling(n / 5))
     A_init <- mean(x[seq_len(n_asymp)])
     B_init <- mean(x[seq(n - n_asymp + 1, n)])
 
-    ## linearise: y = A + (B - A) / (1 + exp(-4 * slope * (t - xmid) / (B - A)))
-    ## => log((B - y) / (y - A)) = -4 * slope / (B - A) * (t - xmid)
-    ## clip x strictly inside [min(A, B), max(A, B)] for valid log argument
+    ## linearisation for 4-param: log((B - y) / (y - A)) ~ t
     lo <- min(A_init, B_init)
     hi <- max(A_init, B_init)
     eps <- (hi - lo) * 1e-3
     x_clip <- pmin(pmax(x, lo + eps), hi - eps)
     xf <- log((B_init - x_clip) / (x_clip - A_init))
 
-    ## init NAs, then overwrite if valid
     xmid_init <- NA_real_
     slope_init <- NA_real_
     finite_idx <- is.finite(xf)
@@ -150,41 +144,37 @@ logistic_init <- function(mCall, data, LHS, ...) {
     ## fallbacks for degenerate data
     t_range <- diff(range(t))
     if (!is.finite(xmid_init) || xmid_init < min(t) || xmid_init > max(t)) {
-        mid_x <- (A_init + B_init) / 2
-        xmid_init <- t[which.min(abs(x - mid_x))]
+        xmid_init <- t[which.min(abs(x - (A_init + B_init) / 2))]
     }
     if (!is.finite(slope_init) || slope_init == 0) {
         slope_init <- if (t_range > 0) {
             (B_init - A_init) / t_range
         } else {
-            sign(B_init - A_init) * 1
+            sign(B_init - A_init)
         }
     }
 
-    if (has_asym) {
-        ## empirical inflection-height fraction at point of steepest change;
-        ## smooth `dx_dt` with a running mean (window ~ 1/10 of n) to
-        ## suppress single-point noise spikes that would otherwise dominate
-        ## `which.max`. Clamp into (0.1, 0.9) to keep init away from bounds.
-        dx_dt <- diff(x) / diff(t)
-        win <- max(3L, 2L * (length(dx_dt) %/% 20L) + 1L)
-        dx_smooth <- as.numeric(stats::filter(
-            dx_dt, rep(1 / win, win), sides = 2L
-        ))
-        dx_smooth[!is.finite(dx_smooth)] <- 0
-        i_infl <- which.max(abs(dx_smooth))
-        asym_emp <- (x[i_infl] - A_init) / (B_init - A_init)
-        asym_init <- min(max(asym_emp, 0.1), 0.9)
-        return(c(
-            A = A_init,
-            B = B_init,
-            xmid = xmid_init,
-            slope = slope_init,
-            asym = asym_init
-        ))
-    } else {
+    if (!has_asym) {
         return(c(A = A_init, B = B_init, xmid = xmid_init, slope = slope_init))
     }
+
+    ## 5-param: empirical inflection from smoothed derivative
+    dx_dt <- diff(x) / diff(t)
+    win <- max(3L, 2L * (length(dx_dt) %/% 20L) + 1L)
+    dx_smooth <- as.numeric(stats::filter(dx_dt, rep(1 / win, win), sides = 2L))
+    dx_smooth[!is.finite(dx_smooth)] <- 0
+    i_infl <- which.max(abs(dx_smooth))
+
+    asym_emp <- (x[i_infl] - A_init) / (B_init - A_init)
+    asym_init <- min(max(asym_emp, 0.1), 0.9)
+
+    return(c(
+        A = A_init,
+        B = B_init,
+        xmid = t[i_infl],
+        slope = dx_smooth[i_infl],
+        asym = asym_init
+    ))
 }
 
 

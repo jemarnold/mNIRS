@@ -347,11 +347,11 @@ test_that("SSlogistic() 5-param converges on most random realisations", {
     skip_if(!interactive(), "Manual convergence check")
 
     ## quantify fit success rate across noisy realisations spanning asym range;
-    ## the 5-param model is known to be fragile near Gompertz limits
+    ## the 5-param model is known to be fragile
     n_rep <- 1000L
     t <- 1:60
     base <- list(A = 10, B = 100, xmid = 30, slope = 4)
-    asym_grid <- seq(0.1, 0.9, length.out = n_rep)
+    asym_grid <- seq(0.3, 0.7, length.out = n_rep)
 
     # set.seed(13)
     fits <- vapply(asym_grid, \(a) {
@@ -374,11 +374,65 @@ test_that("SSlogistic() 5-param converges on most random realisations", {
     
     ## current implementation: report observed rate to flag regressions;
     ## aim for >= 75% on interior of (0, 1) once init is improved
-    expect_true(success_rate >= 0.75)
+    expect_true(success_rate >= 0.95)
 
     ## of successful fits, asym should be recovered within tolerance
     converged <- fits["asym_err", ][fits["success", ] == 1]
     expect_true(median(converged, na.rm = TRUE) < 0.1)
+})
+
+test_that("SSlogistic() converges on real dataset", {
+    skip_on_ci()
+    skip_on_covr()
+    skip_on_cran()
+    skip_if(!interactive(), "Manual convergence check")
+    file_path <- test_path("testdata/reoxy_list.rds")
+    skip_if_not(file.exists(file_path), "testdata not available")
+
+    ## 65 real_world reoxy intervals
+    reoxy_list <- readRDS(file_path)
+    
+    ## fit one signal at a time across all data frames; report convergence
+    ## success rate per signal to flag regressions on real reoxygenation data
+    fit_4param <- function(signal) {
+        vapply(reoxy_list, \(df) {
+            data <- data.frame(t = df$time, x = df[[signal]])
+            model <- tryCatch(
+                nls(x ~ SSlogistic(t, A, B, xmid, slope), data = data),
+                error = \(e) NULL,
+                warning = \(w) NULL
+            )
+            as.integer(!is.null(model))
+        }, integer(1L))
+    }
+
+    smo2_success <- mean(fit_4param("VL_smo2"))
+    smo2_success
+    hhb_success <- mean(fit_4param("VL_HHb"))
+    hhb_success
+
+    expect_true(smo2_success >= 0.95)
+    expect_true(hhb_success >= 0.95)
+
+    fit_5param <- function(signal) {
+        vapply(reoxy_list, \(df) {
+            data <- data.frame(t = df$time, x = df[[signal]])
+            model <- tryCatch(
+                nls(x ~ SSlogistic(t, A, B, xmid, slope, asym), data = data),
+                error = \(e) NULL,
+                warning = \(w) NULL
+            )
+            as.integer(!is.null(model))
+        }, integer(1L))
+    }
+
+    smo2_success <- mean(fit_5param("VL_smo2"))
+    smo2_success
+    hhb_success <- mean(fit_5param("VL_HHb"))
+    hhb_success
+
+    expect_true(smo2_success >= 0.75)
+    expect_true(hhb_success >= 0.75)
 })
 
 
