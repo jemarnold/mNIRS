@@ -8,7 +8,7 @@ analyse_logistic(
   data,
   nirs_channels = NULL,
   time_channel = NULL,
-  use_asym = TRUE,
+  shape = c("symmetric", "gompertz", "gompertz_left"),
   t0 = NULL,
   direction = c("auto", "positive", "negative"),
   end_fit_span = Inf,
@@ -35,11 +35,10 @@ Must match a column name in \code{data} exactly.
 used.
 }}
 
-\item{use_asym}{Logical; default is \code{TRUE} to attempt to fit a 5-parameter
-\code{\link[=SSlogistic]{SSlogistic()}} model (A, B, xmid, slope, asym) with an asymmetry
-parameter. If the 5-parameter fit fails, or if \code{use_asym = FALSE},
-attempts to fit a reduced 4-parameter symmetric \code{\link[=SSlogistic]{SSlogistic()}} model
-(A, B, xmid, slope).}
+\item{shape}{Character; the 4-parameter sigmoidal shape to fit. One of
+\code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic]{SSlogistic()}}), \code{"gompertz"}
+(early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or \code{"gompertz_left"}
+(late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
 
 \item{t0}{A numeric value specifying the start of the kinetics response
 in units of \code{time_channel}. Observations where \code{time_channel <= t0}
@@ -68,7 +67,7 @@ See \emph{Details}.}
 }
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns
-\code{nirs_channels}, \code{A}, \code{B}, \code{xmid}, \code{slope}, \code{asym}, \code{xmid_fitted}.
+\code{nirs_channels}, \code{A}, \code{B}, \code{xmid}, \code{slope}, \code{xmid_fitted}.
 Per-channel metadata are attached as attributes:
 \itemize{
 \item \code{"model"}: an \link[stats:nls]{nls} model object, or \code{NULL} for channels
@@ -82,12 +81,14 @@ recording the resolved arguments used.
 }
 }
 \description{
-Internal channel-level dispatch for
-\code{analyse_kinetics(method = "logistic")}. Fits a logistic curve to each
-\code{nirs_channel} within a single \emph{"mnirs"} data frame. See
-\code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing documentation.
+Internal channel-level dispatch for \code{analyse_kinetics(method = "logistic")}.
+Fits a 4-parameter sigmoidal curve to each \code{nirs_channel} within a single
+\emph{"mnirs"} data frame in one of three asymmetry shapes (\code{"symmetric"},
+\code{"gompertz"}, \code{"gompertz_left"}). See \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing
+documentation.
 }
 \seealso{
-\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=logistic]{logistic()}}, \code{\link[=SSlogistic]{SSlogistic()}}
+\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=logistic]{logistic()}}, \code{\link[=SSlogistic]{SSlogistic()}},
+\code{\link[=gompertz]{gompertz()}}, \code{\link[=gompertz_left]{gompertz_left()}}, \code{\link[=SSgompertz]{SSgompertz()}}, \code{\link[=SSgompertz_left]{SSgompertz_left()}}
 }
 \keyword{internal}

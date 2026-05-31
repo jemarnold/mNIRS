@@ -60,6 +60,11 @@ processing steps. Enjoy!
 ``` r
 library(ggplot2) ## for plotting
 library(mnirs)
+#> 
+#> Attaching package: 'mnirs'
+#> The following object is masked from 'package:stats':
+#> 
+#>     SSgompertz
 
 ## {mnirs} includes sample files from a few mNIRS devices
 example_mnirs()

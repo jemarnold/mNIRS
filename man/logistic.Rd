@@ -24,19 +24,29 @@ variable at the inflection point \code{xmid}.}
 \item{asym}{A numeric parameter for the asymmetry index of the curve,
 equal to the fraction of the response where the inflection point \code{xmid}
 occurs, bounded in \code{c(0, 1)} for \code{(y(xmid) - A) / (B - A)}. \code{asym = 0.5}
-is symmetric and equivalent to the 4-parameter form. If \code{NULL} (\emph{default}), a
-symmetric 4-parameter model is used.}
+is symmetric and equivalent to the 4-parameter form. If \code{NULL}
+(\emph{default}), a symmetric 4-parameter model is used.}
 }
 \value{
 A numeric vector of predicted values the same length as the
 predictor variable \code{t}.
 }
 \description{
-Calculate a 4- or 5-parameter logistic (sigmoidal) curve. This model family
-is fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "logistic"} or \code{"sigmoidal"},
-and by \code{\link[stats:nls]{stats::nls()}} via the self-starting wrapper \code{\link[=SSlogistic]{SSlogistic()}}.
+Calculate a 4- or 5-parameter logistic (sigmoidal) curve.
 }
 \details{
+\subsection{Implementation}{
+
+The 4-parameter symmetric form is fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when
+\code{method = "logistic"} and \code{shape = "symmetric"} (\emph{default}) via the
+self-starting wrapper \code{\link[=SSlogistic]{SSlogistic()}}.
+
+The 5-parameter Richards form is exported for advanced use directly with
+\code{\link[stats:nls]{stats::nls()}} but is not used by \code{\link[=analyse_kinetics]{analyse_kinetics()}}; for asymmetric
+shapes prefer \code{\link[=gompertz]{gompertz()}} / \code{\link[=gompertz_left]{gompertz_left()}}, which are more
+numerically stable.
+}
+
 \subsection{Model equations}{
 
 Logistic models are re-parameterised from a Richards generalised logistic
@@ -58,9 +68,8 @@ Inflection is at \code{t = xmid} with \code{dx/dt = slope} and
 \code{asym -> 0} gives an early-acceleration curve (inflection near \code{A}),
 \code{asym -> 1} gives a late-acceleration curve (inflection near \code{B}).
 
-\code{asym = 0.368} (\code{1/e}) approximates a (right-inflection) Gompertz curve.
-\code{asym = 0.632} (\code{1 - 1/e}) approximates a (left-inflection) modified
-Gompertz curve.
+\code{asym = 0.368} (\code{1/e}) approximates a right-inflection Gompertz curve.
+\code{asym = 0.632} (\code{1 - 1/e}) approximates a left-inflection Gompertz curve.
 }
 }
 \examples{

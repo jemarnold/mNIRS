@@ -1723,7 +1723,7 @@ test_that("analyse_kinetics.logistic dispatches multiple channels", {
         data,
         nirs_channels = nirs_channels,
         method = "logistic",
-        use_asym = FALSE,
+        shape = "symmetric",
         verbose = FALSE
     )
 
@@ -1744,7 +1744,7 @@ test_that("analyse_kinetics.logistic uses custom interval name", {
             data,
             nirs_channels = "smo2",
             method = "logistic",
-            use_asym = FALSE
+            shape = "symmetric",
         ),
         "fit failed for.*smo2.*interval_1" ## call custom interval name
     )

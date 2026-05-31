@@ -264,33 +264,38 @@ reduced 3-parameter model.}
 
 Aliases: \code{method = c("sigmoidal", "xmid")}.
 
-A parametric approach fitting a self-starting logistic function to the
-response curve using \code{\link[stats:nls]{stats::nls()}} with \code{\link[=SSlogistic]{SSlogistic()}} for either a
-5-parameter (A, B, xmid, slope, asym) or 4-parameter symmetric
-(A, B, xmid, slope) model.
+A parametric approach fitting a self-starting 4-parameter sigmoidal
+function to the response curve using \code{\link[stats:nls]{stats::nls()}} in one of three
+shapes. All three expose the same coefficients \verb{(A, B, xmid, slope)}
+for cross-shape and cross-channel comparability.
 
-Model equations:
+Model equations (all 4-parameter):
 \itemize{
-\item 4-parameter: \code{A + (B - A) / (1 + exp(-4 * slope * (t - xmid) / (B - A)))}
-\item 5-parameter: Richards re-parameterisation so \code{asym} is the
-inflection-height fraction \code{(y(xmid) - A) / (B - A)}, bounded in
-\verb{(0, 1)}. \code{asym = 0.5} collapses to the 4-parameter symmetric form.
+\item \code{shape = "symmetric"} (\code{\link[=SSlogistic]{SSlogistic()}}):
+\code{A + (B - A) / (1 + exp(-4 * slope * (t - xmid) / (B - A)))}
+\item \code{shape = "gompertz"} (\code{\link[=SSgompertz]{SSgompertz()}}):
+\code{A + (B - A) * exp(-exp(-k * (t - xmid)))}
+with \code{k = slope * e / (B - A)}. Early-acceleration; inflection
+height fixed at \code{A + (B - A) / e}.
+\item \code{shape = "gompertz_left"} (\code{\link[=SSgompertz_left]{SSgompertz_left()}}):
+\code{A + (B - A) * (1 - exp(-exp(k * (t - xmid))))}
+with \code{k = slope * e / (B - A)}. Late-acceleration; inflection
+height fixed at \code{A + (B - A) * (1 - 1/e)}.
 }
 
 \code{xmid} is the time at the inflection (steepest) point of the response,
 reported relative to \code{t0}. \code{slope} is the response rate \code{dx/dt} at the
-inflection. \code{asym} is the inflection-height fraction; values \verb{< 0.5}
-indicate an early-acceleration curve and \verb{> 0.5} a late-acceleration
-curve. See \code{\link[=logistic]{logistic()}} for the model family and \code{\link[=SSlogistic]{SSlogistic()}} for
-self-start initialisation.
+inflection. The \code{symmetric} shape is the default for an unbiased fit
+when no obvious asymmetry is expected; \code{gompertz} is appropriate
+for fast-onset / slow-tail responses, and \code{gompertz_left} for
+slow-onset / fast-tail responses. See \code{\link[=logistic]{logistic()}}, \code{\link[=gompertz]{gompertz()}},
+and \code{\link[=gompertz_left]{gompertz_left()}} for the model families.
 
 Additional arguments (\code{...}) accepted when \code{method = "logistic"}:
 
 \describe{
-\item{\code{use_asym}}{Logical; default is \code{TRUE} to attempt to fit a
-5-parameter \code{\link[=SSlogistic]{SSlogistic()}} model with an asymmetry parameter
-(\code{asym}). If the 5-parameter fit fails, or if \code{use_asym = FALSE},
-fits a reduced 4-parameter symmetric model.}
+\item{\code{shape}}{Character; the sigmoidal shape to fit. One of
+\code{"symmetric"} (\emph{default}), \code{"gompertz"}, or \code{"gompertz_left"}.}
 \item{\code{...}}{Other arguments passed to \code{\link[stats:nls]{stats::nls()}}
 \verb{<NOT YET IMPLEMENTED>}.}
 }

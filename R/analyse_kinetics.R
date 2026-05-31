@@ -167,32 +167,37 @@
 #'
 #' Aliases: `method = c("sigmoidal", "xmid")`.
 #'
-#' A parametric approach fitting a self-starting logistic function to the
-#' response curve using [stats::nls()] with [SSlogistic()] for either a
-#' 5-parameter (A, B, xmid, slope, asym) or 4-parameter symmetric
-#' (A, B, xmid, slope) model.
+#' A parametric approach fitting a self-starting 4-parameter sigmoidal
+#' function to the response curve using [stats::nls()] in one of three
+#' shapes. All three expose the same coefficients `(A, B, xmid, slope)`
+#' for cross-shape and cross-channel comparability.
 #'
-#' Model equations:
+#' Model equations (all 4-parameter):
 #'
-#' - 4-parameter: `A + (B - A) / (1 + exp(-4 * slope * (t - xmid) / (B - A)))`
-#' - 5-parameter: Richards re-parameterisation so `asym` is the
-#'   inflection-height fraction `(y(xmid) - A) / (B - A)`, bounded in
-#'   `(0, 1)`. `asym = 0.5` collapses to the 4-parameter symmetric form.
+#' - `shape = "symmetric"` ([SSlogistic()]):
+#'   `A + (B - A) / (1 + exp(-4 * slope * (t - xmid) / (B - A)))`
+#' - `shape = "gompertz"` ([SSgompertz()]):
+#'   `A + (B - A) * exp(-exp(-k * (t - xmid)))`
+#'   with `k = slope * e / (B - A)`. Early-acceleration; inflection
+#'   height fixed at `A + (B - A) / e`.
+#' - `shape = "gompertz_left"` ([SSgompertz_left()]):
+#'   `A + (B - A) * (1 - exp(-exp(k * (t - xmid))))`
+#'   with `k = slope * e / (B - A)`. Late-acceleration; inflection
+#'   height fixed at `A + (B - A) * (1 - 1/e)`.
 #'
 #' `xmid` is the time at the inflection (steepest) point of the response,
 #' reported relative to `t0`. `slope` is the response rate `dx/dt` at the
-#' inflection. `asym` is the inflection-height fraction; values `< 0.5`
-#' indicate an early-acceleration curve and `> 0.5` a late-acceleration
-#' curve. See [logistic()] for the model family and [SSlogistic()] for
-#' self-start initialisation.
+#' inflection. The `symmetric` shape is the default for an unbiased fit
+#' when no obvious asymmetry is expected; `gompertz` is appropriate
+#' for fast-onset / slow-tail responses, and `gompertz_left` for
+#' slow-onset / fast-tail responses. See [logistic()], [gompertz()],
+#' and [gompertz_left()] for the model families.
 #'
 #' Additional arguments (`...`) accepted when `method = "logistic"`:
 #'
 #' \describe{
-#'   \item{`use_asym`}{Logical; default is `TRUE` to attempt to fit a
-#'       5-parameter [SSlogistic()] model with an asymmetry parameter
-#'       (`asym`). If the 5-parameter fit fails, or if `use_asym = FALSE`,
-#'       fits a reduced 4-parameter symmetric model.}
+#'   \item{`shape`}{Character; the sigmoidal shape to fit. One of
+#'       `"symmetric"` (*default*), `"gompertz"`, or `"gompertz_left"`.}
 #'   \item{`...`}{Other arguments passed to [stats::nls()]
 #'       `<NOT YET IMPLEMENTED>`.}
 #' }
@@ -507,7 +512,7 @@ analyse_kinetics.logistic <- function(
             data = data_list[[.i]],
             nirs_channels = !!enquo(nirs_channels),
             time_channel = !!enquo(time_channel),
-            use_asym = args$use_asym %||% TRUE,
+            shape = args$shape %||% "symmetric",
             end_fit_span = end_fit_span,
             channel_args = channel_args,
             verbose = verbose,

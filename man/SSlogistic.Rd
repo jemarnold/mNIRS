@@ -24,8 +24,8 @@ variable at the inflection point \code{xmid}.}
 \item{asym}{A numeric parameter for the asymmetry index of the curve,
 equal to the fraction of the response where the inflection point \code{xmid}
 occurs, bounded in \code{c(0, 1)} for \code{(y(xmid) - A) / (B - A)}. \code{asym = 0.5}
-is symmetric and equivalent to the 4-parameter form. If \code{NULL} (\emph{default}), a
-symmetric 4-parameter model is used.}
+is symmetric and equivalent to the 4-parameter form. If \code{NULL}
+(\emph{default}), a symmetric 4-parameter model is used.}
 }
 \value{
 A numeric vector of predicted values the same length as the
@@ -43,10 +43,14 @@ symmetric form (A, B, xmid, slope) and the 5-parameter asymmetric form
 
 5-parameter model: \code{x ~ SSlogistic(t, A, B, xmid, slope, asym)}
 
-The 4-parameter form is recommended for small samples or when no obvious
-asymmetry is expected, as it converges more reliably. \code{\link[stats:nls]{stats::nls()}}
-reads the free parameters from the formula right-hand side, so omitting
-\code{asym} incurs no degrees-of-freedom penalty.
+The 4-parameter form is used by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when
+\code{method = "logistic"} and \code{shape = "symmetric"}. The 5-parameter
+asymmetric form is retained as an advanced escape hatch for direct
+\code{\link[stats:nls]{stats::nls()}} use only; \code{analyse_kinetics()} instead dispatches to
+\code{\link[=SSgompertz]{SSgompertz()}} / \code{\link[=SSgompertz_left]{SSgompertz_left()}} for asymmetric shapes,
+which are more numerically stable on noisy real-world data.
+\code{\link[stats:nls]{stats::nls()}} reads the free parameters from the formula right-hand
+side, so omitting \code{asym} incurs no degrees-of-freedom penalty.
 }
 \examples{
 ## create a logistic curve with random noise

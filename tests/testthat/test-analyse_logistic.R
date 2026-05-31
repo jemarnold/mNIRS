@@ -449,6 +449,219 @@ test_that("SSlogistic() fails gracefully on non-sigmoidal data", {
 })
 
 
+## gompertz() / gompertz_left() ===================================
+test_that("gompertz() returns correct vector length and type", {
+    t <- 1:60
+    result <- gompertz(t, A = 0, B = 100, xmid = 30, slope = 4)
+
+    expect_length(result, length(t))
+    expect_type(result, "double")
+})
+
+test_that("gompertz() inflection at xmid equals A + (B - A) / e", {
+    t <- seq(0, 60, length.out = 1000)
+    A <- 10
+    B <- 100
+    xmid <- 30
+    result <- gompertz(t, A = A, B = B, xmid = xmid, slope = 4)
+
+    y_at_xmid <- result[which.min(abs(t - xmid))]
+    expect_true(all.equal(
+        y_at_xmid, A + (B - A) / exp(1), tolerance = 1, scale = 1
+    ))
+})
+
+test_that("gompertz_left() inflection at xmid equals A + (B - A) * (1 - 1/e)", {
+    t <- seq(0, 60, length.out = 1000)
+    A <- 10
+    B <- 100
+    xmid <- 30
+    result <- gompertz_left(t, A = A, B = B, xmid = xmid, slope = 4)
+
+    ## visual check
+    # ggplot2::ggplot(data.frame(), ggplot2::aes(x = t, y = result)) +
+    #     ggplot2::geom_line()
+
+    y_at_xmid <- result[which.min(abs(t - xmid))]
+    expect_true(all.equal(
+        y_at_xmid, A + (B - A) * (1 - 1 / exp(1)), tolerance = 1, scale = 1
+    ))
+})
+
+test_that("gompertz() recovers slope at inflection numerically", {
+    t <- seq(0, 60, length.out = 10000)
+    slope <- 4
+    result <- gompertz(t, A = 10, B = 100, xmid = 30, slope = slope)
+    ## numerical derivative at the inflection
+    dy_dt <- diff(result) / diff(t)
+    i_infl <- which.min(abs(t[-1L] - 30))
+
+    expect_true(all.equal(
+        dy_dt[i_infl], slope, tolerance = 0.1, scale = 1
+    ))
+})
+
+test_that("gompertz_left() recovers slope at inflection numerically", {
+    t <- seq(0, 60, length.out = 10000)
+    slope <- 4
+    result <- gompertz_left(t, A = 10, B = 100, xmid = 30, slope = slope)
+    dy_dt <- diff(result) / diff(t)
+    i_infl <- which.min(abs(t[-1L] - 30))
+
+    expect_true(all.equal(
+        dy_dt[i_infl], slope, tolerance = 0.1, scale = 1
+    ))
+})
+
+test_that("gompertz() approaches A and B asymptotes", {
+    t <- -200:200
+    result <- gompertz(t, A = 10, B = 100, xmid = 0, slope = 4)
+
+    expect_true(all.equal(result[1L], 10, tolerance = 0.5, scale = 1))
+    expect_true(
+        all.equal(result[length(result)], 100, tolerance = 0.5, scale = 1)
+    )
+})
+
+test_that("gompertz_left() approaches A and B asymptotes", {
+    t <- -200:200
+    result <- gompertz_left(t, A = 10, B = 100, xmid = 0, slope = 4)
+
+    expect_true(all.equal(result[1L], 10, tolerance = 0.5, scale = 1))
+    expect_true(
+        all.equal(result[length(result)], 100, tolerance = 0.5, scale = 1)
+    )
+})
+
+test_that("gompertz()/gompertz_left() are monotonic for B > A", {
+    t <- 1:60
+    right <- gompertz(t, A = 10, B = 100, xmid = 30, slope = 4)
+    left <- gompertz_left(t, A = 10, B = 100, xmid = 30, slope = 4)
+
+    expect_true(all(diff(right) > 0))
+    expect_true(all(diff(left) > 0))
+})
+
+test_that("gompertz()/gompertz_left() handle falling curves (B < A)", {
+    t <- 1:60
+    right <- gompertz(t, A = 100, B = 10, xmid = 30, slope = -4)
+    left <- gompertz_left(t, A = 100, B = 10, xmid = 30, slope = -4)
+
+    expect_true(all(diff(right) < 0))
+    expect_true(all(diff(left) < 0))
+})
+
+
+## SSgompertz() / SSgompertz_left() ================================
+test_that("SSgompertz() recovers parameters", {
+    set.seed(13)
+    t <- 1:60
+    base <- list(A = 10, B = 100, xmid = 30, slope = 4)
+    x <- do.call(gompertz, c(list(t = t), base)) + rnorm(length(t), 0, 2)
+    data <- data.frame(t, x)
+
+    model <- nls(x ~ SSgompertz(t, A, B, xmid, slope), data = data)
+
+    expect_s3_class(model, "nls")
+    expect_named(coef(model), c("A", "B", "xmid", "slope"))
+
+    coefs <- coef(model)
+    expect_true(all.equal(coefs[["A"]], base$A, tolerance = 1, scale = 1))
+    expect_true(all.equal(coefs[["B"]], base$B, tolerance = 1, scale = 1))
+    expect_true(all.equal(coefs[["xmid"]], base$xmid, tolerance = 1, scale = 1))
+    expect_true(
+        all.equal(coefs[["slope"]], base$slope, tolerance = 0.1, scale = 1)
+    )
+})
+
+test_that("SSgompertz_left() recovers parameters", {
+    set.seed(13)
+    t <- 1:60
+    base <- list(A = 10, B = 100, xmid = 30, slope = 4)
+    x <- do.call(gompertz_left, c(list(t = t), base)) + rnorm(length(t), 0, 2)
+    data <- data.frame(t, x)
+
+    model <- nls(x ~ SSgompertz_left(t, A, B, xmid, slope), data = data)
+
+    expect_s3_class(model, "nls")
+    expect_named(coef(model), c("A", "B", "xmid", "slope"))
+
+    coefs <- coef(model)
+    expect_true(all.equal(coefs[["A"]], base$A, tolerance = 1, scale = 1))
+    expect_true(all.equal(coefs[["B"]], base$B, tolerance = 1, scale = 1))
+    expect_true(all.equal(coefs[["xmid"]], base$xmid, tolerance = 1, scale = 1))
+    expect_true(
+        all.equal(coefs[["slope"]], base$slope, tolerance = 0.1, scale = 1)
+    )
+})
+
+test_that("SSgompertz() handles falling curves (B < A)", {
+    set.seed(456)
+    t <- 1:60
+    base <- list(A = 100, B = 10, xmid = 30, slope = -4)
+    x <- do.call(gompertz, c(list(t = t), base)) + rnorm(length(t), 0, 2)
+    data <- data.frame(t, x)
+
+    model <- nls(x ~ SSgompertz(t, A, B, xmid, slope), data = data)
+    coefs <- coef(model)
+
+    expect_s3_class(model, "nls")
+    expect_true(all.equal(coefs[["A"]], base$A, tolerance = 1, scale = 1))
+    expect_true(all.equal(coefs[["B"]], base$B, tolerance = 2, scale = 1))
+    expect_true(all.equal(coefs[["xmid"]], base$xmid, tolerance = 1, scale = 1))
+    expect_true(
+        all.equal(coefs[["slope"]], base$slope, tolerance = 0.1, scale = 1)
+    )
+})
+
+test_that("SSgompertz()/SSgompertz_left() converge on real dataset", {
+    skip_on_ci()
+    skip_on_covr()
+    skip_on_cran()
+    skip_if(!interactive(), "Manual convergence check")
+    file_path <- test_path("testdata/reoxy_list.rds")
+    skip_if_not(file.exists(file_path), "testdata not available")
+
+    reoxy_list <- readRDS(file_path)
+
+    fit_shape <- function(signal, ss_fn) {
+        result <- lapply(reoxy_list, \(df) {
+            data <- data.frame(t = df$time, x = df[[signal]])
+            rhs <- as.call(c(
+                ss_fn,
+                list(quote(t), quote(A), quote(B), quote(xmid), quote(slope))
+            ))
+            f <- stats::as.formula(call("~", quote(x), rhs))
+            model <- tryCatch(
+                nls(f, data = data),
+                error = \(e) NULL,
+                warning = \(w) NULL
+            )
+
+            if (is.null(model)) {
+                stats::setNames(
+                    rep(NA_real_, 4), c("A", "B", "xmid", "slope")
+                )
+            } else {
+                coef(model)
+            }
+        })
+
+        return(do.call(rbind, lapply(result, \(x) as.data.frame(as.list(x)))))
+    }
+
+    smo2_right <- fit_shape("VL_smo2", quote(SSgompertz))
+    hhb_right <- fit_shape("VL_HHb", quote(SSgompertz))
+    smo2_left <- fit_shape("VL_smo2", quote(SSgompertz_left))
+    hhb_left <- fit_shape("VL_HHb", quote(SSgompertz_left))
+
+    expect_true(mean(!is.na(smo2_right$A)) >= 0.9)
+    expect_true(mean(!is.na(hhb_right$A)) >= 0.9)
+    expect_true(mean(!is.na(smo2_left$A)) >= 0.9)
+    expect_true(mean(!is.na(hhb_left$A)) >= 0.9)
+})
+
+
 ## analyse_logistic() ===================================================
 
 ## helper: create logistic test data with known parameters
@@ -491,14 +704,14 @@ test_that("analyse_logistic() returns correct structure", {
     result <- analyse_logistic(
         data,
         nirs_channels = "smo2",
-        use_asym = FALSE,
+        shape = "symmetric",
         verbose = FALSE
     )
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
         "nirs_channels", "time_channel",
-        "A", "B", "xmid", "slope", "asym", "xmid_fitted"
+        "A", "B", "xmid", "slope", "xmid_fitted"
     ))
     expect_equal(nrow(result), 1L)
 
@@ -515,29 +728,19 @@ test_that("analyse_logistic() returns correct structure", {
     expect_equal(nrow(attr(result, "channel_args")), 1L)
 })
 
-test_that("analyse_logistic() validates use_asym argument", {
+test_that("analyse_logistic() validates shape argument", {
     data <- create_logistic_data()
 
     expect_error(
         analyse_logistic(
             data,
             nirs_channels = "smo2",
-            use_asym = "yes"
-        ),
-        "use_asym.*logical"
-    )
-
-    expect_error(
-        analyse_logistic(
-            data,
-            nirs_channels = "smo2",
-            use_asym = c(TRUE, FALSE)
-        ),
-        "use_asym.*logical"
+            shape = "not_a_shape"
+        )
     )
 })
 
-test_that("analyse_logistic() recovers 4-param known parameters", {
+test_that("analyse_logistic() recovers symmetric known parameters", {
     A <- 10
     B <- 100
     xmid <- 30
@@ -550,7 +753,7 @@ test_that("analyse_logistic() recovers 4-param known parameters", {
     result <- analyse_logistic(
         data,
         nirs_channels = "smo2",
-        use_asym = FALSE,
+        shape = "symmetric",
         verbose = FALSE
     )
 
@@ -558,33 +761,62 @@ test_that("analyse_logistic() recovers 4-param known parameters", {
     expect_true(all.equal(result$B, B, tolerance = 1, scale = 1))
     expect_true(all.equal(result$xmid, xmid, tolerance = 1, scale = 1))
     expect_true(all.equal(result$slope, slope, tolerance = 0.2, scale = 1))
-    expect_true(is.na(result$asym))
 })
 
-test_that("analyse_logistic() recovers 5-param known parameters", {
+test_that("analyse_logistic() recovers gompertz known parameters", {
     A <- 10
     B <- 100
     xmid <- 30
     slope <- 4
-    asym <- 0.3
 
-    data <- create_logistic_data(
-        A = A, B = B, xmid = xmid, slope = slope, asym = asym,
-        n = 100, noise_sd = 1
+    set.seed(13)
+    n <- 100
+    t <- seq(0, n - 1, length.out = n)
+    x <- gompertz(t, A, B, xmid, slope) + rnorm(n, 0, 1)
+    df <- data.frame(time = t, smo2 = x)
+    data <- create_mnirs_data(
+        df, nirs_channels = "smo2", time_channel = "time", sample_rate = 1
     )
 
     result <- analyse_logistic(
         data,
         nirs_channels = "smo2",
-        use_asym = TRUE,
+        shape = "gompertz",
         verbose = FALSE
     )
 
     expect_true(all.equal(result$A, A, tolerance = 2, scale = 1))
     expect_true(all.equal(result$B, B, tolerance = 2, scale = 1))
     expect_true(all.equal(result$xmid, xmid, tolerance = 2, scale = 1))
-    expect_true(all.equal(result$slope, slope, tolerance = 0.25, scale = 1))
-    expect_true(all.equal(result$asym, asym, tolerance = 0.15, scale = 1))
+    expect_true(all.equal(result$slope, slope, tolerance = 0.3, scale = 1))
+})
+
+test_that("analyse_logistic() recovers gompertz_left known parameters", {
+    A <- 10
+    B <- 100
+    xmid <- 30
+    slope <- 4
+
+    set.seed(13)
+    n <- 100
+    t <- seq(0, n - 1, length.out = n)
+    x <- gompertz_left(t, A, B, xmid, slope) + rnorm(n, 0, 1)
+    df <- data.frame(time = t, smo2 = x)
+    data <- create_mnirs_data(
+        df, nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+    )
+
+    result <- analyse_logistic(
+        data,
+        nirs_channels = "smo2",
+        shape = "gompertz_left",
+        verbose = FALSE
+    )
+
+    expect_true(all.equal(result$A, A, tolerance = 2, scale = 1))
+    expect_true(all.equal(result$B, B, tolerance = 2, scale = 1))
+    expect_true(all.equal(result$xmid, xmid, tolerance = 2, scale = 1))
+    expect_true(all.equal(result$slope, slope, tolerance = 0.3, scale = 1))
 })
 
 test_that("analyse_logistic() uses t0 correctly", {
@@ -602,7 +834,7 @@ test_that("analyse_logistic() uses t0 correctly", {
     result <- analyse_logistic(
         data,
         nirs_channels = "smo2",
-        use_asym = FALSE,
+        shape = "symmetric",
         t0 = t0,
         verbose = FALSE
     )
@@ -631,7 +863,7 @@ test_that("analyse_logistic() t0 edge cases", {
         result <- analyse_logistic(
             data,
             nirs_channels = "smo2",
-            use_asym = FALSE,
+            shape = "symmetric",
             t0 = 0,
             verbose = TRUE
         ),
@@ -645,7 +877,7 @@ test_that("analyse_logistic() t0 edge cases", {
         analyse_logistic(
             data,
             nirs_channels = "smo2",
-            use_asym = FALSE,
+            shape = "symmetric",
             t0 = max(data$time) + 10,
             verbose = TRUE
         ),
@@ -653,35 +885,16 @@ test_that("analyse_logistic() t0 edge cases", {
     )
 })
 
-test_that("analyse_logistic() falls back from 5-param to 4-param", {
-    ## short noisy series makes 5-param hard to converge
-    data <- create_logistic_data(n = 60, noise_sd = 5, seed = 101)
-
-    expect_warning(
-        result <- analyse_logistic(
-            data,
-            nirs_channels = "smo2",
-            use_asym = TRUE,
-            verbose = TRUE
-        ),
-        "SSlogistic.*fit failed"
-    )
-
-    ## should still return a valid result via 4-param fallback
-    expect_s3_class(result, "data.frame")
-    expect_true(is.na(result$asym))
-    expect_false(is.na(result$xmid))
-})
-
 test_that("analyse_logistic() returns NA for failed fit", {
-    ## only 3 observations for a 4-param model
+    ## only 10 observations for a 4-param model with near-zero noise —
+    ## insufficient distinct response to converge
     custom_name <- create_logistic_data(n = 10, noise_sd = 0.1)
 
     expect_warning(
         result <- analyse_logistic(
             custom_name,
             nirs_channels = "smo2",
-            use_asym = FALSE
+            shape = "symmetric"
         ),
         "fit failed for.*smo2.*custom_name" ## call custom interval name
     )
@@ -692,14 +905,14 @@ test_that("analyse_logistic() returns NA for failed fit", {
 })
 
 test_that("analyse_logistic() suppresses fit-failure warning when verbose = FALSE", {
-    ## only 3 observations for a 4-param model — guaranteed fit failure
+    ## small n + low noise — guaranteed fit failure
     custom_name <- create_logistic_data(n = 10, noise_sd = 0.1)
 
     expect_no_warning(
         analyse_logistic(
             custom_name,
             nirs_channels = "smo2",
-            use_asym = FALSE,
+            shape = "symmetric",
             verbose = FALSE
         )
     )
@@ -712,7 +925,7 @@ test_that("analyse_logistic() works with multiple channels", {
     result <- analyse_logistic(
         data,
         nirs_channels = nirs_channels,
-        use_asym = FALSE,
+        shape = "symmetric",
         verbose = FALSE
     )
 
@@ -726,25 +939,24 @@ test_that("analyse_logistic() works with multiple channels", {
 
 test_that("analyse_logistic() channel_args override defaults", {
     data <- create_logistic_data(
-        channels = c("ch1", "ch2"), asym = 0.5, n = 100, noise_sd = 1
+        channels = c("ch1", "ch2"), n = 100, noise_sd = 1
     )
 
     result <- analyse_logistic(
         data,
         nirs_channels = c("ch1", "ch2"),
-        use_asym = FALSE,
-        channel_args = list(ch2 = list(use_asym = TRUE)),
+        shape = "symmetric",
+        channel_args = list(ch2 = list(shape = "gompertz")),
         verbose = FALSE
     )
 
-    ## ch1 has no asym (4-param), ch2 has asym (5-param)
-    expect_equal(is.na(result$asym), c(TRUE, FALSE))
+    expect_equal(nrow(result), 2L)
 
     ca <- attr(result, "channel_args")
     ch1_row <- ca[ca$nirs_channels == "ch1", ]
     ch2_row <- ca[ca$nirs_channels == "ch2", ]
-    expect_false(ch1_row$use_asym)
-    expect_true(ch2_row$use_asym)
+    expect_equal(ch1_row$shape, "symmetric")
+    expect_equal(ch2_row$shape, "gompertz")
 })
 
 test_that("analyse_logistic() fitted_data attribute is well-formed", {
@@ -753,7 +965,7 @@ test_that("analyse_logistic() fitted_data attribute is well-formed", {
     result <- analyse_logistic(
         data,
         nirs_channels = "smo2",
-        use_asym = FALSE,
+        shape = "symmetric",
         verbose = FALSE
     )
 
@@ -772,7 +984,7 @@ test_that("analyse_logistic() diagnostics contain expected columns", {
     result <- analyse_logistic(
         data,
         nirs_channels = "smo2",
-        use_asym = FALSE,
+        shape = "symmetric",
         verbose = FALSE
     )
 
