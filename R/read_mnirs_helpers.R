@@ -649,28 +649,26 @@ detect_irregular_samples <- function(
         return(invisible())
     }
 
-    ## find duplicated, unordered, or big gaps in samples
+    ## flag duplicated, unordered, or big-gap samples
     diffs <- diff(x)
-    irregular_idx <- c(
-        which(duplicated(x)), which(diffs < 0), which(diffs >= 3600)
-    )
+    irregular <- duplicated(x)
+    irregular[-1L] <- irregular[-1L] | diffs < 0 | diffs >= 3600
 
-    ## silence if no irregular samples
-    if (length(irregular_idx) == 0) {
+    ## skip if no irregular samples
+    if (!any(irregular)) {
         return(invisible())
     }
 
-    irregular_vec <- round(unique(x[irregular_idx]), 6)
+    irregular_vec <- unique(round(x[irregular], 6))
+    n_total <- length(irregular_vec)
 
-    info_msg <- if (length(irregular_vec) > 5L) {
-        ## if more than 5 irregular samples, print the first three
-        irregular_display <- irregular_vec[seq_len(3L)]
-
-        "Investigate at {.arg {time_channel}} = {.val {irregular_display}} \\
-        and {length(irregular_vec) - 3L} more."
+    info_msg <- if (n_total > 5L) {
+        ## more than 5: print the first three plus remaining count
+        "{.arg {time_channel}} = {.val {irregular_vec[seq_len(3L)]}} \\
+        and {n_total - 3L} more."
     } else {
-        ## if 5 or fewer irregular samples, print all of them
-        "Investigate at {.arg {time_channel}} = {.val {irregular_vec}}."
+        ## 5 or fewer: print all
+        "{.arg {time_channel}} = {.val {irregular_vec}}."
     }
 
     cli_warn(c(

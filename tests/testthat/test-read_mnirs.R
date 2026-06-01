@@ -1650,7 +1650,7 @@ test_that("detect_irregular_samples detects unordered samples", {
     )
     expect_warning(
         detect_irregular_samples(x, "time"),
-        "time.*=.*3"
+        "time.*=.*2"
     )
 })
 

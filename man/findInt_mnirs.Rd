@@ -2,11 +2,11 @@
 % Please edit documentation in R/validate_mnirs.R
 \name{findInt_mnirs}
 \alias{findInt_mnirs}
-\title{wrap findInterval: relabel base R's 'vec' as 'time_channel' on error}
+\title{wrap findInterval: informative 'time_channel' error message}
 \usage{
 findInt_mnirs(...)
 }
 \description{
-wrap findInterval: relabel base R's 'vec' as 'time_channel' on error
+wrap findInterval: informative 'time_channel' error message
 }
 \keyword{internal}

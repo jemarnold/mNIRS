@@ -520,12 +520,13 @@ ensemble_intervals <- function(
 
     ## warn if any time samples have only one value, implying irregular
     ## samples and may result in alternating samples instead of ensemble-means
-    if (verbose && min(lengths(time_groups), na.rm = TRUE) < 2) {
+    if (verbose && any(lengths(time_groups) < 2L)) {
         cli_warn(c(
             "!" = "Duplicate or irregular {.arg time_channel} samples \\
             detected after ensemble-averaging.",
-            "i" = "Check your resulting data for inconsistent results.",
-            "i" = "Re-sample with {.fn mnirs::resample_mnirs}."
+            "i" = "Re-sample with {.fn mnirs::resample_mnirs} before \\
+            ensemble-averaging.",
+            "i" = "Check your resulting data for inconsistent results."
         ))
     }
 
@@ -539,11 +540,10 @@ ensemble_intervals <- function(
 
     ## vapply returns channels x times (or vector if 1 channel)
     ## coerce to times x channels data frame
-    if (col_n == 1L) {
-        result_df <- data.frame(setNames(list(result_matrix), nirs_channels))
+    result_df <- if (col_n == 1L) {
+        data.frame(setNames(list(result_matrix), nirs_channels))
     } else {
-        result_df <- as.data.frame(t(result_matrix))
-        names(result_df) <- nirs_channels
+        as.data.frame(t(result_matrix))
     }
     result <- data.frame(setNames(list(unique_times), time_channel), result_df)
 

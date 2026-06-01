@@ -173,7 +173,7 @@ compute_valid_neighbours <- function(
 
     if (!is.null(width)) {
         ## find position to the left of each NA in valid_idx sequence
-        pos <- findInt_mnirs(na_idx, valid_idx)
+        pos <- findInterval(na_idx, valid_idx)
         half_width <- floor(width / 2L)
 
         window_idx <- vector("list", n_na)
@@ -199,7 +199,7 @@ compute_valid_neighbours <- function(
         ) + 1L
         hi <- findInt_mnirs(t_na[.i] + half_span, t_valid)
         if (lo > hi) {
-            pos <- findInt_mnirs(na_idx[.i], valid_idx)
+            pos <- findInterval(na_idx[.i], valid_idx)
             return(unique(valid_idx[c(pos, min(n_valid, pos + 1L))]))
         }
         valid_idx[lo:hi]

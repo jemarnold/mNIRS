@@ -268,14 +268,14 @@ create_mnirs_data(df, nirs_channels = c(o2hb, hhb))
 * Add `portamon-oxcap.xlsx` example file (thanks to Dr. Thomas Tripp and Dr. Martin MacInnis).
 * Update `train.red_intervals.csv`, delete redundant NIRS channels to reduce file size.
 * Minors updates to `monoexponential` family of functions.
-    * Fix `SS_monoexp3()` to not internally look for `TD` parameter. 
+    * Fix `SSmonoexp3()` to not internally look for `TD` parameter. 
     * Remove `monoexp_init()` from exported to internal.
 
 # mnirs 0.4.0
 
-* Create `monoexponential()`, `SS_monoexp3()`, and `SS_monoexp4()` self-starting model functions.
+* Create `monoexponential()`, `SSmonoexp3()`, and `SSmonoexp4()` self-starting model functions.
     * `monoexponential()` is the equation for a 4-parameter monoexponential function with parametera "A", "B", "tau", and "TD".
-    * `SS_monoexp*()` are self-starting functions for `nls()` or other curve fitting functions, for either the 4-parameter monoexponential function, or a reduced 3-parameter function without a time delay ("TD").
+    * `SSmonoexp*()` are self-starting functions for `nls()` or other curve fitting functions, for either the 4-parameter monoexponential function, or a reduced 3-parameter function without a time delay ("TD").
     * `fix_coef()` is used to update a model with any number of parameters set to fixed values, e.g. if the starting or ending values are known a priori. By entering fixed values, the remaining parameters are left free to be optimised (experimental function, may not work when called from within nested function conditions, need to further validate).  
 * Add `vo2master.csv` example file recorded with VO2 Master Manager app (thanks Philip Skotzke).
 * Update `read_mnirs()` to correctly convert "," decimal values to numeric (thanks Philip Skotzke).
