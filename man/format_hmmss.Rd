@@ -14,7 +14,7 @@ A character vector the same length as \code{x}.
 }
 \description{
 Convert numeric time span data to \code{h:mm:ss} format for pretty plotting.
-Inspired by \code{\link[ggplot2:scale_date]{ggplot2::scale_x_time()}}.
+Inspired by \code{\link[ggplot2:scale_x_time]{ggplot2::scale_x_time()}}.
 }
 \details{
 If all values are less than 3600 (1 hour), then format is returned as

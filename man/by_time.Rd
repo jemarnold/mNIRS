@@ -9,7 +9,7 @@
 \usage{
 by_time(...)
 
-by_label(...)
+by_label(..., ignore_case = FALSE, fixed = FALSE)
 
 by_lap(...)
 
@@ -20,12 +20,20 @@ by_sample(...)
 \describe{
 \item{\code{by_time(...)}}{Numeric time values in units of \code{time_channel}.}
 \item{\code{by_label(...)}}{Character strings to match in \code{event_channel}.
-All matching occurrences are returned.}
+Matched as regular expressions by default; see \code{ignore_case} and
+\code{fixed}. All matching occurrences are returned.}
 \item{\code{by_lap(...)}}{Integer lap numbers to match in \code{event_channel}.
 For \code{start}, resolves to the first sample of each lap. For \code{end},
 resolves to the last sample.}
 \item{\code{by_sample(...)}}{Integer sample indices (row numbers).}
 }}
+
+\item{ignore_case}{For \code{by_label()}. If \code{TRUE}, match case-insensitive
+labels. Default \code{FALSE}.}
+
+\item{fixed}{For \code{by_label()}. If \code{TRUE}, treat labels as fixed strings
+rather than regular expressions. Useful when labels contain regex
+metacharacters (\code{.}, \code{*}, \code{(}, etc.). Default \code{FALSE}.}
 }
 \value{
 An object of class \code{"mnirs_interval"} for use with the \code{start}
@@ -73,7 +81,15 @@ data <- create_mnirs_data(data, event_channel = "event")
 ## start by label, end by time
 extract_intervals(data, start = by_label("start"), end = by_time(1500))
 
+## case-insensitive label match
+extract_intervals(data, start = by_label("START", ignore_case = TRUE))
+
+## literal-string label match (regex metacharacters treated as text)
+data$event[1000] <- "lap.1"
+data <- create_mnirs_data(data, event_channel = "event")
+extract_intervals(data, start = by_label("lap.1", fixed = TRUE))
+
 ## multiple intervals by sample index
-extract_intervals(data, start = by_sample(1000, 1500), end = by_sample(2000, 2600))
+extract_intervals(data, start = by_sample(1000, 1500))
 
 }

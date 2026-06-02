@@ -25,7 +25,7 @@ A \link[ggplot2:ggplot]{ggplot2} scale object.
 Scales for custom \emph{{mnirs}} palette
 }
 \examples{
-\dontshow{if (rlang::is_installed(c("ggplot2", "scales"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (rlang::is_installed("ggplot2")) withAutoprint(\{ # examplesIf}
 ## plot example data
 data <- read_mnirs(
     file_path = example_mnirs("moxy_ramp"),
@@ -37,7 +37,7 @@ data <- read_mnirs(
 
 ggplot2::ggplot(data, ggplot2::aes(x = time)) +
     theme_mnirs() +
-    scale_colour_mnirs(name = NULL) +
+    scale_colour_mnirs() +
     ggplot2::geom_line(ggplot2::aes(y = smo2_left, colour = "smo2_left")) +
     ggplot2::geom_line(ggplot2::aes(y = smo2_right, colour = "smo2_right"))
 \dontshow{\}) # examplesIf}

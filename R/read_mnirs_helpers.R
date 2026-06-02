@@ -10,7 +10,7 @@ read_file <- function(file_path) {
     }
 
     ## import data_raw from either excel or csv
-    if (grepl("\\.csv$", file_path, ignore.case = TRUE)) {
+    if (grepl("\\.(csv|tsv|txt)$", file_path, ignore.case = TRUE)) {
         ## sample lines for separator and column count detection
         lines <- readLines(file_path, warn = FALSE)
         nrows <- length(lines)
@@ -28,15 +28,13 @@ read_file <- function(file_path) {
 
         ## read with explicit sep and column count to handle
         ## irregular header rows with fewer columns than data
-        data_raw <- data.frame(
-            data.table::fread(
-                text = lines,
-                header = FALSE,
-                fill = Inf,
-                sep = sep,
-                colClasses = "character",
-            )[-1, ]
-        )
+        data_raw <- data.table::fread(
+            text = lines,
+            header = FALSE,
+            fill = Inf,
+            sep = sep,
+            colClasses = "character",
+        )[-1, ]
     } else if (grepl("\\.xls(x)?$", file_path, ignore.case = TRUE)) {
         ## report error when file is open and cannot be accessed by readxl
         data_raw <- tryCatch(
@@ -49,27 +47,26 @@ read_file <- function(file_path) {
             error = \(e) {
                 if (grepl("cannot be opened", e$message)) {
                     cli_abort(c(
-                        "{e}",
                         "x" = "File cannot be opened.",
-                        "i" = "Check the file is not in use by another \\
-                        application."
+                        "i" = "Check file is not in use by another \\
+                        application.",
+                        "i" = "{e$message}"
                     ))
                 } else {
                     cli_abort(e$message)
                 }
             }
         )
-        data_raw <- data.frame(data_raw)
     } else {
         ## validation: check file types
         cli_abort(c(
-            "i" = "{.arg file_path} = {.path {file_path}}",
             "x" = "Unsupported file type.",
-            "i" = "Only {.var .csv} or {.var .xls(x)} supported."
+            "i" = "{.arg file_path} = {.path {file_path}}",
+            "i" = "Only {.var .csv}, {.var .txt}, and {.var .xls(x)} supported."
         ))
     }
 
-    return(data_raw)
+    return(data.frame(data_raw))
 }
 
 
@@ -78,48 +75,32 @@ read_file <- function(file_path) {
 device_patterns <- list(
     Artinis = list(
         ## keep `time_channel = NULL` to force `detect_time_channel` message
+        ## also requires matching "oxysoft" string
         time_channel = NULL,
-        nirs_channels = c("2"),
         pattern = "^(\\d+ )+(\\d+|NA) ?$",
         fixed = FALSE
     ),
     Train.Red = list(
-        time_channel = c("Timestamp (seconds passed)"),
-        nirs_channels = c("SmO2"),
+        time_channel = "Timestamp (seconds passed)",
         pattern = c("Timestamp (seconds passed)", "SmO2"),
         fixed = TRUE
     ),
     Moxy = list(
-        time_channel = c("hh:mm:ss"),
-        nirs_channels = c("SmO2 Live"),
+        time_channel = "hh:mm:ss",
         pattern = c("hh:mm:ss", "SmO2 Live"),
         fixed = TRUE
     ),
     VO2master = list(
-        time_channel = c("Time[s]"),
-        nirs_channels = c("SmO2[%]"),
+        time_channel = "Time[s]",
         pattern = c("Time[s]", "SmO2[%]"),
         fixed = TRUE
     ),
+    ## matches `nirs_channels` with "SmO2" below
     PerfPro = list(
-        time_channel = c("Time"),
-        nirs_channels = NULL,
+        time_channel = "Time",
         pattern = c("Time.*SmO2"),
         fixed = FALSE
     )
-)
-
-
-#' Datetime format strings for POSIXct parsing
-#' @keywords internal
-datetime_formats <- c(
-    "%H:%M:%OS",
-    "%Y-%m-%dT%H:%M:%OS",
-    "%Y-%m-%dT%H:%M:%OS%z",
-    "%Y-%m-%d %H:%M:%OS",
-    "%Y/%m/%d %H:%M:%OS",
-    "%d-%m-%Y %H:%M:%OS",
-    "%d/%m/%Y %H:%M:%OS"
 )
 
 
@@ -155,6 +136,14 @@ detect_mnirs_device <- function(data) {
         !is.null(find_row(data_strings[matched_row], .d$pattern, .d$fixed))
     }, names(device_patterns))
 
+    ## require "oxysoft" match for Artinis pattern
+    if (identical(device_name, "Artinis")) {
+        above_strings <- data_strings[seq_len(matched_row)]
+        if (!any(grepl("oxysoft", above_strings, ignore.case = TRUE))) {
+            return(list(nirs_device = NULL, header_row = 1L))
+        }
+    }
+
     return(list(nirs_device = device_name, header_row = matched_row))
 }
 
@@ -180,27 +169,36 @@ detect_device_channels <- function(
         ))
     }
 
-    ## need device detection when is.null(nirs_channel)
-    if (is.null(nirs_device)) {
+    ## scan header row for cols starting with "SmO2" ignore case, ignore NA
+    header <- Filter(Negate(is_empty), as.character(data[header_row, ]))
+
+    nirs_channels <- if (identical(nirs_device, "Artinis")) {
+        ## Artinis Oxysoft exports use numeric channel ids, not "SmO2"
+        header[startsWith(header, "2")]
+    } else {
+        header[startsWith(toupper(header), "SMO2")]
+    }
+
+    ## drop redundant unfiltered Train.Red, and Averaged Moxy channels
+    nirs_channels <- nirs_channels[
+        !grepl("unfiltered|Averaged", nirs_channels, ignore.case = TRUE)
+    ]
+
+    if (length(nirs_channels) == 0L) {
         cli_abort(c(
             "x" = "{.arg nirs_channels} cannot be determined automatically.",
             "i" = "Define {.arg nirs_channels} explicitly."
         ))
     }
 
-    ## successfully detected `nirs_device` with `nirs_channels = NULL`
-    ch_list <- device_patterns[[nirs_device]]
-    
-    if (nirs_device == "PerfPro") {
-        ch_list$nirs_channels <- Find(\(.x) {
-            startsWith(.x, "SmO2")
-        }, data[header_row, ])
-    }
-    
+    ## check for NULL
+    nirs_device <- nirs_device %||% "Unknown"
+
     ch_list <- list(
-        ## user-specified `time_channel` takes priority here
-        time_channel = time_channel %||% ch_list$time_channel,
-        nirs_channels = ch_list$nirs_channels,
+        ## priority: user `time_channel` -> device default -> NULL
+        time_channel = time_channel %||%
+            device_patterns[[nirs_device]]$time_channel,
+        nirs_channels = nirs_channels,
         keep_all = TRUE ## return all cols to view potential nirs_channels
     )
 
@@ -220,8 +218,8 @@ detect_device_channels <- function(
 #' @keywords internal
 read_data_table <- function(
     data,
-    nirs_channels = NULL,
-    header_row = 1L
+    header_row = 1L,
+    nirs_channels = NULL
 ) {
     nrows <- nrow(data)
     ## find the first row where ALL nirs_channels match
@@ -249,6 +247,19 @@ read_data_table <- function(
         data_table = data_table
     ))
 }
+
+
+#' Datetime format strings for POSIXct parsing
+#' @keywords internal
+datetime_formats <- c(
+    "%H:%M:%OS",
+    "%Y-%m-%dT%H:%M:%OS",
+    "%Y-%m-%dT%H:%M:%OS%z",
+    "%Y-%m-%d %H:%M:%OS",
+    "%Y/%m/%d %H:%M:%OS",
+    "%d-%m-%Y %H:%M:%OS",
+    "%d/%m/%Y %H:%M:%OS"
+)
 
 
 #' Extract earliest POSIXct value from file header metadata
@@ -638,28 +649,26 @@ detect_irregular_samples <- function(
         return(invisible())
     }
 
-    ## find duplicated, unordered, or big gaps in samples
+    ## flag duplicated, unordered, or big-gap samples
     diffs <- diff(x)
-    irregular_idx <- c(
-        which(duplicated(x)), which(diffs < 0), which(diffs >= 3600)
-    )
+    irregular <- duplicated(x)
+    irregular[-1L] <- irregular[-1L] | diffs < 0 | diffs >= 3600
 
-    ## silence if no irregular samples
-    if (length(irregular_idx) == 0) {
+    ## skip if no irregular samples
+    if (!any(irregular)) {
         return(invisible())
     }
 
-    irregular_vec <- round(unique(x[irregular_idx]), 6)
+    irregular_vec <- unique(round(x[irregular], 6))
+    n_total <- length(irregular_vec)
 
-    info_msg <- if (length(irregular_vec) > 5L) {
-        ## if more than 5 irregular samples, print the first three
-        irregular_display <- irregular_vec[seq_len(3L)]
-
-        "Investigate at {.arg {time_channel}} = {.val {irregular_display}} \\
-        and {length(irregular_vec) - 3L} more."
+    info_msg <- if (n_total > 5L) {
+        ## more than 5: print the first three plus remaining count
+        "{.arg {time_channel}} = {.val {irregular_vec[seq_len(3L)]}} \\
+        and {n_total - 3L} more."
     } else {
-        ## if 5 or fewer irregular samples, print all of them
-        "Investigate at {.arg {time_channel}} = {.val {irregular_vec}}."
+        ## 5 or fewer: print all
+        "{.arg {time_channel}} = {.val {irregular_vec}}."
     }
 
     cli_warn(c(

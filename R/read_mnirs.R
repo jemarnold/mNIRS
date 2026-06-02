@@ -156,7 +156,7 @@ read_mnirs <- function(
     keep_all <- channels$keep_all ## TRUE when `nirs_channels` unspecified
 
     ## extract the data_table, and name by header row
-    table_list <- read_data_table(data, nirs_channels, header_row)
+    table_list <- read_data_table(data, header_row, nirs_channels)
     data <- table_list$data_table
     file_header <- table_list$file_header
 
@@ -362,5 +362,5 @@ example_mnirs <- function(file = NULL) {
     }
 
     file <- match.arg(file, choices = dir_files)
-    system.file("extdata", file, package = "mnirs", mustWork = TRUE)
+    return(system.file("extdata", file, package = "mnirs", mustWork = TRUE))
 }

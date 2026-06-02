@@ -1,6 +1,6 @@
 Package: mnirs
 Title: Muscle Near-Infrared Spectroscopy Processing and Analysis
-Version: 0.6.4
+Version: 0.6.5
 Authors@R: 
     person("Jem", "Arnold", , "jem.arnold@gmail.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0003-3908-9447"))
@@ -42,4 +42,4 @@ Config/Needs/website: quarto, tidyverse
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
+Config/roxygen2/version: 8.0.0

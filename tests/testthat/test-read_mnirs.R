@@ -133,7 +133,7 @@ test_that("read_file() errors", {
         "File not found"
     )
 
-    temp_file <- tempfile(fileext = ".txt")
+    temp_file <- tempfile(fileext = ".docx")
     writeLines("test", temp_file)
     on.exit(unlink(temp_file))
 
@@ -246,6 +246,32 @@ test_that("detect_mnirs_device() returns NULL when no match", {
     )
 })
 
+test_that("detect_mnirs_device() requires 'oxysoft' for Artinis match", {
+    ## bare numeric rows match Artinis regex, but no 'oxysoft' above
+    data <- data.frame(
+        V1 = c("some", "1", "2"),
+        V2 = c("header", "2", "3"),
+        V3 = c("info", "3", "4")
+    )
+
+    expect_equal(
+        detect_mnirs_device(data),
+        list(nirs_device = NULL, header_row = 1)
+    )
+
+    ## 'oxysoft' present above numeric row — case-insensitive
+    data <- data.frame(
+        V1 = c("Exported from OxySoft", "more", "1", "2"),
+        V2 = c("v1", "info", "2", "3"),
+        V3 = c("", "", "3", "4")
+    )
+
+    expect_equal(
+        detect_mnirs_device(data),
+        list(nirs_device = "Artinis", header_row = 3)
+    )
+})
+
 
 ## detect_device_channels() ============================================
 test_that("detect_device_channels() returns user channels when provided", {
@@ -273,15 +299,101 @@ test_that("detect_device_channels() returns user channels even with NULL device"
 })
 
 test_that("detect_device_channels() detects known channels for device", {
+    data <- data.frame(
+        V1 = c("meta", "hh:mm:ss", "00:00:01"),
+        V2 = c("meta", "SmO2 Live", "55"),
+        stringsAsFactors = FALSE
+    )
+
     result <- detect_device_channels(
+        data,
+        header_row = 2L,
         nirs_device = "Moxy",
         nirs_channels = NULL,
         time_channel = NULL,
         verbose = FALSE
     )
 
-    expect_equal(result$nirs_channels, device_patterns$Moxy$nirs_channels)
+    expect_equal(result$nirs_channels, "SmO2 Live")
     expect_equal(result$time_channel, device_patterns$Moxy$time_channel)
+})
+
+test_that("detect_device_channels() detects multiple SmO2 channels", {
+    data <- data.frame(
+        V1 = c("Time", "0.1"),
+        V2 = c("SmO2 (1)", "55"),
+        V3 = c("SmO2 (2)", "60"),
+        V4 = c("HR", "120"),
+        stringsAsFactors = FALSE
+    )
+
+    result <- detect_device_channels(
+        data,
+        header_row = 1L,
+        nirs_device = "PerfPro",
+        nirs_channels = NULL,
+        verbose = FALSE
+    )
+
+    expect_equal(result$nirs_channels, c("SmO2 (1)", "SmO2 (2)"))
+})
+
+test_that("detect_device_channels() matches SmO2 case-insensitively", {
+    data <- data.frame(
+        V1 = c("Time", "0.1"),
+        V2 = c("smo2 raw", "55"),
+        V3 = c("SMO2_LIVE", "60"),
+        stringsAsFactors = FALSE
+    )
+
+    result <- detect_device_channels(
+        data,
+        header_row = 1L,
+        nirs_device = "Moxy",
+        nirs_channels = NULL,
+        verbose = FALSE
+    )
+
+    expect_equal(result$nirs_channels, c("smo2 raw", "SMO2_LIVE"))
+})
+
+test_that("detect_device_channels() returns '2' for Artinis without scanning", {
+    ## Artinis uses numeric channel id — no SmO2 column needed in data
+    data <- data.frame(
+        V1 = c("1", "2", "3"),
+        V2 = c("4", "5", "6"),
+        stringsAsFactors = FALSE
+    )
+
+    result <- detect_device_channels(
+        data,
+        header_row = 2L,
+        nirs_device = "Artinis",
+        nirs_channels = NULL,
+        verbose = FALSE
+    )
+
+    expect_equal(result$nirs_channels, "2")
+    expect_null(result$time_channel)
+})
+
+test_that("detect_device_channels() detects SmO2 for unknown device", {
+    data <- data.frame(
+        V1 = c("Time", "0.1"),
+        V2 = c("SmO2", "55"),
+        stringsAsFactors = FALSE
+    )
+
+    result <- detect_device_channels(
+        data,
+        header_row = 1L,
+        nirs_device = NULL,
+        nirs_channels = NULL,
+        verbose = FALSE
+    )
+
+    expect_equal(result$nirs_channels, "SmO2")
+    expect_null(result$time_channel)
 })
 
 test_that("detect_device_channels() detects known channels for PerfPro", {
@@ -305,26 +417,55 @@ test_that("detect_device_channels() detects known channels for PerfPro", {
         verbose = FALSE
     )
 
-    expect_equal(result$nirs_channels, "SmO2 (1614)")
+    expect_equal(result$nirs_channels, c("SmO2 (1614)", "SmO2 (1615)"))
     expect_equal(result$time_channel, "Time")
 })
 
 test_that("detect_device_channels() user time_channel overrides device default", {
+    data <- data.frame(
+        V1 = c("hh:mm:ss", "00:00:01"),
+        V2 = c("SmO2 Live", "55"),
+        stringsAsFactors = FALSE
+    )
+
     result <- detect_device_channels(
+        data,
+        header_row = 1L,
         nirs_device = "Moxy",
         nirs_channels = NULL,
         time_channel = c(time = "custom_time"),
         verbose = FALSE
     )
 
-    expect_equal(result$nirs_channels, device_patterns$Moxy$nirs_channels)
+    expect_equal(result$nirs_channels, "SmO2 Live")
     expect_equal(result$time_channel, c(time = "custom_time"))
 })
 
-test_that("detect_device_channels() errors when device is NULL and no channels", {
+test_that("detect_device_channels() errors when no SmO2 columns found", {
+    data <- data.frame(
+        V1 = c("Time", "0.1"),
+        V2 = c("HR", "120"),
+        stringsAsFactors = FALSE
+    )
+
+    ## NULL device + no SmO2 columns
     expect_error(
         detect_device_channels(
+            data,
+            header_row = 1L,
             nirs_device = NULL,
+            nirs_channels = NULL,
+            verbose = FALSE
+        ),
+        "cannot be determined"
+    )
+
+    ## known device + no SmO2 columns
+    expect_error(
+        detect_device_channels(
+            data,
+            header_row = 1L,
+            nirs_device = "Moxy",
             nirs_channels = NULL,
             verbose = FALSE
         ),
@@ -333,13 +474,33 @@ test_that("detect_device_channels() errors when device is NULL and no channels",
 })
 
 test_that("detect_device_channels() verbose messages for detection", {
+    data <- data.frame(
+        V1 = c("hh:mm:ss", "00:00:01"),
+        V2 = c("SmO2 Live", "55"),
+        stringsAsFactors = FALSE
+    )
+
     expect_message(
         detect_device_channels(
+            data,
+            header_row = 1L,
             nirs_device = "Moxy",
             nirs_channels = NULL,
             verbose = TRUE
         ),
         "Moxy.*detected"
+    )
+
+    ## unknown device labelled "Unknown"
+    expect_message(
+        detect_device_channels(
+            data,
+            header_row = 1L,
+            nirs_device = NULL,
+            nirs_channels = NULL,
+            verbose = TRUE
+        ),
+        "Unknown.*detected"
     )
 
     ## no message when user provides channels
@@ -353,7 +514,15 @@ test_that("detect_device_channels() verbose messages for detection", {
 })
 
 test_that("detect_device_channels() returns appropriate keep_all", {
+    data <- data.frame(
+        V1 = c("hh:mm:ss", "00:00:01"),
+        V2 = c("SmO2 Live", "55"),
+        stringsAsFactors = FALSE
+    )
+
     result <- detect_device_channels(
+        data,
+        header_row = 1L,
         nirs_device = "Moxy",
         nirs_channels = NULL,
         time_channel = c(time = "custom_time"),
@@ -407,7 +576,7 @@ test_that("read_data_table() errors when channels not found", {
     )
 
     expect_error(
-        read_data_table(data, "O2Hb"),
+        read_data_table(data, nirs_channels = "O2Hb"),
         "Channel names not detected"
     )
 })
@@ -420,7 +589,7 @@ test_that("read_data_table() is case sensitive", {
     )
 
     expect_error(
-        read_data_table(data, "O2Hb"),
+        read_data_table(data, nirs_channels = "O2Hb"),
         "case sensitive"
     )
 })
@@ -1310,7 +1479,7 @@ test_that("parse_time_channel() returns local time zonel", {
         time_channel <- channels$time_channel
         keep_all <- channels$keep_all
 
-        table_list <- read_data_table(data, nirs_channels, header_row)
+        table_list <- read_data_table(data, header_row, nirs_channels)
         data <- table_list$data_table
         file_header <- table_list$file_header
 
@@ -1481,7 +1650,7 @@ test_that("detect_irregular_samples detects unordered samples", {
     )
     expect_warning(
         detect_irregular_samples(x, "time"),
-        "time.*=.*3"
+        "time.*=.*2"
     )
 })
 
@@ -1552,12 +1721,8 @@ test_that("read_mnirs auto-detects Moxy channels when nirs_channels = NULL", {
 
     expect_s3_class(df, "mnirs")
     expect_equal(attr(df, "nirs_device"), "Moxy")
-    expect_equal(attr(df, "nirs_channels"), device_patterns$Moxy$nirs_channels)
+    expect_equal(attr(df, "nirs_channels"), c("SmO2 Live", "SmO2 Live(2)"))
     expect_equal(attr(df, "time_channel"), device_patterns$Moxy$time_channel)
-    ## auto-detected channels should keep original names (not renamed)
-    expect_true(all(
-        device_patterns$Moxy$nirs_channels %in% names(df)
-    ))
 })
 
 test_that("read_mnirs auto-detects Train.Red channels when nirs_channels = NULL", {
@@ -1572,22 +1737,17 @@ test_that("read_mnirs auto-detects Train.Red channels when nirs_channels = NULL"
         ),
         "Train.Red.*detected"
     ) |>
+        expect_warning("Duplicate channel names") |>
         expect_warning("irregular") |>
         expect_message("Estimated.*sample_rate.*10")
 
     expect_s3_class(df, "mnirs")
     expect_equal(attr(df, "nirs_device"), "Train.Red")
-    expect_equal(
-        attr(df, "nirs_channels"),
-        device_patterns$Train.Red$nirs_channels
-    )
+    expect_equal(attr(df, "nirs_channels"), c("SmO2", "SmO2_1"))
     expect_equal(
         attr(df, "time_channel"),
         device_patterns$Train.Red$time_channel
     )
-    expect_true(all(
-        device_patterns$Train.Red$nirs_channels %in% names(df)
-    ))
 })
 
 test_that("read_mnirs auto-detects Artinis channels when nirs_channels = NULL", {
@@ -1607,14 +1767,8 @@ test_that("read_mnirs auto-detects Artinis channels when nirs_channels = NULL", 
 
     expect_s3_class(df, "mnirs")
     expect_equal(attr(df, "nirs_device"), "Artinis")
-    expect_equal(
-        attr(df, "nirs_channels"),
-        device_patterns$Artinis$nirs_channels
-    )
+    expect_equal(attr(df, "nirs_channels"), "2")
     expect_equal(attr(df, "time_channel"), "time")
-    expect_true(all(
-        device_patterns$Artinis$nirs_channels %in% names(df)
-    ))
 })
 
 test_that("read_mnirs keep_all = FALSE returns only specified columns by default", {
@@ -2221,7 +2375,7 @@ test_that("read_mnirs PerfPro", {
     )
 
     expect_equal(channels$time_channel, "Time")
-    expect_equal(channels$nirs_channels, "SmO2 (1614)")
+    expect_equal(channels$nirs_channels, c("SmO2 (1614)", "SmO2 (1615)"))
     expect_true(channels$keep_all)
 
     ## integrated test

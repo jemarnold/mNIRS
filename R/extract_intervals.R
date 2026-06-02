@@ -207,7 +207,7 @@ extract_intervals <- function(
         enquo(nirs_channels), data, verbose, as_list = TRUE
     )
     time_channel <- validate_time_channel(enquo(time_channel), data)
-    ## avoid floating point precision issues downstream with findIntervals()
+    ## avoid floating point precision issues downstream with findInterval()
     time_vec <- round(data[[time_channel]], 6)
     ## estimate sample_rate for appropriate time binning
     sample_rate <- validate_sample_rate(

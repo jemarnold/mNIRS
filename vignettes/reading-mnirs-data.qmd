@@ -179,10 +179,6 @@ data_raw
 
     `FALSE` by default; time values on the x-axis will be plotted as numeric by default. `time_labels = TRUE` will instead plot time values as `h:mm:ss` format.
 
-* `n.breaks`
-
-    Defines the number of breaks plotted on the x-axis, passed to the *`ggplot2`* settings.
-
 * `na.omit`
 
     `FALSE` by default; missing data (`NA`s) will be plotted as gaps in the time-series data. If `na.omit = TRUE`, `NA`s will be omitted from the plotted data, effectively plotting across these gaps, making them less visible, but making the general data trend easier to see if there are lots of missing values.
@@ -193,7 +189,6 @@ plot(
     data_raw,
     points = FALSE,
     time_labels = TRUE,
-    n.breaks = 5,
     na.omit = FALSE
 )
 ```

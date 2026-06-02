@@ -50,7 +50,7 @@ entirely.
 }
 }
 \examples{
-\dontshow{if (rlang::is_installed(c("ggplot2", "scales"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (rlang::is_installed("ggplot2")) withAutoprint(\{ # examplesIf}
 ## plot example data
 read_mnirs(
     file_path = example_mnirs("moxy_ramp"),

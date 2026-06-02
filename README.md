@@ -86,7 +86,7 @@ data_raw <- read_mnirs(
 #> ! Estimated `sample_rate` = 2 Hz.
 #> ℹ Define `sample_rate` explicitly to override.
 #> Warning: ! Duplicate or irregular `time_channel` samples detected.
-#> ℹ Investigate at `time` = 211.59 and 1183.6.
+#> ℹ `time` = 211.59 and 1183.6.
 #> ℹ Re-sample with `mnirs::resample_mnirs()`.
 
 ## Note the above info message that sample_rate was estimated correctly at 2 Hz 👆
@@ -112,7 +112,6 @@ data_raw
 plot(
     data_raw,
     time_labels = TRUE,
-    n.breaks = 5,
     na.omit = FALSE
 )
 ```

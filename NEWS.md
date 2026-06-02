@@ -1,3 +1,34 @@
+# mnirs 0.6.5
+
+## `read_mnirs()`
+
+* `read_mnirs()` can now handle `c(".txt", ".tsv")` files via the same `data.table::fread()` pathway as `".csv"`. There are occasionally still odd file formats where columns will not be properly detetcted, usually where files are designed to be human-readible not machine-readable.
+
+* `read_mnirs(nirs_channels = NULL)` now automatically returns **all** channels starting with "SmO2" (case insensitive), which is the most common NIRS channel name for wearable mNIRS devices. Previously, only the first detected nirs channel was returned.
+
+``` r
+## read an mNIRS file with two "smo2" channels
+df <- read_mnirs(file_path = example_mnirs("moxy_ramp"))
+
+attr(df, "nirs_channels")
+#> [1] "SmO2 Live"    "SmO2 Live(2)"
+```
+
+## Core function updates
+
+* `extract_intervals()` helper function `by_label()` matches character strings as regular expressions (regex) by default. Now more clearly documents this, and accepts two additional arguments for better handling character strings, which are both `FALSE` be default and must be explicitly opted into (see `?grep`):
+
+    * `by_label(ignore_case = TRUE)` ignore case when evaluating strings.
+
+    * `by_label(fixed = TRUE)` treat labels as fixed strings rather than regular expressions. Useful when labels contain regex metacharacters (`.`, `*`, `(`, etc.).
+
+* `plot.mnirs()` internal update to pass additional arguments `n.breaks` to y-axis breaks, and `breaks` to x-axis breaks.
+
+* `format_hmmss()` can now display fractional seconds values.
+
+* `replace_mnirs()`, `resample_mnirs()`, and some other functions return more informative error message when `time_channel` has irregularly sampled values (time series must be monotonically increasing, non `NA`).
+
+
 # mnirs 0.6.4
 
 ## Bug fix

@@ -712,3 +712,11 @@ test_that("validate_x_t() validates inputs", {
     expect_error(validate_x_t(x = NA_real_, t = 1), "valid.*numeric")
     expect_silent(validate_x_t(x = NA_real_, t = 1, allow_na = TRUE))
 })
+
+## findInt_mnirs() ==================================
+test_that("findInt_mnirs provides informative error", {
+    expect_error(findInt_mnirs(1, c(3, 1, 2)), "time_channel.*sorted")
+    expect_error(findInt_mnirs(1, c(1, NA, 2)), "time_channel.*sorted")
+    ## valid input passes through to findInterval()
+    expect_equal(findInt_mnirs(2.5, 1:5), findInterval(2.5, 1:5))
+})

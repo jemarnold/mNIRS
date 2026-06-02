@@ -423,8 +423,7 @@ estimate_sample_rate <- function(x) {
     pretty_vals <- c(
         0.25, 0.5, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 50, 60, 75, 100
     )
-    rounded <- pretty_vals[which.min(abs(pretty_vals - sample_rate_raw))]
-    return(rounded)
+    return(pretty_vals[which.min(abs(pretty_vals - sample_rate_raw))])
 }
 
 
@@ -436,15 +435,17 @@ validate_sample_rate <- function(
     verbose = TRUE
 ) {
     ## if not defined, check metadata
-    if (is.null(sample_rate)) {
-        sample_rate <- attr(data, "sample_rate")
-    }
+    sample_rate <- sample_rate %||% attr(data, "sample_rate")
 
-    ## estimate sample_rate from time_channel
-    ## time_channel MUST be validated before this
-    time_vec <- as.numeric(data[[time_channel]])
-    ## will error on unable to estimate sample_rate
-    sample_rate_est <- estimate_sample_rate(time_vec)
+    ## skip estimation when sample_rate ~ 1 (integer time_channel, the
+    ## common cheap case); estimate when NULL or verbose check needed
+    near_one <- \(x) isTRUE(all.equal(1, x, tol = 1e-3, scale = 1))
+    if (is.null(sample_rate) || (verbose && !near_one(sample_rate))) {
+        ## time_channel must be validated before this
+        time_vec <- as.numeric(data[[time_channel]])
+        ## will error if unable to estimate sample_rate
+        sample_rate_est <- estimate_sample_rate(time_vec)
+    }
 
     ## if still not defined, use estimated sample_rate
     if (is.null(sample_rate)) {
@@ -462,14 +463,10 @@ validate_sample_rate <- function(
         sample_rate, 1, c(0, Inf), FALSE, msg1 = "one-element positive"
     )
 
-    ## if provided sample rate seems off and time_channel doesn't appear
-    ## to be integer values, report warning
+    ## warn when user-provided sample_rate disagrees with the estimate
     if (
-        verbose && !isTRUE(
-            all.equal(1, sample_rate_est, tolerance = 0.001, scale = 1)
-        ) & !isTRUE(
-            all.equal(sample_rate_est, sample_rate, tolerance = 0.5, scale = 1)
-        )
+        verbose && !near_one(sample_rate) &&
+        !isTRUE(all.equal(sample_rate_est, sample_rate, tol = 0.5, scale = 1))
     ) {
         cli_warn(c(
             "!" = "`sample_rate = {.val {sample_rate}}` appears to be \\
@@ -584,4 +581,18 @@ within <- function(x, vec, inclusive = c("left", "right")) {
     right_op <- if ("right" %in% inclusive) `<=` else `<`
 
     return(left_op(x, left) & right_op(x, right))
+}
+
+
+#' wrap findInterval: informative 'time_channel' error message
+#' @keywords internal
+findInt_mnirs <- function(...) {
+    withCallingHandlers(findInterval(...), error = \(e) {
+        cli_abort(c(
+            "x" = "Duplicate or irregular {.arg time_channel} samples \\
+            detected.",
+            "i" = "{.arg time_channel} must be sorted without repeating, \\
+            decreasing, or {.val {NA}}s."
+        ))
+    })
 }
