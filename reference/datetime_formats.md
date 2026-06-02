@@ -7,7 +7,3 @@ Datetime format strings for POSIXct parsing
 ``` r
 datetime_formats
 ```
-
-## Format
-
-An object of class `character` of length 7.

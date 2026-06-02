@@ -8,7 +8,7 @@ Helper functions to define interval start or end boundaries for
 ``` r
 by_time(...)
 
-by_label(...)
+by_label(..., ignore_case = FALSE, fixed = FALSE)
 
 by_lap(...)
 
@@ -27,8 +27,9 @@ by_sample(...)
 
   `by_label(...)`
 
-  :   Character strings to match in `event_channel`. All matching
-      occurrences are returned.
+  :   Character strings to match in `event_channel`. Matched as regular
+      expressions by default; see `ignore_case` and `fixed`. All
+      matching occurrences are returned.
 
   `by_lap(...)`
 
@@ -39,6 +40,17 @@ by_sample(...)
   `by_sample(...)`
 
   :   Integer sample indices (row numbers).
+
+- ignore_case:
+
+  For `by_label()`. If `TRUE`, match case-insensitive labels. Default
+  `FALSE`.
+
+- fixed:
+
+  For `by_label()`. If `TRUE`, treat labels as fixed strings rather than
+  regular expressions. Useful when labels contain regex metacharacters
+  (`.`, `*`, `(`, etc.). Default `FALSE`.
 
 ## Value
 
@@ -141,12 +153,12 @@ extract_intervals(data, start = by_label("start"), end = by_time(1500))
 #> # ℹ 11,591 more rows
 #> 
 
-## multiple intervals by sample index
-extract_intervals(data, start = by_sample(1000, 1500), end = by_sample(2000, 2600))
+## case-insensitive label match
+extract_intervals(data, start = by_label("START", ignore_case = TRUE))
 #> ℹ `nirs_channels` = c("smo2_left", "smo2_right") grouped together from
 #>   metadata.
 #> $interval_1
-#> # A tibble: 2,210 × 5
+#> # A tibble: 1,211 × 5
 #>     time   lap smo2_left smo2_right event
 #>    <dbl> <int>     <dbl>      <dbl> <chr>
 #>  1  39.0     1      67.8       69.3 NA   
@@ -159,10 +171,54 @@ extract_intervals(data, start = by_sample(1000, 1500), end = by_sample(2000, 260
 #>  8  39.6     1      68.5       69.2 NA   
 #>  9  39.7     1      68.5       70.0 NA   
 #> 10  39.9     1      68.5       69.8 NA   
-#> # ℹ 2,200 more rows
+#> # ℹ 1,201 more rows
+#> 
+
+## literal-string label match (regex metacharacters treated as text)
+data$event[1000] <- "lap.1"
+data <- create_mnirs_data(data, event_channel = "event")
+extract_intervals(data, start = by_label("lap.1", fixed = TRUE))
+#> ℹ `nirs_channels` = c("smo2_left", "smo2_right") grouped together from
+#>   metadata.
+#> $interval_1
+#> # A tibble: 1,211 × 5
+#>     time   lap smo2_left smo2_right event
+#>    <dbl> <int>     <dbl>      <dbl> <chr>
+#>  1  39.0     1      67.8       69.3 NA   
+#>  2  39.0     1      67.8       69.1 NA   
+#>  3  39.2     1      68.0       70.1 NA   
+#>  4  39.2     1      68.0       69.8 NA   
+#>  5  39.3     1      68.2       69.4 NA   
+#>  6  39.4     1      68.2       69.7 NA   
+#>  7  39.5     1      68.0       69.2 NA   
+#>  8  39.6     1      68.5       69.2 NA   
+#>  9  39.7     1      68.5       70.0 NA   
+#> 10  39.9     1      68.5       69.8 NA   
+#> # ℹ 1,201 more rows
+#> 
+
+## multiple intervals by sample index
+extract_intervals(data, start = by_sample(1000, 1500))
+#> ℹ `nirs_channels` = c("smo2_left", "smo2_right") grouped together from
+#>   metadata.
+#> $interval_1
+#> # A tibble: 1,211 × 5
+#>     time   lap smo2_left smo2_right event
+#>    <dbl> <int>     <dbl>      <dbl> <chr>
+#>  1  39.0     1      67.8       69.3 NA   
+#>  2  39.0     1      67.8       69.1 NA   
+#>  3  39.2     1      68.0       70.1 NA   
+#>  4  39.2     1      68.0       69.8 NA   
+#>  5  39.3     1      68.2       69.4 NA   
+#>  6  39.4     1      68.2       69.7 NA   
+#>  7  39.5     1      68.0       69.2 NA   
+#>  8  39.6     1      68.5       69.2 NA   
+#>  9  39.7     1      68.5       70.0 NA   
+#> 10  39.9     1      68.5       69.8 NA   
+#> # ℹ 1,201 more rows
 #> 
 #> $interval_2
-#> # A tibble: 2,311 × 5
+#> # A tibble: 1,211 × 5
 #>     time   lap smo2_left smo2_right event
 #>    <dbl> <int>     <dbl>      <dbl> <chr>
 #>  1  88.5     2      58.7       65.2 NA   
@@ -175,6 +231,6 @@ extract_intervals(data, start = by_sample(1000, 1500), end = by_sample(2000, 260
 #>  8  89.2     2      58.9       65.7 NA   
 #>  9  89.3     2      58.9       65.0 NA   
 #> 10  89.4     2      58.8       65.1 NA   
-#> # ℹ 2,301 more rows
+#> # ℹ 1,201 more rows
 #> 
 ```

@@ -49,7 +49,7 @@ data <- read_mnirs(
 
 ggplot2::ggplot(data, ggplot2::aes(x = time)) +
     theme_mnirs() +
-    scale_colour_mnirs(name = NULL) +
+    scale_colour_mnirs() +
     ggplot2::geom_line(ggplot2::aes(y = smo2_left, colour = "smo2_left")) +
     ggplot2::geom_line(ggplot2::aes(y = smo2_right, colour = "smo2_right"))
 ```

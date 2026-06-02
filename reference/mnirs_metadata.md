@@ -8,7 +8,3 @@ Metadata names of class `"mnirs"`, retrieved with
 ``` r
 mnirs_metadata
 ```
-
-## Format
-
-An object of class `character` of length 8.

@@ -211,7 +211,7 @@ data_raw <- read_mnirs(
 #> ! Estimated `sample_rate` = 2 Hz.
 #> ℹ Define `sample_rate` explicitly to override.
 #> Warning: ! Duplicate or irregular `time_channel` samples detected.
-#> ℹ Investigate at `time` = 211.59 and 1183.6.
+#> ℹ `time` = 211.59 and 1183.6.
 #> ℹ Re-sample with `mnirs::resample_mnirs()`.
 
 ## Note the above info message that sample_rate was estimated correctly at 2 Hz ☝
@@ -262,11 +262,6 @@ generated or read by *`mnirs`* functions where the metadata contains
   numeric by default. `time_labels = TRUE` will instead plot time values
   as `h:mm:ss` format.
 
-- `n.breaks`
-
-  Defines the number of breaks plotted on the x-axis, passed to the
-  *`ggplot2`* settings.
-
 - `na.omit`
 
   `FALSE` by default; missing data (`NA`s) will be plotted as gaps in
@@ -282,7 +277,6 @@ plot(
     data_raw,
     points = FALSE,
     time_labels = TRUE,
-    n.breaks = 5,
     na.omit = FALSE
 )
 ```

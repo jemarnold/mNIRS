@@ -23,3 +23,8 @@ Useful links:
 
 **Maintainer**: Jem Arnold <jem.arnold@gmail.com>
 ([ORCID](https://orcid.org/0000-0003-3908-9447)) \[copyright holder\]
+
+Authors:
+
+- Jem Arnold <jem.arnold@gmail.com>
+  ([ORCID](https://orcid.org/0000-0003-3908-9447)) \[copyright holder\]

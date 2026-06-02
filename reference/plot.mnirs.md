@@ -7,14 +7,7 @@ Create a base plot for data frames or lists of data frames with class
 
 ``` r
 # S3 method for class 'mnirs'
-plot(
-  x,
-  points = FALSE,
-  time_labels = FALSE,
-  n.breaks = 5,
-  na.omit = FALSE,
-  ...
-)
+plot(x, points = FALSE, time_labels = FALSE, na.omit = FALSE, ...)
 ```
 
 ## Arguments
@@ -37,11 +30,6 @@ plot(
   [`format_hmmss()`](https://jemarnold.github.io/mnirs/reference/format_hmmss.md).
   Otherwise, x-axis values are displayed as numeric.
 
-- n.breaks:
-
-  A numeric value specifying the number of breaks in both x- and y-axes.
-  Default is `5`.
-
 - na.omit:
 
   Logical. Default is `FALSE`. If `TRUE` omits missing (`NA`) and
@@ -61,9 +49,11 @@ When `x` is a named list of *"mnirs"* data frames, elements are bound
 into a single data frame and displayed as faceted panels via
 [`ggplot2::facet_wrap()`](https://ggplot2.tidyverse.org/reference/facet_wrap.html).
 
-Arguments in `...` are currently passed to
-[`ggplot2::facet_wrap()`](https://ggplot2.tidyverse.org/reference/facet_wrap.html)
-formals, such as `nrow`, `ncol`, and `scales` for more precise control.
+Accepts some arguments in `...`, such as `nrow`, `ncol`, and `scales`
+passed to
+[`ggplot2::facet_wrap()`](https://ggplot2.tidyverse.org/reference/facet_wrap.html).
+`n.breaks` overrides the default number of y-axis breaks. `breaks`
+overrides the x-axis breaks directly.
 
 ## Examples
 
