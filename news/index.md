@@ -2,6 +2,8 @@
 
 ## mnirs 0.6.5
 
+CRAN release: 2026-06-02
+
 ### `read_mnirs()`
 
 - [`read_mnirs()`](https://jemarnold.github.io/mnirs/reference/read_mnirs.md)
