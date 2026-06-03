@@ -226,7 +226,10 @@ test_that("as_plot_data errors on invalid lists", {
     ## empty list
     expect_error(as_plot_data(list()), "at least one")
     ## not a df
-    expect_error(as_plot_data(list(mock_mnirs(), "not_a_df")), "must contain all")
+    expect_error(
+        as_plot_data(list(mock_mnirs(), "not_a_df")),
+        "must contain all"
+    )
 })
 
 test_that("as_plot_data errors when element missing time_channel attribute", {
@@ -319,6 +322,47 @@ test_that("time_labels controls x-axis name and formatting", {
     p2 <- plot(x, time_labels = TRUE)
     expect_equal(p2$labels$x, "time (h:mm:ss)")
     expect_false(ggplot2::is_waiver(p2$scales$get_scales("x")$labels))
+})
+
+test_that("n.breaks overrides y-axis break count", {
+    skip_if_not_installed("scales")
+    x <- mock_mnirs()
+
+    ## default n = 5
+    p_default <- plot(x)
+    y_breaks_default <- p_default$scales$get_scales("y")$breaks
+    expect_type(y_breaks_default, "closure")
+
+    ## n.breaks alters break count on built scale
+    p_custom <- plot(x, n.breaks = 10)
+    built <- ggplot2::ggplot_build(p_custom)
+    built_default <- ggplot2::ggplot_build(p_default)
+    y_breaks_custom <- built$layout$panel_params[[1L]]$y$breaks
+    y_breaks_def <- built_default$layout$panel_params[[1L]]$y$breaks
+    expect_gt(
+        length(y_breaks_custom[!is.na(y_breaks_custom)]),
+        length(y_breaks_def[!is.na(y_breaks_def)])
+    )
+})
+
+test_that("breaks overrides x-axis breaks directly", {
+    x <- mock_mnirs()
+    custom <- seq(2.1, 8.4, 2.1)
+
+    p <- plot(x, breaks = custom)
+    built <- ggplot2::ggplot_build(p)
+    x_breaks <- built$layout$panel_params[[1L]]$x$breaks
+    expect_equal(x_breaks[!is.na(x_breaks)], custom)
+})
+
+test_that("breaks overrides x-axis with time_labels = TRUE", {
+    x <- mock_mnirs()
+    custom <- seq(2.1, 8.4, 2.1)
+
+    p <- plot(x, time_labels = TRUE, breaks = custom)
+    built <- ggplot2::ggplot_build(p)
+    x_breaks <- built$layout$panel_params[[1L]]$x$breaks
+    expect_equal(x_breaks[!is.na(x_breaks)], custom)
 })
 
 test_that("plot.mnirs groups and facets", {
@@ -432,47 +476,6 @@ test_that("plot.mnirs() returns ggplot2 warnings for missing values", {
         warning = \(w) conditionMessage(w)
     )
     expect_match(w, "Removed.*containing missing")
-})
-
-test_that("n.breaks overrides y-axis break count", {
-    skip_if_not_installed("scales")
-    x <- mock_mnirs()
-
-    ## default n = 5
-    p_default <- plot(x)
-    y_breaks_default <- p_default$scales$get_scales("y")$breaks
-    expect_type(y_breaks_default, "closure")
-
-    ## n.breaks alters break count on built scale
-    p_custom <- plot(x, n.breaks = 10)
-    built <- ggplot2::ggplot_build(p_custom)
-    built_default <- ggplot2::ggplot_build(p_default)
-    y_breaks_custom <- built$layout$panel_params[[1L]]$y$breaks
-    y_breaks_def <- built_default$layout$panel_params[[1L]]$y$breaks
-    expect_gt(
-        length(y_breaks_custom[!is.na(y_breaks_custom)]),
-        length(y_breaks_def[!is.na(y_breaks_def)])
-    )
-})
-
-test_that("breaks overrides x-axis breaks directly", {
-    x <- mock_mnirs()
-    custom <- seq(2.1, 8.4, 2.1)
-
-    p <- plot(x, breaks = custom)
-    built <- ggplot2::ggplot_build(p)
-    x_breaks <- built$layout$panel_params[[1L]]$x$breaks
-    expect_equal(x_breaks[!is.na(x_breaks)], custom)
-})
-
-test_that("breaks overrides x-axis with time_labels = TRUE", {
-    x <- mock_mnirs()
-    custom <- seq(2.1, 8.4, 2.1)
-
-    p <- plot(x, time_labels = TRUE, breaks = custom)
-    built <- ggplot2::ggplot_build(p)
-    x_breaks <- built$layout$panel_params[[1L]]$x$breaks
-    expect_equal(x_breaks[!is.na(x_breaks)], custom)
 })
 
 test_that("plot.mnirs moxy.perfpro works", {
