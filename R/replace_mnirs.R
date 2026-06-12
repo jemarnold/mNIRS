@@ -286,7 +286,7 @@ replace_invalid <- function(
         }
 
         window_idx <- compute_local_windows(t, invalid_idx, width, span)
-        local_medians <- compute_local_fun(y, window_idx, median, na.rm = TRUE)
+        local_medians <- compute_local_fun(y, window_idx, median_nona)
         ## if method = "median"
         ## invalid_values removed to NA first,
         ## so returns local median excluding idx
@@ -365,8 +365,7 @@ replace_outliers <- function(
     method <- match.arg(method)
 
     ## process =====================================================
-    window_idx <- compute_local_windows(t, width = width, span = span)
-    outlier_stats <- compute_outliers(x, window_idx, outlier_cutoff)
+    outlier_stats <- compute_outliers(x, t, outlier_cutoff, width, span)
     local_medians <- outlier_stats$local_medians
     is_outlier <- outlier_stats$is_outlier
 
@@ -457,7 +456,7 @@ replace_missing <- function(
         y <- x
         na_idx <- which(is.na(x))
         window_idx <- compute_valid_neighbours(x, t, width, span, verbose)
-        local_medians <- compute_local_fun(x, window_idx, median, na.rm = TRUE)
+        local_medians <- compute_local_fun(x, window_idx, median_nona)
         y[na_idx] <- local_medians
     }
 

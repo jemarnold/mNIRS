@@ -1,3 +1,7 @@
+# mnirs 0.6.6
+
+* Performance improvements with `read_mnirs()` and especially `replace_mnirs` / `replace_outliers`, which creates a significant bottleneck with large files (still slow, but now 30+% less slow).
+
 # mnirs 0.6.5
 
 ## `read_mnirs()`

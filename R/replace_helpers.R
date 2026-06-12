@@ -77,6 +77,32 @@ compute_local_windows <- function(
 
 
 #' @description
+#' `median_nona()`: Fast median for numeric vectors. Strips `NA`s and
+#' replicates `median.default` arithmetic without S3 dispatch.
+#'
+#' @returns
+#' `median_nona()`: A numeric value.
+#'
+#' @rdname compute_helpers
+#' @keywords internal
+median_nona <- function(w) {
+    if (anyNA(w)) {
+        w <- w[!is.na(w)]
+    }
+    n <- length(w)
+    if (n == 0L) {
+        return(NA_real_)
+    }
+    half <- (n + 1L) %/% 2L
+    if (n %% 2L == 1L) {
+        sort.int(w, partial = half)[half]
+    } else {
+        mean(sort.int(w, partial = half + 0L:1L)[half + 0L:1L])
+    }
+}
+
+
+#' @description
 #' `compute_local_fun()`: Compute a rolling function along `x` from a list of
 #' rolling sample windows.
 #'
@@ -98,35 +124,86 @@ compute_local_fun <- function(x, window_idx, fn, ...) {
 
 
 #' @description
-#' `compute_outliers()`: Computes a vector of local medians and logicals 
-#' indicating outliers of `x` within a list of rolling sample windows 
-#' `window_idx`.
+#' `col_medians_padded()`: Column medians of an `NA`-padded numeric matrix
+#' via a single radix sort. `NA`s sort last per column; medians indexed
+#' from per-column valid counts. Matches `median(w, na.rm = TRUE)`.
+#'
+#' @param m A numeric matrix with one column per rolling window, padded
+#'   with `NA` where windows extend beyond the data.
 #'
 #' @returns
-#' `compute_outliers()`: A `list()` with vectors the same length as `x` for 
+#' `col_medians_padded()`: A numeric vector of length `ncol(m)`.
+#'
+#' @rdname compute_helpers
+#' @keywords internal
+col_medians_padded <- function(m) {
+    w <- nrow(m)
+    nv <- w - colSums(is.na(m))
+    ## sort all windows at once: by column, then value, NAs last
+    o <- order(col(m), m, na.last = TRUE, method = "radix")
+    ms <- matrix(m[o], nrow = w)
+    half <- pmax((nv + 1L) %/% 2L, 1L) ## guard nv == 0
+    cols <- seq_len(ncol(m))
+    lo <- ms[cbind(half, cols)]
+    hi <- ms[cbind(half + (nv %% 2L == 0L), cols)] ## even nv: mean of pair
+    med <- (lo + hi) / 2
+    med[nv == 0L] <- NA_real_
+    return(med)
+}
+
+
+#' @description
+#' `compute_outliers()`: Computes a vector of local medians and logicals
+#' indicating outliers of `x` within rolling windows defined by `width`
+#' or `span`.
+#'
+#' @returns
+#' `compute_outliers()`: A `list()` with vectors the same length as `x` for
 #' with numeric local medians and logical identifying where `is_outlier`.
 #'
 #' @rdname compute_helpers
 #' @keywords internal
 compute_outliers <- function(
     x,
-    window_idx,
-    outlier_cutoff
+    t,
+    outlier_cutoff,
+    width = NULL,
+    span = NULL
 ) {
     n <- length(x)
     L <- 1.4826 ## 1 / qnorm(0.75): MAD at the 75% percentile of |Z|
     # MAD = median(|x - median(x)|) within each window
     ## median of absolute local residuals from the local median
-    local_stats <- vapply(seq_len(n), \(.i) {
-        w <- x[window_idx[[.i]]]
-        local_median <- median(w, na.rm = TRUE)
-        local_mad <- median(abs(w - local_median), na.rm = TRUE)
+    if (!is.null(width)) {
+        ## width: fixed-size windows, vectorised over an NA-padded matrix.
+        ## padding out-of-range cells with NA is equivalent to the clamped
+        ## partial edge windows because medians ignore NA.
+        ## same offsets as compute_local_windows(align = "centre")
+        offsets <- (-floor((width - 1L) / 2L)):(floor(width / 2L))
+        idx <- outer(offsets, seq_len(n), `+`)
+        oob <- idx < 1L | idx > n
+        idx[oob] <- 1L
+        m <- matrix(x[idx], nrow = width)
+        m[oob] <- NA_real_
 
-        c(local_median, local_mad)
-    }, numeric(2))
+        local_medians <- col_medians_padded(m)
+        local_mad <- col_medians_padded(
+            abs(m - rep(local_medians, each = width))
+        )
+    } else {
+        ## span: variable-size windows, per-window loop
+        window_idx <- compute_local_windows(t, width = NULL, span = span)
+        local_stats <- vapply(seq_len(n), \(.i) {
+            w <- x[window_idx[[.i]]]
+            local_median <- median_nona(w)
+            local_mad <- median_nona(abs(w - local_median))
 
-    local_medians <- local_stats[1L, ]
-    local_mad <- local_stats[2L, ]
+            c(local_median, local_mad)
+        }, numeric(2))
+
+        local_medians <- local_stats[1L, ]
+        local_mad <- local_stats[2L, ]
+    }
 
     ## robust variance threshold based on minimum sample difference
     abs_diffs <- abs(diff(x[!is.na(x)]))
