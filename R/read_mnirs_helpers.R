@@ -12,7 +12,10 @@ read_file <- function(file_path) {
     ## import data_raw from either excel or csv
     if (grepl("\\.(csv|tsv|txt)$", file_path, ignore.case = TRUE)) {
         ## sample lines for separator and column count detection
-        lines <- readLines(file_path, warn = FALSE)
+        ## strip whitespace inside quoted fields and around line edges
+        lines <- trimws(gsub(
+            '\\s*"\\s*', '"', readLines(file_path, warn = FALSE)
+        ))
         nrows <- length(lines)
 
         ## detect separator: comma vs tab from first 10 lines
@@ -107,34 +110,24 @@ device_patterns <- list(
 #' Detect mnirs device from file metadata
 #' @keywords internal
 detect_mnirs_device <- function(data) {
-    ## find the first row in `string` where all `patterns` match
-    find_row <- function(string, patterns, fixed = TRUE) {
-        Find(\(.i) {
-            all(vapply(patterns, \(.x) {
-                    grepl(.x, string[.i], fixed = fixed)
-                }, logical(1L)))
-        }, seq_along(string))
-    }
-
     ## collapse each row to a single string for pattern matching
-    data_strings <- apply(data, 1L, paste, collapse = " ")
+    data_strings <- do.call(paste, c(data, list(sep = " ")))
 
-    ## find first row of `data_strings` which matches any of `device_patterns`
-    matched_row <- Find(\(.i) {
-        any(vapply(device_patterns, \(.d) {
-            !is.null(find_row(data_strings[.i], .d$pattern, .d$fixed))
-        }, logical(1L)))
-    }, seq_along(data_strings))
+    ## first row index where all of a device's patterns match; NA if none
+    first_rows <- vapply(device_patterns, \(.d) {
+        hits <- Reduce(`&`, lapply(
+            .d$pattern, grepl, x = data_strings, fixed = .d$fixed
+        ))
+        which(hits)[1L]
+    }, integer(1L))
 
-    if (is.null(matched_row)) {
+    if (all(is.na(first_rows))) {
         return(list(nirs_device = NULL, header_row = 1L))
     }
 
-    ## return the first device name which matches the row of `data_strings`
-    device_name <- Find(\(.nm) {
-        .d <- device_patterns[[.nm]]
-        !is.null(find_row(data_strings[matched_row], .d$pattern, .d$fixed))
-    }, names(device_patterns))
+    ## earliest matching row; ties resolved by device order via which.min
+    matched_row <- min(first_rows, na.rm = TRUE)
+    device_name <- names(first_rows)[which.min(first_rows)]
 
     ## require "oxysoft" match for Artinis pattern
     if (identical(device_name, "Artinis")) {
@@ -267,6 +260,8 @@ datetime_formats <- c(
 extract_start_timestamp <- function(file_header) {
     header_values <- unlist(file_header, use.names = FALSE)
     header_values <- header_values[!is_empty(header_values)]
+    ## all datetime_formats contain %H:%M, so candidates must contain ":"
+    header_values <- header_values[grepl(":", header_values, fixed = TRUE)]
 
     ## search for POSIXct values, return the earliest time value
     ## vulnerable to invalid timestamps

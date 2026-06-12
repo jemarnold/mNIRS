@@ -24,6 +24,7 @@ mnirs-hex-v*\.svg$
 ^CLAUDE\.md$
 ^AGENTS\.md$
 ^tests/testthat/testdata$
+^tests/profiles$
 ^\.claude$
 ^man/figures/README-mnirs-app\.gif$
 ^CRAN-SUBMISSION$
