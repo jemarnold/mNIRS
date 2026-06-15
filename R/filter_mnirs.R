@@ -122,11 +122,13 @@
 #' Missing values (`NA`) in `nirs_channels` will cause an error for
 #' `method = "smooth_spline"` or `"butterworth"`, unless `na.rm = TRUE`.
 #' Then `NA`s will be ignored and passed through to the returned data.
-#' 
+#'
 #' For `method = "moving_average"`, `na.rm` controls whether `NA`s within
-#' each local window are either propagated to the returned vector when 
-#' `na.rm = FALSE` (the default), or ignored before processing if 
+#' each local window are either propagated to the returned vector when
+#' `na.rm = FALSE` (the default), or ignored before processing if
 #' `na.rm = TRUE`.
+#'
+#' @inheritSection replace_mnirs Per-channel arguments
 #'
 #' @returns
 #' A [tibble][tibble::tibble-package] of class *"mnirs"* with metadata
@@ -227,36 +229,46 @@ filter_mnirs.smooth_spline <- function(
     metadata <- attributes(data)
     nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
     time_channel <- validate_time_channel(enquo(time_channel), data)
-    spar <- list(...)$spar
-    validate_numeric(spar, 1, c(0, Inf), FALSE, msg1 = "one-element positive")
+
+    ## broadcast global args, applying any per-channel list() overrides
+    per_channel <- resolve_channel_args(
+        nirs_channels,
+        args = list(spar = list(...)$spar),
+        verbose = verbose
+    )
 
     ## processing ==========================================
-    time_vec <- data[[time_channel]]
+    t_vec <- data[[time_channel]]
 
-    if (anyDuplicated(time_vec)) {
+    if (anyDuplicated(t_vec)) {
         cli_abort(c(
             "x" = "{.arg time_channel} has duplicated or irregular samples.",
             "i" = "Re-sample first with {.fn mnirs::resample_mnirs}."
         ))
     }
 
+    env <- environment()
     data[nirs_channels] <- lapply(nirs_channels, \(.x) {
+        spar <- per_channel[[.x]]$spar
+        validate_numeric(
+            spar, 1, c(0, Inf), FALSE, msg1 = "one-element positive"
+        )
         x <- data[[.x]]
         ## handle NAs
         handle_na <- na.rm && anyNA(x)
         if (handle_na) {
             na_info <- preserve_na(x)
             x <- na_info$x_valid
-            time_vec <- time_vec[!na_info$na_idx]
+            t_vec <- t_vec[!na_info$na_idx]
         } else if (anyNA(x)) {
             cli_abort(c(
                 "x" = "{.arg nirs_channels} = {.val {.x}} contains internal \\
                 {.val {NA}}'s.",
                 "i" = "Set {.arg na.rm = TRUE} to ignore {.val {NA}}'s."
-            ))
+            ), call = env)
         }
 
-        spline_model <- stats::smooth.spline(x = time_vec, y = x, spar = spar)
+        spline_model <- stats::smooth.spline(x = t_vec, y = x, spar = spar)
 
         if (is.null(spar) && verbose) {
             cli_inform(c(
@@ -300,53 +312,69 @@ filter_mnirs.butterworth <- function(
     sample_rate <- validate_sample_rate(
         data, time_channel, sample_rate, verbose
     )
-    order <- args$order %||% 2L
-    W <- args$W
-    fc <- args$fc
-    type <- args$type %||% "low"
-    type <- match.arg(type, c("low", "high", "stop", "pass"))
-    edges <- args$edges %||% "rev"
 
-    if (is.null(c(W, fc))) {
-        cli_abort(c(
-            "x" = "Cutoff frequency undefined.",
-            "i" = "One of {.arg W} or {.arg fc} must be defined for a \\
-            Butterworth filter."
-        ))
-    }
-
-    fc_n <- if (type %in% c("low", "high")) 1 else 2
-    ## order & W are validated in filter_butter
-    validate_numeric(
-        fc, fc_n, c(0, Inf), inclusive = FALSE,
-        msg1 = paste0(fc_n, "-element positive")
+    ## broadcast global args, applying any per-channel list() overrides
+    per_channel <- resolve_channel_args(
+        nirs_channels,
+        args = list(
+            order = args$order %||% 2L,
+            W = args$W,
+            fc = args$fc,
+            type = args$type %||% "low",
+            edges = args$edges %||% "rev"
+        ),
+        defaults = list(order = 2L, type = "low", edges = "rev"),
+        choices = list(
+            type = c("low", "high", "stop", "pass"),
+            edges = c("rev", "rep1", "none")
+        ),
+        verbose = verbose
     )
 
-    if (!is.null(W) && !is.null(fc)) {
-        fc <- NULL
-        if (verbose) {
-            cli_inform(c(
-                "i" = "{.val Butterworth} parameter {.arg W} = \\
-                {.val {W}} overrides {.arg fc}."
-            ))
-        }
-    }
-
-    if (is.null(W) && !is.null(fc) && !is.null(sample_rate)) {
-        nq <- sample_rate * 0.5
-        W <- fc / nq
-        if (W > 1 | W <= 0) {
-            cli_abort(c(
-                "x" = "{.arg fc} must be between {.val {0}} and half \\
-                the {.val sample_rate} ({.val {signif(nq, 3)}} Hz)"
-            ))
-        }
-    }
-
     ## processing ==========================================
-    data[nirs_channels] <- lapply(data[nirs_channels], \(.x) {
-        filter_butter(.x, order, W, type, edges, na.rm)
-    })
+    env <- environment()
+    data[nirs_channels] <- Map(\(.nirs, .a) {
+        ## verbose validator hints emitted once for the first channel
+        .v <- verbose && .nirs == nirs_channels[[1L]]
+
+        if (is.null(c(.a$W, .a$fc))) {
+            cli_abort(c(
+                "x" = "Cutoff frequency undefined.",
+                "i" = "One of {.arg W} or {.arg fc} must be defined for a \\
+                Butterworth filter."
+            ), call = env)
+        }
+
+        fc_n <- if (.a$type %in% c("low", "high")) 1 else 2
+        ## order & W are validated in filter_butter
+        validate_numeric(
+            .a$fc, fc_n, c(0, Inf), inclusive = FALSE,
+            msg1 = paste0(fc_n, "-element positive")
+        )
+
+        if (!is.null(.a$W) && !is.null(.a$fc)) {
+            .a$fc <- NULL
+            if (.v) {
+                cli_inform(c(
+                    "i" = "{.val Butterworth} parameter {.arg W} = \\
+                    {.val {(.a$W)}} overrides {.arg fc}."
+                ))
+            }
+        }
+
+        if (is.null(.a$W) && !is.null(.a$fc) && !is.null(sample_rate)) {
+            nq <- sample_rate * 0.5 ## nyquist frequency
+            .a$W <- .a$fc / nq
+            if (.a$W > 1 | .a$W <= 0) {
+                cli_abort(c(
+                    "x" = "{.arg fc} must be between {.val {0}} and half \\
+                    the {.val sample_rate} ({.val {signif(nq, 3)}} Hz)"
+                ), call = env)
+            }
+        }
+
+        filter_butter(data[[.nirs]], .a$order, .a$W, .a$type, .a$edges, na.rm)
+    }, nirs_channels, per_channel[nirs_channels])
 
     ## Metadata =================================
     metadata$nirs_channels <- unique(nirs_channels)
@@ -374,25 +402,34 @@ filter_mnirs.moving_average <- function(
     nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
     time_channel <- validate_time_channel(enquo(time_channel), data)
     args <- list(...)
-    width <- args$width
-    span <- args$span
-    partial <- args$partial %||% FALSE
+
+    ## broadcast global args, applying any per-channel list() overrides
+    per_channel <- resolve_channel_args(
+        nirs_channels,
+        args = list(
+            width = args$width,
+            span = args$span,
+            partial = args$partial %||% FALSE
+        ),
+        defaults = list(partial = FALSE),
+        verbose = verbose
+    )
 
     ## processing ==========================================
-    time_vec <- data[[time_channel]]
+    t_vec <- data[[time_channel]]
 
-    data[nirs_channels] <- lapply(data[nirs_channels], \(.x) {
+    data[nirs_channels] <- Map(\(.nirs, .a) {
         filter_ma(
-            x = .x,
-            t = time_vec,
-            width = width,
-            span = span,
-            partial = partial,
+            x = data[[.nirs]],
+            t = t_vec,
+            width = .a$width,
+            span = .a$span,
+            partial = .a$partial,
             na.rm = na.rm,
             verbose = verbose,
             bypass_checks = TRUE
         )
-    })
+    }, nirs_channels, per_channel[nirs_channels])
 
     ## Metadata =================================
     metadata$nirs_channels <- unique(nirs_channels)

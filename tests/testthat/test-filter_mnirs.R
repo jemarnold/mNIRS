@@ -616,7 +616,7 @@ test_that("butterworth validates filter type", {
             W = 0.1,
             verbose = FALSE
         ),
-        "should be one of"
+        "must be one of"
     )
 })
 

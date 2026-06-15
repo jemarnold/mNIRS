@@ -61,6 +61,32 @@
 #' of samples, or `span` as the time span in units of `time_channel`.
 #' A partial window is calculated at the edges of the data.
 #'
+#' @section Per-channel arguments:
+#'
+#' Arguments apply globally to all `nirs_channels` by default. Relevant
+#' arguments can instead be supplied uniquely per-channel as a named `list()`,
+#' with names matching `nirs_channels`, e.g.:
+#'
+#' ```r
+#' replace_mnirs(
+#'     data,
+#'     nirs_channels = c(hhb, smo2),
+#'     invalid_values = list(hhb = -1, smo2 = c(0, 100)),
+#'     invalid_above = list(hhb = 10),
+#'     span = list(3, hhb = 5)
+#' )
+#' ```
+#'
+#' - A non-list value applies to every channel (the *default* behaviour).
+#' - A `list()` named by `nirs_channels` applies per-channel values. 
+#' - A single unnamed value in the list will be applied to unlisted channels 
+#'   (e.g. `span = list(3, hhb = 5)` gives `hhb` 5 and every other channel 3).
+#'   If no unnamed fallback value in the list, channels not named in the list
+#'   will be returned un-processed (e.g. `span = list(hhb = 5)` will only
+#'   process `hhb`).
+#' - A `list()` whose names do not match `nirs_channels` (e.g.
+#'   `control = list(maxiter = 100)`) is treated as a global value.
+#'
 #' @returns `replace_mnirs()` return a [tibble][tibble::tibble-package] of 
 #' class `"mnirs"` with metadata available via `attributes()`.
 #'
@@ -134,14 +160,45 @@ replace_mnirs <- function(
     verbose = TRUE
 ) {
     ## validation ====================================
-    method <- match.arg(method)
-    check_conditions <- c(
-        !is.null(c(invalid_values, invalid_above, invalid_below)),
-        !is.null(outlier_cutoff),
-        method != "none"
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
+    }
+    validate_mnirs_data(data)
+    metadata <- attributes(data)
+    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
+    time_channel <- validate_time_channel(enquo(time_channel), data)
+    t_vec <- data[[time_channel]]
+
+    ## broadcast global args, applying any per-channel list() overrides
+    per_channel <- resolve_channel_args(
+        nirs_channels,
+        args = list(
+            invalid_values = invalid_values,
+            invalid_above = invalid_above,
+            invalid_below = invalid_below,
+            outlier_cutoff = outlier_cutoff,
+            width = width,
+            span = span,
+            method = method
+        ),
+        defaults = list(method = "linear"),
+        choices = list(method = c("linear", "median", "locf", "none")),
+        verbose = verbose
     )
+
+    ## per-channel replacement criteria: invalid, outliers, missing
+    check_list <- lapply(per_channel, \(.a) {
+        c(
+            !is.null(c(
+                .a$invalid_values, .a$invalid_above, .a$invalid_below
+            )),
+            !is.null(.a$outlier_cutoff),
+            .a$method != "none"
+        )
+    })
+
     ## do nothing condition
-    if (!any(check_conditions)) {
+    if (!any(unlist(check_list))) {
         cli_abort(c(
             "x" = "No replacement criteria specified",
             "i" = "At least one of {.arg invalid_values}, \\
@@ -149,56 +206,51 @@ replace_mnirs <- function(
             {.arg outlier_cutoff}, or {.arg method} must be specified."
         ))
     }
-    if (missing(verbose)) {
-        verbose <- getOption("mnirs.verbose", default = TRUE)
-    }
-
-    validate_mnirs_data(data)
-    metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
-    time_channel <- validate_time_channel(enquo(time_channel), data)
-    time_vec <- data[[time_channel]]
-
-    if (check_conditions[2L] || method == "median") {
-        validate_width_span(width, span, verbose, "for `replace_mnirs()`.")
-    }
 
     ## remove invalid, outliers, and NA ==============================
-    data[nirs_channels] <- lapply(data[nirs_channels], \(.x) {
-        if (check_conditions[1L]) {
+    data[nirs_channels] <- Map(\(.nirs, .a, .check) {
+        .x <- data[[.nirs]]
+        ## verbose validator hints emitted once for the first channel
+        .v <- verbose && .nirs == nirs_channels[[1L]]
+        if (.check[2L] || .a$method == "median") {
+            validate_width_span(
+                .a$width, .a$span, .v, "for `replace_mnirs()`."
+            )
+        }
+        if (.check[1L]) {
             .x <- replace_invalid(
                 x = .x,
-                t = time_vec,
-                invalid_values = invalid_values,
-                invalid_above = invalid_above,
-                invalid_below = invalid_below,
+                t = t_vec,
+                invalid_values = .a$invalid_values,
+                invalid_above = .a$invalid_above,
+                invalid_below = .a$invalid_below,
                 method = "none",
                 bypass_checks = TRUE
             )
         }
-        if (check_conditions[2L]) {
+        if (.check[2L]) {
             .x <- replace_outliers(
                 x = .x,
-                t = time_vec,
-                width = width,
-                span = span,
+                t = t_vec,
+                width = .a$width,
+                span = .a$span,
                 method = "none",
-                outlier_cutoff = outlier_cutoff,
+                outlier_cutoff = .a$outlier_cutoff,
                 bypass_checks = TRUE
             )
         }
-        if (check_conditions[3L]) {
+        if (.check[3L]) {
             .x <- replace_missing(
                 x = .x,
-                t = time_vec,
-                width = width,
-                span = span,
-                method = method,
+                t = t_vec,
+                width = .a$width,
+                span = .a$span,
+                method = .a$method,
                 bypass_checks = TRUE
             )
         }
         .x
-    })
+    }, nirs_channels, per_channel[nirs_channels], check_list[nirs_channels])
 
     ## Metadata =================================
     metadata$nirs_channels <- unique(nirs_channels)

@@ -167,6 +167,7 @@ shift_mnirs <- function(
     )
 
     ## per-group shifts ==============================================
+    env <- environment()
     shifted <- lapply(names(group_channels), \(.key) {
         .a <- per_group[[.key]]
         .cols <- group_channels[[.key]]
@@ -178,7 +179,7 @@ shift_mnirs <- function(
             cli_abort(c(
                 "x" = "Shift value undefined",
                 "i" = "One of {.arg to} or {.arg by} must be defined."
-            ))
+            ), call = env)
         }
         validate_numeric(.a$to, 1, msg1 = "one-element")
         validate_numeric(.a$by, 1, msg1 = "one-element")

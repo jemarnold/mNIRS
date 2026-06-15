@@ -234,6 +234,34 @@ valid sample on either side is used (equivalent to
 \code{replace_missing(x, width = 1)}).
 }
 }
+\section{Per-channel arguments}{
+
+
+Arguments apply globally to all \code{nirs_channels} by default. Relevant
+arguments can instead be supplied uniquely per-channel as a named \code{list()},
+with names matching \code{nirs_channels}, e.g.:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{replace_mnirs(
+    data,
+    nirs_channels = c(hhb, smo2),
+    invalid_values = list(hhb = -1, smo2 = c(0, 100)),
+    invalid_above = list(hhb = 10),
+    span = list(3, hhb = 5)
+)
+}\if{html}{\out{</div>}}
+\itemize{
+\item A non-list value applies to every channel (the \emph{default} behaviour).
+\item A \code{list()} named by \code{nirs_channels} applies per-channel values.
+\item A single unnamed value in the list will be applied to unlisted channels
+(e.g. \code{span = list(3, hhb = 5)} gives \code{hhb} 5 and every other channel 3).
+If no unnamed fallback value in the list, channels not named in the list
+will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
+process \code{hhb}).
+\item A \code{list()} whose names do not match \code{nirs_channels} (e.g.
+\code{control = list(maxiter = 100)}) is treated as a global value.
+}
+}
+
 \examples{
 ## vectorised operations
 x <- c(1, 999, 3, 4, 999, 6)
