@@ -13,9 +13,10 @@ extract_intervals(
   start = NULL,
   end = NULL,
   span = list(c(-60, 60)),
-  event_groups = c("distinct", "ensemble"),
+  group_intervals = c("distinct", "ensemble"),
   zero_time = FALSE,
-  verbose = TRUE
+  verbose = TRUE,
+  event_groups = deprecated()
 )
 }
 \arguments{
@@ -26,9 +27,9 @@ metadata.}
 of mNIRS channel names to operate on within each interval (see \emph{Details}).
 Names must match column names in \code{data} exactly.
 \itemize{
-\item Must only be specified when \code{event_groups} contains \emph{"ensemble"}-
-averaged intervals. If \code{event_groups = "distinct"} no channel processing
-occurs.
+\item Must only be specified when \code{group_intervals} contains \emph{"ensemble"}-
+averaged intervals. If \code{group_intervals = "distinct"} no channel
+processing occurs.
 \item If \code{NULL} (default), channels are retrieved from \emph{"mnirs"} metadata.
 }}
 
@@ -75,7 +76,7 @@ of \code{time_channel}, or a \code{list()} of such vectors. (\emph{default}
 \code{span = -60} -> \code{c(-60, 0)}).
 }}
 
-\item{event_groups}{Either a character string or a \code{list()} of integer
+\item{group_intervals}{Either a character string or a \code{list()} of integer
 vectors specifying how to group intervals (see \emph{Details}).
 \describe{
 \item{\code{"distinct"}}{The default. Extract each interval as an independent
@@ -93,6 +94,9 @@ data frame.}
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+
+\item{event_groups}{\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} Renamed to
+\code{group_intervals} for naming consistency across the package.}
 }
 \value{
 A named \code{list()} of \link[tibble:tibble-package]{tibbles} of class
@@ -150,7 +154,7 @@ boundary window: \verb{start = by_time(30), span = c(-5, 60)} returns
 
 \subsection{Per-interval nirs_channels for ensemble-averaging}{
 
-When \code{event_groups = "ensemble"} or a list of numeric grouped intervals,
+When \code{group_intervals = "ensemble"} or a list of numeric grouped intervals,
 \code{nirs_channels} can be specified as a list of column names to override
 ensemble-averaging across interval. For example, to exclude a channel
 in one interval:
@@ -162,14 +166,14 @@ in one interval:
 }\if{html}{\out{</div>}}
 
 If all grouped intervals can include all \code{nirs_channels}, or if
-\code{event_groups = "distinct"}, a single \code{nirs_channels} character vector can
+\code{group_intervals = "distinct"}, a single \code{nirs_channels} character vector can
 be supplied and recycled to all groups, or left as \code{NULL} for channels to
 be taken from \emph{"mnirs"} metadata.
 }
 
 \subsection{Grouping intervals}{
 
-\code{event_groups} controls whether extracted intervals are returned as distinct
+\code{group_intervals} controls whether extracted intervals are returned as distinct
 data frames or ensemble-averaged.
 
 \describe{
@@ -181,14 +185,14 @@ frame.}
 \item{\code{list(c(1, 2), c(3, 4))}}{Ensemble-average each specified
 \code{nirs_channel} within each group and return a list with one data frame
 for each group. Any intervals detected but not specified in
-\code{event_groups} are returned as distinct.}
+\code{group_intervals} are returned as distinct.}
 }
 
-\code{event_groups} lists can be named (e.g.
+\code{group_intervals} lists can be named (e.g.
 \code{list(low = c(1, 2), high = c(3, 4))}) and will pass those names to the
 returned list of data frames.
 
-When \code{event_groups} is a list of numeric interval numbers, list items in
+When \code{group_intervals} is a list of numeric interval numbers, list items in
 \code{nirs_channels} and \code{span} are recycled to the number of groups. If lists
 are only partially specified, the final item is recycled forward as needed.
 Extra items are ignored.
@@ -215,7 +219,7 @@ interval_list <- extract_intervals(
     nirs_channels = c(smo2_left, smo2_right),
     start = by_time(368, 1084), ## manually identified interval start times
     span = c(-20, 90),          ## include the last 180-sec of each interval (recycled)
-    event_groups = "ensemble",  ## ensemble-average across two intervals
+    group_intervals = "ensemble",  ## ensemble-average across two intervals
     zero_time = TRUE            ## re-calculate common time to start from `0`
 )
 

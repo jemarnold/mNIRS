@@ -524,17 +524,6 @@ validate_x_t <- function(x, t, allow_na = FALSE) {
 }
 
 
-#' Validate if an item is a list
-#' @keywords internal
-make_list <- function(x) {
-    if (is.list(x)) {
-        return(x)
-    } else {
-        return(list(x))
-    }
-}
-
-
 
 
 

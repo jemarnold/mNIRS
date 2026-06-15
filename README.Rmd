@@ -241,12 +241,12 @@ plot(nirs_data, time_labels = TRUE)
 #| fig.width: 8
 #| fig.asp: 0.55
 
-## return each interval independently with `event_groups = "distinct"`
+## return each interval independently with `group_intervals = "distinct"`
 distinct <- extract_intervals(
     nirs_data,                  ## channels blank for "distinct" grouping
     start = by_time(348, 1064), ## manually identified interval start times
     end = by_time(458, 1174),   ## interval end time (start + 150 sec)
-    event_groups = "distinct",  ## return a list of data frames for each (2) event
+    group_intervals = "distinct",  ## return a list of data frames for each (2) event
     span = c(0, 0),             ## no boundary modification
     zero_time = FALSE           ## return original time values
 )
@@ -255,12 +255,12 @@ plot(distinct, time_labels = TRUE)
 ```
 
 ```{r extract_intervals_ensemble}
-## ensemble average both intervals with `event_groups = "ensemble"`
+## ensemble average both intervals with `group_intervals = "ensemble"`
 ensemble <- extract_intervals(
     nirs_data,                  ## channels recycled to all intervals by default
     nirs_channels = c(smo2_left, smo2_right),
     start = by_time(368, 1084), ## alternatively specify start times + span
-    event_groups = "ensemble",  ## ensemble-average across two intervals
+    group_intervals = "ensemble",  ## ensemble-average across two intervals
     span = c(-20, 90),          ## span recycled to all intervals by default
     zero_time = TRUE            ## re-calculate common time to start from `0`
 )

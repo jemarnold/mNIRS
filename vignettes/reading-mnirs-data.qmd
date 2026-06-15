@@ -622,9 +622,9 @@ We may have marked event labels or have incremental lap numbers in the specified
 
 * `nirs_channels`
 
-    If returning a list of *"distinct"* intervals (see `event_groups` below), `nirs_channels` does not have to be specified, as no channels are processed.\
+    If returning a list of *"distinct"* intervals (see `group_intervals` below), `nirs_channels` does not have to be specified, as no channels are processed.\
 \
-Only when *"ensemble"*-averaging, `nirs_channels` should be specified by providing a list of column names (e.g. `list(c(A, B), c(A))`), where each list item specifies the channels to be ensemble-averaged within the respective group (ensemble-groups are specified by `event_groups` below), in the order in which they are returned. The default *`mnirs`* metadata will ensemble-average all `nirs_channels`.
+Only when *"ensemble"*-averaging, `nirs_channels` should be specified by providing a list of column names (e.g. `list(c(A, B), c(A))`), where each list item specifies the channels to be ensemble-averaged within the respective group (ensemble-groups are specified by `group_intervals` below), in the order in which they are returned. The default *`mnirs`* metadata will ensemble-average all `nirs_channels`.
 
 * `time_channel`, `event_channel`, & `sample_rate`
 
@@ -634,11 +634,11 @@ Only when *"ensemble"*-averaging, `nirs_channels` should be specified by providi
 
     Interval boundaries are specified using helper functions: `by_time()` for `time_channel` values; `by_sample()` for sample indices (row numbers); `by_label()` for `event_channel` labels; or `by_lap()` for `event_channel` lap integers. Provide both `start` and `end` to define precise intervals, or provide `start` alone with `span` to extract windows around events. Multiple values can be passed to extract multiple intervals.
 
-* `event_groups`
+* `group_intervals`
 
     Events can be extracted and returned as a list of `"distinct"` intervals, or `"ensemble"`-averaged into a single data frame. Custom grouping structure for ensemble-averaging can be specified by event number, in order of appearance within the original data.\
 \
-e.g. `event_groups = list(c(1, 2), c(3, 4))` would return a list of two intervals, each ensemble-averaged from the respective events, in sequential order from the original data.
+e.g. `group_intervals = list(c(1, 2), c(3, 4))` would return a list of two intervals, each ensemble-averaged from the respective events, in sequential order from the original data.
 
 * `span`
 
@@ -656,12 +656,12 @@ When ensemble-averaging across intervals, time will always be re-calculated from
 #| fig.width: 8
 #| fig.asp: 0.55
 
-## return each interval independently with `event_groups = "distinct"`
+## return each interval independently with `group_intervals = "distinct"`
 distinct <- extract_intervals(
     nirs_data,                  ## channels blank for "distinct" grouping
     start = by_time(348, 1064), ## manually identified interval start times
     end = by_time(458, 1174),   ## interval end time (start + 150 sec)
-    event_groups = "distinct",  ## return a list of data frames for each (2) event
+    group_intervals = "distinct",  ## return a list of data frames for each (2) event
     span = c(0, 0),             ## no boundary modification
     zero_time = FALSE           ## return original time values
 )
@@ -670,12 +670,12 @@ plot(distinct, time_labels = TRUE)
 ```
 
 ```{r}
-## ensemble average both intervals with `event_groups = "ensemble"`
+## ensemble average both intervals with `group_intervals = "ensemble"`
 ensemble <- extract_intervals(
     nirs_data,                  ## channels recycled to all intervals by default
     nirs_channels = c(smo2_left, smo2_right),
     start = by_time(368, 1084), ## alternatively specify start times + span
-    event_groups = "ensemble",  ## ensemble-average across two intervals
+    group_intervals = "ensemble",  ## ensemble-average across two intervals
     span = c(-20, 90),          ## span recycled to all intervals by default
     zero_time = TRUE            ## re-calculate common time to start from `0`
 )

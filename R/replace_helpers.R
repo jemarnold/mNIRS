@@ -58,7 +58,6 @@ compute_local_windows <- function(
         start_idx <- pmax.int(1L, idx + offsets[1L])
         end_idx <- pmin.int(n, idx + offsets[2L])
     } else {
-        # fmt: skip
         offsets <- switch(
             align,
             centre = c(-0.5, 0.5),

@@ -262,7 +262,7 @@
 #'     resample_mnirs(method = "linear", verbose = FALSE) |>
 #'     extract_intervals(
 #'         start = by_time(368, 1084),
-#'         event_groups = "distinct",
+#'         group_intervals = "distinct",
 #'         span = c(-20, 90),
 #'         zero_time = TRUE,
 #'         verbose = FALSE

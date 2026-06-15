@@ -334,7 +334,7 @@ recycle_to_length <- function(
 recycle_param <- function(
     param,
     n_events,
-    event_groups,
+    group_intervals,
     verbose = TRUE
 ) {
     ## flatten nested lists to single-depth list
@@ -345,16 +345,16 @@ recycle_param <- function(
     }
 
     ## custom grouping: recycle per group, then map to event order
-    if (is.numeric(event_groups[[1L]])) {
-        n_groups <- length(event_groups)
-        groups_unlisted <- unlist(event_groups)
+    if (is.numeric(group_intervals[[1L]])) {
+        n_groups <- length(group_intervals)
+        groups_unlisted <- unlist(group_intervals)
 
         ## recycle param to number of groups
         param <- recycle_to_length(param, n_groups, "group", verbose)
 
         ## create mapping:  event_id -> group_id
-        ## rep(1:n_groups, lengths(event_groups)) gives group index per event in event_groups
-        group_for_event <- rep(seq_len(n_groups), lengths(event_groups))
+        ## rep(1:n_groups, lengths(group_intervals)) gives group index per event in group_intervals
+        group_for_event <- rep(seq_len(n_groups), lengths(group_intervals))
 
         ## build lookup:  position i holds group index for event i (NA if ungrouped)
         event_to_group <- integer(n_events)
@@ -593,11 +593,11 @@ preserve_metadata <- function(data, metadata, zero_time = FALSE) {
 
 #' Apply grouping to intervals
 #' @keywords internal
-group_intervals <- function(
+apply_interval_groups <- function(
     df_list,
     nirs_channels,
     metadata,
-    event_groups,
+    group_intervals,
     zero_time = FALSE,
     verbose = TRUE
 ) {
@@ -605,14 +605,14 @@ group_intervals <- function(
     n_intervals <- length(df_list)
 
     ## return distinct intervals
-    if (n_intervals == 1L || event_groups[[1L]][1L] == "distinct") {
+    if (n_intervals == 1L || group_intervals[[1L]][1L] == "distinct") {
         return(lapply(df_list, \(.x) {
             preserve_metadata(.x, metadata, zero_time)
         }))
     }
 
     ## return ensembled intervals
-    if (event_groups[[1L]][1L] == "ensemble") {
+    if (group_intervals[[1L]][1L] == "ensemble") {
         return(list(
             ensemble = ensemble_intervals(
                 df_list,
@@ -624,18 +624,18 @@ group_intervals <- function(
     }
 
     ## custom grouping ===================================
-    grouped_ids <- unlist(event_groups)
+    grouped_ids <- unlist(group_intervals)
     ungrouped_ids <- setdiff(seq_len(n_intervals), grouped_ids)
 
     ## add ungrouped ids as individual groups, sort by position
     if (length(ungrouped_ids) > 0) {
-        event_groups <- c(event_groups, as.list(ungrouped_ids))
-        event_groups <- event_groups[
-            order(vapply(event_groups, median, numeric(1), na.rm = TRUE))
+        group_intervals <- c(group_intervals, as.list(ungrouped_ids))
+        group_intervals <- group_intervals[
+            order(vapply(group_intervals, median, numeric(1), na.rm = TRUE))
         ]
         if (verbose) {
             cli_inform(c(
-                "!" = "Intervals not specified by {.arg event_groups}.",
+                "!" = "Intervals not specified by {.arg group_intervals}.",
                 "i" = "Ungrouped intervals included as discrete."
             ))
         }
@@ -647,12 +647,12 @@ group_intervals <- function(
         cli_warn(c(
             "!" = "Duplicates detected of {qty(length(dupes))} \\
             interval{?s} {.val {dupes}}.",
-            "i" = "Re-specify {.arg event_groups} to remove duplicates."
+            "i" = "Re-specify {.arg group_intervals} to remove duplicates."
         ))
     }
 
     ## process each group
-    result <- lapply(event_groups, \(.g) {
+    result <- lapply(group_intervals, \(.g) {
         if (length(.g) == 1L) {
             return(preserve_metadata(df_list[[.g]], metadata, zero_time))
         }
@@ -661,7 +661,7 @@ group_intervals <- function(
         ensemble_intervals(df_list[.g], group_nirs, metadata, verbose)
     })
 
-    names(result) <- vapply(event_groups, \(.g) {
+    names(result) <- vapply(group_intervals, \(.g) {
         paste0("interval_", paste(.g, collapse = "_"))
     }, character(1))
 

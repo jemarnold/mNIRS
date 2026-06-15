@@ -337,7 +337,6 @@ theme_mnirs <- function(
 #'
 #' @export
 palette_mnirs <- function(...) {
-    # fmt: skip
     colours <- c(                         ## NIRS location codes
         `light blue`  = "#0080ff",      ## "VL"
         `dark red`    = "#ba2630",      ## "FCR"
