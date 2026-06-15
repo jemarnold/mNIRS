@@ -55,7 +55,10 @@
 #'
 #' @param msg1,msg2 A character string appended to the [cli::cli_abort()]
 #'   message when numeric validation fails.
-#' 
+#'
+#' @param env The calling environment, used to report errors and warnings
+#'   as coming from the user-facing function rather than the validator.
+#'
 #' @inheritParams read_mnirs
 #'
 #' @details
@@ -77,17 +80,20 @@ NULL
 
 #' validate_numeric abort message construction
 #' @keywords internal
-abort_validation <- function(name, integer = FALSE, msg1 = "", msg2 = "") {
+abort_validation <- function(
+    name,
+    integer = FALSE,
+    msg1 = "",
+    msg2 = "",
+    env = rlang::caller_env()
+) {
     type <- if (integer) "integer" else "numeric"
 
     cli_abort(c(
         "x" = paste0(
-            "{.arg {name}} must be a valid ",
-            msg1,
-            " {.cls {type}} ",
-            msg2
+            "{.arg {name}} must be a valid ", msg1, " {.cls {type}} ", msg2
         )
-    ))
+    ), call = env)
 }
 
 
@@ -100,7 +106,8 @@ validate_numeric <- function(
     integer = FALSE,
     allow_na = FALSE,
     msg1 = "",
-    msg2 = ""
+    msg2 = "",
+    env = rlang::caller_env()
 ) {
     ## pass through NULL
     if (is.null(x)) {
@@ -111,23 +118,21 @@ validate_numeric <- function(
 
     ## cheap early type check
     if (!is.numeric(x)) {
-        abort_validation(name, integer, msg1, msg2)
+        abort_validation(name, integer, msg1, msg2, env)
     }
 
     ## valid elements length — skip NA scan when allow_na = TRUE
     if (!allow_na) {
         valid <- !is.na(x)
         n_valid <- sum(valid)
-        if (n_valid == 0L) {
-            abort_validation(name, integer, msg1, msg2)
-        }
+        if (n_valid == 0L) abort_validation(name, integer, msg1, msg2, env)
     } else {
         n_valid <- length(x)
     }
 
     ## elements check
     if (is.finite(elements) && n_valid != elements) {
-        abort_validation(name, integer, msg1, msg2)
+        abort_validation(name, integer, msg1, msg2, env)
     }
 
     ## subset once for range/integer checks
@@ -138,11 +143,11 @@ validate_numeric <- function(
 
     ## range check
     if (!is.null(range) && !all(within(x_valid, range, inclusive))) {
-        abort_validation(name, integer, msg1, msg2)
+        abort_validation(name, integer, msg1, msg2, env)
     }
     ## expensive integer check
     if (integer && !rlang::is_integerish(x_valid)) {
-        abort_validation(name, integer, msg1, msg2)
+        abort_validation(name, integer, msg1, msg2, env)
     }
 
     return(invisible())
@@ -150,13 +155,17 @@ validate_numeric <- function(
 
 
 #' @rdname validate_mnirs
-validate_mnirs_data <- function(data, ncol = 2L) {
+validate_mnirs_data <- function(
+    data, 
+    ncol = 2L, 
+    env = rlang::caller_env()
+) {
     ## validate is a data frame with at least two columns
     if (!is.data.frame(data) || length(data) < ncol) {
         cli_abort(c(
             "x" = "{.arg data} must be a data frame with at least \\
             {.val {ncol}} column{?s}."
-        ))
+        ), call = env)
     }
 
     return(invisible())
@@ -174,7 +183,11 @@ validate_mnirs_data <- function(data, ncol = 2L) {
 #' @returns A character vector, list of character vectors, or `NULL`.
 #'
 #' @keywords internal
-parse_channel_name <- function(channel, data, env = rlang::caller_env()) {
+parse_channel_name <- function(
+    channel,
+    data,
+    env = rlang::caller_env()
+) {
     if (rlang::quo_is_null(channel)) {
         return(NULL)
     }
@@ -257,7 +270,7 @@ validate_nirs_channels <- function(
             "x" = "{.arg nirs_channels} not detected in metadata.",
             "i" = "Check your data attributes or define \\
             {.arg nirs_channels} explicitly."
-        ))
+        ), call = env)
     }
 
     ## validate exists in data
@@ -265,7 +278,7 @@ validate_nirs_channels <- function(
         cli_abort(c(
             "x" = "{.arg nirs_channels} not detected in {.arg data}.",
             "i" = "Channel names are case-sensitive and must match exactly."
-        ))
+        ), call = env)
     }
 
     ## validate is numeric and has >=2 valid values
@@ -276,7 +289,7 @@ validate_nirs_channels <- function(
     if (sum(invalid_channels) > 0) {
         cli_abort(c(
             "x" = "{.arg nirs_channels} must contain valid {.cls numeric} data."
-        ))
+        ), call = env)
     }
 
     ## preserve list grouping for callers that need it
@@ -320,7 +333,7 @@ validate_time_channel <- function(
             "x" = "{.arg time_channel} not detected in metadata.",
             "i" = "Check your data attributes or define \\
             {.arg time_channel} explicitly."
-        ))
+        ), call = env)
     }
 
     ## validate exists in data
@@ -328,7 +341,7 @@ validate_time_channel <- function(
         cli_abort(c(
             "x" = "{.arg time_channel} not detected in {.arg data}.",
             "i" = "Channel names are case-sensitive and must match exactly."
-        ))
+        ), call = env)
     }
 
     ## validate is numeric and has >=2 valid values
@@ -338,7 +351,7 @@ validate_time_channel <- function(
     ) {
         cli_abort(c(
             "x" = "{.arg time_channel} must contain valid {.cls numeric} data."
-        ))
+        ), call = env)
     }
 
     return(time_channel)
@@ -367,7 +380,7 @@ validate_event_channel <- function(
             "x" = "{.arg event_channel} not detected in metadata.",
             "i" = "Check your data attributes or define {.arg event_channel} \\
             explicitly."
-        ))
+        ), call = env)
     } else if (is.null(event_channel) && !required) {
         ## return event_channel = NULL if not required
         return(event_channel)
@@ -378,7 +391,7 @@ validate_event_channel <- function(
         cli_abort(c(
             "x" = "{.arg event_channel} not detected in {.arg data}.",
             "i" = "Channel names are case-sensitive and must match exactly."
-        ))
+        ), call = env)
     }
 
     ## validate column type: must be character or integerish
@@ -387,7 +400,7 @@ validate_event_channel <- function(
         cli_abort(c(
             "x" = "{.arg event_channel} must contain valid {.cls character} \\
             event labels or {.cls integer} lap numbers."
-        ))
+        ), call = env)
     }
 
     ## check for empty column — character columns also check for empty strings
@@ -400,7 +413,7 @@ validate_event_channel <- function(
         cli_abort(c(
             "x" = "{.arg event_channel} must contain valid {.cls character} \\
             event labels or {.cls integer} lap numbers."
-        ))
+        ), call = env)
     }
 
     return(event_channel)
@@ -408,16 +421,16 @@ validate_event_channel <- function(
 
 
 #' @rdname validate_mnirs
-estimate_sample_rate <- function(x) {
+estimate_sample_rate <- function(x, env = rlang::caller_env()) {
     ## estimate samples per second
     sample_rate_raw <- 1 / median(diff(x), na.rm = TRUE)
-    
+
     if (!is.finite(sample_rate_raw) || sample_rate_raw == 0) {
         cli_abort(c(
             "x" = "Unable to estimate {.arg sample_rate}.",
             "i" = "Check that {.arg time_channel} values are consistent.",
             "i" = "Set {.arg sample_rate} = {.cls numeric}."
-        ))
+        ), call = env)
     }
 
     pretty_vals <- c(
@@ -432,7 +445,8 @@ validate_sample_rate <- function(
     data,
     time_channel,
     sample_rate,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     ## if not defined, check metadata
     sample_rate <- sample_rate %||% attr(data, "sample_rate")
@@ -444,7 +458,7 @@ validate_sample_rate <- function(
         ## time_channel must be validated before this
         time_vec <- as.numeric(data[[time_channel]])
         ## will error if unable to estimate sample_rate
-        sample_rate_est <- estimate_sample_rate(time_vec)
+        sample_rate_est <- estimate_sample_rate(time_vec, env)
     }
 
     ## if still not defined, use estimated sample_rate
@@ -460,7 +474,8 @@ validate_sample_rate <- function(
 
     ## validate has one numeric value
     validate_numeric(
-        sample_rate, 1, c(0, Inf), FALSE, msg1 = "one-element positive"
+        sample_rate, 1, c(0, Inf), FALSE, 
+        msg1 = "one-element positive", env = env
     )
 
     ## warn when user-provided sample_rate disagrees with the estimate
@@ -474,7 +489,7 @@ validate_sample_rate <- function(
             `sample_rate = {.val {sample_rate_est}}`.",
             "i" = "Check that your sample rate and {.arg time_channel} \\
             values are consistent."
-        ))
+        ), call = env)
     }
 
     return(sample_rate)
@@ -485,21 +500,24 @@ validate_width_span <- function(
     width = NULL,
     span = NULL,
     verbose = TRUE,
-    msg = ""
+    msg = "",
+    env = rlang::caller_env()
 ) {
     if (is.null(c(width, span))) {
         cli_abort(c(
             "x" = "Window size undefined",
             "i" = paste(
-                "One of {.arg width} or {.arg span} must be defined",
-                msg
+                "One of {.arg width} or {.arg span} must be defined", msg
             )
-        ))
+        ), call = env)
     }
     validate_numeric(
-        width, 1, c(1, Inf), integer = TRUE, msg1 = "one-element positive"
+        width, 1, c(1, Inf), integer = TRUE, 
+        msg1 = "one-element positive", env = env
     )
-    validate_numeric(span, 1, c(0, Inf), msg1 = "one-element positive")
+    validate_numeric(
+        span, 1, c(0, Inf), msg1 = "one-element positive", env = env
+    )
     if (verbose && !is.null(width) && !is.null(span)) {
         cli_inform(c(
             "i" = "{.arg width} = {.val {width}} overrides {.arg span}."
@@ -509,30 +527,38 @@ validate_width_span <- function(
 
 
 #' @rdname validate_mnirs
-validate_x_t <- function(x, t, allow_na = FALSE) {
+validate_x_t <- function(
+    x,
+    t,
+    allow_na = FALSE,
+    env = rlang::caller_env()
+) {
     ## exclude NULL by defaulting to allow_na character
     x <- x %||% character()
     t <- t %||% character()
-    validate_numeric(x, allow_na = allow_na)
-    validate_numeric(t, allow_na = allow_na)
+    validate_numeric(x, allow_na = allow_na, env = env)
+    validate_numeric(t, allow_na = allow_na, env = env)
     if (length(x) != length(t)) {
         cli_abort(c(
             "x" = "{.arg x} and {.arg t} must be {.cls numeric} vectors \\
             of equal length."
-        ))
+        ), call = env)
     }
 }
 
 
-
-
-
 #' Validate t0
 #' @keywords internal
-validate_t0 <- function(t0, data, time_vec, verbose = TRUE) {
+validate_t0 <- function(
+    t0,
+    data,
+    time_vec,
+    verbose = TRUE,
+    env = rlang::caller_env()
+) {
     ## fall back to metadata or zero
     t0 <- t0 %||% attr(data, "interval_times") %||% 0
-    validate_numeric(t0, 1L)
+    validate_numeric(t0, 1L, env = env)
 
     if (length(which(time_vec <= t0)) == 0L) {
         if (verbose) {
@@ -540,7 +566,7 @@ validate_t0 <- function(t0, data, time_vec, verbose = TRUE) {
                 "!" = "No observations where {.arg time_channel} <= \\
                 `t0 = {.val {t0}}`.",
                 "i" = "All samples included in response."
-            ))
+            ), call = env)
         }
         t0 <- time_vec[1L]
     }
@@ -549,23 +575,22 @@ validate_t0 <- function(t0, data, time_vec, verbose = TRUE) {
             "x" = "No observations in {.arg time_channel} before {.arg t0}.",
             "i" = "{.arg t0} must be specified within the range of \\
             {.arg time_channel}."
-        ))
+        ), call = env)
     }
 
     return(t0)
 }
 
 
-
 #' wrap findInterval: informative 'time_channel' error message
 #' @keywords internal
-findInt_mnirs <- function(...) {
+findInt_mnirs <- function(..., env = rlang::caller_env()) {
     withCallingHandlers(findInterval(...), error = \(e) {
         cli_abort(c(
             "x" = "Duplicate or irregular {.arg time_channel} samples \\
             detected.",
             "i" = "{.arg time_channel} must be sorted without repeating, \\
             decreasing, or {.val {NA}}s."
-        ))
+        ), call = env)
     })
 }

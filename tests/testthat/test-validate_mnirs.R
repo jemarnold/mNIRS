@@ -81,6 +81,15 @@ test_that("validate_numeric handles NULL", {
     expect_silent(validate_numeric(NULL))
 })
 
+test_that("validate_numeric reports errors from the caller's `env`", {
+    ## a named caller env attributes the abort to the user-facing function
+    caller <- function() {
+        validate_numeric("text", env = rlang::current_env())
+    }
+    err <- expect_error(caller(), "numeric")
+    expect_equal(rlang::call_name(conditionCall(err)), "caller")
+})
+
 ## validate_mnirs_data() ========================================
 test_that("validate_mnirs_data() accepts valid data frames", {
     data <- create_test_data()

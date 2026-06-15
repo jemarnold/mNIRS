@@ -21,10 +21,11 @@ validate_numeric(
   integer = FALSE,
   allow_na = FALSE,
   msg1 = "",
-  msg2 = ""
+  msg2 = "",
+  env = rlang::caller_env()
 )
 
-validate_mnirs_data(data, ncol = 2L)
+validate_mnirs_data(data, ncol = 2L, env = rlang::caller_env())
 
 validate_nirs_channels(
   nirs_channels,
@@ -43,13 +44,25 @@ validate_event_channel(
   env = rlang::caller_env()
 )
 
-estimate_sample_rate(x)
+estimate_sample_rate(x, env = rlang::caller_env())
 
-validate_sample_rate(data, time_channel, sample_rate, verbose = TRUE)
+validate_sample_rate(
+  data,
+  time_channel,
+  sample_rate,
+  verbose = TRUE,
+  env = rlang::caller_env()
+)
 
-validate_width_span(width = NULL, span = NULL, verbose = TRUE, msg = "")
+validate_width_span(
+  width = NULL,
+  span = NULL,
+  verbose = TRUE,
+  msg = "",
+  env = rlang::caller_env()
+)
 
-validate_x_t(x, t, allow_na = FALSE)
+validate_x_t(x, t, allow_na = FALSE, env = rlang::caller_env())
 }
 \arguments{
 \item{x}{A numeric vector.}
@@ -72,6 +85,9 @@ of \code{NA} to the returned numeric/integer vector.}
 
 \item{msg1, msg2}{A character string appended to the \code{\link[cli:cli_abort]{cli::cli_abort()}}
 message when numeric validation fails.}
+
+\item{env}{The calling environment, used to report errors and warnings
+as coming from the user-facing function rather than the validator.}
 
 \item{data}{A data frame of class \emph{"mnirs"} containing time series data and
 metadata.}
