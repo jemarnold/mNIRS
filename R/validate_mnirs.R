@@ -241,7 +241,7 @@ parse_channel_name <- function(
 validate_nirs_channels <- function(
     nirs_channels,
     data,
-    verbose = FALSE, ## only for functions requiring list()
+    verbose = FALSE, ## hint only emitted on the as_list grouping path
     as_list = FALSE,
     env = rlang::caller_env()
 ) {
@@ -292,21 +292,12 @@ validate_nirs_channels <- function(
         ), call = env)
     }
 
-    ## preserve list grouping for callers that need it
+    ## preserve list grouping for callers that need it (as_list = TRUE)
     if (as_list) {
         return(nirs_channels)
     }
 
-    ## default: coerce to flat vector
-    if (verbose && is.list(nirs_channels)) {
-        cli_inform(c(
-            "i" = "{.arg nirs_channels} = \\
-            {col_blue({deparse(nirs_unlisted)})} passed through unlisted."
-        ))
-    }
-
-    ## returns explicitly grouped nirs_channels
-    ## or nirs_unlisted if retrieved from metadata
+    ## default: return a flat character vector of channel names
     return(nirs_unlisted)
 }
 

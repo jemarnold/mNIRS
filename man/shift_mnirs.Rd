@@ -6,13 +6,14 @@
 \usage{
 shift_mnirs(
   data,
-  nirs_channels = list(),
+  nirs_channels = NULL,
   time_channel = NULL,
   to = NULL,
   by = NULL,
   width = NULL,
   span = NULL,
   position = c("min", "max", "first"),
+  group_channels = c("ensemble", "distinct"),
   verbose = TRUE
 )
 }
@@ -58,6 +59,19 @@ specified values.}
 values.}
 }}
 
+\item{group_channels}{Either a character string or a \code{list()} of
+channel-name vectors specifying how to group \code{nirs_channels}
+(see \emph{Details}).
+\describe{
+\item{\code{"ensemble"}}{The \emph{default}. Operate on all channels together,
+preserving the relative scaling between channels.}
+\item{\code{"distinct"}}{Operate on each channel independently, losing
+the relative scaling between channels.}
+\item{\code{list(c("A", "B"), c("C", "D"))}}{Operate on channels \code{A} & \code{B}
+in one group, and \code{C} & \code{D} in another group. Groups can be named
+(e.g. \code{list(smo2 = c("A", "B"))}).}
+}}
+
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
@@ -74,30 +88,67 @@ positive values, or shift the mean of the first time span in a recording
 to zero.
 }
 \details{
-\code{nirs_channels = list()} can be used to group data channels (column names)
-to preserve absolute or relative scaling.
+\code{group_channels} controls how data channels are grouped to preserve
+absolute or relative scaling (see \code{\link[=rescale_mnirs]{rescale_mnirs()}}).
 \itemize{
-\item Channels grouped together in a vector (e.g. \code{list(c("A", "B"))}) will be
-shifted to a common value, and the relative scaling within that group
-will be preserved.
-\item Channels in separate list vectors (e.g. \code{list("A", "B")}) will be
-shifted independently, and relative scaling between groups will be lost.
-\item A single vector of channel names (e.g. \code{c("A", "B")}) will group
-channels together.
-\item Channels (columns) in \code{data} not explicitly defined in \code{nirs_channels}
-will be passed through untouched to the output data frame.
+\item \code{group_channels = "ensemble"} (the \emph{default}) shifts all
+\code{nirs_channels} to a common value, preserving relative scaling
+between channels.
+\item \code{group_channels = "distinct"} shifts each channel independently,
+losing relative scaling between channels.
+\item A \code{list()} of channel-name vectors (e.g. \code{list(c("A", "B"), c("C", "D"))})
+shifts channels \code{A} & \code{B} together and \code{C} & \code{D} together, preserving
+relative scaling within, but not between groups. \code{nirs_channels}
+omitted from the list are rescaled independently.
+\item Channel groups can be named (e.g. \code{list(smo2 = c("A", "B"))}) and names
+used as keys for per-group arguments.
+}
+
+Only one of either \code{to} or \code{by} and one of either \code{width} or \code{span} should
+be defined for each \code{group_channels}. If both of either pairing are
+defined, \code{to} will be preferred over \code{by}, and \code{width} will be preferred
+over \code{span}.
+\itemize{
+\item Channels (columns) in \code{data} not in \code{nirs_channels} are passed
+through without processing to the output data frame.
 }
 
 \code{nirs_channels} and \code{time_channel} can be retrieved automatically from
 \code{data} of class \emph{"mnirs"} which has been processed with \code{{mnirs}},
-if not defined explicitly. This will default to returning all
-\code{nirs_channels} grouped together, and should be defined explicitly
-for other grouping arrangements.
-
-Only one of either \code{to} or \code{by} and one of either \code{width} or \code{span} should
-be defined. If both of either pairing are defined, \code{to} will be preferred
-over \code{by}, and \code{width} will be preferred over \code{span}.
+if not defined explicitly.
 }
+\section{Per-channel arguments}{
+
+
+Arguments apply globally to all \code{nirs_channels} by default. Relevant
+arguments can instead be supplied uniquely per-channel as a named \code{list()},
+with names matching either \code{nirs_channels} or list names in
+\code{group_channels}, e.g.:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{shift_mnirs(
+    data,
+    nirs_channels = c(A, B, C),
+    to = list(100, C = 0),
+    width = list(smo2 = 3),
+    span = list(hhb = 5),
+    position = "first",
+    group_channels = list(smo2 = c(A, B), hhb = C)
+)
+}\if{html}{\out{</div>}}
+\itemize{
+\item A non-list value applies to every channel (the \emph{default} behaviour).
+\item A \code{list()} named by \code{nirs_channels} or \code{group_channels} applies
+per-channel / per-group values.
+\item A single unnamed value in the list will be applied to unlisted channels
+(e.g. \code{span = list(3, hhb = 5)} gives \code{hhb} 5 and every other channel 3).
+If no unnamed fallback value in the list, channels not named in the list
+will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
+process \code{hhb}).
+\item A \code{list()} whose names do not match \code{nirs_channels} or \code{group_channels}
+(e.g. \code{control = list(maxiter = 100)}) is treated as a global value.
+}
+}
+
 \examples{
 ## read example data
 data <- read_mnirs(
@@ -107,11 +158,12 @@ data <- read_mnirs(
     time_channel = c(time = "hh:mm:ss"),
     verbose = FALSE
 ) |>
-    shift_mnirs(        ## un-grouped nirs channels to shift separately 
-        nirs_channels = list(smo2_left, smo2_right), 
+    shift_mnirs(        ## un-grouped nirs channels to shift separately
+        nirs_channels = c(smo2_left, smo2_right),
         to = 0,         ## NIRS values will be shifted to zero
         span = 120,     ## shift the *first* 120 sec of data to zero
-        position = "first"
+        position = "first",
+        group_channels = "distinct"
     )
 
 data

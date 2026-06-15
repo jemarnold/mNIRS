@@ -24,31 +24,65 @@
 #' @inheritParams rescale_mnirs
 #'
 #' @details
-#' `nirs_channels = list()` can be used to group data channels (column names)
-#'   to preserve absolute or relative scaling.
+#' `group_channels` controls how data channels are grouped to preserve
+#'   absolute or relative scaling (see [rescale_mnirs()]).
 #'
-#' - Channels grouped together in a vector (e.g. `list(c("A", "B"))`) will be
-#'   shifted to a common value, and the relative scaling within that group
-#'   will be preserved.
+#' - `group_channels = "ensemble"` (the *default*) shifts all
+#'   `nirs_channels` to a common value, preserving relative scaling
+#'   between channels.
 #'
-#' - Channels in separate list vectors (e.g. `list("A", "B")`) will be
-#'   shifted independently, and relative scaling between groups will be lost.
+#' - `group_channels = "distinct"` shifts each channel independently,
+#'   losing relative scaling between channels.
+#' 
+#' - A `list()` of channel-name vectors (e.g. `list(c("A", "B"), c("C", "D"))`)
+#'   shifts channels `A` & `B` together and `C` & `D` together, preserving
+#'   relative scaling within, but not between groups. `nirs_channels`
+#'   omitted from the list are rescaled independently.
 #'
-#' - A single vector of channel names (e.g. `c("A", "B")`) will group
-#'   channels together.
+#' - Channel groups can be named (e.g. `list(smo2 = c("A", "B"))`) and names
+#'   used as keys for per-group arguments.
 #'
-#' - Channels (columns) in `data` not explicitly defined in `nirs_channels`
-#'   will be passed through untouched to the output data frame.
+#' Only one of either `to` or `by` and one of either `width` or `span` should
+#'   be defined for each `group_channels`. If both of either pairing are
+#'   defined, `to` will be preferred over `by`, and `width` will be preferred
+#'   over `span`.
+#' 
+#' - Channels (columns) in `data` not in `nirs_channels` are passed
+#'   through without processing to the output data frame.
 #'
 #' `nirs_channels` and `time_channel` can be retrieved automatically from
 #'   `data` of class *"mnirs"* which has been processed with `{mnirs}`,
-#'   if not defined explicitly. This will default to returning all
-#'   `nirs_channels` grouped together, and should be defined explicitly
-#'   for other grouping arrangements.
+#'   if not defined explicitly.
 #'
-#' Only one of either `to` or `by` and one of either `width` or `span` should
-#'   be defined. If both of either pairing are defined, `to` will be preferred
-#'   over `by`, and `width` will be preferred over `span`.
+#' @section Per-channel arguments:
+#'
+#' Arguments apply globally to all `nirs_channels` by default. Relevant
+#' arguments can instead be supplied uniquely per-channel as a named `list()`,
+#' with names matching either `nirs_channels` or list names in 
+#' `group_channels`, e.g.:
+#'
+#' ```r
+#' shift_mnirs(
+#'     data,
+#'     nirs_channels = c(A, B, C),
+#'     to = list(100, C = 0),
+#'     width = list(smo2 = 3),
+#'     span = list(hhb = 5),
+#'     position = "first",
+#'     group_channels = list(smo2 = c(A, B), hhb = C)
+#' )
+#' ```
+#'
+#' - A non-list value applies to every channel (the *default* behaviour).
+#' - A `list()` named by `nirs_channels` or `group_channels` applies
+#'   per-channel / per-group values. 
+#' - A single unnamed value in the list will be applied to unlisted channels 
+#'   (e.g. `span = list(3, hhb = 5)` gives `hhb` 5 and every other channel 3).
+#'   If no unnamed fallback value in the list, channels not named in the list
+#'   will be returned un-processed (e.g. `span = list(hhb = 5)` will only
+#'   process `hhb`).
+#' - A `list()` whose names do not match `nirs_channels` or `group_channels`
+#'   (e.g. `control = list(maxiter = 100)`) is treated as a global value.
 #'
 #' @returns
 #' A [tibble][tibble::tibble-package] of class *"mnirs"* with metadata
@@ -63,11 +97,12 @@
 #'     time_channel = c(time = "hh:mm:ss"),
 #'     verbose = FALSE
 #' ) |>
-#'     shift_mnirs(        ## un-grouped nirs channels to shift separately 
-#'         nirs_channels = list(smo2_left, smo2_right), 
+#'     shift_mnirs(        ## un-grouped nirs channels to shift separately
+#'         nirs_channels = c(smo2_left, smo2_right),
 #'         to = 0,         ## NIRS values will be shifted to zero
 #'         span = 120,     ## shift the *first* 120 sec of data to zero
-#'         position = "first"
+#'         position = "first",
+#'         group_channels = "distinct"
 #'     )
 #'
 #' data
@@ -82,114 +117,130 @@
 #' @export
 shift_mnirs <- function(
     data,
-    nirs_channels = list(),
+    nirs_channels = NULL,
     time_channel = NULL,
     to = NULL,
     by = NULL,
     width = NULL,
     span = NULL,
     position = c("min", "max", "first"),
+    group_channels = c("ensemble", "distinct"),
     verbose = TRUE
 ) {
     ## validation =============================================
-    ## do nothing condition
-    if (is.null(c(to, by))) {
-        cli_abort(c(
-            "x" = "Shift value undefined",
-            "i" = "One of {.arg to} or {.arg by} must be defined."
-        ))
-    }
-
     validate_mnirs_data(data)
     metadata <- attributes(data)
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    nirs_channels <- validate_nirs_channels(
-        enquo(nirs_channels), data, verbose, as_list = TRUE
+    nirs_parsed <- parse_channel_name(enquo(nirs_channels), data)
+    if (is.list(nirs_parsed)) {
+        lifecycle::deprecate_stop(
+            when = "0.7.0",
+            what = I(paste(
+                "Passing a `list()` to `nirs_channels` for channel grouping"
+            )),
+            with = I("the `group_channels` argument")
+        )
+    }
+    nirs_channels <- validate_nirs_channels(nirs_parsed, data, verbose)
+    group_channels <- validate_group_channels(
+        nirs_channels, enquo(group_channels), data, verbose
     )
     time_channel <- validate_time_channel(enquo(time_channel), data)
-    validate_numeric(to, 1, msg1 = "one-element")
-    validate_numeric(by, 1, msg1 = "one-element")
-    if (!is.null(to) && !is.null(by)) {
-        by <- NULL
-        if (verbose) {
-            cli_inform(c("i" = "{.arg to} = {.val {to}} overrides {.arg by}."))
+    t_vec <- data[[time_channel]]
+
+    ## broadcast global args, applying per-channel/per-group overrides
+    per_group <- resolve_channel_args(
+        nirs_channels,
+        args = list(
+            to = to,
+            by = by,
+            width = width,
+            span = span,
+            position = position
+        ),
+        defaults = list(position = "min"),
+        choices = list(position = c("min", "max", "first")),
+        group_channels = group_channels,
+        verbose = verbose
+    )
+
+    ## per-group shifts ==============================================
+    shifted <- lapply(names(group_channels), \(.key) {
+        .a <- per_group[[.key]]
+        .cols <- group_channels[[.key]]
+        ## verbose messages emitted once for the first channel/group
+        .v <- verbose && .key == names(group_channels)[[1L]]
+
+        ## do nothing condition
+        if (is.null(c(.a$to, .a$by))) {
+            cli_abort(c(
+                "x" = "Shift value undefined",
+                "i" = "One of {.arg to} or {.arg by} must be defined."
+            ))
         }
-    }
+        validate_numeric(.a$to, 1, msg1 = "one-element")
+        validate_numeric(.a$by, 1, msg1 = "one-element")
+        if (!is.null(.a$to) && !is.null(.a$by)) {
+            .a$by <- NULL
+            if (.v) {
+                cli_inform(c(
+                    "i" = "Shift {.arg to} = {.val {(.a$to)}} \\
+                    overrides {.arg by}."
+                ))
+            }
+        }
 
-    if (
-        verbose &&
-            is.null(attr(data, "nirs_channels")) &&
-            !is.list(nirs_channels)
-    ) {
-        cli_inform(c(
-            "!" = "{.fn shift_mnirs} accepts {.arg nirs_channels} = \\
-            {col_blue('list()')} for channel grouping. See `?shift_mnirs`."
-        ))
-    }
-    nirs_listed <- make_list(nirs_channels)
-    nirs_unlisted <- unlist(nirs_listed, use.names = FALSE)
+        ## shift_by does not require calculating reference positions
+        if (!is.null(.a$by)) {
+            return(data[.cols] + .a$by)
+        }
 
-    ## Metadata =================================
-    metadata$nirs_channels <- unique(nirs_unlisted)
-    metadata$time_channel <- time_channel
+        ## calculate shift_to reference values =======================
+        validate_width_span(.a$width, .a$span, .v, "for `shift_mnirs()`.")
 
-    ## shift_by ====================================================
-    ## shift_by does not require grouping or calculating positions
-    if (!is.null(by) && is.null(to)) {
-        data[nirs_unlisted] <- data[nirs_unlisted] + by
-        return(create_mnirs_data(data, metadata))
-    }
-
-    ## calculate shift_to values ====================================
-    ## validate
-    position <- match.arg(position)
-    validate_width_span(width, span, verbose, "for `shift_mnirs()`.")
-    time_vec <- data[[time_channel]]
-
-    if (position == "first") {
-        ## for span, take data <= first time_channel value + span, assuming sorted
-        width <- width %||% rev(which(time_vec <= (time_vec[1L] + span)))[1L]
-        ## drop = FALSE to avoid reducing to vector with one `nirs_unlisted`
-        shift_values <- colMeans(
-            data[seq_len(width), nirs_unlisted, drop = FALSE],
-            na.rm = TRUE
-        )
-    } else if (position %in% c("min", "max")) {
-        ## find local windows within width/span centred around idx
-        ## TODO need to fix edges. Should be partial = FALSE
-        window_idx <- compute_local_windows(
-            t = time_vec, width = width, span = span,
-        )
-        shift_fun <- match.fun(position)
-        ## compute min or max along local means
-        ## return named vec of min/max for each nirs_channel
-        shift_values <- vapply(data[nirs_unlisted], \(.x) {
-            shift_fun(
-                compute_local_fun(.x, window_idx, mean, na.rm = TRUE), 
+        if (.a$position == "first") {
+            ## for span, take data <= first time value + span, assuming
+            ## sorted time_channel (sum == last index)
+            first_width <- .a$width %||% sum(t_vec <= t_vec[1L] + .a$span)
+            ## drop = FALSE to avoid reducing single channels to vector
+            shift_values <- colMeans(
+                data[seq_len(first_width), .cols, drop = FALSE],
                 na.rm = TRUE
             )
-        }, numeric(1))
-    }
+        } else {
+            ## find local windows within width/span centred around idx
+            ## TODO need to fix edges. Should be partial = FALSE
+            window_idx <- compute_local_windows(
+                t = t_vec, width = .a$width, span = .a$span,
+            )
+            shift_fun <- match.fun(.a$position)
+            ## compute min or max along local means per channel
+            shift_values <- vapply(data[.cols], \(.x) {
+                shift_fun(
+                    compute_local_fun(.x, window_idx, mean, na.rm = TRUE),
+                    na.rm = TRUE
+                )
+            }, numeric(1))
+        }
 
-    ## apply shifts ==============================================
-    ## find the value to shift to per nirs_channel group
-    group_shift_values <- vapply(nirs_listed, \(.cols) {
-        switch(
-            position,
-            min = min(shift_values[.cols]),
-            max = max(shift_values[.cols]),
-            first = mean(shift_values[.cols])
+        ## single reference value shared across the channel group
+        group_shift <- switch(
+            .a$position,
+            min = min(shift_values),
+            max = max(shift_values),
+            first = mean(shift_values)
         )
-    }, numeric(1))
-
-    ## expand grouped shift values for each nirs_channel
-    channel_shifts <- rep(group_shift_values, lengths(nirs_listed))
-    ## move the shift_value to the `to` value for each nirs_channel
-    data[nirs_unlisted] <- lapply(seq_along(nirs_unlisted), \(.i) {
-        data[[nirs_unlisted[.i]]] - channel_shifts[.i] + to
+        data[.cols] - group_shift + .a$to
     })
+
+    ## apply shifts in group order =====================================
+    data[unlist(group_channels, use.names = FALSE)] <- do.call(cbind, shifted)
+
+    ## Metadata =================================
+    metadata$nirs_channels <- unique(nirs_channels)
+    metadata$time_channel <- time_channel
 
     return(create_mnirs_data(data, metadata))
 }
