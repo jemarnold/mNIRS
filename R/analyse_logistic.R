@@ -533,7 +533,8 @@ analyse_logistic <- function(
     time_channel <- validate_time_channel(enquo(time_channel), data)
     t_vec <- data[[time_channel]]
     args <- list(...)
-    interval_names <- args$interval_names %||% substitute(data)
+    ## interval label; falls back to the `data` argument name when unsupplied
+    interval_name <- args$interval_name %||% deparse(substitute(data))
 
     ## broadcast global args, applying any per-channel list() overrides
     per_channel <- resolve_channel_args(
@@ -585,7 +586,7 @@ analyse_logistic <- function(
         }
         cli_warn(c(
             "x" = "{.fn {as.character(fn)}} fit failed for \\
-            {.field {(.nirs)}} in {.field {interval_names}}.",
+            {.field {(.nirs)}} in {.field {interval_name}}.",
             "!" = "{conditionMessage(e)}"
         ))
         return(invisible(NULL))
@@ -650,7 +651,13 @@ analyse_logistic <- function(
     }
 
     return(analyse_kinetics_channels(
-        data, nirs_channels, time_channel,
-        per_channel, logistic_fit, verbose, args
+        data,
+        nirs_channels,
+        time_channel,
+        per_channel,
+        logistic_fit,
+        verbose,
+        interval_name,
+        extra_args = args
     ))
 }

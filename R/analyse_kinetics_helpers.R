@@ -289,42 +289,13 @@ build_kinetics_results <- function(
 }
 
 
-#' Serialise per-channel arguments to a 1-row data frame
-#'
-#' Converts `NULL` values to `NA` and `list` values (e.g. `control`) to
-#' their `deparse()` representation so the result can be stored in a flat
-#' data frame.
-#'
-#' @param nirs_channel Character; column name of the channel.
-#' @param all_args Named list of resolved arguments.
-#'
-#' @returns A 1-row `data.frame`.
-#'
-#' @keywords internal
-build_channel_args <- function(nirs_channel, all_args) {
-    args_list <- lapply(all_args, \(.x) {
-        if (is.null(.x)) {
-            NA
-        } else if (is.list(.x)) {
-            deparse(.x)
-        } else {
-            .x
-        }
-    })
-    ## omit internal args
-    args_list[["verbose"]] <- NULL
-    args_list[["bypass_checks"]] <- NULL
-    return(data.frame(nirs_channels = nirs_channel, args_list))
-}
-
-
 #' Process kinetics fits across NIRS channels
 #'
 #' Shared per-channel skeleton for all `analyse_kinetics()` methods. Resolves
 #' the fitting window for each channel via [find_kinetics_idx()], delegates
 #' the method-specific fit to `fit_fn`, and assembles the standard attributed
-#' result via [build_channel_results()]. Method workers supply a validated
-#' `per_channel` argument list and a `fit_fn`; everything else is common.
+#' result. Method workers supply a validated `per_channel` argument list and a
+#' `fit_fn`; everything else is common.
 #'
 #' @param data A single *"mnirs"* data frame.
 #' @param nirs_channels Character vector of resolved channel names.
@@ -337,11 +308,17 @@ build_channel_args <- function(nirs_channel, all_args) {
 #'   *without* `nirs_channels`/`time_channel`), `model`, `fitted_data`
 #'   (`window_idx`/`fitted`), and `diag` (1-row data frame from
 #'   [compute_diagnostics()]).
+#' @param interval_name Character; the interval name recorded in the `interval`
+#'   column of the returned coefficients.
 #' @param extra_args Named list of additional arguments recorded in the
 #'   `channel_args` result attribute.
 #' @inheritParams validate_mnirs
 #'
-#' @returns The attributed result data frame from [build_channel_results()].
+#' @returns A `data.frame` of coefficients (columns `interval`,
+#'   `nirs_channels`, `time_channel`, and method parameters), one row per
+#'   channel, with attributes `"model"` and `"fitted_data"` (named lists by
+#'   channel) and `"diagnostics"` and `"channel_args"` (data frames, one row
+#'   per channel).
 #'
 #' @keywords internal
 analyse_kinetics_channels <- function(
@@ -351,11 +328,13 @@ analyse_kinetics_channels <- function(
     per_channel,
     fit_fn,
     verbose = TRUE,
+    interval_name = NA_character_,
     extra_args = list()
 ) {
     t_vec <- data[[time_channel]]
 
-    results <- lapply(nirs_channels, \(.nirs) {
+    ## per-channel fit; collect parallel pieces keyed by channel
+    fits <- setNames(lapply(nirs_channels, \(.nirs) {
         .a <- per_channel[[.nirs]]
 
         ## filter for valid finite idx before first extreme + end_fit_span
@@ -369,19 +348,56 @@ analyse_kinetics_channels <- function(
         ## method-specific fit; coefs/diag carry method columns only
         fit <- fit_fn(.nirs, x_fit, t_fit, .a, valid, verbose)
 
+        ## serialise resolved args: NULL to NA, list() to its deparse(),
+        ## dropping internal-only args, so they fit a flat data frame row
+        arg_row <- lapply(c(.a, extra_args), \(.x) {
+            if (is.null(.x)) NA else if (is.list(.x)) deparse(.x) else .x
+        })
+        arg_row[c("verbose", "bypass_checks")] <- NULL
+
         list(
             coefficients = cbind(
-                data.frame(nirs_channels = .nirs, time_channel = time_channel),
+                data.frame(
+                    interval      = interval_name,
+                    nirs_channels = .nirs,
+                    time_channel  = time_channel
+                ),
                 fit$coefs
             ),
-            model = fit$model,
-            fitted_data = fit$fitted_data,
-            diagnostics = cbind(data.frame(nirs_channels = .nirs), fit$diag),
-            channel_args = build_channel_args(.nirs, c(.a, extra_args))
+            model        = fit$model,
+            fitted_data  = fit$fitted_data,
+            diagnostics  = cbind(data.frame(nirs_channels = .nirs), fit$diag),
+            channel_args = data.frame(nirs_channels = .nirs, arg_row)
         )
-    })
+    }), nirs_channels)
 
-    return(build_channel_results(results, nirs_channels, verbose = verbose))
+    ## assemble single attributed df (consumed by build_kinetics_results)
+    result <- structure(
+        do.call(rbind, lapply(fits, `[[`, "coefficients")),
+        model        = lapply(fits, `[[`, "model"),
+        fitted_data  = lapply(fits, `[[`, "fitted_data"),
+        diagnostics  = do.call(rbind, lapply(fits, `[[`, "diagnostics")),
+        channel_args = do.call(rbind, lapply(fits, `[[`, "channel_args"))
+    )
+
+    ## warn when time coefficients are negative (response before t0)
+    if (verbose) {
+        check_cols <- intersect(
+            c("TD", "tau", "response_time", "peak_slope_time"), names(result)
+        )
+
+        if (any(unlist(result[check_cols]) < 0, na.rm = TRUE)) {
+            cli_warn(c(
+                "!" = "Negative {.arg time_channel} coefficients imply the \\
+                response occured before {.arg t0}. This may indicate a \\
+                poorly fitted or misparameterised model.",
+                "i" = "Check {.arg time_channel} and {.arg t0} values, or \\
+                consider using a different {.fn analyse_kinetics} method."
+            ))
+        }
+    }
+
+    return(result)
 }
 
 
@@ -483,55 +499,6 @@ build_na_results <- function(na_coefs) {
         diag = na_diag
     ))
 }
-
-
-#' Assemble per-channel results into an attributed data frame
-#'
-#' Combines the list of per-channel result lists (each with
-#' `coefficients`, `fitted_data`, `diagnostics`, `channel_args`) into
-#' the single attributed data frame that [build_kinetics_results()]
-#' expects.
-#'
-#' @param results List of per-channel result lists.
-#' @param nirs_channels Names to pass to list items
-#'
-#' @returns A `data.frame` with attributes `"model"`, `"fitted_data"`,
-#'   `"diagnostics"`, and `"channel_args"`.
-#' @keywords internal
-build_channel_results <- function(
-    results,
-    nirs_channels,
-    verbose = TRUE
-) {
-    result <- structure(
-        do.call(rbind, lapply(results, `[[`, "coefficients")),
-        model = setNames(lapply(results, `[[`, "model"), nirs_channels),
-        fitted_data = setNames(
-            lapply(results, `[[`, "fitted_data"), nirs_channels
-        ),
-        diagnostics = do.call(rbind, lapply(results, `[[`, "diagnostics")),
-        channel_args = do.call(rbind, lapply(results, `[[`, "channel_args"))
-    )
-
-    if (verbose) {
-        check_cols <- intersect(
-            c("TD", "tau", "response_time", "peak_slope_time"), names(result)
-        )
-
-        if (any(unlist(result[check_cols]) < 0, na.rm = TRUE)) {
-            cli_warn(c(
-                "!" = "Negative {.arg time_channel} coefficients imply the \\
-                response occured before {.arg t0}. This may indicate a \\
-                poorly fitted or misparameterised model.",
-                "i" = "Check {.arg time_channel} and {.arg t0} values, or \\
-                consider using a different {.fn analyse_kinetics} method."
-            ))
-        }
-    }
-
-    return(result)
-}
-
 
 
 #' Coerce `data` input to a named list of data frames

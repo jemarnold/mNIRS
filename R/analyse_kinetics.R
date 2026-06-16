@@ -339,11 +339,9 @@ analyse_kinetics.response_time <- function(
             direction = direction,
             end_fit_span = end_fit_span,
             verbose = verbose,
+            interval_name = names(data_list)[[.i]],
             bypass_checks = TRUE
         )
-
-        result$interval <- names(data_list)[[.i]]
-        result
     })
 
     ## collate and return mnirs_kinetics object
@@ -389,11 +387,9 @@ analyse_kinetics.peak_slope <- function(
             partial = args$partial %||% FALSE,
             na.rm = args$na.rm %||% FALSE,
             verbose = verbose,
+            interval_name = names(data_list)[[.i]],
             bypass_checks = TRUE
         )
-
-        result$interval <- names(data_list)[[.i]]
-        result
     })
 
     ## collate and return mnirs_kinetics object
@@ -428,8 +424,7 @@ analyse_kinetics.monoexponential <- function(
 
     ## iterate over each interval
     result_list <- lapply(seq_along(data_list), \(.i) {
-        interval_name <- names(data_list)[[.i]]
-        result <- analyse_monoexponential(
+        analyse_monoexponential(
             data = data_list[[.i]],
             nirs_channels = !!enquo(nirs_channels),
             time_channel = !!enquo(time_channel),
@@ -437,12 +432,9 @@ analyse_kinetics.monoexponential <- function(
             t0 = t0,
             end_fit_span = end_fit_span,
             verbose = verbose,
-            interval_names = interval_name,
+            interval_name = names(data_list)[[.i]],
             bypass_checks = TRUE
         )
-
-        result$interval <- interval_name
-        result
     })
 
     ## collate and return mnirs_kinetics object
@@ -477,8 +469,7 @@ analyse_kinetics.logistic <- function(
 
     ## iterate over each interval
     result_list <- lapply(seq_along(data_list), \(.i) {
-        interval_name <- names(data_list)[[.i]]
-        result <- analyse_logistic(
+        analyse_logistic(
             data = data_list[[.i]],
             nirs_channels = !!enquo(nirs_channels),
             time_channel = !!enquo(time_channel),
@@ -486,12 +477,9 @@ analyse_kinetics.logistic <- function(
             t0 = t0,
             end_fit_span = end_fit_span,
             verbose = verbose,
-            interval_names = interval_name,
+            interval_name = names(data_list)[[.i]],
             bypass_checks = TRUE
         )
-
-        result$interval <- interval_name
-        result
     })
 
     ## collate and return mnirs_kinetics object

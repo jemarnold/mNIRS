@@ -256,7 +256,8 @@ analyse_monoexponential <- function(
     time_channel <- validate_time_channel(enquo(time_channel), data)
     t_vec <- data[[time_channel]]
     args <- list(...)
-    interval_names <- args$interval_names %||% substitute(data)
+    ## interval label; falls back to the `data` argument name when unsupplied
+    interval_name <- args$interval_name %||% deparse(substitute(data))
 
     ## broadcast global args, applying any per-channel list() overrides
     per_channel <- resolve_channel_args(
@@ -294,7 +295,7 @@ analyse_monoexponential <- function(
         }
         msg <- c(
             "x" = "{n_params}-parameter {.fn SSmonoexp} fit failed for \\
-            {.field {(.nirs)}} in {.field {interval_names}}.",
+            {.field {(.nirs)}} in {.field {interval_name}}.",
             "!" = "{conditionMessage(e)}"
         )
         if (n_params == 4L) {
@@ -379,7 +380,13 @@ analyse_monoexponential <- function(
     }
 
     return(analyse_kinetics_channels(
-        data, nirs_channels, time_channel,
-        per_channel, monoexponential_fit, verbose, args
+        data,
+        nirs_channels,
+        time_channel,
+        per_channel,
+        monoexponential_fit,
+        verbose,
+        interval_name,
+        extra_args = args
     ))
 }

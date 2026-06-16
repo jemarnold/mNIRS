@@ -214,6 +214,8 @@ analyse_response_time <- function(
     time_channel <- validate_time_channel(enquo(time_channel), data)
     t_vec <- data[[time_channel]]
     args <- list(...)
+    ## interval label; falls back to the `data` argument name when unsupplied
+    interval_name <- args$interval_name %||% deparse(substitute(data))
 
     ## broadcast global args, applying any per-channel list() overrides
     per_channel <- resolve_channel_args(
@@ -279,7 +281,13 @@ analyse_response_time <- function(
     }
 
     return(analyse_kinetics_channels(
-        data, nirs_channels, time_channel,
-        per_channel, response_time_fit, verbose, args
+        data,
+        nirs_channels,
+        time_channel,
+        per_channel,
+        response_time_fit,
+        verbose,
+        interval_name,
+        extra_args = args
     ))
 }
