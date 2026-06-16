@@ -378,91 +378,69 @@ analyse_peak_slope <- function(
     end_fit_span = Inf,
     partial = FALSE,
     na.rm = FALSE,
-    channel_args = list(),
     verbose = TRUE,
     ...
 ) {
     ## validation ==============================================
     validate_mnirs_data(data)
-    args <- list(...)
-    direction <- match.arg(direction)
-    
-    if (!(args$bypass_checks %||% FALSE)) {
-        if (missing(verbose)) {
-            verbose <- getOption("mnirs.verbose", default = TRUE)
-        }
-    }
     nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
     time_channel <- validate_time_channel(enquo(time_channel), data)
-    validate_width_span(width, span, verbose)
-    align <- sub("^center$", "centre", align)
-    align <- match.arg(align)
-    validate_numeric(
-        end_fit_span, 1, c(0, Inf), msg1 = "one-element positive"
+    t_vec <- data[[time_channel]]
+    args <- list(...)
+
+    ## broadcast global args, applying any per-channel list() overrides
+    per_channel <- resolve_channel_args(
+        nirs_channels,
+        args = list(
+            t0 = t0,
+            width = width,
+            span = span,
+            align = align,
+            direction = direction,
+            end_fit_span = end_fit_span,
+            partial = partial,
+            na.rm = na.rm
+        ),
+        choices = list(direction = c("auto", "positive", "negative")),
+        verbose = verbose
     )
-    time_vec <- data[[time_channel]]
-    t0 <- validate_t0(t0, data, time_vec, verbose)
+    ## validate resolved args once, before fitting any channel
+    per_channel <- validate_kinetics_args(per_channel, data, t_vec, verbose)
 
-    default_args <- list(
-        t0 = t0,
-        width = width,
-        span = span,
-        align = align,
-        direction = direction,
-        end_fit_span = end_fit_span,
-        partial = partial,
-        na.rm = na.rm,
-        verbose = verbose,
-        bypass_checks = TRUE,
-        args
-    )
-
-    ## process per-channel =================================
-    results <- lapply(nirs_channels, \(.nirs) {
-        all_args <- utils::modifyList(
-            default_args, channel_args[[.nirs]] %||% list()
-        )
-
-        ## filter for valid finite idx before first extreme + end_fit_span
-        valid <- find_kinetics_idx(
-            data[[.nirs]], time_vec, all_args$end_fit_span, all_args$direction
-        )
-        all_args$direction <- valid$direction
-        x_fit <- data[[.nirs]][valid$idx]
-        t_fit <- time_vec[valid$idx]
-
-        slopes <- do.call(peak_slope, c(list(x = x_fit, t = t_fit), all_args))
-        
-        coefs <- data.frame(
-            nirs_channels   = .nirs,
-            time_channel    = time_channel,
-            slope           = slopes$slope,
-            intercept       = slopes$intercept,
-            fitted          = slopes$y, ## predicted response value at idx
-            peak_slope_time = slopes$t - t0,
-            idx             = slopes$idx
-        )
-        
-        diag <- compute_diagnostics(
-            x               = x_fit[slopes$window_idx],
-            t               = t_fit[slopes$window_idx],
-            fitted          = slopes$fitted,
-            n_params        = 2L,
-            verbose         = verbose
-        )
+    ## method-specific fit: peak rolling linear slope
+    peak_slope_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
+        slopes <- do.call(peak_slope, c(
+            list(x = x_fit, t = t_fit),
+            .a,
+            list(verbose = verbose, bypass_checks = TRUE),
+            args
+        ))
 
         list(
-            coefficients    = coefs,
-            model           = slopes$model,
-            fitted_data = data.frame(
-                window_idx  = slopes$window_idx,
-                fitted      = slopes$fitted
+            coefs = data.frame(
+                slope           = slopes$slope,
+                intercept       = slopes$intercept,
+                fitted          = slopes$y, ## predicted response value at idx
+                peak_slope_time = slopes$t - .a$t0,
+                idx             = slopes$idx
             ),
-            diagnostics = cbind(data.frame(nirs_channels = .nirs), diag),
-            channel_args = build_channel_args(.nirs, all_args)
+            model = slopes$model,
+            fitted_data = data.frame(
+                window_idx = slopes$window_idx,
+                fitted     = slopes$fitted
+            ),
+            diag = compute_diagnostics(
+                x        = x_fit[slopes$window_idx],
+                t        = t_fit[slopes$window_idx],
+                fitted   = slopes$fitted,
+                n_params = 2L,
+                verbose  = verbose
+            )
         )
-    })
+    }
 
-    ## coefs tibble with per-channel metadata as attributes
-    return(build_channel_results(results, nirs_channels, t0, verbose))
+    return(analyse_kinetics_channels(
+        data, nirs_channels, time_channel,
+        per_channel, peak_slope_fit, verbose, args
+    ))
 }

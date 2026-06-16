@@ -524,43 +524,37 @@ analyse_logistic <- function(
     t0 = NULL,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
-    channel_args = list(),
     verbose = TRUE,
     ...
 ) {
     ## validation ==================================================
     validate_mnirs_data(data)
-    args <- list(...)
-    direction <- match.arg(direction)
-    shape <- match.arg(shape)
-
-    if (!(args$bypass_checks %||% FALSE)) {
-        if (missing(verbose)) {
-            verbose <- getOption("mnirs.verbose", default = TRUE)
-        }
-    }
     nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
     time_channel <- validate_time_channel(enquo(time_channel), data)
-    validate_numeric(
-        end_fit_span, 1, c(0, Inf), msg1 = "one-element positive"
-    )
-    time_vec <- data[[time_channel]]
-    t0 <- validate_t0(t0, data, time_vec, verbose)
+    t_vec <- data[[time_channel]]
+    args <- list(...)
     interval_names <- args$interval_names %||% substitute(data)
 
-    default_args <- list(
-        shape = shape,
-        t0 = t0,
-        direction = direction,
-        end_fit_span = end_fit_span,
-        verbose = verbose,
-        args
+    ## broadcast global args, applying any per-channel list() overrides
+    per_channel <- resolve_channel_args(
+        nirs_channels,
+        args = list(
+            shape = shape,
+            t0 = t0,
+            direction = direction,
+            end_fit_span = end_fit_span
+        ),
+        choices = list(
+            shape = c("symmetric", "gompertz", "gompertz_left"),
+            direction = c("auto", "positive", "negative")
+        ),
+        verbose = verbose
     )
+    ## validate resolved args once, before fitting any channel
+    per_channel <- validate_kinetics_args(per_channel, data, t_vec, verbose)
 
-    ## NA scaffold for convergence failure
+    ## NA scaffold (method columns only) for convergence failure
     na_coefs <- data.frame(
-        nirs_channels = NA_character_,
-        time_channel = time_channel,
         A = NA_real_,
         B = NA_real_,
         xmid = NA_real_,
@@ -597,24 +591,11 @@ analyse_logistic <- function(
         return(invisible(NULL))
     }
 
-    ## process per-channel ============================================
-    results <- lapply(nirs_channels, \(.nirs) {
-        all_args <- utils::modifyList(
-            default_args, channel_args[[.nirs]] %||% list()
-        )
+    ## method-specific fit: self-starting sigmoidal via nls
+    logistic_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
         ## resolve per-channel shape and matching self-start fn
-        ch_shape <- match.arg(all_args$shape, names(shape_dispatch))
-        ch_fn <- shape_dispatch[[ch_shape]]$model
-        ch_predict_fn <- shape_dispatch[[ch_shape]]$predict
-
-        ## filter for valid finite idx before first extreme + end_fit_span
-        valid <- find_kinetics_idx(
-            data[[.nirs]], time_vec, all_args$end_fit_span, all_args$direction
-        )
-        all_args$direction <- valid$direction
-        x_fit <- data[[.nirs]][valid$idx]
-        t_fit <- time_vec[valid$idx]
-
+        ch_fn <- shape_dispatch[[.a$shape]]$model
+        ch_predict_fn <- shape_dispatch[[.a$shape]]$predict
         fit_data <- data.frame(.x = x_fit, .t = t_fit)
 
         ## build nls formula: .x ~ <ch_fn>(.t, A, B, xmid, slope)
@@ -633,12 +614,12 @@ analyse_logistic <- function(
         )
 
         if (is.null(model)) {
-            return(build_na_results(.nirs, na_coefs, all_args, n_params = 4L))
+            return(build_na_results(na_coefs))
         }
 
         fitted_vals <- stats::predict(model)
         coefs <- stats::coef(model)
-        xmid_offset <- coefs[["xmid"]] - t0
+        xmid_offset <- coefs[["xmid"]] - .a$t0
 
         ## predict response at the inflection point xmid
         xmid_fitted <- ch_predict_fn(
@@ -649,31 +630,27 @@ analyse_logistic <- function(
             slope = coefs[["slope"]]
         )
 
-        coefs <- data.frame(
-            nirs_channels = .nirs,
-            time_channel  = time_channel,
-            A             = coefs[["A"]],
-            B             = coefs[["B"]],
-            xmid          = xmid_offset,
-            slope         = coefs[["slope"]],
-            xmid_fitted   = xmid_fitted
-        )
-
-        diag <- compute_diagnostics(
-            x_fit, t_fit, fitted_vals, n_params = 4L, verbose
-        )
-
         list(
-            coefficients = coefs,
+            coefs = data.frame(
+                A           = coefs[["A"]],
+                B           = coefs[["B"]],
+                xmid        = xmid_offset,
+                slope       = coefs[["slope"]],
+                xmid_fitted = xmid_fitted
+            ),
             model = model,
             fitted_data = data.frame(
                 window_idx = valid$idx,
                 fitted     = fitted_vals
             ),
-            diagnostics = cbind(data.frame(nirs_channels = .nirs), diag),
-            channel_args = build_channel_args(.nirs, all_args)
+            diag = compute_diagnostics(
+                x_fit, t_fit, fitted_vals, n_params = 4L, verbose
+            )
         )
-    })
+    }
 
-    return(build_channel_results(results, nirs_channels, t0, verbose))
+    return(analyse_kinetics_channels(
+        data, nirs_channels, time_channel,
+        per_channel, logistic_fit, verbose, args
+    ))
 }

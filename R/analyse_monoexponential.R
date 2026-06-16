@@ -247,48 +247,34 @@ analyse_monoexponential <- function(
     t0 = NULL, ## ! better arg name?
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
-    channel_args = list(),
     verbose = TRUE,
     ...
 ) {
     ## validation ==================================================
     validate_mnirs_data(data)
-    args <- list(...)
-    direction <- match.arg(direction)
-
-    if (!(args$bypass_checks %||% FALSE)) {
-        if (missing(verbose)) {
-            verbose <- getOption("mnirs.verbose", default = TRUE)
-        }
-    }
     nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
     time_channel <- validate_time_channel(enquo(time_channel), data)
-    if (!is.logical(use_time_delay) || length(use_time_delay) != 1L) {
-        cli_abort(c(
-            "x" = "{.arg use_time_delay} must be a {.cls logical} \\
-            either {.val {TRUE}} or {.val {FALSE}}."
-        ))
-    }
-    validate_numeric(
-        end_fit_span, 1, c(0, Inf), msg1 = "one-element positive"
-    )
-    time_vec <- data[[time_channel]]
-    t0 <- validate_t0(t0, data, time_vec, verbose)
+    t_vec <- data[[time_channel]]
+    args <- list(...)
     interval_names <- args$interval_names %||% substitute(data)
 
-    default_args <- list(
-        use_time_delay = use_time_delay,
-        t0 = t0,
-        direction = direction,
-        end_fit_span = end_fit_span,
-        verbose = verbose,
-        args
+    ## broadcast global args, applying any per-channel list() overrides
+    per_channel <- resolve_channel_args(
+        nirs_channels,
+        args = list(
+            use_time_delay = use_time_delay,
+            t0 = t0,
+            direction = direction,
+            end_fit_span = end_fit_span
+        ),
+        choices = list(direction = c("auto", "positive", "negative")),
+        verbose = verbose
     )
+    ## validate resolved args once, before fitting any channel
+    per_channel <- validate_kinetics_args(per_channel, data, t_vec, verbose)
 
-    ## NA scaffold for convergence failure
+    ## NA scaffold (method columns only) for convergence failure
     na_coefs <- data.frame(
-        nirs_channels = NA_character_,
-        time_channel = time_channel,
         A = NA_real_,
         B = NA_real_,
         tau = NA_real_,
@@ -318,22 +304,10 @@ analyse_monoexponential <- function(
         return(invisible(NULL))
     }
 
-    ## process per-channel ============================================
-    results <- lapply(nirs_channels, \(.nirs) {
-        all_args <- utils::modifyList(
-            default_args, channel_args[[.nirs]] %||% list()
-        )
+    ## method-specific fit: self-starting monoexponential via nls
+    monoexponential_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
         ## derive n_params from use_time_delay for internal use
-        n_params <- if (all_args$use_time_delay) 4L else 3L
-
-        ## filter for valid finite idx before first extreme + end_fit_span
-        valid <- find_kinetics_idx(
-            data[[.nirs]], time_vec, all_args$end_fit_span, all_args$direction
-        )
-        all_args$direction <- valid$direction
-        x_fit <- data[[.nirs]][valid$idx]
-        t_fit <- time_vec[valid$idx]
-
+        n_params <- if (.a$use_time_delay) 4L else 3L
         fit_data <- data.frame(.x = x_fit, .t = t_fit)
 
         ## attempt nls fit on 4-param then fall back to 3-param on failure
@@ -359,14 +333,14 @@ analyse_monoexponential <- function(
             )
         }
 
-        ## ! implement fallback HRT method?
+        ## TODO: implement fallback HRT method on convergence failure
         if (is.null(model)) {
-            return(build_na_results(.nirs, na_coefs, all_args, n_params))
+            return(build_na_results(na_coefs))
         }
 
         fitted_vals <- stats::predict(model)
         coefs <- stats::coef(model)
-        TD_arg <- if (n_params == 4L) coefs[["TD"]] - t0 else NULL
+        TD_arg <- if (n_params == 4L) coefs[["TD"]] - .a$t0 else NULL
         TD_val <- TD_arg %||% NA_real_
         MRT_val <- sum(TD_arg, coefs[["tau"]])
         HRT_val <- sum(TD_arg, coefs[["tau"]] * log(2))
@@ -380,36 +354,32 @@ analyse_monoexponential <- function(
             TD = TD_arg
         )
 
-        coefs <- data.frame(
-            nirs_channels = .nirs,
-            time_channel  = time_channel,
-            A             = coefs[["A"]],
-            B             = coefs[["B"]],
-            tau           = coefs[["tau"]],
-            k             = 1 / coefs[["tau"]],
-            TD            = TD_val,
-            MRT           = MRT_val,
-            HRT           = HRT_val,
-            tau_fitted    = fitted_params[[1L]],
-            MRT_fitted    = fitted_params[[2L]],
-            HRT_fitted    = fitted_params[[3L]]
-        )
-
-        diag <- compute_diagnostics(
-            x_fit, t_fit, fitted_vals, n_params, verbose
-        )
-
         list(
-            coefficients = coefs,
+            coefs = data.frame(
+                A          = coefs[["A"]],
+                B          = coefs[["B"]],
+                tau        = coefs[["tau"]],
+                k          = 1 / coefs[["tau"]],
+                TD         = TD_val,
+                MRT        = MRT_val,
+                HRT        = HRT_val,
+                tau_fitted = fitted_params[[1L]],
+                MRT_fitted = fitted_params[[2L]],
+                HRT_fitted = fitted_params[[3L]]
+            ),
             model = model,
             fitted_data = data.frame(
-                window_idx = valid$idx, 
+                window_idx = valid$idx,
                 fitted     = fitted_vals
             ),
-            diagnostics = cbind(data.frame(nirs_channels = .nirs), diag),
-            channel_args = build_channel_args(.nirs, all_args)
+            diag = compute_diagnostics(
+                x_fit, t_fit, fitted_vals, n_params, verbose
+            )
         )
-    })
+    }
 
-    return(build_channel_results(results, nirs_channels, t0, verbose))
+    return(analyse_kinetics_channels(
+        data, nirs_channels, time_channel,
+        per_channel, monoexponential_fit, verbose, args
+    ))
 }

@@ -23,9 +23,6 @@
 #'   in units of `time_channel`. Observations where `time_channel <= t0`
 #'   define the pre-response baseline window. If `NULL` (*default*), retrieves
 #'   `interval_times` from *"mnirs"* metadata, or falls back to `0`.
-#' @param channel_args An *optional* named `list()` with names corresponding
-#'   to `nirs_channels` for unique per-channel arguments that override the
-#'   global defaults (see *Details*).
 #' @param ... Additional arguments passed to the underlying method function.
 #'   See *Details*.
 #' @inheritParams validate_mnirs
@@ -202,25 +199,6 @@
 #'       `<NOT YET IMPLEMENTED>`.}
 #' }
 #'
-#' ## Per-channel argument overrides
-#'
-#' Arguments in `analyse_kinetics()` apply to all `nirs_channels` by default.
-#' `channel_args` allows overriding any argument with a unique value per
-#' channel, e.g.:
-#'
-#' ```r
-#' analyse_kinetics(
-#'     data,
-#'     nirs_channels = c(hhb, smo2),
-#'     span = 3,
-#'     direction = "positive",
-#'     channel_args = list(
-#'         hhb  = list(span = 5),
-#'         smo2 = list(direction = "negative")
-#'     )
-#' )
-#' ```
-#'
 #' @returns A formatted table of printed results, with individual elements
 #'   accessible as a structured list of class *"mnirs_kinetics"* containing:
 #'
@@ -293,7 +271,6 @@ analyse_kinetics <- function(
     t0 = NULL,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
-    channel_args = list(),
     verbose = TRUE,
     ...
 ) {
@@ -323,7 +300,6 @@ analyse_kinetics <- function(
         ignore.case = TRUE
     )
     method <- match.arg(method)
-    direction <- match.arg(direction)
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
@@ -345,7 +321,6 @@ analyse_kinetics.response_time <- function(
     t0 = NULL,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
-    channel_args = list(),
     verbose = TRUE,
     ...
 ) {
@@ -363,7 +338,6 @@ analyse_kinetics.response_time <- function(
             fraction = args$fraction %||% 0.5,
             direction = direction,
             end_fit_span = end_fit_span,
-            channel_args = channel_args,
             verbose = verbose,
             bypass_checks = TRUE
         )
@@ -376,7 +350,6 @@ analyse_kinetics.response_time <- function(
     return(build_kinetics_results(
         data_list,
         result_list,
-        names(data_list),
         method = "response_time",
         match.call()
     ))
@@ -394,7 +367,6 @@ analyse_kinetics.peak_slope <- function(
     t0 = NULL,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
-    channel_args = list(),
     verbose = TRUE,
     ...
 ) {
@@ -408,14 +380,14 @@ analyse_kinetics.peak_slope <- function(
             data = data_list[[.i]],
             nirs_channels = !!enquo(nirs_channels),
             time_channel = !!enquo(time_channel),
+            t0 = t0,
             width = args$width %||% NULL,
             span = args$span %||% NULL,
             align = args$align %||% "centre",
             direction = direction,
             end_fit_span = end_fit_span,
             partial = args$partial %||% FALSE,
-            na.rm = args$na.rm %||% TRUE, ## TODO do I want less opinionated?
-            channel_args = channel_args,
+            na.rm = args$na.rm %||% FALSE,
             verbose = verbose,
             bypass_checks = TRUE
         )
@@ -428,7 +400,6 @@ analyse_kinetics.peak_slope <- function(
     return(build_kinetics_results(
         data_list,
         result_list,
-        names(data_list),
         method = "peak_slope",
         match.call()
     ))
@@ -446,31 +417,31 @@ analyse_kinetics.monoexponential <- function(
     t0 = NULL,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
-    channel_args = list(),
     verbose = TRUE,
     ...
 ) {
-    ## ! implement stats::nls() additional args
-    ## ! implement `direction`
+    ## TODO: pass additional stats::nls() args
+    ## TODO: implement `direction`
     args <- list(...)
     ## normalise input to named list of data frames
     data_list <- as_data_list(data)
 
     ## iterate over each interval
     result_list <- lapply(seq_along(data_list), \(.i) {
+        interval_name <- names(data_list)[[.i]]
         result <- analyse_monoexponential(
             data = data_list[[.i]],
             nirs_channels = !!enquo(nirs_channels),
             time_channel = !!enquo(time_channel),
             use_time_delay = args$use_time_delay %||% TRUE,
+            t0 = t0,
             end_fit_span = end_fit_span,
-            channel_args = channel_args,
             verbose = verbose,
-            interval_names = names(data_list), ## ! is this needed?
+            interval_names = interval_name,
             bypass_checks = TRUE
         )
 
-        result$interval <- names(data_list)[[.i]]
+        result$interval <- interval_name
         result
     })
 
@@ -478,7 +449,6 @@ analyse_kinetics.monoexponential <- function(
     return(build_kinetics_results(
         data_list,
         result_list,
-        names(data_list),
         method = "monoexponential",
         match.call()
     ))
@@ -496,31 +466,31 @@ analyse_kinetics.logistic <- function(
     t0 = NULL,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
-    channel_args = list(),
     verbose = TRUE,
     ...
 ) {
-    ## ! implement stats::nls() additional args
-    ## ! implement `direction`
+    ## TODO: pass additional stats::nls() args
+    ## TODO: implement `direction`
     args <- list(...)
     ## normalise input to named list of data frames
     data_list <- as_data_list(data)
 
     ## iterate over each interval
     result_list <- lapply(seq_along(data_list), \(.i) {
+        interval_name <- names(data_list)[[.i]]
         result <- analyse_logistic(
             data = data_list[[.i]],
             nirs_channels = !!enquo(nirs_channels),
             time_channel = !!enquo(time_channel),
             shape = args$shape %||% "symmetric",
+            t0 = t0,
             end_fit_span = end_fit_span,
-            channel_args = channel_args,
             verbose = verbose,
-            interval_names = names(data_list),
+            interval_names = interval_name,
             bypass_checks = TRUE
         )
 
-        result$interval <- names(data_list)[[.i]]
+        result$interval <- interval_name
         result
     })
 
@@ -528,7 +498,6 @@ analyse_kinetics.logistic <- function(
     return(build_kinetics_results(
         data_list,
         result_list,
-        names(data_list),
         method = "logistic",
         match.call()
     ))
@@ -545,7 +514,6 @@ analyze_kinetics <- function(
     t0 = NULL,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
-    channel_args = list(),
     verbose = TRUE,
     ...
 ) {

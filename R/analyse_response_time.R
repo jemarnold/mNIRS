@@ -95,8 +95,9 @@ response_time <- function(
         fraction, 1L, c(0, 1), msg2 = "between {col_blue('[0, 1]')}."
     )
     direction <- match.arg(direction)
+    args <- list(...)
 
-    if (!(list(...)$bypass_checks %||% FALSE)) {
+    if (!(args$bypass_checks %||% FALSE)) {
         validate_x_t(x, t, allow_na = TRUE)
         if (missing(verbose)) {
             verbose <- getOption("mnirs.verbose", default = TRUE)
@@ -107,7 +108,7 @@ response_time <- function(
 
     baseline_idx <- which(t <= t0)
 
-    if (!(list(...)$bypass_checks %||% FALSE)) {
+    if (!(args$bypass_checks %||% FALSE)) {
         validate_numeric(t0, 1L)
         if (length(baseline_idx) == 0L) {
             if (verbose) {
@@ -201,7 +202,6 @@ analyse_response_time <- function(
     fraction = 0.5,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
-    channel_args = list(),
     verbose = TRUE,
     ...
 ) {
@@ -212,54 +212,40 @@ analyse_response_time <- function(
     validate_mnirs_data(data)
     nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
     time_channel <- validate_time_channel(enquo(time_channel), data)
-    direction <- match.arg(direction)
-    time_vec <- data[[time_channel]]
-    t0 <- validate_t0(t0, data, time_vec, verbose)
+    t_vec <- data[[time_channel]]
+    args <- list(...)
 
-    default_args <- list(
-        t0 = t0,
-        fraction = fraction,
-        direction = direction,
-        end_fit_span = end_fit_span,
-        verbose = verbose,
-        bypass_checks = TRUE,
-        ...
+    ## broadcast global args, applying any per-channel list() overrides
+    per_channel <- resolve_channel_args(
+        nirs_channels,
+        args = list(
+            t0 = t0,
+            fraction = fraction,
+            direction = direction,
+            end_fit_span = end_fit_span
+        ),
+        choices = list(direction = c("auto", "positive", "negative")),
+        verbose = verbose
     )
+    ## validate resolved args once, before fitting any channel
+    per_channel <- validate_kinetics_args(per_channel, data, t_vec, verbose)
 
-    ## process per-channel =================================
-    results <- lapply(nirs_channels, \(.nirs) {
-        all_args <- utils::modifyList(
-            default_args, channel_args[[.nirs]] %||% list()
-        )
-        
-        ## filter for valid finite idx before first extreme + end_fit_span
-        valid <- find_kinetics_idx(
-            data[[.nirs]], time_vec, all_args$end_fit_span, all_args$direction
-        )
-        all_args$direction <- valid$direction
-        x_fit <- data[[.nirs]][valid$idx]
-        t_fit <- time_vec[valid$idx]
+    ## method-specific fit: fractional response time (no model fit)
+    response_time_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
+        response <- do.call(response_time, c(
+            list(x = x_fit, t = t_fit),
+            .a,
+            list(verbose = verbose, bypass_checks = TRUE),
+            args
+        ))
 
-        response <- do.call(
-            response_time, c(list(x = x_fit, t = t_fit), all_args)
-        )
-        
         coefs <- data.frame(
-            nirs_channels  = .nirs,
-            time_channel   = time_channel,
             A              = response$A,
             B              = response$B,
             response_time  = response$response_time,
             response_value = response$response_value,
             fitted         = response$fitted,
             idx            = response$response_idx
-        )
-        diag <- compute_diagnostics(
-            x              = x_fit[1L:3L], ## placeholder
-            t              = t_fit[1L:3L], ## placeholder
-            fitted         = c(coefs$A, coefs$fitted, coefs$B),
-            n_params       = 0L, ## invalid for response time method
-            verbose        = verbose
         )
 
         ## bind baseline vec with `A`, and response and extreme scalars
@@ -279,14 +265,21 @@ analyse_response_time <- function(
         fitted_data <- fitted_data[!is.na(fitted_data$window_idx), ]
 
         list(
-            coefficients = coefs,
+            coefs = coefs,
             model = NULL,
             fitted_data = fitted_data,
-            diagnostics = cbind(data.frame(nirs_channels = .nirs), diag),
-            channel_args = build_channel_args(.nirs, all_args)
+            diag = compute_diagnostics(
+                x        = x_fit[1L:3L], ## placeholder
+                t        = t_fit[1L:3L], ## placeholder
+                fitted   = c(coefs$A, coefs$fitted, coefs$B),
+                n_params = 0L, ## invalid for response time method
+                verbose  = verbose
+            )
         )
-    })
+    }
 
-    ## coefs tibble with per-channel metadata as attributes
-    return(build_channel_results(results, nirs_channels, verbose))
+    return(analyse_kinetics_channels(
+        data, nirs_channels, time_channel,
+        per_channel, response_time_fit, verbose, args
+    ))
 }
