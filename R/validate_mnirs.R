@@ -447,9 +447,9 @@ validate_sample_rate <- function(
     near_one <- \(x) isTRUE(all.equal(1, x, tol = 1e-3, scale = 1))
     if (is.null(sample_rate) || (verbose && !near_one(sample_rate))) {
         ## time_channel must be validated before this
-        time_vec <- as.numeric(data[[time_channel]])
+        t_vec <- as.numeric(data[[time_channel]])
         ## will error if unable to estimate sample_rate
-        sample_rate_est <- estimate_sample_rate(time_vec, env)
+        sample_rate_est <- estimate_sample_rate(t_vec, env)
     }
 
     ## if still not defined, use estimated sample_rate
@@ -543,7 +543,7 @@ validate_x_t <- function(
 validate_t0 <- function(
     t0,
     data,
-    time_vec,
+    t_vec,
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
@@ -551,7 +551,7 @@ validate_t0 <- function(
     t0 <- t0 %||% attr(data, "interval_times") %||% 0
     validate_numeric(t0, 1L, env = env)
 
-    if (length(which(time_vec <= t0)) == 0L) {
+    if (length(which(t_vec <= t0)) == 0L) {
         if (verbose) {
             cli_warn(c(
                 "!" = "No observations where {.arg time_channel} <= \\
@@ -559,9 +559,9 @@ validate_t0 <- function(
                 "i" = "All samples included in response."
             ), call = env)
         }
-        t0 <- time_vec[1L]
+        t0 <- t_vec[1L]
     }
-    if (t0 > time_vec[length(time_vec)]) {
+    if (t0 > t_vec[length(t_vec)]) {
         cli_abort(c(
             "x" = "No observations in {.arg time_channel} before {.arg t0}.",
             "i" = "{.arg t0} must be specified within the range of \\

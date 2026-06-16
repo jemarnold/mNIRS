@@ -219,7 +219,7 @@ extract_intervals <- function(
     )
     time_channel <- validate_time_channel(enquo(time_channel), data)
     ## avoid floating point precision issues downstream with findInterval()
-    time_vec <- round(data[[time_channel]], 6)
+    t_vec <- round(data[[time_channel]], 6)
     ## estimate sample_rate for appropriate time binning
     sample_rate <- validate_sample_rate(
         data, time_channel, sample_rate, verbose
@@ -286,7 +286,7 @@ extract_intervals <- function(
     }
 
     ## resolve interval boundary times ==========================
-    interval_list <- resolve_interval(start, end, time_vec, event_vec)
+    interval_list <- resolve_interval(start, end, t_vec, event_vec)
     n_events <- length(interval_list$start_time)
 
     ## recycle params to match number of intervals
@@ -296,10 +296,10 @@ extract_intervals <- function(
     span <- recycle_param(span, n_events, group_intervals, verbose)
 
     ## apply span and build interval spec ======================
-    interval_spec <- apply_span(interval_list, time_vec, span, verbose)
+    interval_spec <- apply_span(interval_list, t_vec, span, verbose)
 
     ## extract interval data ===================================
-    df_list <- extract_df_list(data, time_vec, interval_spec, nirs_channels)
+    df_list <- extract_df_list(data, t_vec, interval_spec, nirs_channels)
 
     ## apply grouping logic ====================================
     result <- apply_interval_groups(

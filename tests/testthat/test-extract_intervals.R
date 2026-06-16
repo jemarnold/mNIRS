@@ -25,15 +25,15 @@ create_mock_interval <- function(
     event_time = 0,
     span = c(-1, 4)
 ) {
-    time_vec <- seq(
+    t_vec <- seq(
         time_start,
         time_start + (n - 1) / sample_rate,
         length.out = n
     )
     df <- tibble::tibble(
-        time = time_vec,
-        smo2_left = sin(time_vec) * 5 + 50,
-        smo2_right = cos(time_vec) * 5 + 50
+        time = t_vec,
+        smo2_left = sin(t_vec) * 5 + 50,
+        smo2_right = cos(t_vec) * 5 + 50
     )
     structure(
         df,
@@ -184,33 +184,33 @@ test_that("recycle_span validates span", {
 
 ## find_interval_time() ====================================================
 test_that("find_interval_time resolves time values directly", {
-    time_vec <- seq(0.1, 10, by = 0.1)
+    t_vec <- seq(0.1, 10, by = 0.1)
 
-    result <- find_interval_time(by_time(2, 5, 8), time_vec)
+    result <- find_interval_time(by_time(2, 5, 8), t_vec)
     expect_equal(result, c(2, 5, 8))
 })
 
 test_that("find_interval_time resolves samples to times", {
-    time_vec <- seq(0.1, 10, by = 0.1)
+    t_vec <- seq(0.1, 10, by = 0.1)
 
     result <- find_interval_time(
-        by_sample(10, 30, 70), time_vec
+        by_sample(10, 30, 70), t_vec
     )
-    expect_equal(result, time_vec[c(10, 30, 70)])
+    expect_equal(result, t_vec[c(10, 30, 70)])
 })
 
 test_that("find_interval_time resolves labels to times", {
-    time_vec <- seq(0.1, 10, by = 0.1)
+    t_vec <- seq(0.1, 10, by = 0.1)
     event_vec <- c(
         "start", rep("", 4), "mid", rep("", 4), "end"
     )
 
     result <- find_interval_time(
         by_label("start", "mid"),
-        time_vec,
+        t_vec,
         event_vec
     )
-    expect_equal(result, time_vec[c(1, 6)])
+    expect_equal(result, t_vec[c(1, 6)])
 })
 
 test_that("find_interval_time errors when no labels match", {
@@ -219,7 +219,7 @@ test_that("find_interval_time errors when no labels match", {
     expect_error(
         find_interval_time(
             by_label("invalid"),
-            time_vec = NULL,
+            t_vec = NULL,
             event_vec
         ),
         "No events detected"
@@ -227,78 +227,78 @@ test_that("find_interval_time errors when no labels match", {
 })
 
 test_that("find_interval_time matches case-insensitively with ignore_case", {
-    time_vec <- seq(0.1, 1, by = 0.1)
+    t_vec <- seq(0.1, 1, by = 0.1)
     event_vec <- c("start", rep("", 4), "MID", rep("", 4))
 
     ## default case-sensitive — "START" must not match "start"
     expect_error(
-        find_interval_time(by_label("START"), time_vec, event_vec),
+        find_interval_time(by_label("START"), t_vec, event_vec),
         "No events detected"
     )
 
     ## ignore_case = TRUE matches both cases
     result <- find_interval_time(
         by_label("START", "mid", ignore_case = TRUE),
-        time_vec,
+        t_vec,
         event_vec
     )
-    expect_equal(result, time_vec[c(1, 6)])
+    expect_equal(result, t_vec[c(1, 6)])
 })
 
 test_that("find_interval_time treats labels as literal with fixed = TRUE", {
-    time_vec <- seq(0.1, 0.4, by = 0.1)
+    t_vec <- seq(0.1, 0.4, by = 0.1)
     event_vec <- c("lap.1", "lapX1", "lap.1", "lapX1")
 
     ## default regex — "lap.1" matches both "lap.1" and "lapX1"
     regex_result <- find_interval_time(
-        by_label("lap.1"), time_vec, event_vec
+        by_label("lap.1"), t_vec, event_vec
     )
-    expect_equal(regex_result, time_vec[1:4])
+    expect_equal(regex_result, t_vec[1:4])
 
     ## fixed = TRUE — "lap.1" matches only literal "lap.1"
     fixed_result <- find_interval_time(
-        by_label("lap.1", fixed = TRUE), time_vec, event_vec
+        by_label("lap.1", fixed = TRUE), t_vec, event_vec
     )
-    expect_equal(fixed_result, time_vec[c(1, 3)])
+    expect_equal(fixed_result, t_vec[c(1, 3)])
 })
 
 test_that("find_interval_time fixed = TRUE works with multiple labels", {
     ## grepl(fixed = TRUE) rejects "a|b" — verifies Reduce path
-    time_vec <- seq(0.1, 0.4, by = 0.1)
+    t_vec <- seq(0.1, 0.4, by = 0.1)
     event_vec <- c("lap.1", "lap.2", "lap.3", "lap.4")
 
     result <- find_interval_time(
         by_label("lap.1", "lap.3", fixed = TRUE),
-        time_vec,
+        t_vec,
         event_vec
     )
-    expect_equal(result, time_vec[c(1, 3)])
+    expect_equal(result, t_vec[c(1, 3)])
 })
 
 test_that("find_interval_time resolves laps with position = first", {
-    time_vec <- seq(0, 0.8, by = 0.1)
+    t_vec <- seq(0, 0.8, by = 0.1)
     event_vec <- c(1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L)
 
     result <- find_interval_time(
         by_lap(1, 3),
-        time_vec,
+        t_vec,
         event_vec,
         position = "first"
     )
-    expect_equal(result, time_vec[c(1, 7)])
+    expect_equal(result, t_vec[c(1, 7)])
 })
 
 test_that("find_interval_time resolves laps with position = last", {
-    time_vec <- seq(0, 0.8, by = 0.1)
+    t_vec <- seq(0, 0.8, by = 0.1)
     event_vec <- c(1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L)
 
     result <- find_interval_time(
         by_lap(1, 3),
-        time_vec,
+        t_vec,
         event_vec,
         position = "last"
     )
-    expect_equal(result, time_vec[c(3, 9)])
+    expect_equal(result, t_vec[c(3, 9)])
 })
 
 test_that("find_interval_time errors when lap not found", {
@@ -307,7 +307,7 @@ test_that("find_interval_time errors when lap not found", {
     expect_error(
         find_interval_time(
             by_lap(5),
-            time_vec = NULL,
+            t_vec = NULL,
             event_vec,
             position = "first"
         ),
@@ -317,12 +317,12 @@ test_that("find_interval_time errors when lap not found", {
 
 ## resolve_interval() ===============================================
 test_that("resolve_interval returns start-only times", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
 
     result <- resolve_interval(
         start = by_time(2, 5),
         end = NULL,
-        time_vec = time_vec
+        t_vec = t_vec
     )
 
     expect_true(result$has_start)
@@ -332,12 +332,12 @@ test_that("resolve_interval returns start-only times", {
 })
 
 test_that("resolve_interval returns paired start+end times", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
 
     result <- resolve_interval(
         start = by_time(2, 5),
         end = by_time(4, 8),
-        time_vec = time_vec
+        t_vec = t_vec
     )
 
     expect_true(result$has_start)
@@ -347,13 +347,13 @@ test_that("resolve_interval returns paired start+end times", {
 })
 
 test_that("resolve_interval warns and truncates unequal lengths", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
 
     expect_warning(
         result <- resolve_interval(
             start = by_time(2, 5, 8),
             end = by_time(4, 7),
-            time_vec = time_vec
+            t_vec = t_vec
         ),
         "Unequal lengths"
     )
@@ -365,17 +365,17 @@ test_that("resolve_interval warns and truncates unequal lengths", {
 
 test_that("resolve_interval resolves lap start-only to lap start", {
     event_vec <- c(1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L)
-    time_vec <- seq(0, 0.8, by = 0.1)
+    t_vec <- seq(0, 0.8, by = 0.1)
 
     result <- resolve_interval(
         start = by_lap(2),
         end = NULL,
-        time_vec = time_vec,
+        t_vec = t_vec,
         event_vec = event_vec
     )
 
     ## lap 2 starts row 4; time 0.3
-    expect_equal(result$start_time, time_vec[4])
+    expect_equal(result$start_time, t_vec[4])
     expect_null(result$end_time)
     expect_true(result$has_start)
     expect_false(result$has_end)
@@ -383,17 +383,17 @@ test_that("resolve_interval resolves lap start-only to lap start", {
 
 test_that("resolve_interval resolves lap end-only to lap end", {
     event_vec <- c(1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L)
-    time_vec <- seq(0, 0.8, by = 0.1)
+    t_vec <- seq(0, 0.8, by = 0.1)
 
     result <- resolve_interval(
         start = NULL,
         end = by_lap(3),
-        time_vec = time_vec,
+        t_vec = t_vec,
         event_vec = event_vec
     )
 
     ## lap 3 ends row 9; time 0.8
-    expect_equal(result$start_time, time_vec[9])
+    expect_equal(result$start_time, t_vec[9])
     expect_null(result$end_time)
     expect_false(result$has_start)
     expect_true(result$has_end)
@@ -401,17 +401,17 @@ test_that("resolve_interval resolves lap end-only to lap end", {
 
 test_that("resolve_interval lap single-boundary supports multiple laps", {
     event_vec <- c(1L, 1L, 2L, 2L, 3L, 3L)
-    time_vec <- seq(0, 0.5, by = 0.1)
+    t_vec <- seq(0, 0.5, by = 0.1)
 
     result <- resolve_interval(
         start = by_lap(1, 3),
         end = NULL,
-        time_vec = time_vec,
+        t_vec = t_vec,
         event_vec = event_vec
     )
 
     ## lap 1: row 1; lap 3: row 5
-    expect_equal(result$start_time, time_vec[c(1, 5)])
+    expect_equal(result$start_time, t_vec[c(1, 5)])
     expect_null(result$end_time)
     expect_true(result$has_start)
     expect_false(result$has_end)
@@ -732,9 +732,9 @@ test_that("recycle_param messages when recycling groups with verbose", {
 ## apply_span() ============================================================
 test_that("apply_span creates correct interval specification", {
     ## floating point precision issues
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
     interval_list <- list(
-        start_time = time_vec[c(20, 50, 80)], ## c(1.9, 4.9, 7.9)
+        start_time = t_vec[c(20, 50, 80)], ## c(1.9, 4.9, 7.9)
         end_time = NULL,
         has_start = TRUE,
         has_end = FALSE
@@ -743,23 +743,23 @@ test_that("apply_span creates correct interval specification", {
 
     result <- apply_span(
         interval_list,
-        time_vec,
+        t_vec,
         span,
         verbose = FALSE
     )
 
     expect_s3_class(result, "data.frame")
     expect_equal(nrow(result), 3)
-    expect_equal(result$start_times, time_vec[c(20, 50, 80)] - 1)
-    expect_equal(result$end_times, time_vec[c(20, 50, 80)] + 1)
-    expect_equal(result$interval_times, as.list(time_vec[c(20, 50, 80)]))
+    expect_equal(result$start_times, t_vec[c(20, 50, 80)] - 1)
+    expect_equal(result$end_times, t_vec[c(20, 50, 80)] + 1)
+    expect_equal(result$interval_times, as.list(t_vec[c(20, 50, 80)]))
 })
 
 test_that("apply_span creates correct specification with start, end", {
     ## floating point precision issues
-    time_vec <- seq(0, 10, by = 0.1)
-    start_times <- time_vec[c(10, 40, 70)]
-    end_times <- time_vec[c(30, 60, 90)]
+    t_vec <- seq(0, 10, by = 0.1)
+    start_times <- t_vec[c(10, 40, 70)]
+    end_times <- t_vec[c(30, 60, 90)]
     interval_list <- list(
         start_time = start_times,
         end_time = end_times,
@@ -769,7 +769,7 @@ test_that("apply_span creates correct specification with start, end", {
 
     result <- apply_span(
         interval_list,
-        time_vec,
+        t_vec,
         span = list(c(0, 1), c(0, 1), c(0, 1)),
         verbose = FALSE
     )
@@ -780,7 +780,7 @@ test_that("apply_span creates correct specification with start, end", {
 })
 
 test_that("apply_span calculates correct start/end indices", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
     interval_list <- list(
         start_time = 5.0,
         end_time = NULL,
@@ -790,7 +790,7 @@ test_that("apply_span calculates correct start/end indices", {
 
     result <- apply_span(
         interval_list,
-        time_vec,
+        t_vec,
         span = list(c(-1, 2)),
         verbose = FALSE
     )
@@ -801,9 +801,9 @@ test_that("apply_span calculates correct start/end indices", {
 })
 
 test_that("apply_span clips partial out-of-bounds intervals", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
     interval_list <- list(
-        start_time = time_vec[6],
+        start_time = t_vec[6],
         end_time = NULL,
         has_start = TRUE,
         has_end = FALSE
@@ -811,7 +811,7 @@ test_that("apply_span clips partial out-of-bounds intervals", {
 
     result <- apply_span(
         interval_list,
-        time_vec,
+        t_vec,
         span = list(c(-2, 2)),
         verbose = FALSE
     )
@@ -822,7 +822,7 @@ test_that("apply_span clips partial out-of-bounds intervals", {
     expect_warning(
         result <- apply_span(
             interval_list,
-            time_vec,
+            t_vec,
             span = list(c(-2, 10)),
             verbose = TRUE
         ),
@@ -834,9 +834,9 @@ test_that("apply_span clips partial out-of-bounds intervals", {
 })
 
 test_that("apply_span errors for entirely out-of-bounds", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
     interval_list <- list(
-        start_time = time_vec[50],
+        start_time = t_vec[50],
         end_time = NULL,
         has_start = TRUE,
         has_end = FALSE
@@ -845,7 +845,7 @@ test_that("apply_span errors for entirely out-of-bounds", {
     expect_error(
         apply_span(
             interval_list,
-            time_vec,
+            t_vec,
             span = list(c(100, 200)),
             verbose = FALSE
         ),
@@ -854,7 +854,7 @@ test_that("apply_span errors for entirely out-of-bounds", {
 })
 
 test_that("apply_span applies span correctly with start+end", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
     interval_list <- list(
         start_time = 2.0,
         end_time = 6.0,
@@ -865,7 +865,7 @@ test_that("apply_span applies span correctly with start+end", {
     ## span[1] shifts start, span[2] shifts end
     result <- apply_span(
         interval_list,
-        time_vec,
+        t_vec,
         span = list(c(-1, 2)),
         verbose = FALSE
     )
@@ -879,19 +879,19 @@ test_that("apply_span applies span correctly with start+end", {
 ## extract_df_list() ==============================================
 test_that("extract_df_list returns correct number of intervals", {
     data <- create_mock_mnirs(n = 100, sample_rate = 10)
-    time_vec <- data$time
+    t_vec <- data$time
     
     interval_spec <- data.frame(
         span_before = c(-1, -1),
         span_after = c(2, 2),
-        start_times = time_vec[c(10, 50)],
-        end_times = time_vec[c(30, 70)]
+        start_times = t_vec[c(10, 50)],
+        end_times = t_vec[c(30, 70)]
     )
     interval_spec$interval_times <- list(1, 5) ## two start_times, no end_times
 
     result <- extract_df_list(
         data,
-        time_vec,
+        t_vec,
         interval_spec,
         nirs_channels = list(
             c("smo2_left", "smo2_right"),
@@ -905,19 +905,19 @@ test_that("extract_df_list returns correct number of intervals", {
 
 test_that("extract_df_list extracts correct row ranges", {
     data <- create_mock_mnirs(n = 100, sample_rate = 10)
-    time_vec <- data$time
+    t_vec <- data$time
 
     interval_spec <- data.frame(
         span_before = -1,
         span_after = 1,
-        start_times = time_vec[20],
-        end_times = time_vec[40]
+        start_times = t_vec[20],
+        end_times = t_vec[40]
     )
     interval_spec$interval_times <- list(3) ## one start_times, no end_times
 
     result <- extract_df_list(
         data,
-        time_vec,
+        t_vec,
         interval_spec,
         nirs_channels = list(c("smo2_left", "smo2_right"))
     )
@@ -927,19 +927,19 @@ test_that("extract_df_list extracts correct row ranges", {
 
 test_that("extract_df_list preserves metadata attributes", {
     data <- create_mock_mnirs(n = 100, sample_rate = 10)
-    time_vec <- data$time
+    t_vec <- data$time
 
     interval_spec <- data.frame(
         span_before = -0.5,
         span_after = 1.5,
-        start_times = time_vec[10],
-        end_times = time_vec[30]
+        start_times = t_vec[10],
+        end_times = t_vec[30]
     )
     interval_spec$interval_times <- list(c(1.5, 3.0)) ## one start_times, one end_times
 
     result <- extract_df_list(
         data,
-        time_vec, 
+        t_vec, 
         interval_spec,
         nirs_channels = list(c("smo2_left"))
     )

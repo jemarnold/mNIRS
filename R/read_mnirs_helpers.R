@@ -244,7 +244,7 @@ read_data_table <- function(
 
 #' Datetime format strings for POSIXct parsing
 #' @keywords internal
-datetime_formats <- c(
+dttm_opts <- c(
     "%H:%M:%OS",
     "%Y-%m-%dT%H:%M:%OS",
     "%Y-%m-%dT%H:%M:%OS%z",
@@ -260,13 +260,13 @@ datetime_formats <- c(
 extract_start_timestamp <- function(file_header) {
     header_values <- unlist(file_header, use.names = FALSE)
     header_values <- header_values[!is_empty(header_values)]
-    ## all datetime_formats contain %H:%M, so candidates must contain ":"
+    ## all dttm_opts contain %H:%M, so candidates must contain ":"
     header_values <- header_values[grepl(":", header_values, fixed = TRUE)]
 
     ## search for POSIXct values, return the earliest time value
     ## vulnerable to invalid timestamps
     parsed <- which(!is.na(vapply(header_values, \(.x) {
-        as.POSIXct(.x, tryFormats = datetime_formats, optional = TRUE)
+        as.POSIXct(.x, tryFormats = dttm_opts, optional = TRUE)
     }, numeric(1L))))
 
     if (length(parsed) == 0L) {
@@ -517,36 +517,34 @@ parse_time_channel <- function(
     add_timestamp = FALSE,
     zero_time = FALSE
 ) {
-    time_vec <- data[[time_channel]]
+    t_vec <- data[[time_channel]]
 
     ## fractional unix time to POSIXct coerced to local time zone
-    if (is.numeric(time_vec) && all(time_vec <= 1, na.rm = TRUE)) {
-        time_vec <- as.POSIXct(
+    if (is.numeric(t_vec) && all(t_vec <= 1, na.rm = TRUE)) {
+        t_vec <- as.POSIXct(
             as.character(as.POSIXct(Sys.Date(), "UTC")),
             tz = Sys.timezone()
-        ) + time_vec * 86400
+        ) + t_vec * 86400
     }
 
     ## recalculate numeric time to start from zero
-    if (zero_time && is.numeric(time_vec)) {
-        time_vec <- time_vec - time_vec[1L]
+    if (zero_time && is.numeric(t_vec)) {
+        t_vec <- t_vec - t_vec[1L]
     }
 
     ## character time to POSIXct
-    if (is.character(time_vec)) {
-        time_vec <- as.POSIXct(
-            time_vec, tryFormats = datetime_formats, optional = TRUE
-        )
+    if (is.character(t_vec)) {
+        t_vec <- as.POSIXct(t_vec, tryFormats = dttm_opts, optional = TRUE)
     }
 
     ## preserve POSIXct timestamp and convert to numeric seconds
     timestamp_vec <- NULL
-    if (inherits(time_vec, "POSIXct")) {
-        timestamp_vec <- time_vec
-        time_vec <- as.numeric(difftime(time_vec, time_vec[1L], units = "secs"))
+    if (inherits(t_vec, "POSIXct")) {
+        timestamp_vec <- t_vec
+        t_vec <- as.numeric(difftime(t_vec, t_vec[1L], units = "secs"))
     }
 
-    data[[time_channel]] <- time_vec
+    data[[time_channel]] <- t_vec
 
     ## add_timestamp preserves or adds POSIXct/dttm column
     if (add_timestamp) {
@@ -561,9 +559,9 @@ parse_time_channel <- function(
         ## then return NULL and don't append column
         if (!is.null(start_timestamp)) {
             start_time <- as.POSIXct(
-                start_timestamp, tryFormats = datetime_formats, optional = TRUE
+                start_timestamp, tryFormats = dttm_opts, optional = TRUE
             )
-            data$timestamp <- start_time + time_vec
+            data$timestamp <- start_time + t_vec
         } else if (!is.null(timestamp_vec)) {
             data$timestamp <- timestamp_vec
         } else {
@@ -600,12 +598,12 @@ parse_sample_rate <- function(
         sample_rate <- as.numeric(file_header[pos[1L], pos[2L] + 1L])
 
         col_names <- names(data)
-        time_vec <- data[[time_channel]] / sample_rate
         time_idx <- match(time_channel, col_names)
         data_names <- append(col_names, "time", time_idx)
         data_names <- rename_duplicates(data_names)
+        t_vec <- data[[time_channel]] / sample_rate
         time_channel <- setdiff(data_names, col_names)
-        data[[time_channel]] <- time_vec
+        data[[time_channel]] <- t_vec
         data <- data[data_names]
 
         if (verbose) {

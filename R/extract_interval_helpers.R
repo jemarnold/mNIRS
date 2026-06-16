@@ -189,14 +189,14 @@ recycle_span <- function(span) {
 #' @keywords internal
 find_interval_time <- function(
     interval,
-    time_vec,
+    t_vec,
     event_vec = NULL,
     position = c("first", "last")
 ) {
     switch(
         interval$type,
         time = interval$by_time,
-        sample = time_vec[interval$by_sample],
+        sample = t_vec[interval$by_sample],
         label = {
             ## OR per-label matches; grepl(fixed = TRUE) can't take a|b
             matches <- which(Reduce(`|`, lapply(interval$by_label, \(.p) {
@@ -212,7 +212,7 @@ find_interval_time <- function(
                     {.arg ignore_case} and {.arg fixed} in {.fn by_label}."
                 ))
             }
-            time_vec[matches]
+            t_vec[matches]
         },
         lap = {
             ## convert once outside loop
@@ -227,7 +227,7 @@ find_interval_time <- function(
                     ))
                 }
                 idx <- if (position == "first") 1L else length(matches)
-                time_vec[matches[idx]]
+                t_vec[matches[idx]]
             }, numeric(1))
         }
     )
@@ -239,7 +239,7 @@ find_interval_time <- function(
 resolve_interval <- function(
     start,
     end,
-    time_vec,
+    t_vec,
     event_vec = NULL
 ) {
     has_start <- !is.null(start)
@@ -250,7 +250,7 @@ resolve_interval <- function(
     if (xor(has_start, has_end)) {
         start_time <- find_interval_time(
             interval,
-            time_vec,
+            t_vec,
             event_vec,
             position = if (has_start) "first" else "last"
         )
@@ -263,8 +263,8 @@ resolve_interval <- function(
     }
 
     ## both boundaries specified
-    start_time <- find_interval_time(start, time_vec, event_vec, "first")
-    end_time <- find_interval_time(end, time_vec, event_vec, "last")
+    start_time <- find_interval_time(start, t_vec, event_vec, "first")
+    end_time <- find_interval_time(end, t_vec, event_vec, "last")
 
     ## warn and truncate if lengths differ
     n_start <- length(start_time)
@@ -378,7 +378,7 @@ recycle_param <- function(
 #' @keywords internal
 apply_span <- function(
     interval_list,
-    time_vec,
+    t_vec,
     span,
     verbose = TRUE
 ) {
@@ -401,8 +401,8 @@ apply_span <- function(
     }
 
     ## data time bounds
-    t_min <- time_vec[1L]
-    t_max <- time_vec[length(time_vec)]
+    t_min <- t_vec[1L]
+    t_max <- t_vec[length(t_vec)]
 
     ## check for entirely out of bounds intervals
     entirely_oob <- end_times < t_min | start_times > t_max
@@ -449,14 +449,14 @@ apply_span <- function(
 #' @keywords internal
 extract_df_list <- function(
     data,
-    time_vec,
+    t_vec,
     interval_spec,
     nirs_channels ## as list
 ) {
     n_vec <- seq_len(nrow(interval_spec))
     df_list <- lapply(n_vec, \(.i) {
-        time_range <- time_vec >= interval_spec$start_times[.i] &
-            time_vec <= interval_spec$end_times[.i]
+        time_range <- t_vec >= interval_spec$start_times[.i] &
+            t_vec <= interval_spec$end_times[.i]
         interval_data <- data[time_range, , drop = FALSE]
 
         ## return interval_data with metadata
