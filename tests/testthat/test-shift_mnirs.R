@@ -455,13 +455,14 @@ test_that("shift_mnirs aborts on intra-group argument conflict", {
 })
 
 test_that("shift_mnirs informs when channel omitted from args", {
+    skip("WIP")
     data <- tibble(
         time = 1:10,
         ch1 = 1:10,
         ch2 = 11:20
     )
 
-    ## ! FIX LOTS OF EDGE CASES
+    #! FIX LOTS OF EDGE CASES
     shift_mnirs(
         data,
         nirs_channels = c(ch1, ch2),

@@ -724,7 +724,7 @@ test_that("analyse_peak_slope returns correct structure", {
     expect_s3_class(results, "data.frame")
     expect_equal(nrow(results), 2)
     expect_named(results, c(
-        "nirs_channels", "time_channel", 
+        "interval", "nirs_channels", "time_channel",
         "slope", "intercept", "fitted", "peak_slope_time", "idx"
     ))
 
@@ -899,10 +899,7 @@ test_that("analyse_peak_slope channel_args override defaults", {
     # Different widths per channel
     results <- analyse_peak_slope(
         data,
-        width = 3,
-        channel_args = list(
-            q = list(width = 7)
-        ),
+        width = list(3, q = 7),
         verbose = FALSE
     )
 
@@ -925,10 +922,7 @@ test_that("analyse_peak_slope channel_args sets different directions", {
     results <- analyse_peak_slope(
         df,
         width = 3,
-        direction = "positive",
-        channel_args = list(
-            q = list(direction = "negative")
-        ),
+        direction = list("positive", q = "negative"),
         verbose = FALSE
     )
 
@@ -1053,11 +1047,8 @@ test_that("analyse_peak_slope channel_args stores overrides", {
 
     results <- analyse_peak_slope(
         df,
-        width = 3,
-        direction = "positive",
-        channel_args = list(
-            q = list(width = 7, direction = "negative")
-        ),
+        width = list(3, q = 7),
+        direction = list("positive", q = "negative"),
         verbose = FALSE
     )
 

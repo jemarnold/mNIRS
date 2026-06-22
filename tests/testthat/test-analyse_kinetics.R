@@ -275,6 +275,17 @@ test_that("as_data_list preserves names in list", {
     expect_named(result, c("baseline", "exercise"))
 })
 
+test_that("as_data_list fills only unnamed list elements", {
+    df1 <- data.frame(t = 1:5, x = rnorm(5))
+    df2 <- data.frame(t = 1:5, y = rnorm(5))
+    ## second element unnamed: supplied name kept, blank gets `interval_<n>`
+    data_list <- list(baseline = df1, df2)
+
+    result <- as_data_list(data_list)
+
+    expect_named(result, c("baseline", "interval_2"))
+})
+
 test_that("as_data_list handles grouped data frame", {
     skip_if_not_installed("dplyr")
 
@@ -393,152 +404,203 @@ test_that("as_data_list preserves attributes in grouped split", {
 })
 
 
-## build_channel_args ===================================================
-test_that("build_channel_args returns 1-row data frame", {
-    args <- list(width = 10, direction = "up")
-    result <- build_channel_args("smo2", args)
-
-    expect_s3_class(result, "data.frame")
-    expect_equal(nrow(result), 1L)
-    expect_equal(result$nirs_channels, "smo2")
-    expect_equal(result$width, 10)
-    expect_equal(result$direction, "up")
-})
-
-test_that("build_channel_args converts NULL to NA", {
-    args <- list(width = 10, control = NULL)
-    result <- build_channel_args("smo2", args)
-
-    expect_true(is.na(result$control))
-})
-
-test_that("build_channel_args deparses list values", {
-    args <- list(
-        use_time_delay = FALSE,
-        control = list(maxiter = 100, tol = 1e-5)
-    )
-    result <- build_channel_args("smo2", args)
-
-    expect_type(result$control, "character")
-    expect_match(result$control, "maxiter")
-})
-
-
 ## build_na_results ====================================================
-test_that("build_na_results returns correct 4-element list", {
+test_that("build_na_results returns correct 4-element fit list", {
     na_coefs <- data.frame(
-        nirs_channels = NA_character_,
         slope = NA_real_,
         intercept = NA_real_
     )
-    all_args <- list(width = 10, direction = "up")
 
-    result <- build_na_results("smo2", na_coefs, all_args, n_params = 1L)
+    result <- build_na_results(na_coefs)
 
     expect_type(result, "list")
-    expect_named(
-        result,
-        c("coefficients", "model", "fitted_data", "diagnostics", "channel_args")
-    )
+    expect_named(result, c("coefs", "model", "fitted_data", "diag"))
 
-    ## coefs inherits template with channel name filled in
-    expect_equal(result$coefficients$nirs_channels, "smo2")
-    expect_true(is.na(result$coefficients$slope))
+    ## coefs returned unchanged (channel/time columns added upstream)
+    expect_identical(result$coefs, na_coefs)
+    expect_true(is.na(result$coefs$slope))
+
+    ## no model for a failed fit
+    expect_null(result$model)
 
     ## fitted_data has NA placeholders
     expect_true(is.na(result$fitted_data$window_idx))
     expect_true(is.na(result$fitted_data$fitted))
 
-    ## diagnostics has all-NA values
-    expect_equal(result$diagnostics$nirs_channels, "smo2")
-    expect_true(all(is.na(result$diagnostics$r2)))
-
-    ## channel_args is a 1-row data frame
-    expect_equal(nrow(result$channel_args), 1L)
-    expect_equal(result$channel_args$nirs_channels, "smo2")
+    ## diag has all-NA values and zero observations
+    expect_equal(result$diag$n_obs, 0L)
+    expect_true(all(is.na(result$diag$r2)))
 })
 
 
-## build_channel_results ============================================
-test_that("build_channel_results combines channels correctly", {
-    ch1 <- list(
-        coefficients = data.frame(nirs_channels = "ch1", slope = 1.0),
-        model = data.frame(temp = "object"),
-        fitted_data = data.frame(window_idx = 1:3, fitted = c(1, 2, 3)),
-        diagnostics = data.frame(nirs_channels = "ch1", r2 = 0.95),
-        channel_args = data.frame(nirs_channels = "ch1", width = 10)
+## analyse_kinetics_channels() ============================================
+## helper: minimal mnirs data with a clear rise-then-fall per channel
+make_channels_data <- function(channels = c("ch1", "ch2")) {
+    n <- 20L
+    x <- c(seq(1, 10, length.out = 10L), seq(9, 1, length.out = 10L))
+    df <- data.frame(time = seq_len(n))
+    for (.ch in channels) df[[.ch]] <- x
+    create_mnirs_data(
+        df,
+        nirs_channels = channels,
+        time_channel = "time"
     )
-    ch2 <- list(
-        coefficients = data.frame(nirs_channels = "ch2", slope = 2.0),
-        model = data.frame(temp = "object"),
-        fitted_data = data.frame(window_idx = 1:3, fitted = c(4, 5, 6)),
-        diagnostics = data.frame(nirs_channels = "ch2", r2 = 0.85),
-        channel_args = data.frame(nirs_channels = "ch2", width = 10)
+}
+
+## helper: per-channel arg list keyed by channel, as resolve_channel_args()
+make_per_channel <- function(channels, ...) {
+    extra <- list(...)
+    setNames(
+        lapply(channels, \(.ch) {
+            c(list(end_fit_span = Inf, direction = "auto"), extra)
+        }),
+        channels
     )
-    
-    nirs_channels <- c("ch1", "ch2")
-    result <- build_channel_results(
-        list(ch1 = ch1, ch2 = ch2), t0 = 0, nirs_channels
+}
+
+## helper: trivial fit_fn returning one coefficient per channel
+slope_fit <- function(coef_value = 1.0, time_coef = NULL) {
+    function(.nirs, x_fit, t_fit, .a, valid, verbose) {
+        coefs <- data.frame(slope = coef_value)
+        if (!is.null(time_coef)) coefs$peak_slope_time <- time_coef
+        list(
+            coefs = coefs,
+            model = structure(list(), class = "lm"),
+            fitted_data = data.frame(
+                window_idx = seq_along(x_fit),
+                fitted = x_fit
+            ),
+            diag = compute_diagnostics(
+                x_fit, t_fit, x_fit, n_params = 2L, verbose = verbose
+            )
+        )
+    }
+}
+
+test_that("analyse_kinetics_channels combines channels correctly", {
+    channels <- c("ch1", "ch2")
+    data <- make_channels_data(channels)
+    per_channel <- make_per_channel(channels)
+
+    result <- analyse_kinetics_channels(
+        data, channels, "time",
+        per_channel, slope_fit(), verbose = FALSE
     )
 
-    ## coefficient rows are combined
+    ## coefficient rows are combined, one per channel
     expect_equal(nrow(result), 2L)
-    expect_equal(result$nirs_channels, c("ch1", "ch2"))
-    expect_equal(result$slope, c(1.0, 2.0))
+    expect_equal(result$nirs_channels, channels)
+    expect_equal(result$time_channel, c("time", "time"))
 
     ## TODO model preserved as ...
+    ## model preserved as named list
     model <- attr(result, "model")
     expect_type(model, "list")
     expect_length(model, 2L)
     ## TODO verify model object type
+    expect_named(model, channels)
 
     ## fitted_data preserved as named list
     fitted_data <- attr(result, "fitted_data")
     expect_type(fitted_data, "list")
-    expect_length(fitted_data, 2L)
-    expect_setequal(vapply(fitted_data, nrow, numeric(1)), 3)
+    expect_named(fitted_data, channels)
 
-    ## diagnostics combined
+    ## diagnostics combined, one row per channel
     diag <- attr(result, "diagnostics")
     expect_equal(nrow(diag), 2L)
-    expect_equal(diag$nirs_channels, c("ch1", "ch2"))
+    expect_equal(diag$nirs_channels, channels)
 
-    ## channel_args combined
+    ## channel_args combined, one row per channel
     ca <- attr(result, "channel_args")
     expect_equal(nrow(ca), 2L)
+    expect_equal(ca$nirs_channels, channels)
 })
 
-test_that("build_channel_results warns for time coefficients < t0", {
-    ch1 <- list(
-        coefficients = data.frame(
-            nirs_channels = "ch1", slope = 1.0, peak_slope_time = 0
-        ),
-        model = data.frame(temp = "object"),
-        fitted_data = data.frame(window_idx = 1:3, fitted = c(1, 2, 3)),
-        diagnostics = data.frame(nirs_channels = "ch1", r2 = 0.95),
-        channel_args = data.frame(nirs_channels = "ch1", width = 10)
-    )
-    ch2 <- list(
-        coefficients = data.frame(
-            nirs_channels = "ch2", slope = 2.0, peak_slope_time = -2),
-        model = data.frame(temp = "object"),
-        fitted_data = data.frame(window_idx = 1:3, fitted = c(4, 5, 6)),
-        diagnostics = data.frame(nirs_channels = "ch2", r2 = 0.85),
-        channel_args = data.frame(nirs_channels = "ch2", width = 10)
+test_that("analyse_kinetics_channels sets interval column", {
+    channels <- "ch1"
+    data <- make_channels_data(channels)
+    per_channel <- make_per_channel(channels)
+
+    result <- analyse_kinetics_channels(
+        data, channels, "time",
+        per_channel, slope_fit(), verbose = FALSE,
+        interval_name = "baseline"
     )
 
-    nirs_channels <- c("ch1", "ch2")
+    expect_equal(names(result)[1L], "interval")
+    expect_equal(result$interval, "baseline")
+})
+
+test_that("analyse_kinetics_channels serialises args (NULL to NA, list)", {
+    channels <- "ch1"
+    data <- make_channels_data(channels)
+    ## NULL and list-valued args must collapse into a flat data frame row
+    per_channel <- make_per_channel(
+        channels,
+        width = 10,
+        control = NULL,
+        nls_control = list(maxiter = 100, tol = 1e-5)
+    )
+
+    result <- analyse_kinetics_channels(
+        data, channels, "time",
+        per_channel, slope_fit(), verbose = FALSE
+    )
+
+    ca <- attr(result, "channel_args")
+    expect_equal(nrow(ca), 1L)
+    expect_equal(ca$nirs_channels, "ch1")
+    expect_equal(ca$width, 10)
+    ## NULL collapses to NA
+    expect_true(is.na(ca$control))
+    ## list deparses to a character string
+    expect_type(ca$nls_control, "character")
+    expect_match(ca$nls_control, "maxiter")
+})
+
+test_that("analyse_kinetics_channels records extra_args in channel_args", {
+    channels <- "ch1"
+    data <- make_channels_data(channels)
+    per_channel <- make_per_channel(channels)
+
+    result <- analyse_kinetics_channels(
+        data, channels, "time",
+        per_channel, slope_fit(), verbose = FALSE,
+        extra_args = list(shape = "symmetric")
+    )
+
+    ca <- attr(result, "channel_args")
+    expect_equal(ca$shape, "symmetric")
+})
+
+test_that("analyse_kinetics_channels warns for negative time coefficients", {
+    channels <- c("ch1", "ch2")
+    data <- make_channels_data(channels)
+    per_channel <- make_per_channel(channels)
 
     expect_warning(
-        result <- build_channel_results(
-            list(ch1 = ch1, ch2 = ch2), nirs_channels, t0 = 0, verbose = TRUE
+        result <- analyse_kinetics_channels(
+            data, channels, "time",
+            per_channel, slope_fit(time_coef = -2), verbose = TRUE
         ),
         "Negative.*coefficients"
     )
 
-    expect_equal(result$peak_slope_time, c(0, -2))
+    expect_equal(result$peak_slope_time, c(-2, -2))
 })
 
+test_that("analyse_kinetics_channels silent for valid coefficients", {
+    channels <- "ch1"
+    data <- make_channels_data(channels)
+    per_channel <- make_per_channel(channels)
+
+    expect_silent(
+        analyse_kinetics_channels(
+            data, channels, "time",
+            per_channel, slope_fit(time_coef = 5), verbose = TRUE
+        )
+    )
+})
 
 
 ## find_kinetics_idx ==================================================
@@ -788,7 +850,6 @@ test_that("build_kinetics_results returns mnirs_kinetics with correct names", {
     result_list <- list(make_kinetics_results("int1"))
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = "int1",
         method = "peak_slope",
         call = NULL
     )
@@ -807,7 +868,6 @@ test_that("build_kinetics_results stores method and call", {
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = "int1",
         method = "peak_slope",
         call = fake_call
     )
@@ -822,7 +882,6 @@ test_that("build_kinetics_results places interval as first column of coefficient
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = c("A", "B"),
         method = "peak_slope",
         call = NULL
     )
@@ -838,7 +897,6 @@ test_that("build_kinetics_results adds _fitted columns to data elements", {
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = "int1",
         method = "peak_slope",
         call = NULL
     )
@@ -860,7 +918,6 @@ test_that("build_kinetics_results fitted values placed at correct indices", {
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = "int1",
         method = "peak_slope",
         call = NULL
     )
@@ -877,7 +934,6 @@ test_that("build_kinetics_results data elements preserve mnirs metadata", {
     result <- build_kinetics_results(
         data_list,
         result_list,
-        interval_names = "int1",
         method = "peak_slope",
         call = NULL
     )
@@ -902,7 +958,6 @@ test_that("build_kinetics_results data list has class = mnirs", {
     result <- build_kinetics_results(
         data_list,
         result_list,
-        interval_names = c("int1", "int2"),
         method = "peak_slope",
         call = NULL
     )
@@ -935,7 +990,6 @@ test_that("build_kinetics_results data is named by interval_names", {
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = c("baseline", "exercise"),
         method = "peak_slope",
         call = NULL
     )
@@ -956,7 +1010,6 @@ test_that("build_kinetics_results model list is named by interval_names", {
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = c("A", "B"),
         method = "peak_slope",
         call = NULL
     )
@@ -977,7 +1030,6 @@ test_that("build_kinetics_results interval_times scalar numeric", {
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = c("baseline", "exercise"),
         method = "peak_slope",
         call = NULL
     )
@@ -999,7 +1051,6 @@ test_that("build_kinetics_results interval_times unpacks list (ensemble)", {
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = "ensemble",
         method = "peak_slope",
         call = NULL
     )
@@ -1016,7 +1067,6 @@ test_that("build_kinetics_results interval_times is NA when attribute is NULL", 
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = "int1",
         method = "peak_slope",
         call = NULL
     )
@@ -1033,7 +1083,6 @@ test_that("build_kinetics_results diagnostics has interval col and correct rows"
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = c("A", "B"),
         method = "peak_slope",
         call = NULL
     )
@@ -1050,7 +1099,6 @@ test_that("build_kinetics_results channel_args has interval col and correct rows
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = c("A", "B"),
         method = "peak_slope",
         call = NULL
     )
@@ -1061,6 +1109,29 @@ test_that("build_kinetics_results channel_args has interval col and correct rows
     expect_equal(ca$interval, c("A", "B"))
 })
 
+test_that("build_kinetics_results tags attrs per row with uneven channels", {
+    ## interval A has 1 channel, B has 2 — attr rows must align per interval,
+    ## not by recycling a length-2 interval vector across 3 rows
+    data_list <- list(
+        A = make_kinetics_data(),
+        B = make_kinetics_data(channels = c("smo2_left", "smo2_right"))
+    )
+    result_list <- list(
+        make_kinetics_results("A"),
+        make_kinetics_results("B", channels = c("smo2_left", "smo2_right"))
+    )
+
+    result <- build_kinetics_results(
+        data_list, result_list,
+        method = "peak_slope",
+        call = NULL
+    )
+
+    expect_equal(result$diagnostics$interval, c("A", "B", "B"))
+    expect_equal(result$channel_args$interval, c("A", "B", "B"))
+    expect_equal(result$coefficients$interval, c("A", "B", "B"))
+})
+
 test_that("build_kinetics_results handles multiple channels per interval", {
     channels <- c("smo2_left", "smo2_right")
     data_list <- list(int1 = make_kinetics_data(channels = channels))
@@ -1068,7 +1139,6 @@ test_that("build_kinetics_results handles multiple channels per interval", {
 
     result <- build_kinetics_results(
         data_list, result_list,
-        interval_names = "int1",
         method = "peak_slope",
         call = NULL
     )
@@ -1397,10 +1467,7 @@ test_that("analyse_kinetics.response_time channel_args override defaults", {
         data,
         nirs_channels = c("smo2_left", "smo2_right"),
         method = "response_time",
-        direction = "positive",
-        channel_args = list(
-            smo2_right = list(direction = "negative")
-        ),
+        direction = list("positive", smo2_right = "negative"),
         verbose = FALSE
     )
 
@@ -1556,10 +1623,7 @@ test_that("analyse_kinetics.peak_slope channel_args override defaults", {
         nirs_channels = c("smo2_left", "smo2_right"),
         method = "peak_slope",
         width = 5,
-        direction = "positive",
-        channel_args = list(
-            smo2_right = list(direction = "negative")
-        ),
+        direction = list("positive", smo2_right = "negative"),
         verbose = FALSE
     )
 
@@ -1678,6 +1742,28 @@ test_that("analyse_kinetics.monoexponential uses custom interval name", {
     expect_true(is.na(result$coefficients$k))
 })
 
+test_that("analyse_kinetics.monoexponential names only the failing interval", {
+    ## named list: `good` converges, `bad` has too few points to fit
+    data <- list(
+        good = create_monoexp_data(n = 60, noise_sd = 0.5),
+        bad = create_monoexp_data(n = 3, noise_sd = 0.1)
+    )
+
+    msg <- conditionMessage(rlang::catch_cnd(
+        analyse_kinetics(
+            data,
+            nirs_channels = "smo2",
+            method = "monoexponential",
+            use_time_delay = FALSE
+        ),
+        classes = "warning"
+    ))
+
+    ## warning names the failing interval only, not the converged one
+    expect_match(msg, "fit failed for.*smo2.*bad")
+    expect_no_match(msg, "good")
+})
+
 ## analyse_kinetics.logistic ============================================
 ## helper: create logistic test data with known parameters
 create_logistic_data <- function(
@@ -1752,6 +1838,28 @@ test_that("analyse_kinetics.logistic uses custom interval name", {
     expect_true(is.na(result$coefficients$A))
     expect_true(is.na(result$coefficients$xmid))
     expect_true(is.na(result$coefficients$slope))
+})
+
+test_that("analyse_kinetics.logistic names only the failing interval", {
+    ## named list: `good` converges, `bad` has too few points to fit
+    data <- list(
+        good = create_logistic_data(n = 60, noise_sd = 2),
+        bad = create_logistic_data(n = 10, noise_sd = 0.1)
+    )
+
+    msg <- conditionMessage(rlang::catch_cnd(
+        analyse_kinetics(
+            data,
+            nirs_channels = "smo2",
+            method = "logistic",
+            shape = "symmetric"
+        ),
+        classes = "warning"
+    ))
+
+    ## warning names the failing interval only, not the converged one
+    expect_match(msg, "fit failed for.*smo2.*bad")
+    expect_no_match(msg, "good")
 })
 
 ## analyze_kinetics (US spelling alias) ================================

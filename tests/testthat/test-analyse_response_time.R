@@ -212,7 +212,7 @@ test_that("analyse_response_time returns correct structure", {
     expect_s3_class(result, "data.frame")
     expect_equal(nrow(result), 2L)
     expect_named(result, c(
-        "nirs_channels", "time_channel",
+        "interval", "nirs_channels", "time_channel",
         "A", "B", "response_time", "response_value", "fitted", "idx"
     ))
 
@@ -318,8 +318,7 @@ test_that("analyse_response_time channel_args override defaults", {
     result <- analyse_response_time(
         df,
         t0 = 5,
-        fraction = 0.5,
-        channel_args = list(q = list(fraction = 0.25)),
+        fraction = list(0.5, q = 0.25),
         verbose = FALSE
     )
 

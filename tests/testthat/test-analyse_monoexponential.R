@@ -337,7 +337,7 @@ test_that("analyse_monoexponential() returns correct structure", {
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
-        "nirs_channels", "time_channel", 
+        "interval", "nirs_channels", "time_channel",
         "A", "B", "tau", "k", "TD", "MRT", "HRT",
         "tau_fitted", "MRT_fitted", "HRT_fitted"
     ))
@@ -607,8 +607,7 @@ test_that("analyse_monoexponential() channel_args override defaults", {
     result <- analyse_monoexponential(
         data,
         nirs_channels = c("ch1", "ch2"),
-        use_time_delay = FALSE,
-        channel_args = list(ch2 = list(use_time_delay = TRUE))
+        use_time_delay = list(FALSE, ch2 = TRUE),
     )
 
     ## ch1 has no TD (3-param), ch2 has TD (4-param)

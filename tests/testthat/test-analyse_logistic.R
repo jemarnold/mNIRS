@@ -710,7 +710,7 @@ test_that("analyse_logistic() returns correct structure", {
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
-        "nirs_channels", "time_channel",
+        "interval", "nirs_channels", "time_channel",
         "A", "B", "xmid", "slope", "xmid_fitted"
     ))
     expect_equal(nrow(result), 1L)
@@ -945,8 +945,7 @@ test_that("analyse_logistic() channel_args override defaults", {
     result <- analyse_logistic(
         data,
         nirs_channels = c("ch1", "ch2"),
-        shape = "symmetric",
-        channel_args = list(ch2 = list(shape = "gompertz")),
+        shape = list("symmetric", ch2 = "gompertz"),
         verbose = FALSE
     )
 
