@@ -396,11 +396,11 @@ test_that("analyse_response_time works visually on Moxy", {
         ) |> 
         _[[1L]]
 
-    time_vec <- data$time
+    t_vec <- data$time
     response_list <- response_time(
-        data$smo2_left, time_vec, 878, fraction = 0.5
+        data$smo2_left, t_vec, 878, fraction = 0.5
     )
-    # response_time(data$smo2_right, time_vec, fraction = 0.5)
+    # response_time(data$smo2_right, t_vec, fraction = 0.5)
 
     result <- analyse_response_time(
         data, 
@@ -418,7 +418,7 @@ test_that("analyse_response_time works visually on Moxy", {
     plot(data) +
         annotate(
             "point",
-            x = time_vec[
+            x = t_vec[
                 unlist(response_list[c("response_idx", "extreme_idx")])
             ],
             y = unlist(response_list[c("response_value", "B")]),
@@ -428,12 +428,12 @@ test_that("analyse_response_time works visually on Moxy", {
         ) +
         annotate(
             "line",
-            x = time_vec[response_list$baseline_idx],
+            x = t_vec[response_list$baseline_idx],
             y = response_list$A,
         ) +
         annotate(
             "point",
-            x = time_vec[rev(rev(hrt_data$window_idx)[1:3])],
+            x = t_vec[rev(rev(hrt_data$window_idx)[1:3])],
             y = unlist(result[c("A", "response_value", "B")]),
             size = 3,
             shape = 21,
@@ -441,7 +441,7 @@ test_that("analyse_response_time works visually on Moxy", {
         ) +
         annotate(
             "line",
-            x = rev(time_vec[hrt_data$window_idx])[-(1:2)],
+            x = rev(t_vec[hrt_data$window_idx])[-(1:2)],
             y = result$A,
         )
 })

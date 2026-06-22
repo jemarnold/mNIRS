@@ -729,7 +729,7 @@ make_kinetics_data <- function(
 ) {
     df_data <- data.frame(
         time = seq_len(n) / sample_rate,
-        stats::setNames(
+        setNames(
             lapply(channels, \(.ch) rnorm(n)),
             channels
         )
@@ -758,7 +758,7 @@ make_kinetics_results <- function(
         slope = seq_len(length(channels)) * 0.5,
         interval = interval
     )
-    attr(df, "fitted_data") <- stats::setNames(
+    attr(df, "fitted_data") <- setNames(
         lapply(channels, \(.ch) {
             data.frame(
                 window_idx = seq_len(n),
@@ -767,7 +767,7 @@ make_kinetics_results <- function(
         }),
         channels
     )
-    attr(df, "model") <- stats::setNames(
+    attr(df, "model") <- setNames(
         lapply(channels, \(.ch) structure(list(), class = "lm")),
         channels
     )
@@ -1317,7 +1317,7 @@ create_response_time_data <- function(
         rep(B, n_plateau)
     )
     t <- seq_along(x) - n_baseline ## t = 0 at end of baseline
-    df <- stats::setNames(
+    df <- setNames(
         data.frame(t, x),
         c("time", channels[1])
     )
@@ -1613,7 +1613,7 @@ create_monoexp_data <- function(
     t <- seq(0, (n - 1) / sample_rate, length.out = n)
     x <- monoexponential(t, A, B, tau, TD) + rnorm(n, 0, noise_sd)
 
-    df <- stats::setNames(
+    df <- setNames(
         data.frame(t, x),
         c("time", channels[1])
     )
@@ -1695,7 +1695,7 @@ create_logistic_data <- function(
     t <- seq(0, (n - 1) / sample_rate, length.out = n)
     x <- logistic(t, A, B, xmid, slope, asym) + rnorm(n, 0, noise_sd)
 
-    df <- stats::setNames(
+    df <- setNames(
         data.frame(t, x),
         c("time", channels[1])
     )

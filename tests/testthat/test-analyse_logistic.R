@@ -639,7 +639,7 @@ test_that("SSgompertz()/SSgompertz_left() converge on real dataset", {
             )
 
             if (is.null(model)) {
-                stats::setNames(
+                setNames(
                     rep(NA_real_, 4), c("A", "B", "xmid", "slope")
                 )
             } else {
@@ -680,7 +680,7 @@ create_logistic_data <- function(
     set.seed(seed)
     t <- seq(0, (n - 1) / sample_rate, length.out = n)
     x <- logistic(t, A, B, xmid, slope, asym) + rnorm(n, 0, noise_sd)
-    df <- stats::setNames(data.frame(t, x), c("time", channels[1]))
+    df <- setNames(data.frame(t, x), c("time", channels[1]))
     if (length(channels) > 1) {
         for (ch in channels[-1]) {
             df[[ch]] <- logistic(t, A + 5, B + 5, xmid, slope, asym) +

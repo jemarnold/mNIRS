@@ -184,13 +184,11 @@ test_that("resolve_channel_args resolves per group with group_channels", {
 })
 
 test_that("resolve_channel_args aborts on intra-group conflicts", {
-    groups <- list(oxy = c("smo2_l", "smo2_r"))
-
     expect_error(
         resolve_channel_args(
             c("smo2_l", "smo2_r"),
             args = list(to = list(smo2_l = 0, smo2_r = 5)),
-            group_channels = groups,
+            group_channels = list(oxy = c("smo2_l", "smo2_r")),
             verbose = FALSE
         ),
         "conflicting.*group_channels"
@@ -200,10 +198,10 @@ test_that("resolve_channel_args aborts on intra-group conflicts", {
     out <- resolve_channel_args(
         c("smo2_l", "smo2_r"),
         args = list(to = list(smo2_l = 0, smo2_r = 0)),
-        group_channels = groups,
+        group_channels = list(oxy = c("smo2_l", "smo2_r")),
         verbose = FALSE
     )
-    expect_equal(out$smo2$to, 0)
+    expect_equal(out$oxy$to, 0)
 })
 
 test_that("resolve_channel_args reports errors from the caller's `env`", {

@@ -421,10 +421,12 @@ validate_kinetics_args <- function(
     per_channel,
     data,
     t_vec,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     chans <- names(per_channel)
-    setNames(lapply(chans, \(.nirs) {
+    setNames(
+        lapply(chans, \(.nirs) {
         .a <- per_channel[[.nirs]]
         ## emit verbose hints once, for the first channel only
         .v <- verbose && .nirs == chans[[1L]]
@@ -437,24 +439,24 @@ validate_kinetics_args <- function(
             cli_abort(c(
                 "x" = "{.arg use_time_delay} must be a {.cls logical} \\
                 either {.val {TRUE}} or {.val {FALSE}}."
-            ))
+            ), call = env)
         }
-        if (!is.null(.a$t0)) {
-            .a$t0 <- validate_t0(.a$t0, data, t_vec, .v)
-        }
+        ## always resolve: user value > interval_times metadata > 0
+        .a$t0 <- validate_t0(.a$t0, data, t_vec, .v, env = env)
         if (!is.null(.a$end_fit_span)) {
             validate_numeric(
-                .a$end_fit_span, 1, c(0, Inf), msg1 = "one-element positive"
+                .a$end_fit_span, 1, c(0, Inf), 
+                msg1 = "one-element positive", env = env
             )
         }
         if (!is.null(.a$fraction)) {
             validate_numeric(
-                .a$fraction, 1L, c(0, 1),
-                msg2 = "between {col_blue('[0, 1]')}."
+                .a$fraction, 1L, c(0, 1), 
+                msg2 = "between {col_blue('[0, 1]')}.", env = env
             )
         }
         if (any(c("width", "span") %in% names(.a))) {
-            validate_width_span(.a$width, .a$span, .v)
+            validate_width_span(.a$width, .a$span, .v, env = env)
         }
         if (!is.null(.a$align)) {
             .a$align <- sub("^center$", "centre", .a$align[[1L]])
@@ -463,7 +465,9 @@ validate_kinetics_args <- function(
             )
         }
         .a
-    }), chans)
+    }),
+        chans
+    )
 }
 
 

@@ -299,7 +299,7 @@ create_monoexp_data <- function(
     t <- seq(0, (n - 1) / sample_rate, length.out = n)
     x <- monoexponential(t, A, B, tau, TD) + rnorm(n, 0, noise_sd)
 
-    df <- stats::setNames(
+    df <- setNames(
         data.frame(t, x),
         c("time", channels[1])
     )
