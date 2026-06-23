@@ -28,3 +28,5 @@ mnirs-hex-v*\.svg$
 ^\.claude$
 ^man/figures/README-mnirs-app\.gif$
 ^CRAN-SUBMISSION$
+^README_files$
+^README\.html$

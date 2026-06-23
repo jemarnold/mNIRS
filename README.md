@@ -5,6 +5,8 @@
 
 <!-- badges: start -->
 
+[![CRAN
+downloads](https://cranlogs.r-pkg.org/badges/grand-total/mnirs)](https://cran.r-project.org/package=mnirs)
 [![Lifecycle:
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 [![R-CMD-check](https://github.com/jemarnold/mnirs/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jemarnold/mnirs/actions/workflows/R-CMD-check.yaml)
@@ -91,7 +93,7 @@ data_raw <- read_mnirs(
 #> ! Estimated `sample_rate` = 2 Hz.
 #> ℹ Define `sample_rate` explicitly to override.
 #> Warning: ! Duplicate or irregular `time_channel` samples detected.
-#> ℹ Investigate at `time` = 211.59 and 1183.6.
+#> ℹ `time` = 211.59 and 1183.6.
 #> ℹ Re-sample with `mnirs::resample_mnirs()`.
 
 ## Note the above info message that sample_rate was estimated correctly at 2 Hz 👆
@@ -215,7 +217,7 @@ plot(data_filtered, time_labels = TRUE) +
 ``` r
 data_shifted <- shift_mnirs(
     data_filtered,     ## un-grouped nirs channels to shift separately 
-    nirs_channels = list(smo2_left, smo2_right), 
+    group_channels = list(smo2_left, smo2_right), 
     to = 0,            ## NIRS values will be shifted to zero
     span = 120,        ## shift the *first* 120 sec of data to zero
     position = "first"
@@ -230,7 +232,7 @@ plot(data_shifted, time_labels = TRUE) +
 ``` r
 data_rescaled <- rescale_mnirs(
     data_filtered,    ## un-grouped nirs channels to rescale separately 
-    nirs_channels = list(smo2_left, smo2_right), 
+    group_channels = list(smo2_left, smo2_right), 
     range = c(0, 100) ## rescale to a 0-100% functional exercise range
 )
 
@@ -268,13 +270,13 @@ nirs_data <- read_mnirs(
         na.rm = TRUE
     ) |>
     shift_mnirs(
-        nirs_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
+        group_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
         to = 0,
         span = 60,
         position = "first"
     ) |>
     rescale_mnirs(
-        nirs_channels = list(c(smo2_left, smo2_right)), ## 👈 channels grouped together
+        group_channels = list(c(smo2_left, smo2_right)), ## 👈 channels grouped together
         range = c(0, 100)
     )
 
@@ -286,12 +288,12 @@ plot(nirs_data, time_labels = TRUE)
 ### `extract_intervals()`: detect events and extract intervals
 
 ``` r
-## return each interval independently with `event_groups = "distinct"`
+## return each interval independently with `group_intervals = "distinct"`
 distinct <- extract_intervals(
     nirs_data,                  ## channels blank for "distinct" grouping
     start = by_time(348, 1064), ## manually identified interval start times
     end = by_time(458, 1174),   ## interval end time (start + 150 sec)
-    event_groups = "distinct",  ## return a list of data frames for each (2) event
+    group_intervals = "distinct",  ## return a list of data frames for each (2) event
     span = c(0, 0),             ## no boundary modification
     zero_time = FALSE           ## return original time values
 )
@@ -302,12 +304,11 @@ plot(distinct, time_labels = TRUE)
 <img src="man/figures/README-extract_intervals_distinct-1.png" alt="" width="100%" />
 
 ``` r
-## ensemble average both intervals with `event_groups = "ensemble"`
+## ensemble average both intervals with `group_intervals = "ensemble"`
 ensemble <- extract_intervals(
     nirs_data,                  ## channels recycled to all intervals by default
-    nirs_channels = c(smo2_left, smo2_right),
     start = by_time(368, 1084), ## alternatively specify start times + span
-    event_groups = "ensemble",  ## ensemble-average across two intervals
+    group_intervals = "ensemble",  ## ensemble-average across two intervals
     span = c(-20, 90),          ## span recycled to all intervals by default
     zero_time = TRUE            ## re-calculate common time to start from `0`
 )
