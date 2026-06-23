@@ -8,7 +8,7 @@ format:
         embed-resources: true
         toc: true
 bibliography: oxcap-citations.bib
-csl: vancouver.csl
+csl: ../vancouver.csl
 knitr:
     opts_chunk:
         collapse: true
@@ -159,7 +159,7 @@ df
 ## find each occlusion event, find where there is a longer gap
 ## the number of occlusions before this should be in the first trial
 df_occlusions <- df[grepl("Occlusion", df$event), ]
-n_occlusions <- which(diff(df_occlusions$time) > 60)
+n_occl <- which(diff(df_occlusions$time) > 60)
 
 plot(df)
 ```
@@ -180,25 +180,17 @@ The preferred method is to iteratively correct for instantaneous changes in oxyg
 #| label: blood volume correction
 
 df <- df |>
-    mutate(
-        ## blood volume correction factor `beta`
-        beta = o2hb / (o2hb + hhb),
-        ## iteratively correct NIRS values from one sample to the next
-        o2hb = purrr::accumulate(2:n(), \(prev, i) {
-            prev + (o2hb[i] - o2hb[i - 1]) - beta[i] * (thb[i] - thb[i - 1])
-            }, .init = 0
-        ),
-        hhb = purrr::accumulate(2:n(), \(prev, i) {
-            prev + (hhb[i] - hhb[i - 1]) - (1 - beta[i]) * (thb[i] - thb[i - 1])
-            }, .init = 0
-        ),
-        ## thb corrected for changes in blood volume becomes equal to zero
-        thb = o2hb + hhb,
+    correct_blood_volume(
+        oxy_channel = o2hb,
+        deoxy_channel = hhb, 
+        total_channel = thb
     )
 
 ## plot corrected data with occlusion event indicators
 plot(df) +
-    geom_vline(xintercept = df_occlusions$time, linetype = "dotted", alpha = 0.4)
+    geom_vline(
+        xintercept = df_occlusions$time, linetype = "dotted", alpha = 0.4
+    )
 ```
 
 
@@ -262,8 +254,8 @@ For repeated occlusion testing, the original time information for each occlusion
 ## re-join the returned list of data frames 
 df_list <- extract_intervals(
     df,
-    start = by_label("Occlusion"), ## event label used in file
-    event_groups = "distinct", ## return each occlusion event separately
+    start = "Occlusion", ## event label used in file
+    group_intervals = "distinct", ## return each occlusion event separately
     span = c(1, 5), ## interval c(start, end) around each event time value
     zero_time = FALSE ## preserve original time values at each event
 )
@@ -330,25 +322,31 @@ A window with fewer samples will tend to return steeper slope values, which may 
 
 ```{r}
 #| label: find peak slopes
-
+#| warning: false
 ## iteratively find peak local slopes within each occlusion interval
 ## return summary values for each factor level of "interval" grouping column
-slopes_df <- analyse_kinetics(
+slope_results <- analyse_kinetics(
     df_list,
     nirs_channel = hhb,
     time_channel = time,
     method = "peak_slope",
     span = 3,
-    align = "left",
     direction = "positive",
     partial = FALSE,
-)$results |> 
+)
+
+## return raw interval start times
+interval_times <- unlist(slope_results$interval_times$interval_times)
+
+slopes_df <- slope_results$coefficient |>
     mutate(
         ## manual factor by occlusions in each trial
-        trial = factor(if_else(row_number() %in% seq_len(n_occlusions), 1L, 2L))
+        trial = factor(if_else(row_number() %in% seq_len(n_occl), 1L, 2L)),
+        time = peak_slope_time + interval_times,
+        peak_slope_time = NULL,
     ) |>
     mutate(
-        ## recalculate time as starting from zero for each trial
+        ## recalculate time starting from zero for each trial
         .by = trial,
         time = time - time[1L],
     ) |>
@@ -411,37 +409,32 @@ Having split our data set of times and slopes by trial, we can use `tidyr::nest(
 
 ```{r}
 #| label: monoexponential curve modelling
-
 ## use 3-param monoexponential model for each trial
 ## fit models by trial within the data frame with {tidyr} and {purrr}
 ## return fitted data and time constant tau coefficient
-pred_df <- slopes_df |>
-    ## nest the data to model each trial
-    tidyr::nest(.by = trial) |>
-    mutate(
-        ## apply self-starting monoexp model to each trial
-        model = purrr::map(data, \(.df) {
-            nls(slope ~ SSmonoexp(time, A, B, tau), data = .df)
-        }),
-        ## return tau coefficient for each trial model
-        tau = purrr::map_dbl(model, \(.m) coef(.m)[["tau"]]),
-        ## return the predicted exponential curve values for plotting
-        data = purrr::map2(data, model, \(.df, .m) {
-            mutate(.df, predicted_slope = predict(.m))
-        })
-    ) |>
-    select(trial, tau, data) |>
-    ## unnest back into the top level data frame for extraction and plotting
-    tidyr::unnest(data)
+results <- slopes_df |>
+    group_by(trial) |>
+    analyse_kinetics(
+        nirs_channels = slope,
+        time_channel = time,
+        method = "monoexponential",
+        use_time_delay = FALSE
+    )
+
+results
+
+## extract data frame with fitted values for plotting
+fitted_data <- list_rbind(results$data)
 
 ## extract tau and k coef labels per trial, for plotting
-coef_df <- pred_df |>
+coef_df <- results$coefficients |>
+    rename(trial = interval) |>
     summarise(
         .by = trial,
         label = stringr::str_glue(
-            "Trial {trial[1]}
-            tau = {mnirs:::signif_trailing(tau[1], 1)} sec
-            k = {mnirs:::signif_trailing(60 / tau[1], 1)} min⁻¹"
+            "Trial {trial}
+            tau = {mnirs:::signif_trailing(tau, 1)} sec
+            k = {mnirs:::signif_trailing(60 / tau, 1)} min⁻¹"
         )
     )
 ```
@@ -452,8 +445,8 @@ coef_df <- pred_df |>
 ## add predicted values to the plot of observed data
 p +
     geom_line(
-        data = pred_df,
-        aes(y = predicted_slope, group = trial),
+        data = fitted_data,
+        aes(y = slope_fitted, group = trial),
         colour = "black", linewidth = 1
     ) +
     geom_text(

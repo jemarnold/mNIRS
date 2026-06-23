@@ -548,6 +548,7 @@ validate_t0 <- function(
     env = rlang::caller_env()
 ) {
     ## fall back to metadata or zero
+    ## TODO fall back to first non-zero time value rather than 0?
     t0 <- t0 %||% attr(data, "interval_times") %||% 0
     validate_numeric(t0, 1L, env = env)
 

@@ -215,12 +215,12 @@ data <- read_mnirs(
 
 ## ensemble-average across multiple intervals
 interval_list <- extract_intervals(
-    data,                       ## channels recycled to all intervals by default
+    data,                         ## channels recycled to all intervals by default
     nirs_channels = c(smo2_left, smo2_right),
-    start = by_time(368, 1084), ## manually identified interval start times
-    span = c(-20, 90),          ## include the last 180-sec of each interval (recycled)
-    group_intervals = "ensemble",  ## ensemble-average across two intervals
-    zero_time = TRUE            ## re-calculate common time to start from `0`
+    start = by_time(368, 1084),   ## manually identified interval start times
+    span = c(-20, 90),            ## include the last 180-sec of each interval (recycled)
+    group_intervals = "ensemble", ## ensemble-average across two intervals
+    zero_time = TRUE              ## re-calculate common time to start from `0`
 )
 
 interval_list[[1L]]

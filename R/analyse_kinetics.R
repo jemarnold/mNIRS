@@ -260,9 +260,6 @@ analyse_kinetics <- function(
         ignore.case = TRUE
     )
     method <- match.arg(method)
-    if (missing(verbose)) {
-        verbose <- getOption("mnirs.verbose", default = TRUE)
-    }
 
     UseMethod(
         "analyse_kinetics",
@@ -286,6 +283,10 @@ analyse_kinetics.response_time <- function(
     verbose = TRUE,
     ...
 ) {
+    ## resolve global verbose option when caller omits the argument
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
+    }
     ## normalise input to named list of data frames
     data_list <- as_data_list(data)
 
@@ -335,6 +336,10 @@ analyse_kinetics.peak_slope <- function(
     verbose = TRUE,
     ...
 ) {
+    ## resolve global verbose option when caller omits the argument
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
+    }
     ## normalise input to named list of data frames
     data_list <- as_data_list(data)
 
@@ -386,6 +391,10 @@ analyse_kinetics.monoexponential <- function(
 ) {
     ## TODO: pass additional stats::nls() args
     ## TODO: implement `direction`
+    ## resolve global verbose option when caller omits the argument
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
+    }
     ## normalise input to named list of data frames
     data_list <- as_data_list(data)
 
@@ -432,6 +441,10 @@ analyse_kinetics.logistic <- function(
 ) {
     ## TODO: pass additional stats::nls() args
     ## TODO: implement `direction`
+    ## resolve global verbose option when caller omits the argument
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
+    }
     ## normalise input to named list of data frames
     data_list <- as_data_list(data)
 

@@ -1590,6 +1590,38 @@ test_that("analyse_kinetics.peak_slope passes width and span correctly", {
     )
 })
 
+test_that("analyse_kinetics.peak_slope respects global verbose option", {
+    data <- create_kinetics_data(n = 40, channels = "smo2_left")
+
+    old_verbose <- getOption("mnirs.verbose")
+    on.exit(options(mnirs.verbose = old_verbose), add = TRUE)
+
+    ## supplying both width and span normally emits a verbose "overrides" hint
+    options(mnirs.verbose = TRUE)
+    expect_message(
+        analyse_kinetics(
+            data,
+            nirs_channels = "smo2_left",
+            method = "peak_slope",
+            width = 5,
+            span = 1
+        ),
+        "overrides"
+    )
+
+    ## global option must reach the S3 method when `verbose` is omitted
+    options(mnirs.verbose = FALSE)
+    expect_silent(
+        analyse_kinetics(
+            data,
+            nirs_channels = "smo2_left",
+            method = "peak_slope",
+            width = 5,
+            span = 1
+        )
+    )
+})
+
 test_that("analyse_kinetics.peak_slope passes direction argument", {
     data <- create_kinetics_data(n = 100)
 
