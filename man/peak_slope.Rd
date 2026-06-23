@@ -75,7 +75,8 @@ of regression parameters for the peak window. Vector-level companion to
 \subsection{Rolling window}{
 
 The local rolling window is defined by either \code{width} (number of samples)
-or \code{span} (time duration in units of \code{t}). When \code{align = "centre"} and
+or \code{span} (time duration in units of \code{t}); one of either \code{width} or \code{span}
+must be specified. When \code{align = "centre"} and
 \code{width} is specified, the window spans
 \verb{[idx - floor((width - 1) / 2), idx + floor(width / 2)]}. Even \code{width}
 values bias alignment to \emph{"left"}, placing the unequal sample forward of

@@ -188,7 +188,8 @@ rolling_slope <- function(
 #' ## Rolling window
 #'
 #' The local rolling window is defined by either `width` (number of samples)
-#' or `span` (time duration in units of `t`). When `align = "centre"` and
+#' or `span` (time duration in units of `t`); one of either `width` or `span`
+#' must be specified. When `align = "centre"` and
 #' `width` is specified, the window spans
 #' `[idx - floor((width - 1) / 2), idx + floor(width / 2)]`. Even `width`
 #' values bias alignment to *"left"*, placing the unequal sample forward of

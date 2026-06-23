@@ -12,7 +12,6 @@ analyse_monoexponential(
   t0 = NULL,
   direction = c("auto", "positive", "negative"),
   end_fit_span = Inf,
-  channel_args = list(),
   verbose = TRUE,
   ...
 )
@@ -44,19 +43,6 @@ fit a reduced 3-parameter \code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau
 in units of \code{time_channel}. Observations where \code{time_channel <= t0}
 define the pre-response baseline window. If \code{NULL} (\emph{default}), retrieves
 \code{interval_times} from \emph{"mnirs"} metadata, or falls back to \code{0}.}
-
-\item{direction}{A character string specifying the response direction to
-detect -- \code{"auto"} (\emph{default}), \code{"positive"}, or \code{"negative"}. See
-\emph{Details}.}
-
-\item{end_fit_span}{A numeric value in units of \code{time_channel} or \code{t}
-specifying the forward-looking window used to check for subsequent
-greater/lesser values than the candidate extreme. \code{end_fit_span = Inf}
-(\emph{default}) returns the global extreme from the full range of \code{x}.}
-
-\item{channel_args}{An \emph{optional} named \code{list()} with names corresponding
-to \code{nirs_channels} for unique per-channel arguments that override the
-global defaults (see \emph{Details}).}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad

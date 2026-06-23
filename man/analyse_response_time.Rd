@@ -12,7 +12,6 @@ analyse_response_time(
   fraction = 0.5,
   direction = c("auto", "positive", "negative"),
   end_fit_span = Inf,
-  channel_args = list(),
   verbose = TRUE,
   ...
 )
@@ -52,10 +51,6 @@ detect -- \code{"auto"} (\emph{default}), \code{"positive"}, or \code{"negative"
 specifying the forward-looking window used to check for subsequent
 greater/lesser values than the candidate extreme. \code{end_fit_span = Inf}
 (\emph{default}) returns the global extreme from the full range of \code{x}.}
-
-\item{channel_args}{An \emph{optional} named \code{list()} with names corresponding
-to \code{nirs_channels} for unique per-channel arguments that override the
-global defaults (see \emph{Details}).}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad

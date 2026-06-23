@@ -6,7 +6,7 @@
 \usage{
 find_interval_time(
   interval,
-  time_vec,
+  t_vec,
   event_vec = NULL,
   position = c("first", "last")
 )

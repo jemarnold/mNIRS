@@ -77,9 +77,9 @@
 #' A non-parametric approach (estimated directly from the observed data without
 #' assuming a specific mathetmatical shape) to estimate the response time at
 #' which a signal reaches a specified fraction of its total response amplitude
-#' relative to the baseline. e.g. *half-response time* (`fraction = 0.5``) is
+#' relative to the baseline. e.g. *half-response time* (`fraction = 0.5`) is
 #' the time from response onset to attain 50% of the total amplitude change.
-#' `fraction = 0.632` approximates the time constant (`tau` (\eqn{\tau}))
+#' `fraction = 0.632` approximates the time constant (`tau`; \eqn{\tau})
 #' parameter from a monoexponential function.
 #' 
 #' The target response value is:
@@ -91,13 +91,6 @@
 #' the elapsed time from `t0` to `response_value`; the first observed sample
 #' where the signal is equal to or greater/lesser than the target `fitted`
 #' value. See [response_time()] for the full algorithm and coefficients results.
-#'
-#' Additional arguments (`...`) accepted when `method = "response_time"`:
-#'
-#' \describe{
-#'   \item{`fraction`}{Numeric in the range `[0, 1]`; the fractional response
-#'       amplitude to detect. Defaults to `0.5` (50% response).}
-#' }
 #'
 #' ## method = "peak_slope"
 #'
@@ -112,23 +105,6 @@
 #' The local window is defined by either `width` (number of samples) or `span`
 #' (in units of `time_channel`). See [peak_slope()] for window mechanics,
 #' partial-window behaviour, and the returned vector-level list.
-#'
-#' Additional arguments (`...`) accepted when `method = "peak_slope"`:
-#'
-#' \describe{
-#'   \item{`width` or `span`}{Either the number of samples (integer), or the
-#'       time duration in units of `time_channel` (numeric), respectively, in
-#'       the local rolling window. One of either `width` or `span` must be
-#'       specified.}
-#'   \item{`align`}{Character; window alignment -- `"centre"` (default),
-#'       `"left"`, or `"right"`.}
-#'   \item{`partial`}{Logical; default is `FALSE`, requires local windows
-#'       to have the complete number of samples specified by `width` or
-#'       `span`. If `TRUE`, processes available samples within the local
-#'       window returns results on partial data.}
-#'   \item{`na.rm`}{Logical; default is `FALSE`, If `TRUE`, ignores `NA`s and
-#'       processes available valid samples within the local window.}
-#' }
 #'
 #' ## method = "monoexponential"
 #'
@@ -149,16 +125,7 @@
 #' can also be derived. See [monoexponential()] for the model family and
 #' [SSmonoexp()] for self-start initialisation.
 #'
-#' Additional arguments (`...`) accepted when `method = "monoexponential"`:
-#'
-#' \describe{
-#'   \item{`use_time_delay`}{Logical; default is `TRUE` to attempt to fit a
-#'       4-parameter [SSmonoexp()] model with a time delay (`TD`). If the
-#'       4-parameter fit fails, or if `use_time_delay = FALSE`, fits a
-#'       reduced 3-parameter model.}
-#'   \item{`...`}{Other arguments passed to [stats::nls()] 
-#'       `<NOT YET IMPLEMENTED>`.} 
-#' }
+#' Other arguments (`...`) passed to [stats::nls()] are `<NOT YET IMPLEMENTED>`.
 #'
 #' ## method = "logistic"
 #'
@@ -190,14 +157,7 @@
 #' slow-onset / fast-tail responses. See [logistic()], [gompertz()],
 #' and [gompertz_left()] for the model families.
 #'
-#' Additional arguments (`...`) accepted when `method = "logistic"`:
-#'
-#' \describe{
-#'   \item{`shape`}{Character; the sigmoidal shape to fit. One of
-#'       `"symmetric"` (*default*), `"gompertz"`, or `"gompertz_left"`.}
-#'   \item{`...`}{Other arguments passed to [stats::nls()]
-#'       `<NOT YET IMPLEMENTED>`.}
-#' }
+#' Other arguments (`...`) passed to [stats::nls()] are `<NOT YET IMPLEMENTED>`.
 #'
 #' @returns A formatted table of printed results, with individual elements
 #'   accessible as a structured list of class *"mnirs_kinetics"* containing:
@@ -312,6 +272,7 @@ analyse_kinetics <- function(
 
 #' @rdname analyse_kinetics
 #' @usage NULL
+#' @inheritParams response_time
 #' @export
 analyse_kinetics.response_time <- function(
     data,
@@ -319,12 +280,12 @@ analyse_kinetics.response_time <- function(
     time_channel = NULL,
     method,
     t0 = NULL,
+    fraction = 0.5,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
     verbose = TRUE,
     ...
 ) {
-    args <- list(...)
     ## normalise input to named list of data frames
     data_list <- as_data_list(data)
 
@@ -335,7 +296,7 @@ analyse_kinetics.response_time <- function(
             nirs_channels = !!enquo(nirs_channels),
             time_channel = !!enquo(time_channel),
             t0 = t0,
-            fraction = args$fraction %||% 0.5,
+            fraction = fraction,
             direction = direction,
             end_fit_span = end_fit_span,
             verbose = verbose,
@@ -356,6 +317,7 @@ analyse_kinetics.response_time <- function(
 
 #' @rdname analyse_kinetics
 #' @usage NULL
+#' @inheritParams peak_slope
 #' @export
 analyse_kinetics.peak_slope <- function(
     data,
@@ -363,12 +325,16 @@ analyse_kinetics.peak_slope <- function(
     time_channel = NULL,
     method,
     t0 = NULL,
+    width = NULL,
+    span = NULL,
+    align = c("centre", "left", "right"),
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
+    partial = FALSE,
+    na.rm = FALSE,
     verbose = TRUE,
     ...
 ) {
-    args <- list(...)
     ## normalise input to named list of data frames
     data_list <- as_data_list(data)
 
@@ -379,13 +345,13 @@ analyse_kinetics.peak_slope <- function(
             nirs_channels = !!enquo(nirs_channels),
             time_channel = !!enquo(time_channel),
             t0 = t0,
-            width = args$width %||% NULL,
-            span = args$span %||% NULL,
-            align = args$align %||% "centre",
+            width = width,
+            span = span,
+            align = align,
             direction = direction,
             end_fit_span = end_fit_span,
-            partial = args$partial %||% FALSE,
-            na.rm = args$na.rm %||% FALSE,
+            partial = partial,
+            na.rm = na.rm,
             verbose = verbose,
             interval_name = names(data_list)[[.i]],
             bypass_checks = TRUE
@@ -404,6 +370,7 @@ analyse_kinetics.peak_slope <- function(
 
 #' @rdname analyse_kinetics
 #' @usage NULL
+#' @inheritParams analyse_monoexponential
 #' @export
 analyse_kinetics.monoexponential <- function(
     data,
@@ -411,6 +378,7 @@ analyse_kinetics.monoexponential <- function(
     time_channel = NULL,
     method,
     t0 = NULL,
+    use_time_delay = TRUE,
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
     verbose = TRUE,
@@ -418,7 +386,6 @@ analyse_kinetics.monoexponential <- function(
 ) {
     ## TODO: pass additional stats::nls() args
     ## TODO: implement `direction`
-    args <- list(...)
     ## normalise input to named list of data frames
     data_list <- as_data_list(data)
 
@@ -428,7 +395,7 @@ analyse_kinetics.monoexponential <- function(
             data = data_list[[.i]],
             nirs_channels = !!enquo(nirs_channels),
             time_channel = !!enquo(time_channel),
-            use_time_delay = args$use_time_delay %||% TRUE,
+            use_time_delay = use_time_delay,
             t0 = t0,
             end_fit_span = end_fit_span,
             verbose = verbose,
@@ -449,6 +416,7 @@ analyse_kinetics.monoexponential <- function(
 
 #' @rdname analyse_kinetics
 #' @usage NULL
+#' @inheritParams analyse_logistic
 #' @export
 analyse_kinetics.logistic <- function(
     data,
@@ -456,6 +424,7 @@ analyse_kinetics.logistic <- function(
     time_channel = NULL,
     method,
     t0 = NULL,
+    shape = c("symmetric", "gompertz", "gompertz_left"),
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
     verbose = TRUE,
@@ -463,7 +432,6 @@ analyse_kinetics.logistic <- function(
 ) {
     ## TODO: pass additional stats::nls() args
     ## TODO: implement `direction`
-    args <- list(...)
     ## normalise input to named list of data frames
     data_list <- as_data_list(data)
 
@@ -473,7 +441,7 @@ analyse_kinetics.logistic <- function(
             data = data_list[[.i]],
             nirs_channels = !!enquo(nirs_channels),
             time_channel = !!enquo(time_channel),
-            shape = args$shape %||% "symmetric",
+            shape = shape,
             t0 = t0,
             end_fit_span = end_fit_span,
             verbose = verbose,

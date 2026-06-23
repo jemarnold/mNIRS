@@ -16,7 +16,6 @@ analyse_peak_slope(
   end_fit_span = Inf,
   partial = FALSE,
   na.rm = FALSE,
-  channel_args = list(),
   verbose = TRUE,
   ...
 )
@@ -72,10 +71,6 @@ processes available samples within the local window. See \emph{Details}.}
 returned vector. If \code{TRUE}, ignores \code{NA}s and processes available valid
 samples within the local window. May return errors or warnings. (see
 \emph{Details}).}
-
-\item{channel_args}{An \emph{optional} named \code{list()} with names corresponding
-to \code{nirs_channels} for unique per-channel arguments that override the
-global defaults (see \emph{Details}).}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad

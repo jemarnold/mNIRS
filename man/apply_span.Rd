@@ -4,7 +4,7 @@
 \alias{apply_span}
 \title{apply span to resolved times and build interval_spec data frame}
 \usage{
-apply_span(interval_list, time_vec, span, verbose = TRUE)
+apply_span(interval_list, t_vec, span, verbose = TRUE)
 }
 \description{
 apply span to resolved times and build interval_spec data frame

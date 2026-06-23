@@ -4,7 +4,7 @@
 \alias{validate_t0}
 \title{Validate t0}
 \usage{
-validate_t0(t0, data, time_vec, verbose = TRUE, env = rlang::caller_env())
+validate_t0(t0, data, t_vec, verbose = TRUE, env = rlang::caller_env())
 }
 \description{
 Validate t0

@@ -4,7 +4,7 @@
 \alias{build_kinetics_results}
 \title{Gather per-interval \code{mnirs_kinetics} into results structure}
 \usage{
-build_kinetics_results(data_list, result_list, interval_names, method, call)
+build_kinetics_results(data_list, result_list, method, call)
 }
 \arguments{
 \item{data_list}{Named list of original interval data frames.}
@@ -18,7 +18,8 @@ A named list with: \code{coefficients}, \code{model}, \code{data},
 \description{
 Shared helper for \verb{analyse_kinetics.*} methods. Takes a list of
 per-interval (per-data frame) kinetics results data frames (each carrying
-\code{"fitted_data"}, \code{"channel_args"}, and \code{"diagnostics"} attributes), the
-original \code{data_list}, and interval names.
+\code{"fitted_data"}, \code{"channel_args"}, and \code{"diagnostics"} attributes) and the
+original \code{data_list}. Interval names are read from the \code{interval} column
+that each result data frame already carries.
 }
 \keyword{internal}

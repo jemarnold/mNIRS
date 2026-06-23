@@ -4,7 +4,7 @@
 \alias{resolve_interval}
 \title{resolve start/end into time value vectors (no span applied)}
 \usage{
-resolve_interval(start, end, time_vec, event_vec = NULL)
+resolve_interval(start, end, t_vec, event_vec = NULL)
 }
 \description{
 resolve start/end into time value vectors (no span applied)

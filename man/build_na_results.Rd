@@ -4,27 +4,19 @@
 \alias{build_na_results}
 \title{Build a standardised NA result for a failed channel}
 \usage{
-build_na_results(nirs_channel, na_coefs, all_args, n_params = 1L)
+build_na_results(na_coefs)
 }
 \arguments{
-\item{nirs_channel}{Character; column name of the channel.}
-
-\item{na_coefs}{A template 1-row \code{data.frame} with all \code{NA} values matching
-the method's coefficients columns.}
-
-\item{all_args}{Named list of resolved arguments (passed to
-\code{\link[=build_channel_args]{build_channel_args()}}).}
-
-\item{n_params}{Integer; number of model parameters (passed to
-\code{\link[=compute_diagnostics]{compute_diagnostics()}}).}
+\item{na_coefs}{A template 1-row \code{data.frame} of \code{NA} method coefficients
+(\emph{without} \code{nirs_channels}/\code{time_channel}, which are added upstream).}
 }
 \value{
-A named list with elements \code{coefficients}, \code{model},
-\code{fitted_data}, \code{diagnostics}, and \code{channel_args}.
+A named list with elements \code{coefs}, \code{model}, \code{fitted_data},
+and \code{diag}.
 }
 \description{
-Returns the 5-element list (\code{coefficients}, \code{model}, \code{fitted_data},
-\code{diagnostics}, \code{channel_args}) expected by \code{\link[=build_kinetics_results]{build_kinetics_results()}},
+Returns the method-specific \code{coefs}/\code{model}/\code{fitted_data}/\code{diag} list
+expected by \code{\link[=analyse_kinetics_channels]{analyse_kinetics_channels()}} when a model fit fails,
 populated with \code{NA}/\code{NULL} values.
 }
 \keyword{internal}
