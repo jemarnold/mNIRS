@@ -41,8 +41,9 @@ fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "
 \code{ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))}
 
 \code{tau} is the time constant, equal to the reciprocal of the rate constant
-\code{k} (\code{k = 1 / tau}). Common derived quantities include the mean response
-time \code{MRT = TD + tau} and the half-response time \code{HRT = TD + tau * log(2)}.
+\code{k} (\code{k = 1 / tau} in reciprocal units of \code{time_channel}; i.e. \verb{sec^-1s}).
+Common derived quantities include the mean response time \code{MRT = TD + tau}
+and the half-response time \code{HRT = TD + tau * log(2)}.
 }
 }
 \examples{

@@ -25,8 +25,9 @@
 #'   `ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))`
 #'
 #' `tau` is the time constant, equal to the reciprocal of the rate constant
-#' `k` (`k = 1 / tau`). Common derived quantities include the mean response
-#' time `MRT = TD + tau` and the half-response time `HRT = TD + tau * log(2)`.
+#' `k` (`k = 1 / tau` in reciprocal units of `time_channel`; i.e. `sec^-1s`).
+#' Common derived quantities include the mean response time `MRT = TD + tau`
+#' and the half-response time `HRT = TD + tau * log(2)`.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -360,7 +361,7 @@ analyse_monoexponential <- function(
                 A          = coefs[["A"]],
                 B          = coefs[["B"]],
                 tau        = coefs[["tau"]],
-                k          = 1 / coefs[["tau"]],
+                k          = 1 / coefs[["tau"]], ## time_channel units^-1
                 TD         = TD_val,
                 MRT        = MRT_val,
                 HRT        = HRT_val,
