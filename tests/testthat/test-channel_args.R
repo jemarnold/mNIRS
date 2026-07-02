@@ -61,19 +61,16 @@ test_that("resolve_channel_args lists without channel names stay global", {
 })
 
 test_that("resolve_channel_args informs on omitted channels", {
-    ## a per-channel list with no unnamed fallback omits channels
-    ## ! implement single channel bypass matching error message
-    expect_message(
-        resolve_channel_args(
-            c("smo2", "o2hb"),
-            args = list(width = list(smo2 = 5)),
-            verbose = TRUE
-        ),
-        "width.*o2hb"
-    )
+    ## unnamed channel omits channel and produces a warning
+    resolve_channel_args(
+        nirs_channels = c("smo2", "o2hb"),
+        args = list(width = list(smo2 = 5)),
+        verbose = TRUE
+    ) |>
+        expect_warning("width.*o2hb.*not specified")
 
-    ## an unnamed fallback covers omitted channels: no message
-    expect_no_message(
+    ## an unnamed fallback covers omitted channels: no warning
+    expect_no_warning(
         resolve_channel_args(
             c("smo2", "o2hb"),
             args = list(width = list(10, smo2 = 5)),
@@ -117,16 +114,26 @@ test_that("resolve_channel_args choices match like match.arg", {
     )
 })
 
-test_that("resolve_channel_args treats non-channel lists as global", {
-    ## named list whose names are not channels (e.g. nls control)
-    control <- list(maxiter = 100)
-    out <- resolve_channel_args(
+test_that("resolve_channel_args warns on non-channel list names", {
+    ## named list with no recognised channel names is a per-channel map:
+    ## unknown names warned and ignored, channels fall back to defaults
+    resolve_channel_args(
         c("smo2", "o2hb"),
-        args = list(control = control),
-        verbose = FALSE
+        args = list(width = list(typo = 7)),
+        verbose = TRUE
+    ) |>
+        expect_warning("typo.*not recognised") |>
+        expect_warning("width.*not specified")
+
+    out <- suppressWarnings(
+        resolve_channel_args(
+            c("smo2", "o2hb"),
+            args = list(width = list(typo = 7)),
+            verbose = TRUE
+        )
     )
-    expect_equal(out$smo2$control, control)
-    expect_equal(out$o2hb$control, control)
+    expect_null(out$smo2$width)
+    expect_null(out$o2hb$width)
 
     ## unnamed vectors are always global
     out <- resolve_channel_args(
@@ -139,23 +146,24 @@ test_that("resolve_channel_args treats non-channel lists as global", {
 })
 
 test_that("resolve_channel_args warns on partly matching list names", {
-    expect_warning(
+    resolve_channel_args(
+        c("smo2", "o2hb"),
+        args = list(width = list(smo2 = 5, typo = 7)),
+        verbose = TRUE
+    ) |>
+        expect_warning("typo.*not recognised") |>
+        expect_warning("width.*o2hb.*not specified")
+
+    ## unrecognised names are ignored; valid keys resolve per channel
+    out <- suppressWarnings(
         resolve_channel_args(
             c("smo2", "o2hb"),
             args = list(width = list(smo2 = 5, typo = 7)),
             verbose = TRUE
-        ),
-        "global"
+        )
     )
-
-    ## the partly matching list is applied globally
-    out <- suppressWarnings(resolve_channel_args(
-        c("smo2", "o2hb"),
-        args = list(width = list(smo2 = 5, typo = 7)),
-        verbose = TRUE
-    ))
-    expect_equal(out$smo2$width, list(smo2 = 5, typo = 7))
-    expect_equal(out$o2hb$width, list(smo2 = 5, typo = 7))
+    expect_equal(out$smo2$width, 5)
+    expect_null(out$o2hb$width)
 })
 
 test_that("resolve_channel_args resolves per group with group_channels", {
@@ -271,7 +279,7 @@ test_that("validate_group_channels aborts on invalid groups", {
     ## unknown members
     expect_error(
         validate_group_channels(channels, list(c("smo2", "typo"))),
-        "unknown channel"
+        "typo.*not recognised"
     )
 
     ## duplicated members across groups
@@ -294,6 +302,6 @@ test_that("validate_group_channels reports errors from the caller's `env`", {
     caller <- function() {
         validate_group_channels(channels, list(c("smo2", "typo")))
     }
-    err <- expect_error(caller(), "unknown")
+    err <- expect_error(caller(), "typo.*not recognised")
     expect_equal(rlang::call_name(conditionCall(err)), "caller")
 })

@@ -111,7 +111,7 @@ rescale_mnirs <- function(
     }
     nirs_channels <- validate_nirs_channels(nirs_parsed, data, verbose)
     group_channels <- validate_group_channels(
-        nirs_channels, enquo(group_channels), data, verbose
+        nirs_channels, enquo(group_channels), data
     )
 
     ## broadcast global args, applying per-channel/per-group overrides

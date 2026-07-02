@@ -455,14 +455,13 @@ test_that("shift_mnirs aborts on intra-group argument conflict", {
 })
 
 test_that("shift_mnirs informs when channel omitted from args", {
-    skip("WIP")
     data <- tibble(
         time = 1:10,
         ch1 = 1:10,
         ch2 = 11:20
     )
 
-    #! FIX LOTS OF EDGE CASES
+    #! FIX LOTS OF EDGE CASES?
     shift_mnirs(
         data,
         nirs_channels = c(ch1, ch2),
@@ -471,17 +470,25 @@ test_that("shift_mnirs informs when channel omitted from args", {
         width = list(ch1 = 1),
         position = "min",
         group_channels = "distinct"
-    )
+    ) |> 
+        expect_warning("`to`:.*ch2.*not specified") |>
+        expect_warning("`width`:.*ch2.*not specified") |>
+        expect_error("Shift value undefined")
 
+    ## unrecognised names warned and ignored; all channels omitted from
+    ## `to` leaves the shift undefined
     shift_mnirs(
         data,
         nirs_channels = c(ch1, ch2),
         time_channel = time,
-        to = list(g = 0),
-        width = list(ch1 = 1),
+        to = list(ch3 = 0),
+        width = 1,
         position = "min",
-        group_channels = list(g = ch1)
-    )
+        group_channels = "distinct"
+    ) |>
+        expect_warning("`to`:.*ch3.*not recognised") |>
+        expect_warning("`to`:.*not specified") |>
+        expect_error("Shift value undefined")
 })
 
 test_that("shift_mnirs `to` overrides `by` once, for the first group", {

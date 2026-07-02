@@ -2,13 +2,13 @@
 #'
 #' Broadcasts global argument values across `nirs_channels`, applying
 #' per-channel overrides where an argument is supplied as a named `list()`
-#' keyed by channel name. An argument is treated as per-channel only when
-#' it is a `list()` whose named elements all match `nirs_channels` or group
-#' names, with at most one unnamed element acting as the fallback for
-#' unlisted channels (e.g. `width = list(5, q = 7)` gives `q` 7 and every
-#' other channel 5). Any other value (including unnamed vectors and named
-#' lists such as `control = list(maxiter = 100)`) is applied globally to
-#' every channel.
+#' keyed by channel name. An argument is treated as per-channel when it is
+#' a `list()` with at least one named element, with at most one unnamed
+#' element acting as the fallback for unlisted channels (e.g.
+#' `width = list(5, q = 7)` gives `q` 7 and every other channel 5). Names
+#' must match `nirs_channels` or group names; unrecognised names are
+#' warned about and ignored. Any other value (unnamed vectors and fully
+#' unnamed lists) is applied globally to every channel.
 #'
 #' @param nirs_channels Character vector of resolved channel names.
 #' @param args Named list of per-channel-capable arguments. Each element is
@@ -28,7 +28,7 @@
 #'   resolved per group: a group-name key or any member-channel key
 #'   applies to the whole group, and conflicting member values within one
 #'   group abort.
-#' @param call The calling environment, used to report errors as coming
+#' @param env The calling environment, used to report errors as coming
 #'   from the user-facing function (e.g. [rescale_mnirs()]).
 #' @inheritParams validate_mnirs
 #'
@@ -48,69 +48,55 @@ resolve_channel_args <- function(
 ) {
     ## units of resolution: single channels, or groups when supplied
     units <- group_channels %||% setNames(as.list(nirs_channels), nirs_channels)
-    valid_ch <- c(nirs_channels, names(units))
+    valid_ch <- unique(c(nirs_channels, names(units)))
 
-    ## a list is a per-channel map only when at least one element names a
-    ## known channel or group, every named element is a known name, and at
-    ## most one element is unnamed (the fallback for unlisted channels)
-    is_per_channel <- function(.a) {
+    ## an argument is a per-channel map when it is a list with at least one
+    ## named element and at most one unnamed element (the fallback for
+    ## unlisted channels); anything else (unnamed vectors and fully
+    ## unnamed lists) is global
+    per_channel <- vapply(args, \(.a) {
         if (!is.list(.a) || is.data.frame(.a)) {
             return(FALSE)
         }
         named <- nzchar(names(.a))
-        any(named) && sum(!named) <= 1L && all(names(.a)[named] %in% valid_ch)
-    }
+        any(named) && sum(!named) <= 1L
+    }, logical(1))
 
-    ## warn when a list arg looks like a mistyped per-channel map
+    ## warn once per per-channel arg: unrecognised channel names are
+    ## ignored; omitted channels with no unnamed fallback fall back to
+    ## the argument's formal default
     if (verbose) {
-        invisible(lapply(names(args), \(.nm) {
-            .a <- args[[.nm]]
-            names <- names(.a)
-            if (
-                is.list(.a) && !is.data.frame(.a) && length(names) > 0L &&
-                    !is_per_channel(.a) && any(names %in% valid_ch)
-            ) {
-                unknown <- setdiff(names[nzchar(names)], valid_ch)
+        lapply(names(args)[per_channel], \(.nm) {
+            keys <- names(args[[.nm]])
+            unknown <- setdiff(keys[nzchar(keys)], valid_ch)
+            if (length(unknown) > 0L) {
                 cli_warn(c(
-                    "!" = "{.arg {(.nm)}} treated as a global value: \\
-                    name{?s} {.val {unknown}} not found in \\
-                    {.arg nirs_channels}.",
-                    "i" = "Per-channel lists must be named by \\
-                    {.arg nirs_channels}, with only one unnamed default value."
+                    "!" = "{.arg {(.nm)}}: channel{?s} {.val {unknown}} \\
+                    not recognised.",
+                    "i" = "Per-channel named argument lists must match \\
+                    {.arg nirs_channels} exactly."
                 ), call = env)
             }
-        }))
-    }
-
-    ## inform when a per-channel list omits channels and gives no unnamed
-    ## fallback; those channels fall back to the argument's formal default
-    if (verbose) {
-        invisible(lapply(names(args), \(.nm) {
-            .a <- args[[.nm]]
-            if (!is_per_channel(.a) || any(!nzchar(names(.a)))) {
-                return(invisible())
+            if (all(nzchar(keys))) {
+                omitted <- names(units)[!vapply(names(units), \(.key) {
+                    any(c(.key, units[[.key]]) %in% keys)
+                }, logical(1))]
+                if (length(omitted) > 0L) {
+                    cli_warn(c(
+                        "i" = "{.arg {(.nm)}}: channel{?s} {.val {omitted}} \\
+                        not specified."
+                    ), call = env)
+                }
             }
-            omitted <- names(units)[vapply(names(units), \(.key) {
-                length(intersect(names(.a), c(.key, units[[.key]]))) == 0L
-            }, logical(1))]
-            if (length(omitted) > 0L) {
-                cli_inform(c(
-                    "i" = "{.arg {(.nm)}}: channel{?s} {.val {omitted}} \\
-                    not listed and will not be processed."
-                ))
-            }
-        }))
+        })
     }
 
     ## resolve one argument for one channel/group
-    resolve_one <- function(.a, .nm, .key, .members) {
-        if (is_per_channel(.a)) {
-            ## the lone unnamed element is the fallback for unlisted channels
-            unnamed <- .a[!nzchar(names(.a))]
-            default_val <- if (length(unnamed)) unnamed[[1L]] else NULL
+    resolve_one <- function(.a, .nm, .key) {
+        if (per_channel[[.nm]]) {
             ## group-name key preferred, then member-channel keys
-            hits <- .a[intersect(names(.a), c(.key, .members))]
-            if (length(hits) > 1L && length(unique(hits)) > 1L) {
+            hits <- .a[intersect(names(.a), c(.key, units[[.key]]))]
+            if (length(unique(hits)) > 1L) {
                 cli_abort(c(
                     "x" = "{.arg {(.nm)}} has conflicting values within \\
                     {.arg group_channels} = {.val {(.key)}}.",
@@ -118,11 +104,11 @@ resolve_channel_args <- function(
                     argument."
                 ), call = env)
             }
-            .a <- if (length(hits) > 0L) {
-                hits[[1L]] %||% default_val %||% defaults[[.nm]]
-            } else {
-                default_val %||% defaults[[.nm]]
-            }
+            ## the lone unnamed element is the fallback for unlisted channels
+            unnamed <- .a[!nzchar(names(.a))]
+            hit <- if (length(hits) > 0L) hits[[1L]]
+            fallback <- if (length(unnamed) > 0L) unnamed[[1L]]
+            .a <- hit %||% fallback %||% defaults[[.nm]]
         }
         ## match choice-type args; a full default vector resolves to its
         ## first element, matching `match.arg()` behaviour
@@ -137,15 +123,12 @@ resolve_channel_args <- function(
         return(.a)
     }
 
-    out <- lapply(names(units), \(.key) {
-        setNames(
-            lapply(names(args), \(.nm) {
-                resolve_one(args[[.nm]], .nm, .key, units[[.key]])
-            }),
-            names(args)
-        )
+    out <- lapply(setNames(nm = names(units)), \(.key) {
+        lapply(setNames(nm = names(args)), \(.nm) {
+            resolve_one(args[[.nm]], .nm, .key)
+        })
     })
-    return(setNames(out, names(units)))
+    return(out)
 }
 
 
@@ -166,7 +149,6 @@ resolve_channel_args <- function(
 #'   member.
 #' @param data A data frame for parsing bare-symbol group members.
 #' @param env Environment for symbol evaluation.
-#' @inheritParams validate_mnirs
 #'
 #' @returns A named list of character vectors covering all
 #'   `nirs_channels`, each channel appearing in exactly one group.
@@ -176,21 +158,16 @@ validate_group_channels <- function(
     nirs_channels,
     group_channels,
     data = NULL,
-    verbose = TRUE,
     env = rlang::caller_env()
 ) {
-    ## parse tidy eval input, preserving group names from list() calls
+    ## parse tidy eval input; parse_channel_name() drops list() names,
+    ## so restore group names from the original call
     if (rlang::is_quosure(group_channels)) {
         expr <- rlang::quo_get_expr(group_channels)
+        quo_env <- rlang::quo_get_env(group_channels)
+        group_channels <- parse_channel_name(group_channels, data, quo_env)
         if (rlang::is_call(expr, "list")) {
-            quo_env <- rlang::quo_get_env(group_channels)
-            group_channels <- lapply(rlang::call_args(expr), \(.arg) {
-                parse_channel_name(
-                    rlang::new_quosure(.arg, env = quo_env), data, env
-                )
-            })
-        } else {
-            group_channels <- parse_channel_name(group_channels, data, env)
+            names(group_channels) <- names(rlang::call_args(expr))
         }
     }
 
@@ -220,9 +197,10 @@ validate_group_channels <- function(
     unknown <- setdiff(members, nirs_channels)
     if (!is.character(members) || length(unknown) > 0L) {
         cli_abort(c(
-            "x" = "{.arg group_channels} contains unknown \\
-            channel{?s}: {.val {unknown}}.",
-            "i" = "Group members must match {.arg nirs_channels} exactly."
+            "x" = "{.arg group_channels}: channel{?s} {.val {unknown}} \\
+            not recognised.",
+            "i" = "Grouped channel names must match {.arg nirs_channels} \\
+            exactly."
         ), call = env)
     }
 
@@ -230,8 +208,8 @@ validate_group_channels <- function(
     if (anyDuplicated(members) > 0L) {
         dupes <- unique(members[duplicated(members)])
         cli_abort(c(
-            "x" = "Channel{?s} {.val {dupes}} assigned to more than one \\
-            group in {.arg group_channels}.",
+            "x" = "{.arg group_channels}: channel{?s} {.val {dupes}} \\
+            assigned to more than one group.",
             "i" = "Each channel may belong to one group only."
         ), call = env)
     }
@@ -244,8 +222,8 @@ validate_group_channels <- function(
 
     ## name unnamed groups by their first member
     names <- names(group_channels) %||% rep("", length(group_channels))
-    first_members <- vapply(group_channels, `[[`, "", 1L)
-    names[!nzchar(names)] <- first_members[!nzchar(names)]
+    unnamed <- !nzchar(names)
+    names[unnamed] <- vapply(group_channels[unnamed], `[[`, "", 1L)
 
     return(setNames(group_channels, names))
 }

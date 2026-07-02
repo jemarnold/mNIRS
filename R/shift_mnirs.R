@@ -81,8 +81,8 @@
 #'   If no unnamed fallback value in the list, channels not named in the list
 #'   will be returned un-processed (e.g. `span = list(hhb = 5)` will only
 #'   process `hhb`).
-#' - A `list()` whose names do not match `nirs_channels` or `group_channels`
-#'   (e.g. `control = list(maxiter = 100)`) is treated as a global value.
+#' - `list()` names not matching `nirs_channels` or `group_channels` are
+#'   warned about and ignored.
 #'
 #' @returns
 #' A [tibble][tibble::tibble-package] of class *"mnirs"* with metadata
@@ -145,7 +145,7 @@ shift_mnirs <- function(
     }
     nirs_channels <- validate_nirs_channels(nirs_parsed, data, verbose)
     group_channels <- validate_group_channels(
-        nirs_channels, enquo(group_channels), data, verbose
+        nirs_channels, enquo(group_channels), data
     )
     time_channel <- validate_time_channel(enquo(time_channel), data)
     t_vec <- data[[time_channel]]

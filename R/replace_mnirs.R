@@ -84,8 +84,8 @@
 #'   If no unnamed fallback value in the list, channels not named in the list
 #'   will be returned un-processed (e.g. `span = list(hhb = 5)` will only
 #'   process `hhb`).
-#' - A `list()` whose names do not match `nirs_channels` (e.g.
-#'   `control = list(maxiter = 100)`) is treated as a global value.
+#' - `list()` names not matching `nirs_channels` are warned about and
+#'   ignored.
 #'
 #' @returns `replace_mnirs()` return a [tibble][tibble::tibble-package] of 
 #' class `"mnirs"` with metadata available via `attributes()`.
