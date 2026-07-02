@@ -531,7 +531,7 @@ as_data_list <- function(data) {
         data_list <- dplyr::group_split(df_grp, .keep = TRUE)
 
         ## copy mnirs metadata down to each df in the list
-        ## ! need to test when a list has been rbinded and has vectors from original list
+        #! need to test when a list has been rbinded and has vectors from original list
         data_list <- lapply(data_list, \(.df) {
             create_mnirs_data(.df, attributes(data)[mnirs_metadata])
         })

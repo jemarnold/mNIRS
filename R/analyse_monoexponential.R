@@ -244,8 +244,8 @@ analyse_monoexponential <- function(
     data,
     nirs_channels = NULL,
     time_channel = NULL,
-    use_time_delay = TRUE, ## ! better arg name?
-    t0 = NULL, ## ! better arg name?
+    use_time_delay = TRUE, #! better arg name?
+    t0 = NULL, #! better arg name?
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
     verbose = TRUE,

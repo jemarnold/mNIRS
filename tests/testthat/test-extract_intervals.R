@@ -1,6 +1,6 @@
 # Mock mnirs data with attributes
 create_mock_mnirs <- function(n = 100, sample_rate = 10) {
-    df <- tibble::tibble(
+    df <- tibble(
         time = seq(0, (n - 1) / sample_rate, length.out = n),
         smo2_left = sin(time * 0.5) * 10 + 50,
         smo2_right = cos(time * 0.5) * 10 + 50,
@@ -30,7 +30,7 @@ create_mock_interval <- function(
         time_start + (n - 1) / sample_rate,
         length.out = n
     )
-    df <- tibble::tibble(
+    df <- tibble(
         time = t_vec,
         smo2_left = sin(t_vec) * 5 + 50,
         smo2_right = cos(t_vec) * 5 + 50
@@ -952,13 +952,13 @@ test_that("extract_df_list preserves metadata attributes", {
 
 ## zero_offset_data() ===============================================
 test_that("zero_offset_data shifts time channel by event time", {
-    df <- tibble::tibble(time = c(5, 6, 7, 8, 9), value = 1:5)
+    df <- tibble(time = c(5, 6, 7, 8, 9), value = 1:5)
     result <- zero_offset_data(df, time_channel = "time", t0 = 7)
     expect_equal(result$time, c(-2, -1, 0, 1, 2))
     expect_equal(result$value, 1:5) # other columns unchanged
 
     ## negative event times
-    df <- tibble::tibble(time = c(-5, -4, -3, -2, -1), value = 1:5)
+    df <- tibble(time = c(-5, -4, -3, -2, -1), value = 1:5)
     result <- zero_offset_data(df, time_channel = "time", t0 = -3)
     expect_equal(result$time, c(-2, -1, 0, 1, 2))
 })

@@ -349,7 +349,7 @@ test_that("filter_butter works visually", {
     noisy <- sin_wave + rnorm(100, 0, 0.3)
     filtered <- filter_butter(noisy, order = 2, W = 0.2)
 
-    ggplot2::ggplot(tibble::tibble()) +
+    ggplot2::ggplot(tibble()) +
         ggplot2::aes(x = x) +
         ggplot2::geom_line(ggplot2::aes(y = sin_wave, colour = "sin")) +
         ggplot2::geom_line(ggplot2::aes(y = noisy, colour = "noisy")) +

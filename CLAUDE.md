@@ -11,19 +11,6 @@
 - Don't run devtool commands.
 - Don't search for or read previous git commits, only look at current state.
 
-## Formatting
-
-- 80-character per line limit.
-- Use explicit `return()` for custom functions.
-
-## Comments/annotations
-- `## lower case comment`.
-- Briefly explain the purpose of the operation
-- Focus on user-facing information. Write for the caller, not the implementer.
-- Focus on the 'what' and 'why', not the 'how' when annotating code
-- Don't describe refactoring changes or reference prompt decisions.
-- Balance jargon and technical language so both a novice and an expert R user will be able to understand well.
-
 ### Documentation
 
 - Roxygen2 with markdown enabled (`Roxygen: list(markdown = TRUE)`). 
