@@ -452,59 +452,72 @@ select_rename_data <- function(
 }
 
 
-#' Standardise comma decimals to periods in character columns
-#' @keywords internal
-convert_type <- function(
-    data,
-    time_channel,
-    event_channel = NULL,
-    verbose = TRUE
-) {
-    colnames <- names(data)
-    ## convert decimal "," to "."
-    char_cols <- setdiff(
-        colnames[vapply(data, is.character, logical(1L))],
-        time_channel
-    )
-    for (col in char_cols) {
-        data.table::set(
-            data, j = col, value = gsub(",", ".", data[[col]], fixed = TRUE)
-        )
-    }
-
-    ## convert column types
-    data <- utils::type.convert(
-        data, na.strings = c("NA", ""), dec = ".", as.is = TRUE
-    )
-
-    ## coerce integer columns to numeric (except event_channel)
-    int_cols <- setdiff(
-        colnames[vapply(data, is.integer, logical(1L))],
-        event_channel
-    )
-    data[int_cols] <- lapply(data[int_cols], as.numeric)
-
-    ## standardise Inf/NaN/empty to NA
-    data[] <- lapply(data, \(.x) {
-        if (is.character(.x)) {
-            .x[.x %in% c("", "NA")] <- NA_character_
-        } else if (is.integer(.x)) {
-            .x[!is.finite(.x)] <- NA_integer_
-        } else if (is.numeric(.x)) {
-            .x[!is.finite(.x)] <- NA_real_
-        }
-        .x
-    })
-
-    return(data)
-}
-
-
 #' Remove Empty Rows and Columns
 #' @keywords internal
 remove_empty_rows_cols <- function(data) {
     data <- data[rowSums(!is_empty(data)) > 0, , drop = FALSE]
     return(data[, colSums(!is_empty(data)) > 0, drop = FALSE])
+}
+
+
+#' Coerce column types by role: nirs numeric, event integer, others detected
+#' @keywords internal
+convert_type <- function(
+    data,
+    nirs_channels = NULL,
+    time_channel,
+    event_channel = NULL,
+    verbose = TRUE
+) {
+    ## convert decimal "," to "."
+    is_char <- vapply(data, is.character, logical(1L))
+    char_cols <- setdiff(names(data)[is_char], time_channel)
+    data[char_cols] <- lapply(
+        data[char_cols], gsub, pattern = ",", replacement = ".", fixed = TRUE
+    )
+
+    ## coerce by role, then standardise NA once:
+    ## - time_channel left unchanged for parse_time_channel
+    ## - nirs_channels  -> numeric
+    ## - event_channel  -> integer or character
+    ## - other columns  -> integer to numeric, otherwise unopinionated
+    data[] <- Map(\(.x, .nm) {
+        if (.nm %in% event_channel) {
+            .x <- utils::type.convert(
+                .x, na.strings = c("NA", ""), as.is = TRUE
+            )
+        } else if (.nm %in% nirs_channels) {
+            .x <- suppressWarnings(as.numeric(.x))
+        } else if (!.nm %in% time_channel) {
+            .x <- utils::type.convert(
+                .x, na.strings = c("NA", ""), as.is = TRUE
+            )
+            if (is.integer(.x)) {
+                .x <- as.numeric(.x)
+            }
+        }
+        ## standardise empty/NaN/Inf to NA by resulting type
+        if (is.character(.x)) {
+            .x[.x %in% c("", "NA")] <- NA_character_
+        } else {
+            .x[!is.finite(.x)] <- NA
+        }
+        .x
+    }, data, names(data))
+
+    ## warn per channel when nirs values are all coerced to NA
+    if (verbose) {
+        nirs_cols <- intersect(nirs_channels, names(data))
+        all_na <- vapply(data[nirs_cols], \(.x) all(is.na(.x)), logical(1L))
+        lapply(nirs_cols[all_na], \(.nm) {
+            cli_warn(c(
+                "!" = "Channel {.val {(.nm)}} values coerced to {.val {NA}}.",
+                "i" = "Check the source data contents should be numeric values."
+            ))
+        })
+    }
+
+    return(data)
 }
 
 
@@ -519,6 +532,17 @@ parse_time_channel <- function(
 ) {
     t_vec <- data[[time_channel]]
 
+    ## character time -> numeric (sample index / seconds) where numeric-like,
+    ## otherwise parse date-time formats to POSIXct
+    if (is.character(t_vec)) {
+        num <- suppressWarnings(as.numeric(t_vec))
+        t_vec <- if (any(!is.na(num))) {
+            num
+        } else {
+            as.POSIXct(t_vec, tryFormats = dttm_opts, optional = TRUE)
+        }
+    }
+
     ## fractional unix time to POSIXct coerced to local time zone
     if (is.numeric(t_vec) && all(t_vec <= 1, na.rm = TRUE)) {
         t_vec <- as.POSIXct(
@@ -530,11 +554,6 @@ parse_time_channel <- function(
     ## recalculate numeric time to start from zero
     if (zero_time && is.numeric(t_vec)) {
         t_vec <- t_vec - t_vec[1L]
-    }
-
-    ## character time to POSIXct
-    if (is.character(t_vec)) {
-        t_vec <- as.POSIXct(t_vec, tryFormats = dttm_opts, optional = TRUE)
     }
 
     ## preserve POSIXct timestamp and convert to numeric seconds

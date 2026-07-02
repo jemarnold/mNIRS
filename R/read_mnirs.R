@@ -181,7 +181,9 @@ read_mnirs <- function(
     ## remove empty (NA) columns and rows
     data <- remove_empty_rows_cols(data)
     ## convert char decimal "," to "." and convert column types
-    data <- convert_type(data, time_renamed, event_renamed, verbose)
+    data <- convert_type(
+        data, nirs_renamed, time_renamed, event_renamed, verbose
+    )
     ## convert POSIXct to numeric and/or recalc time from zero
     ## return list(data, start_timestamp) — start_timestamp from time_channel POSIXct
     time_list <- parse_time_channel(

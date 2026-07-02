@@ -617,7 +617,7 @@ test_that("detect_time_channel finds time column by name", {
         "Time"
     )
 
-    df <- tibble::tibble("hh:mm:ss" = 1:5, value = 6:10)
+    df <- tibble("hh:mm:ss" = 1:5, value = 6:10)
     expect_equal(
         detect_time_channel(df, verbose = FALSE),
         "hh:mm:ss"
@@ -856,12 +856,12 @@ test_that("select_rename_data() includes event channel", {
     expect_equal(result$event_channel, "Event")
 })
 
-test_that("select_rename_data() handles duplicate channel names", {
-    skip('currently returns "Channel names not detected error"')
-
+test_that("select_rename_data() handles un-renamed duplicate channels", {
     data <- data.frame(
         O2Hb = c("10"),
+        O2Hb = c("10"),
         Time = c("0.1"),
+        check.names = FALSE,
         stringsAsFactors = FALSE
     )
 
@@ -872,13 +872,13 @@ test_that("select_rename_data() handles duplicate channel names", {
             time_channel = "Time",
             verbose = TRUE
         ),
-        "Duplicated channel names"
+        "Duplicate channel names"
     )
 
     expect_equal(result$nirs_channel, c("O2Hb", "O2Hb_1"))
 })
 
-test_that("select_rename_data() handles duplicate data columns", {
+test_that("select_rename_data() handles renamed duplicate data columns", {
     data <- data.frame(
         O2Hb = c("10"),
         O2Hb = c("20"),
@@ -1008,22 +1008,20 @@ test_that("select_rename_data() prioritises custom names over data", {
 })
 
 ## convert_type() ================================================
-test_that("convert_type() coerces integer columns apart from event_channel", {
-    data <- data.frame(
+test_that("convert_type() applies unopinionated typing to data columns", {
+    data <- tibble(
         time = c(1, 2, 3),
-        lap = c(1.0, NA_real_, 2.0),
-        B = c(10, 20, 30),
-        x = c(10.5, 11.0, 11.5),
-        stringsAsFactors = FALSE
+        lap = c(1.0, NA_real_, 2.0),  ## event -> integer laps
+        B = c(10, 20, 30),            ## whole numbers -> double
+        x = c(10.5, 11.0, 11.5),      ## fractional -> double
     )
 
-    result <- convert_type(data, "time", event_channel = "lap")
+    result <- convert_type(data, time_channel = "time", event_channel = "lap")
 
-    expect_type(result$time, "double")
-    expect_type(result$B, "double")
+    expect_type(result$time, "double")   ## time left unchanged
     expect_type(result$lap, "integer")
     expect_equal(result$lap, c(1L, NA_integer_, 2L))
-    ## other columns unaffected
+    expect_type(result$B, "double")     ## unopinionated: whole -> duble
     expect_type(result$x, "double")
 })
 
@@ -1036,7 +1034,7 @@ test_that("convert_type() standardises empty and 'NA' strings to NA", {
         stringsAsFactors = FALSE
     )
 
-    result <- convert_type(data, "time")
+    result <- convert_type(data, time_channel = "time")
 
     expect_equal(result$A, c("a", NA_character_, "b"))
     expect_equal(result$B, c("x", NA_character_, "y"))
@@ -1049,22 +1047,21 @@ test_that("convert_type() standardises Inf/NaN to NA in numeric cols", {
         stringsAsFactors = FALSE
     )
 
-    result <- convert_type(data, "time")
+    result <- convert_type(data, time_channel = "time")
 
     expect_type(result$A, "double")
     expect_equal(result$A, c(1.5, NA_real_, NA_real_, NA_real_))
 })
 
 test_that("convert_type() standardises non-finite integers to NA", {
-    ## event_channel kept as integer; other int cols coerced to numeric
-    data <- data.frame(
+    ## event and whole-number cols resolve to integer via type.convert
+    data <- tibble(
         time = c("1", "2", "3"),
         lap = c("1", NA, "2"),
         B = c("10", "20", "30"),
-        stringsAsFactors = FALSE
     )
 
-    result <- convert_type(data, "time", event_channel = "lap")
+    result <- convert_type(data, time_channel = "time", event_channel = "lap")
 
     expect_type(result$lap, "integer")
     expect_equal(result$lap, c(1L, NA_integer_, 2L))
@@ -1078,9 +1075,65 @@ test_that("convert_type() preserves valid numeric values", {
         stringsAsFactors = FALSE
     )
 
-    result <- convert_type(data, "time")
+    result <- convert_type(data, time_channel = "time")
     expect_equal(result$A, c(0, 0))
 })
+
+test_that("convert_type() forces nirs_channels to numeric", {
+    data <- tibble(
+        time = c("1", "2", "3"),
+        smo2 = c("55", "< 0.5", "60"),  ## qualifier in a signal col
+        other = c("55", "< 0.5", "60"),  ## same values, not a signal
+        label = c("Start", "Lap", "Stop")
+    )
+
+    result <- convert_type(data, nirs_channels = "smo2", time_channel = "time")
+
+    ## specified `nirs_channels` coerced to numeric
+    expect_type(result$smo2, "double")
+    expect_equal(result$smo2, c(55, NA_real_, 60))
+    ## partly-numeric col type.converted without opinion
+    expect_type(result$other, "character")
+    expect_equal(result$other, data$other)
+    ## non-signal text col unaffected
+    expect_type(result$label, "character")
+    expect_equal(result$label, c("Start", "Lap", "Stop"))
+})
+
+test_that("convert_type() warns per nirs channel coerced to all NA", {
+    data <- tibble(
+        time = c("1", "2", "3"),
+        smo2 = c("a", "b", "c"),   ## non-numeric -> all NA
+        hhb = c("x", "y", "z"),    ## non-numeric -> all NA
+        o2hb = c("55", "z", "60"), ## partly numeric -> kept
+    )
+
+    expect_warning(
+        result <- convert_type(
+            data,
+            nirs_channels = c("smo2", "hhb", "o2hb"),
+            time_channel = "time"
+        ),
+        "smo2"
+    ) |> 
+        expect_warning("hhb")
+    expect_equal(result$smo2, rep(NA_real_, 3))
+    expect_equal(result$o2hb, c(55, NA_real_, 60))
+})
+
+test_that("convert_type() all-NA warning respects verbose = FALSE", {
+    data <- tibble(
+        time = c("1", "2"),
+        smo2 = c("a", "b"),
+    )
+
+    expect_no_warning(
+        convert_type(
+            data, nirs_channels = "smo2", time_channel = "time", verbose = FALSE
+        )
+    )
+})
+
 
 ## remove_empty_rows_cols() ===========================================
 test_that("remove_empty_rows_cols() removes empty rows & cols", {
@@ -1227,6 +1280,14 @@ test_that("parse_time_channel() returns a list with $data and $start_timestamp",
     expect_type(result, "list")
     expect_named(result, c("data", "start_timestamp"))
     expect_s3_class(result$data, "data.frame")
+})
+
+test_that("parse_time_channel() coerces numeric-string time to numeric", {
+    data <- data.frame(time = c("0", "1", "2"), stringsAsFactors = FALSE)
+    result <- parse_time_channel(data, "time")
+
+    expect_type(result$data$time, "double")
+    expect_equal(result$data$time, c(0, 1, 2))
 })
 
 test_that("parse_time_channel() preserves numeric time (zero_time = FALSE)", {
@@ -1506,7 +1567,9 @@ test_that("parse_time_channel() returns local time zonel", {
         event_renamed <- renamed_list$event_channel
 
         data <- remove_empty_rows_cols(data)
-        data <- convert_type(data, time_renamed, event_renamed, verbose = FALSE)
+        data <- convert_type(
+            data, nirs_renamed, time_renamed, event_renamed, verbose = FALSE
+        )
         time_list <- parse_time_channel(
             data,
             time_renamed,
@@ -2316,7 +2379,7 @@ test_that("read_mnirs VO2master with ',' decimals returns numeric", {
     expect_all_true(vapply(df_raw, is.character, logical(1L)))
 
     ## should convert decimal "," to numeric
-    df <- convert_type(df_raw, time_channel)
+    df <- convert_type(df_raw, time_channel = time_channel)
     expect_all_true(vapply(df[, -c(1:2)], is.numeric, logical(1L)))
 
     ## integrated test
