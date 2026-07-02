@@ -146,39 +146,40 @@ plot.mnirs <- function(
 
 
 #' Validate and bind a list of mnirs data frames for plotting
+#' @inheritParams validate_mnirs
 #' @keywords internal
-as_plot_data <- function(x) {
+as_plot_data <- function(x, env = rlang::caller_env()) {
     if (length(x) == 0L) {
         cli_abort(c(
             "x" = "{.fn plot.mnirs} must contain at least one \\
             {col_blue('\"mnirs\"')} data frame."
-        ))
+        ), call = env)
     }
 
     if (any(!vapply(x, is.data.frame, logical(1)))) {
         cli_abort(c(
             "x" = "{.fn plot.mnirs} must contain all {col_blue('\"mnirs\"')} \\
             data frames."
-        ))
+        ), call = env)
     }
 
     ## validate time_channel is consistent across elements
     time_channels <- vapply(x, \(.df) {
         attr(.df, "time_channel") %||% NA_character_
     }, character(1))
-    
+
     if (anyNA(time_channels)) {
         cli_abort(c(
             "x" = "All elements of {.fn plot.mnirs} must have a \\
             {.field time_channel} attribute."
-        ))
+        ), call = env)
     }
     if (length(unique(time_channels)) > 1L) {
         cli_abort(c(
             "x" = "All elements of {.fn plot.mnirs} must share the same \\
             {.field time_channel}.",
             "i" = "Found: {.val {unique(time_channels)}}."
-        ))
+        ), call = env)
     }
 
     ## auto-name unnamed list elements

@@ -287,8 +287,10 @@ analyse_kinetics.response_time <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## report conditions as coming from the user-facing generic
+    env <- sys.call(-1)
     ## normalise input to named list of data frames
-    data_list <- as_data_list(data)
+    data_list <- as_data_list(data, env = env)
 
     ## iterate over each interval
     result_list <- lapply(seq_along(data_list), \(.i) {
@@ -302,7 +304,8 @@ analyse_kinetics.response_time <- function(
             end_fit_span = end_fit_span,
             verbose = verbose,
             interval_name = names(data_list)[[.i]],
-            bypass_checks = TRUE
+            bypass_checks = TRUE,
+            env = env
         )
     })
 
@@ -340,8 +343,10 @@ analyse_kinetics.peak_slope <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## report conditions as coming from the user-facing generic
+    env <- sys.call(-1)
     ## normalise input to named list of data frames
-    data_list <- as_data_list(data)
+    data_list <- as_data_list(data, env = env)
 
     ## iterate over each interval
     result_list <- lapply(seq_along(data_list), \(.i) {
@@ -359,7 +364,8 @@ analyse_kinetics.peak_slope <- function(
             na.rm = na.rm,
             verbose = verbose,
             interval_name = names(data_list)[[.i]],
-            bypass_checks = TRUE
+            bypass_checks = TRUE,
+            env = env
         )
     })
 
@@ -395,8 +401,10 @@ analyse_kinetics.monoexponential <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## report conditions as coming from the user-facing generic
+    env <- sys.call(-1)
     ## normalise input to named list of data frames
-    data_list <- as_data_list(data)
+    data_list <- as_data_list(data, env = env)
 
     ## iterate over each interval
     result_list <- lapply(seq_along(data_list), \(.i) {
@@ -409,7 +417,8 @@ analyse_kinetics.monoexponential <- function(
             end_fit_span = end_fit_span,
             verbose = verbose,
             interval_name = names(data_list)[[.i]],
-            bypass_checks = TRUE
+            bypass_checks = TRUE,
+            env = env
         )
     })
 
@@ -445,8 +454,10 @@ analyse_kinetics.logistic <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## report conditions as coming from the user-facing generic
+    env <- sys.call(-1)
     ## normalise input to named list of data frames
-    data_list <- as_data_list(data)
+    data_list <- as_data_list(data, env = env)
 
     ## iterate over each interval
     result_list <- lapply(seq_along(data_list), \(.i) {
@@ -459,7 +470,8 @@ analyse_kinetics.logistic <- function(
             end_fit_span = end_fit_span,
             verbose = verbose,
             interval_name = names(data_list)[[.i]],
-            bypass_checks = TRUE
+            bypass_checks = TRUE,
+            env = env
         )
     })
 

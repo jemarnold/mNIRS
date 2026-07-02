@@ -56,8 +56,9 @@
 #' @param msg1,msg2 A character string appended to the [cli::cli_abort()]
 #'   message when numeric validation fails.
 #'
-#' @param env The calling environment, used to report errors and warnings
-#'   as coming from the user-facing function rather than the validator.
+#' @param env The calling environment or a defused call, used to report
+#'   errors and warnings as coming from the user-facing function rather
+#'   than the validator.
 #'
 #' @inheritParams read_mnirs
 #'
@@ -114,7 +115,7 @@ validate_numeric <- function(
         return(invisible(NULL))
     }
 
-    name <- substitute(x)
+    name <- rlang::as_label(substitute(x))
 
     ## cheap early type check
     if (!is.numeric(x)) {
@@ -178,7 +179,8 @@ validate_mnirs_data <- function(
 #'
 #' @param channel A quosure from `rlang::enquo()`.
 #' @param data A data frame for tidyselect context.
-#' @param env Environment for symbol evaluation.
+#' @param env Environment for symbol evaluation (typically the quosure
+#'   environment).
 #'
 #' @returns A character vector, list of character vectors, or `NULL`.
 #'
@@ -247,7 +249,9 @@ validate_nirs_channels <- function(
 ) {
     ## parse tidy eval input
     if (rlang::is_quosure(nirs_channels)) {
-        nirs_channels <- parse_channel_name(nirs_channels, data, env)
+        nirs_channels <- parse_channel_name(
+            nirs_channels, data, rlang::quo_get_env(nirs_channels)
+        )
     }
     nirs_unlisted <- unlist(nirs_channels)
 
@@ -260,7 +264,7 @@ validate_nirs_channels <- function(
                 "i" = "{.arg nirs_channels} = \\
                 {col_blue({deparse(nirs_unlisted)})} \\
                 grouped together from metadata."
-            ))
+            ), call = env)
         }
     }
 
@@ -310,7 +314,9 @@ validate_time_channel <- function(
 ) {
     ## parse tidy eval input
     if (rlang::is_quosure(time_channel)) {
-        time_channel <- parse_channel_name(time_channel, data, env)
+        time_channel <- parse_channel_name(
+            time_channel, data, rlang::quo_get_env(time_channel)
+        )
     }
 
     ## if not defined, check metadata
@@ -358,7 +364,9 @@ validate_event_channel <- function(
 ) {
     ## parse tidy eval input
     if (rlang::is_quosure(event_channel)) {
-        event_channel <- parse_channel_name(event_channel, data, env)
+        event_channel <- parse_channel_name(
+            event_channel, data, rlang::quo_get_env(event_channel)
+        )
     }
     ## if not defined, check metadata
     if (is.null(event_channel)) {
@@ -459,7 +467,7 @@ validate_sample_rate <- function(
             cli_inform(c(
                 "!" = "Estimated {.arg sample_rate} = {.val {sample_rate}} Hz.",
                 "i" = "Define {.arg sample_rate} explicitly to override."
-            ))
+            ), call = env)
         }
     }
 
@@ -512,7 +520,7 @@ validate_width_span <- function(
     if (verbose && !is.null(width) && !is.null(span)) {
         cli_inform(c(
             "i" = "{.arg width} = {.val {width}} overrides {.arg span}."
-        ))
+        ), call = env)
     }
 }
 

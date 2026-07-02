@@ -176,7 +176,8 @@ validate_group_channels <- function(
         shortcut <- rlang::arg_match0(
             arg = group_channels[[1L]],
             values = c("ensemble", "distinct"),
-            arg_nm = "group_channels"
+            arg_nm = "group_channels",
+            error_call = env
         )
         group_channels <- if (shortcut == "ensemble") {
             list(nirs_channels)

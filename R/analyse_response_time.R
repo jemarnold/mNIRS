@@ -91,14 +91,18 @@ response_time <- function(
     verbose = TRUE,
     ...
 ) {
+    ## internal callers pass `env` through `...` to report conditions
+    ## as coming from the user-facing function
+    env <- list(...)$env %||% environment()
     validate_numeric(
-        fraction, 1L, c(0, 1), msg2 = "between {col_blue('[0, 1]')}."
+        fraction, 1L, c(0, 1), msg2 = "between {col_blue('[0, 1]')}.",
+        env = env
     )
     direction <- match.arg(direction)
     args <- list(...)
 
     if (!(args$bypass_checks %||% FALSE)) {
-        validate_x_t(x, t, allow_na = TRUE)
+        validate_x_t(x, t, allow_na = TRUE, env = env)
         if (missing(verbose)) {
             verbose <- getOption("mnirs.verbose", default = TRUE)
         }
@@ -109,14 +113,14 @@ response_time <- function(
     baseline_idx <- which(t <= t0)
 
     if (!(args$bypass_checks %||% FALSE)) {
-        validate_numeric(t0, 1L)
+        validate_numeric(t0, 1L, env = env)
         if (length(baseline_idx) == 0L) {
             if (verbose) {
                 cli_warn(c(
                     "!" = "No observations where {.arg t} <= {.arg t0} = \\
                     {.val {t0}}.",
                     "i" = "{.code x[1]} used as response baseline."
-                ))
+                ), call = env)
             }
             baseline_idx <- 1L
             t0 <- t[baseline_idx]
@@ -126,7 +130,7 @@ response_time <- function(
                 "x" = "No observations in {.arg t} before {.arg t0}.",
                 "i" = "{.arg t0} must be specified within the range of \\
                 {.arg t}."
-            ))
+            ), call = env)
         }
     }
 
@@ -150,7 +154,7 @@ response_time <- function(
             cli_warn(c(
                 "!" = "No valid {.val {direction}} extremes after {.arg t0}. \\
                 Returning {.val {NA}}."
-            ))
+            ), call = env)
         }
         response_fitted <- NA_real_
     }
@@ -203,15 +207,18 @@ analyse_response_time <- function(
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
     verbose = TRUE,
-    ...
+    ...,
+    env = rlang::caller_env()
 ) {
     ## validation ==============================================
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    validate_mnirs_data(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
-    time_channel <- validate_time_channel(enquo(time_channel), data)
+    validate_mnirs_data(data, env = env)
+    nirs_channels <- validate_nirs_channels(
+        enquo(nirs_channels), data, verbose, env = env
+    )
+    time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
     t_vec <- data[[time_channel]]
     args <- list(...)
     ## interval label; falls back to the `data` argument name when unsupplied
@@ -227,19 +234,24 @@ analyse_response_time <- function(
             end_fit_span = end_fit_span
         ),
         choices = list(direction = c("auto", "positive", "negative")),
-        verbose = verbose
+        verbose = verbose,
+        env = env
     )
     ## validate resolved args once, before fitting any channel
-    per_channel <- validate_kinetics_args(per_channel, data, t_vec, verbose)
+    per_channel <- validate_kinetics_args(
+        per_channel, data, t_vec, verbose, env = env
+    )
 
     ## method-specific fit: fractional response time (no model fit)
     response_time_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
+        ## quote = TRUE so `env` (a defused call object for condition
+        ## attribution) is passed as-is, not evaluated by do.call
         response <- do.call(response_time, c(
             list(x = x_fit, t = t_fit),
             .a,
-            list(verbose = verbose, bypass_checks = TRUE),
+            list(verbose = verbose, bypass_checks = TRUE, env = env),
             args
-        ))
+        ), quote = TRUE)
 
         coefs <- data.frame(
             A              = response$A,
@@ -275,7 +287,8 @@ analyse_response_time <- function(
                 t        = t_fit[1L:3L], ## placeholder
                 fitted   = c(coefs$A, coefs$fitted, coefs$B),
                 n_params = 0L, ## invalid for response time method
-                verbose  = verbose
+                verbose  = verbose,
+                env      = env
             )
         )
     }
@@ -288,6 +301,7 @@ analyse_response_time <- function(
         response_time_fit,
         verbose,
         interval_name,
-        extra_args = args
+        extra_args = args,
+        env = env
     ))
 }

@@ -285,15 +285,20 @@ signif_pvalue <- function(
 #'
 #' @seealso [seq()], [range()]
 #'
+#' @inheritParams validate_mnirs
 #' @keywords internal
 seq_range <- function(
     x,
     by = 1,
     length.out = NULL,
-    direction = c("up", "down")
+    direction = c("up", "down"),
+    env = rlang::caller_env()
 ) {
     if (!is.null(length.out) && !missing(by)) {
-        cli_inform(c("i" = "{.arg length.out} overrides {.arg by}."))
+        cli_inform(
+            c("i" = "{.arg length.out} overrides {.arg by}."),
+            call = env
+        )
     }
     ## explicit `direction` wins; otherwise infer from sign of `by`
     direction <- if (missing(direction)) {

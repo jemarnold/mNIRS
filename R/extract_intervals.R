@@ -245,6 +245,8 @@ extract_intervals <- function(
         inherits(end, "mnirs_interval") && end$type %in% c("label", "lap")
     )
     
+    ## report conditions raised in handlers/lambdas from this function
+    env <- environment()
     if (uses_event_channel) {
         event_channel <- tryCatch(
             validate_event_channel(event_channel, data, required = TRUE),
@@ -254,7 +256,7 @@ extract_intervals <- function(
                     {.fn by_label} or {.fn by_lap}.",
                     "i" = "Specify column name containing {.cls character} \\
                     event labels or {.cls integer} lap numbers."
-                ))
+                ), call = env)
             }
         )
         event_vec <- data[[event_channel]]
@@ -278,7 +280,7 @@ extract_intervals <- function(
 
     ## expand parameters ====================================
     span <- if (is.list(span)) span else list(span)
-    span <- lapply(span, recycle_span)
+    span <- lapply(span, recycle_span, env = env)
     group_intervals <- if (is.list(group_intervals)) {
         group_intervals
     } else {

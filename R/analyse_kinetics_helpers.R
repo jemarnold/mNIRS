@@ -89,13 +89,15 @@ detect_direction <- function(
 #'       truncated at `t[extreme] + end_fit_span`.}
 #'   }
 #'
+#' @inheritParams validate_mnirs
 #' @keywords internal
 find_kinetics_idx <- function(
     x,
     t = seq_along(x),
     end_fit_span = Inf,
     direction = c("auto", "positive", "negative"),
-    ...
+    ...,
+    env = rlang::caller_env()
 ) {
     ## validation =================================================
     args <- list(...)
@@ -103,9 +105,10 @@ find_kinetics_idx <- function(
     direction <- match.arg(direction)
 
     if (!(args$bypass_checks %||% FALSE)) {
-        validate_x_t(x, t, allow_na = TRUE)
+        validate_x_t(x, t, allow_na = TRUE, env = env)
         validate_numeric(
-            end_fit_span, 1, c(0, Inf), msg1 = "one-element positive"
+            end_fit_span, 1, c(0, Inf), msg1 = "one-element positive",
+            env = env
         )
     }
 
@@ -156,7 +159,9 @@ find_kinetics_idx <- function(
 
     ## break t_valid into mod_span-width bins
     bin_breaks <- seq(t_valid[1L], t_valid[n_valid] + mod_span, mod_span)
-    bin_idx <- findInt_mnirs(t_valid, bin_breaks, rightmost.closed = TRUE)
+    bin_idx <- findInt_mnirs(
+        t_valid, bin_breaks, rightmost.closed = TRUE, env = env
+    )
 
     ## extreme index per bin (first occurrence for ties)
     bin_extreme_idx <- unname(tapply(seq_len(n_valid), bin_idx, \(.idx) {
@@ -329,7 +334,8 @@ analyse_kinetics_channels <- function(
     fit_fn,
     verbose = TRUE,
     interval_name = NA_character_,
-    extra_args = list()
+    extra_args = list(),
+    env = rlang::caller_env()
 ) {
     t_vec <- data[[time_channel]]
 
@@ -339,7 +345,7 @@ analyse_kinetics_channels <- function(
 
         ## filter for valid finite idx before first extreme + end_fit_span
         valid <- find_kinetics_idx(
-            data[[.nirs]], t_vec, .a$end_fit_span, .a$direction
+            data[[.nirs]], t_vec, .a$end_fit_span, .a$direction, env = env
         )
         .a$direction <- valid$direction
         x_fit <- data[[.nirs]][valid$idx]
@@ -393,7 +399,7 @@ analyse_kinetics_channels <- function(
                 poorly fitted or misparameterised model.",
                 "i" = "Check {.arg time_channel} and {.arg t0} values, or \\
                 consider using a different {.fn analyse_kinetics} method."
-            ))
+            ), call = env)
         }
     }
 
@@ -461,7 +467,8 @@ validate_kinetics_args <- function(
         if (!is.null(.a$align)) {
             .a$align <- sub("^center$", "centre", .a$align[[1L]])
             .a$align <- rlang::arg_match0(
-                .a$align, c("centre", "left", "right"), arg_nm = "align"
+                .a$align, c("centre", "left", "right"), arg_nm = "align",
+                error_call = env
             )
         }
         .a
@@ -506,15 +513,16 @@ build_na_results <- function(na_coefs) {
 
 
 #' Coerce `data` input to a named list of data frames
+#' @inheritParams validate_mnirs
 #' @keywords internal
-as_data_list <- function(data) {
+as_data_list <- function(data, env = rlang::caller_env()) {
     ## grouped data frame → split by groups
     if (inherits(data, "grouped_df")) {
         if (!requireNamespace("dplyr", quietly = TRUE)) {
             cli_abort(c(
                 "x" = "{.pkg dplyr} is required for grouped data frame input.",
                 "i" = "Install with {.code install.packages(\"dplyr\")}."
-            ))
+            ), call = env)
         }
 
         ## refactor grouping variables to order of appearance
@@ -549,7 +557,8 @@ as_data_list <- function(data) {
     if (!is.list(data) || !all(vapply(data, is.data.frame, logical(1)))) {
         cli_abort(
             "{.arg data} must be a list of data frames, or a single grouped \\
-            or ungrouped data frame."
+            or ungrouped data frame.",
+            call = env
         )
     }
 
@@ -574,6 +583,7 @@ as_data_list <- function(data) {
 #'   (`"monoexponential"`, `"sigmoidal"`), pass the number of free parameters
 #'   fit by the solver.
 #' @inheritParams peak_slope
+#' @inheritParams validate_mnirs
 #'
 #' @details
 #'
@@ -607,7 +617,8 @@ compute_diagnostics <- function(
     t,
     fitted,
     n_params = 1L,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     n_obs <- length(fitted)
 
@@ -633,7 +644,7 @@ compute_diagnostics <- function(
                 "!" = "{.arg x}, {.arg t}, and {.arg fitted} must be \\
                 {.cls numeric} vectors of equal lengths to return model \\
                 diagnostics."
-            ))
+            ), call = env)
         }
         return(return_na)
     }
@@ -726,7 +737,13 @@ compute_diagnostics <- function(
 #' @returns An updated model object with remaining free coefficients.
 #'
 #' @keywords internal
-fix_coefs <- function(model, data = NULL, verbose = TRUE, ...) {
+fix_coefs <- function(
+    model,
+    data = NULL,
+    verbose = TRUE,
+    ...,
+    env = rlang::caller_env()
+) {
     current_coefs <- coef(model)
     fixed_coefs <- list(...)
     fixed_names <- names(fixed_coefs)
@@ -738,7 +755,7 @@ fix_coefs <- function(model, data = NULL, verbose = TRUE, ...) {
         cli_warn(c(
             "x" = "Unknown model coefficient{?s}: {.val {invalid}}.",
             "i" = "Returning model with known coefficients."
-        ))
+        ), call = env)
     }
 
     ## extract data from the model environment
@@ -752,7 +769,9 @@ fix_coefs <- function(model, data = NULL, verbose = TRUE, ...) {
         )
 
         if (is.null(data)) {
-            cli_abort(c("x" = "Cannot retrieve original model data frame."))
+            cli_abort(c(
+                "x" = "Cannot retrieve original model data frame."
+            ), call = env)
         }
     }
 
@@ -764,7 +783,7 @@ fix_coefs <- function(model, data = NULL, verbose = TRUE, ...) {
         cli_abort(c(
             "x" = "Cannot update the model if all parameters are fixed. \\
             Nothing to estimate."
-        ))
+        ), call = env)
     }
 
     ## substitute fixed params into model_formula

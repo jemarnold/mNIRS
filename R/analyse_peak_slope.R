@@ -15,12 +15,13 @@ slope <- function(
     x,
     t = seq_along(x),
     na.rm = FALSE,
-    ...
+    ...,
+    env = rlang::caller_env()
 ) {
     ## validation =================================================
     args <- list(...)
     if (!(args$bypass_checks %||% FALSE)) {
-        validate_x_t(x, t, allow_na = TRUE)
+        validate_x_t(x, t, allow_na = TRUE, env = env)
     }
 
     if (length(x) < max(args$min_obs, 2L) || !na.rm && anyNA(x)) {
@@ -84,6 +85,8 @@ slope <- function(
 #' @returns `rolling_slope()` returns a numeric vector of rolling local slopes
 #'   in units of `x / t`, the same length as `x`.
 #'
+#' @inheritParams validate_mnirs
+#'
 #' @rdname rolling_slope
 #' @order 1
 #' @keywords internal
@@ -96,7 +99,8 @@ rolling_slope <- function(
     partial = FALSE,
     na.rm = FALSE,
     verbose = TRUE,
-    ...
+    ...,
+    env = rlang::caller_env()
 ) {
     ## validation =================================================
     args <- list(...)
@@ -111,18 +115,18 @@ rolling_slope <- function(
     )
 
     if (!(args$bypass_checks %||% FALSE)) {
-        validate_x_t(x, t, allow_na = TRUE)
+        validate_x_t(x, t, allow_na = TRUE, env = env)
 
         ## return NA with warning
         if (n == 0L) {
             if (verbose) {
-                cli_warn(insufficient_warn)
+                cli_warn(insufficient_warn, call = env)
             }
             return(numeric(0))
         }
         if (n == 1L || all(diff(t) == 0)) {
             if (verbose) {
-                cli_warn(insufficient_warn)
+                cli_warn(insufficient_warn, call = env)
             }
             return(rep(NA_real_, n))
         }
@@ -130,7 +134,7 @@ rolling_slope <- function(
         if (missing(verbose)) {
             verbose <- getOption("mnirs.verbose", default = TRUE)
         }
-        validate_width_span(width, span, verbose)
+        validate_width_span(width, span, verbose, env = env)
     }
 
     ## min_obs default to estimated width when span is specified
@@ -139,23 +143,23 @@ rolling_slope <- function(
     } else {
         ## less strict span_width - 2 to allow start & end buffer
         ## with irregular t values
-        max(width %||% (floor(span * estimate_sample_rate(t)) - 2L), 2L)
+        max(width %||% (floor(span * estimate_sample_rate(t, env)) - 2L), 2L)
     }
 
     if (n < min_obs) {
         if (verbose) {
-            cli_warn(insufficient_warn)
+            cli_warn(insufficient_warn, call = env)
         }
         return(rep(NA_real_, n))
     }
 
     ## processing =================================================
     window_idx <- compute_local_windows(
-        t, width = width, span = span, align = align
+        t, width = width, span = span, align = align, env = env
     )
 
     if (verbose && all(lengths(window_idx) < min_obs)) {
-        cli_warn(insufficient_warn)
+        cli_warn(insufficient_warn, call = env)
     }
 
     slopes <- vapply(window_idx, \(.idx) {
@@ -257,6 +261,9 @@ peak_slope <- function(
 ) {
     args <- list(...)
     direction <- match.arg(direction)
+    ## internal callers pass `env` through `...` to report conditions
+    ## as coming from the user-facing function
+    env <- args$env %||% environment()
 
     if (!(args$bypass_checks %||% FALSE)) {
         if (missing(verbose)) {
@@ -275,7 +282,8 @@ peak_slope <- function(
         na.rm,
         verbose,
         window_idx = TRUE,
-        bypass_checks = args$bypass_checks %||% FALSE ## use validations
+        bypass_checks = args$bypass_checks %||% FALSE, ## use validations
+        env = env
     )
 
     ## pre-return NA
@@ -306,7 +314,7 @@ peak_slope <- function(
 
     if (length(candidates) == 0L) {
         if (verbose) {
-            cli_warn(c("!" = "No {direction} slopes detected."))
+            cli_warn(c("!" = "No {direction} slopes detected."), call = env)
         }
         return(na_result)
     }
@@ -322,7 +330,11 @@ peak_slope <- function(
     window_idx <- attr(slopes, "window_idx")[[peak_idx]]
 
     ## fit lm on peak window
-    model <- stats::lm(x ~ t, data.frame(x = x[window_idx], t = t[window_idx]))
+    fit_formula <- stats::as.formula("x ~ t", env = baseenv())
+    model <- stats::lm(
+        fit_formula,
+        data.frame(x = x[window_idx], t = t[window_idx])
+    )
 
     slope_val <- unname(stats::coef(model)[["t"]])
     intercept_val <- unname(stats::coef(model)[["(Intercept)"]])
@@ -380,12 +392,15 @@ analyse_peak_slope <- function(
     partial = FALSE,
     na.rm = FALSE,
     verbose = TRUE,
-    ...
+    ...,
+    env = rlang::caller_env()
 ) {
     ## validation ==============================================
-    validate_mnirs_data(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
-    time_channel <- validate_time_channel(enquo(time_channel), data)
+    validate_mnirs_data(data, env = env)
+    nirs_channels <- validate_nirs_channels(
+        enquo(nirs_channels), data, verbose, env = env
+    )
+    time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
     t_vec <- data[[time_channel]]
     args <- list(...)
     ## interval label; falls back to the `data` argument name when unsupplied
@@ -405,19 +420,22 @@ analyse_peak_slope <- function(
             na.rm = na.rm
         ),
         choices = list(direction = c("auto", "positive", "negative")),
-        verbose = verbose
+        verbose = verbose,
+        env = env
     )
     ## validate resolved args once, before fitting any channel
-    per_channel <- validate_kinetics_args(per_channel, data, t_vec, verbose)
+    per_channel <- validate_kinetics_args(
+        per_channel, data, t_vec, verbose, env = env
+    )
 
     ## method-specific fit: peak rolling linear slope
     peak_slope_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
         slopes <- do.call(peak_slope, c(
             list(x = x_fit, t = t_fit),
             .a,
-            list(verbose = verbose, bypass_checks = TRUE),
+            list(verbose = verbose, bypass_checks = TRUE, env = env),
             args
-        ))
+        ), quote = TRUE)
 
         list(
             coefs = data.frame(
@@ -437,7 +455,8 @@ analyse_peak_slope <- function(
                 t        = t_fit[slopes$window_idx],
                 fitted   = slopes$fitted,
                 n_params = 2L,
-                verbose  = verbose
+                verbose  = verbose,
+                env      = env
             )
         )
     }
@@ -450,6 +469,7 @@ analyse_peak_slope <- function(
         peak_slope_fit,
         verbose,
         interval_name,
-        extra_args = args
+        extra_args = args,
+        env = env
     ))
 }

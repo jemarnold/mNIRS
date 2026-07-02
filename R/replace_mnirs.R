@@ -208,13 +208,15 @@ replace_mnirs <- function(
     }
 
     ## remove invalid, outliers, and NA ==============================
+    ## report conditions raised in the lambda from this function
+    env <- environment()
     data[nirs_channels] <- Map(\(.nirs, .a, .check) {
         .x <- data[[.nirs]]
         ## verbose validator hints emitted once for the first channel
         .v <- verbose && .nirs == nirs_channels[[1L]]
         if (.check[2L] || .a$method == "median") {
             validate_width_span(
-                .a$width, .a$span, .v, "for `replace_mnirs()`."
+                .a$width, .a$span, .v, "for `replace_mnirs()`.", env = env
             )
         }
         if (.check[1L]) {
@@ -225,7 +227,8 @@ replace_mnirs <- function(
                 invalid_above = .a$invalid_above,
                 invalid_below = .a$invalid_below,
                 method = "none",
-                bypass_checks = TRUE
+                bypass_checks = TRUE,
+                env = env
             )
         }
         if (.check[2L]) {
@@ -236,7 +239,8 @@ replace_mnirs <- function(
                 span = .a$span,
                 method = "none",
                 outlier_cutoff = .a$outlier_cutoff,
-                bypass_checks = TRUE
+                bypass_checks = TRUE,
+                env = env
             )
         }
         if (.check[3L]) {
@@ -246,7 +250,8 @@ replace_mnirs <- function(
                 width = .a$width,
                 span = .a$span,
                 method = .a$method,
-                bypass_checks = TRUE
+                bypass_checks = TRUE,
+                env = env
             )
         }
         .x
@@ -299,22 +304,25 @@ replace_invalid <- function(
 ) {
     ## validate ===============================================
     args <- list(...)
+    ## internal callers pass `env` through `...` to report conditions
+    ## as coming from the user-facing function
+    env <- args$env %||% environment()
     if (is.null(c(invalid_values, invalid_above, invalid_below))) {
         cli_abort(c(
             "x" = "No replacement criteria specified",
             "i" = "At least one of {.arg invalid_values}, \\
             {.arg invalid_above}, or {.arg invalid_below} must be specified."
-        ))
+        ), call = env)
     }
     if (!(args$bypass_checks %||% FALSE)) {
-        validate_x_t(x, t)
+        validate_x_t(x, t, env = env)
         if (missing(verbose)) {
             verbose <- getOption("mnirs.verbose", default = TRUE)
         }
     }
-    validate_numeric(invalid_values)
-    validate_numeric(invalid_above, 1, msg1 = "one-element")
-    validate_numeric(invalid_below, 1, msg1 = "one-element")
+    validate_numeric(invalid_values, env = env)
+    validate_numeric(invalid_above, 1, msg1 = "one-element", env = env)
+    validate_numeric(invalid_below, 1, msg1 = "one-element", env = env)
     method <- match.arg(method)
 
     ## process ========================================================
@@ -334,10 +342,14 @@ replace_invalid <- function(
 
     if (method == "median") {
         if (!(args$bypass_checks %||% FALSE)) {
-            validate_width_span(width, span, verbose, "for median replacement.")
+            validate_width_span(
+                width, span, verbose, "for median replacement.", env = env
+            )
         }
 
-        window_idx <- compute_local_windows(t, invalid_idx, width, span)
+        window_idx <- compute_local_windows(
+            t, invalid_idx, width, span, env = env
+        )
         local_medians <- compute_local_fun(y, window_idx, median_nona)
         ## if method = "median"
         ## invalid_values removed to NA first,
@@ -404,20 +416,27 @@ replace_outliers <- function(
 ) {
     ## validate ===============================================
     args <- list(...)
+    ## internal callers pass `env` through `...` to report conditions
+    ## as coming from the user-facing function
+    env <- args$env %||% environment()
     if (!(args$bypass_checks %||% FALSE)) {
         if (missing(verbose)) {
             verbose <- getOption("mnirs.verbose", default = TRUE)
         }
-        validate_x_t(x, t)
-        validate_width_span(width, span, verbose, "for `replace_outliers()`.")
+        validate_x_t(x, t, env = env)
+        validate_width_span(
+            width, span, verbose, "for `replace_outliers()`.", env = env
+        )
     }
     validate_numeric(
-        outlier_cutoff, 1, c(0, Inf), msg1 = "one-element positive"
+        outlier_cutoff, 1, c(0, Inf), msg1 = "one-element positive", env = env
     )
     method <- match.arg(method)
 
     ## process =====================================================
-    outlier_stats <- compute_outliers(x, t, outlier_cutoff, width, span)
+    outlier_stats <- compute_outliers(
+        x, t, outlier_cutoff, width, span, env = env
+    )
     local_medians <- outlier_stats$local_medians
     is_outlier <- outlier_stats$is_outlier
 
@@ -478,8 +497,11 @@ replace_missing <- function(
 ) {
     ## validate ===============================================
     args <- list(...)
+    ## internal callers pass `env` through `...` to report conditions
+    ## as coming from the user-facing function
+    env <- args$env %||% environment()
     if (!(args$bypass_checks %||% FALSE)) {
-        validate_x_t(x, t)
+        validate_x_t(x, t, env = env)
     }
     method <- match.arg(method)
     if (method == "locf") {
@@ -502,12 +524,14 @@ replace_missing <- function(
             if (missing(verbose)) {
                 verbose <- getOption("mnirs.verbose", default = TRUE)
             }
-            validate_width_span(width, span, verbose, "for median replacement.")
+            validate_width_span(
+                width, span, verbose, "for median replacement.", env = env
+            )
         }
         ## median of width or span VALID values to either side of sequential NAs
         y <- x
         na_idx <- which(is.na(x))
-        window_idx <- compute_valid_neighbours(x, t, width, span, verbose)
+        window_idx <- compute_valid_neighbours(x, t, width, span, verbose, env)
         local_medians <- compute_local_fun(x, window_idx, median_nona)
         y[na_idx] <- local_medians
     }

@@ -525,12 +525,15 @@ analyse_logistic <- function(
     direction = c("auto", "positive", "negative"),
     end_fit_span = Inf,
     verbose = TRUE,
-    ...
+    ...,
+    env = rlang::caller_env()
 ) {
     ## validation ==================================================
-    validate_mnirs_data(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
-    time_channel <- validate_time_channel(enquo(time_channel), data)
+    validate_mnirs_data(data, env = env)
+    nirs_channels <- validate_nirs_channels(
+        enquo(nirs_channels), data, verbose, env = env
+    )
+    time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
     t_vec <- data[[time_channel]]
     args <- list(...)
     ## interval label; falls back to the `data` argument name when unsupplied
@@ -549,10 +552,13 @@ analyse_logistic <- function(
             shape = c("symmetric", "gompertz", "gompertz_left"),
             direction = c("auto", "positive", "negative")
         ),
-        verbose = verbose
+        verbose = verbose,
+        env = env
     )
     ## validate resolved args once, before fitting any channel
-    per_channel <- validate_kinetics_args(per_channel, data, t_vec, verbose)
+    per_channel <- validate_kinetics_args(
+        per_channel, data, t_vec, verbose, env = env
+    )
 
     ## NA scaffold (method columns only) for convergence failure
     na_coefs <- data.frame(
@@ -588,7 +594,7 @@ analyse_logistic <- function(
             "x" = "{.fn {as.character(fn)}} fit failed for \\
             {.field {(.nirs)}} in {.field {interval_name}}.",
             "!" = "{conditionMessage(e)}"
-        ))
+        ), call = env)
         return(invisible(NULL))
     }
 
@@ -645,7 +651,7 @@ analyse_logistic <- function(
                 fitted     = fitted_vals
             ),
             diag = compute_diagnostics(
-                x_fit, t_fit, fitted_vals, n_params = 4L, verbose
+                x_fit, t_fit, fitted_vals, n_params = 4L, verbose, env
             )
         )
     }
@@ -658,6 +664,7 @@ analyse_logistic <- function(
         logistic_fit,
         verbose,
         interval_name,
-        extra_args = args
+        extra_args = args,
+        env = env
     ))
 }

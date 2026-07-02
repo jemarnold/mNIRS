@@ -181,15 +181,15 @@ shift_mnirs <- function(
                 "i" = "One of {.arg to} or {.arg by} must be defined."
             ), call = env)
         }
-        validate_numeric(.a$to, 1, msg1 = "one-element")
-        validate_numeric(.a$by, 1, msg1 = "one-element")
+        validate_numeric(.a$to, 1, msg1 = "one-element", env = env)
+        validate_numeric(.a$by, 1, msg1 = "one-element", env = env)
         if (!is.null(.a$to) && !is.null(.a$by)) {
             .a$by <- NULL
             if (.v) {
                 cli_inform(c(
                     "i" = "Shift {.arg to} = {.val {(.a$to)}} \\
                     overrides {.arg by}."
-                ))
+                ), call = env)
             }
         }
 
@@ -199,7 +199,9 @@ shift_mnirs <- function(
         }
 
         ## calculate shift_to reference values =======================
-        validate_width_span(.a$width, .a$span, .v, "for `shift_mnirs()`.")
+        validate_width_span(
+            .a$width, .a$span, .v, "for `shift_mnirs()`.", env = env
+        )
 
         if (.a$position == "first") {
             ## for span, take data <= first time value + span, assuming
@@ -214,7 +216,7 @@ shift_mnirs <- function(
             ## find local windows within width/span centred around idx
             ## TODO need to fix edges. Should be partial = FALSE
             window_idx <- compute_local_windows(
-                t = t_vec, width = .a$width, span = .a$span,
+                t = t_vec, width = .a$width, span = .a$span, env = env
             )
             shift_fun <- match.fun(.a$position)
             ## compute min or max along local means per channel

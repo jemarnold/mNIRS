@@ -1,12 +1,13 @@
 #' Read raw data frame from file path
+#' @inheritParams validate_mnirs
 #' @keywords internal
-read_file <- function(file_path) {
+read_file <- function(file_path, env = rlang::caller_env()) {
     ## validation: check file exists
     if (!file.exists(file_path)) {
         cli_abort(c(
             "x" = "File not found. Check that file exists.",
             "i" = "{.arg file_path} = {.path {file_path}}"
-        ))
+        ), call = env)
     }
 
     ## import data_raw from either excel or csv
@@ -54,9 +55,9 @@ read_file <- function(file_path) {
                         "i" = "Check file is not in use by another \\
                         application.",
                         "i" = "{e$message}"
-                    ))
+                    ), call = env)
                 } else {
-                    cli_abort(e$message)
+                    cli_abort(e$message, call = env)
                 }
             }
         )
@@ -66,7 +67,7 @@ read_file <- function(file_path) {
             "x" = "Unsupported file type.",
             "i" = "{.arg file_path} = {.path {file_path}}",
             "i" = "Only {.var .csv}, {.var .txt}, and {.var .xls(x)} supported."
-        ))
+        ), call = env)
     }
 
     return(data.frame(data_raw))
@@ -142,6 +143,7 @@ detect_mnirs_device <- function(data) {
 
 
 #' Detect known channels for a device
+#' @inheritParams validate_mnirs
 #' @keywords internal
 detect_device_channels <- function(
     data,
@@ -150,7 +152,8 @@ detect_device_channels <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     keep_all = FALSE,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     ## user-specified channels always take priority
     if (!is.null(nirs_channels)) {
@@ -181,7 +184,7 @@ detect_device_channels <- function(
         cli_abort(c(
             "x" = "{.arg nirs_channels} cannot be determined automatically.",
             "i" = "Define {.arg nirs_channels} explicitly."
-        ))
+        ), call = env)
     }
 
     ## check for NULL
@@ -200,7 +203,7 @@ detect_device_channels <- function(
             "!" = "{.val {nirs_device}} file format detected. \\
             {.arg nirs_channels} set to {.val {ch_list$nirs_channels}}.",
             "i" = "Override by specifying {.arg nirs_channels} explicitly."
-        ))
+        ), call = env)
     }
 
     return(ch_list)
@@ -208,11 +211,13 @@ detect_device_channels <- function(
 
 
 #' Read data table from raw data
+#' @inheritParams validate_mnirs
 #' @keywords internal
 read_data_table <- function(
     data,
     header_row = 1L,
-    nirs_channels = NULL
+    nirs_channels = NULL,
+    env = rlang::caller_env()
 ) {
     nrows <- nrow(data)
     ## find the first row where ALL nirs_channels match
@@ -227,7 +232,7 @@ read_data_table <- function(
         cli_abort(c(
             "x" = "Channel names not detected.",
             "i" = "Column names are case sensitive and must match exactly."
-        ))
+        ), call = env)
     }
 
     ## extract the data_table, and name by header row
@@ -279,12 +284,14 @@ extract_start_timestamp <- function(file_header) {
 
 
 #' Detect time_channel from header row
+#' @inheritParams validate_mnirs
 #' @keywords internal
 detect_time_channel <- function(
     data,
     time_channel = NULL,
     nirs_device = NULL,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     if (!is.null(time_channel)) {
         return(time_channel)
@@ -296,7 +303,7 @@ detect_time_channel <- function(
         if (verbose) {
             cli_inform(c(
                 "!" = "Oxysoft {.val sample} column detected."
-            ))
+            ), call = env)
         }
         return(c(sample = "1"))
     }
@@ -327,7 +334,7 @@ detect_time_channel <- function(
             cli_inform(c(
                 "!" = "Detected {.arg time_channel} = \\
                 {col_blue(col_names[time_idx])}."
-            ))
+            ), call = env)
         }
         return(col_names[time_idx])
     }
@@ -335,7 +342,7 @@ detect_time_channel <- function(
     cli_abort(c(
         "x" = "{.arg time_channel} not detected.",
         "i" = "Define {.arg time_channel} explicitly."
-    ))
+    ), call = env)
 }
 
 
@@ -372,6 +379,7 @@ name_channels <- function(x) {
 
 
 #' Select data table columns and rename from channels, handling duplicates
+#' @inheritParams validate_mnirs
 #' @keywords internal
 select_rename_data <- function(
     data,
@@ -379,7 +387,8 @@ select_rename_data <- function(
     time_channel,
     event_channel = NULL,
     keep_all = FALSE,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     ## ensure all channel inputs are named (name = original_col_name)
     ch_list <- list(
@@ -411,7 +420,7 @@ select_rename_data <- function(
         cli_abort(c(
             "x" = "Channel names not detected.",
             "i" = "Column names are case sensitive and must match exactly."
-        ))
+        ), call = env)
     }
 
     ## keep all columns or only specified channels
@@ -440,7 +449,7 @@ select_rename_data <- function(
             "!" = "Duplicate channel names detected.",
             "i" = "Renamed: {.val {paste(old, new, sep = ' = ')}}",
             "i" = "Unique channel names can be defined explicitly."
-        ))
+        ), call = env)
     }
 
     return(list(
@@ -461,13 +470,15 @@ remove_empty_rows_cols <- function(data) {
 
 
 #' Coerce column types by role: nirs numeric, event integer, others detected
+#' @inheritParams validate_mnirs
 #' @keywords internal
 convert_type <- function(
     data,
     nirs_channels = NULL,
     time_channel,
     event_channel = NULL,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     ## convert decimal "," to "."
     is_char <- vapply(data, is.character, logical(1L))
@@ -513,7 +524,7 @@ convert_type <- function(
             cli_warn(c(
                 "!" = "Channel {.val {(.nm)}} values coerced to {.val {NA}}.",
                 "i" = "Check the source data contents should be numeric values."
-            ))
+            ), call = env)
         })
     }
 
@@ -600,6 +611,7 @@ parse_time_channel <- function(
 
 
 #' Validate and Estimate Sample Rate
+#' @inheritParams validate_mnirs
 #' @keywords internal
 parse_sample_rate <- function(
     data,
@@ -607,7 +619,8 @@ parse_sample_rate <- function(
     time_channel,
     sample_rate = NULL,
     nirs_device = NULL,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     ## if Oxysoft, sample_rate will be detected = 1
     ## extract and overwrite with exported sample_rate
@@ -630,7 +643,7 @@ parse_sample_rate <- function(
                 "!" = "Oxysoft {.arg sample_rate} = {.val {sample_rate}} Hz.",
                 "i" = "{.arg time_channel} = {.val {time_channel}} added to \\
                 the data frame, in {.cls seconds}."
-            ))
+            ), call = env)
         }
     }
 
@@ -639,7 +652,7 @@ parse_sample_rate <- function(
     ## will estimate from time_channel (time_channel)
     ## will error on unable to estimate sample_rate
     sample_rate <- validate_sample_rate(
-        data, time_channel, sample_rate, verbose
+        data, time_channel, sample_rate, verbose, env = env
     )
 
     return(list(
@@ -651,11 +664,13 @@ parse_sample_rate <- function(
 
 
 #' Report warnings for unbalanced time_channel samples
+#' @inheritParams validate_mnirs
 #' @keywords internal
 detect_irregular_samples <- function(
     x,
     time_channel,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     if (!verbose) {
         return(invisible())
@@ -687,7 +702,7 @@ detect_irregular_samples <- function(
         "!" = "Duplicate or irregular {.arg time_channel} samples detected.",
         "i" = info_msg,
         "i" = "Re-sample with {.fn mnirs::resample_mnirs}."
-    ))
+    ), call = env)
 
     return(invisible())
 }

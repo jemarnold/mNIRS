@@ -34,13 +34,15 @@
 #'   `[t - span/2, t + span/2]`.
 #'
 #' @rdname compute_helpers
+#' @inheritParams validate_mnirs
 #' @keywords internal
 compute_local_windows <- function(
     t,
     idx = seq_along(t),
     width = NULL,
     span = NULL,
-    align = c("centre", "left", "right")
+    align = c("centre", "left", "right"),
+    env = rlang::caller_env()
 ) {
     align <- sub("^center$", "centre", align)
     align <- match.arg(align)
@@ -65,9 +67,9 @@ compute_local_windows <- function(
             right = c(-1, 0)
         ) * span
         start_idx <- findInt_mnirs(
-            t[idx] + offsets[1L], t, left.open = TRUE
+            t[idx] + offsets[1L], t, left.open = TRUE, env = env
         ) + 1L
-        end_idx <- findInt_mnirs(t[idx] + offsets[2L], t)
+        end_idx <- findInt_mnirs(t[idx] + offsets[2L], t, env = env)
     }
 
     ## inclusive of x[i] for detect outliers
@@ -167,7 +169,8 @@ compute_outliers <- function(
     t,
     outlier_cutoff,
     width = NULL,
-    span = NULL
+    span = NULL,
+    env = rlang::caller_env()
 ) {
     n <- length(x)
     L <- 1.4826 ## 1 / qnorm(0.75): MAD at the 75% percentile of |Z|
@@ -191,7 +194,9 @@ compute_outliers <- function(
         )
     } else {
         ## span: variable-size windows, per-window loop
-        window_idx <- compute_local_windows(t, width = NULL, span = span)
+        window_idx <- compute_local_windows(
+            t, width = NULL, span = span, env = env
+        )
         local_stats <- vapply(seq_len(n), \(.i) {
             w <- x[window_idx[[.i]]]
             local_median <- median_nona(w)
@@ -240,7 +245,8 @@ compute_valid_neighbours <- function(
     t = seq_along(x),
     width = NULL,
     span = NULL,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     na_idx <- which(is.na(x))
     valid_idx <- which(!is.na(x))
@@ -271,9 +277,9 @@ compute_valid_neighbours <- function(
     ## falls back to naerest bracketing pair when no valid samples within `span`
     window_idx <- lapply(seq_len(n_na), \(.i) {
         lo <- findInt_mnirs(
-            t_na[.i] - half_span, t_valid, left.open = TRUE
+            t_na[.i] - half_span, t_valid, left.open = TRUE, env = env
         ) + 1L
-        hi <- findInt_mnirs(t_na[.i] + half_span, t_valid)
+        hi <- findInt_mnirs(t_na[.i] + half_span, t_valid, env = env)
         if (lo > hi) {
             pos <- findInterval(na_idx[.i], valid_idx)
             return(unique(valid_idx[c(pos, min(n_valid, pos + 1L))]))

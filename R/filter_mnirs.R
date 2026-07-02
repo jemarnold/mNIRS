@@ -226,15 +226,20 @@ filter_mnirs.smooth_spline <- function(
     ...
 ) {
     ## validation ==========================================
+    ## report conditions as coming from the user-facing generic
+    env <- sys.call(-1)
     metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
-    time_channel <- validate_time_channel(enquo(time_channel), data)
+    nirs_channels <- validate_nirs_channels(
+        enquo(nirs_channels), data, verbose, env = env
+    )
+    time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
 
     ## broadcast global args, applying any per-channel list() overrides
     per_channel <- resolve_channel_args(
         nirs_channels,
         args = list(spar = list(...)$spar),
-        verbose = verbose
+        verbose = verbose,
+        env = env
     )
 
     ## processing ==========================================
@@ -244,14 +249,13 @@ filter_mnirs.smooth_spline <- function(
         cli_abort(c(
             "x" = "{.arg time_channel} has duplicated or irregular samples.",
             "i" = "Re-sample first with {.fn mnirs::resample_mnirs}."
-        ))
+        ), call = env)
     }
 
-    env <- environment()
     data[nirs_channels] <- lapply(nirs_channels, \(.x) {
         spar <- per_channel[[.x]]$spar
         validate_numeric(
-            spar, 1, c(0, Inf), FALSE, msg1 = "one-element positive"
+            spar, 1, c(0, Inf), FALSE, msg1 = "one-element positive", env = env
         )
         x <- data[[.x]]
         ## handle NAs
@@ -274,7 +278,7 @@ filter_mnirs.smooth_spline <- function(
             cli_inform(c(
                 "i" = "{.arg nirs_channel} = {.val {.x}}: \\
                 `smooth.spline(spar = {.val {round(spline_model$spar, 3)}})`"
-            ))
+            ), call = env)
         }
 
         if (handle_na) {
@@ -304,13 +308,17 @@ filter_mnirs.butterworth <- function(
     ...
 ) {
     ## validation ==========================================
+    ## report conditions as coming from the user-facing generic
+    env <- sys.call(-1)
     metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
-    time_channel <- validate_time_channel(enquo(time_channel), data)
+    nirs_channels <- validate_nirs_channels(
+        enquo(nirs_channels), data, verbose, env = env
+    )
+    time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
     args <- list(...)
     sample_rate <- args$sample_rate
     sample_rate <- validate_sample_rate(
-        data, time_channel, sample_rate, verbose
+        data, time_channel, sample_rate, verbose, env = env
     )
 
     ## broadcast global args, applying any per-channel list() overrides
@@ -328,11 +336,11 @@ filter_mnirs.butterworth <- function(
             type = c("low", "high", "stop", "pass"),
             edges = c("rev", "rep1", "none")
         ),
-        verbose = verbose
+        verbose = verbose,
+        env = env
     )
 
     ## processing ==========================================
-    env <- environment()
     data[nirs_channels] <- Map(\(.nirs, .a) {
         ## verbose validator hints emitted once for the first channel
         .v <- verbose && .nirs == nirs_channels[[1L]]
@@ -349,7 +357,7 @@ filter_mnirs.butterworth <- function(
         ## order & W are validated in filter_butter
         validate_numeric(
             .a$fc, fc_n, c(0, Inf), inclusive = FALSE,
-            msg1 = paste0(fc_n, "-element positive")
+            msg1 = paste0(fc_n, "-element positive"), env = env
         )
 
         if (!is.null(.a$W) && !is.null(.a$fc)) {
@@ -358,7 +366,7 @@ filter_mnirs.butterworth <- function(
                 cli_inform(c(
                     "i" = "{.val Butterworth} parameter {.arg W} = \\
                     {.val {(.a$W)}} overrides {.arg fc}."
-                ))
+                ), call = env)
             }
         }
 
@@ -373,7 +381,9 @@ filter_mnirs.butterworth <- function(
             }
         }
 
-        filter_butter(data[[.nirs]], .a$order, .a$W, .a$type, .a$edges, na.rm)
+        filter_butter(
+            data[[.nirs]], .a$order, .a$W, .a$type, .a$edges, na.rm, env = env
+        )
     }, nirs_channels, per_channel[nirs_channels])
 
     ## Metadata =================================
@@ -398,9 +408,13 @@ filter_mnirs.moving_average <- function(
     ...
 ) {
     ## validation ==========================================
+    ## report conditions as coming from the user-facing generic
+    env <- sys.call(-1)
     metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
-    time_channel <- validate_time_channel(enquo(time_channel), data)
+    nirs_channels <- validate_nirs_channels(
+        enquo(nirs_channels), data, verbose, env = env
+    )
+    time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
     args <- list(...)
 
     ## broadcast global args, applying any per-channel list() overrides
@@ -412,7 +426,8 @@ filter_mnirs.moving_average <- function(
             partial = args$partial %||% FALSE
         ),
         defaults = list(partial = FALSE),
-        verbose = verbose
+        verbose = verbose,
+        env = env
     )
 
     ## processing ==========================================
@@ -427,7 +442,8 @@ filter_mnirs.moving_average <- function(
             partial = .a$partial,
             na.rm = na.rm,
             verbose = verbose,
-            bypass_checks = TRUE
+            bypass_checks = TRUE,
+            env = env
         )
     }, nirs_channels, per_channel[nirs_channels])
 
@@ -512,31 +528,38 @@ filter_ma <- function(
     ...
 ) {
     ## validation ===========================================
+    ## internal callers pass `env` through `...` to report conditions
+    ## as coming from the user-facing function
+    env <- list(...)$env %||% environment()
     if (!(list(...)$bypass_checks %||% FALSE)) {
         if (missing(verbose)) {
             verbose <- getOption("mnirs.verbose", default = TRUE)
         }
     }
-    validate_x_t(x, t)
-    validate_width_span(width, span, verbose, "for a moving average filter.")
+    validate_x_t(x, t, env = env)
+    validate_width_span(
+        width, span, verbose, "for a moving average filter.", env = env
+    )
 
     ## handle NAs
     if (verbose && !na.rm && anyNA(x)) {
         cli_warn(c(
             "!" = "{.arg x} contains internal {.val {NA}}'s.",
             "i" = "Set {.arg na.rm = TRUE} to ignore {.val {NA}}'s."
-        ))
+        ), call = env)
     }
 
     ## processing ==============================================
-    window_idx <- compute_local_windows(t, width = width, span = span)
+    window_idx <- compute_local_windows(
+        t, width = width, span = span, env = env
+    )
 
     if (!partial) {
         ## min_obs default to estimated width when span is specified
         ## less strict span_width - 2 to allow start & end buffer
         ## with irregular t values
         min_obs <- max(
-            width %||% (floor(span * estimate_sample_rate(t)) - 2L),
+            width %||% (floor(span * estimate_sample_rate(t, env)) - 2L),
             1L
         )
 
@@ -546,7 +569,7 @@ filter_ma <- function(
                 "x" = "Insufficient valid samples detected.",
                 "i" = "{.arg width} or {.arg span} must be smaller than \\
                 the range of {.arg x} when {.arg partial} = {.val {FALSE}}."
-            ))
+            ), call = env)
         }
 
         which_partial <- lengths(window_idx) < min_obs
@@ -576,6 +599,8 @@ filter_moving_average <- function(
     verbose = TRUE,
     ...
 ) {
+    ## report conditions as coming from this wrapper unless overridden
+    env <- list(...)$env %||% environment()
     filter_ma(
         x = x,
         t = t,
@@ -584,6 +609,7 @@ filter_moving_average <- function(
         partial = partial,
         na.rm = na.rm,
         verbose = verbose,
+        env = env,
         ...
     )
 }
@@ -690,17 +716,22 @@ filter_butter <- function(
     ...
 ) {
     ## validation ============================================
+    ## internal callers pass `env` through `...` to report conditions
+    ## as coming from the user-facing function
+    env <- list(...)$env %||% environment()
     check_installed("signal", "to use Butterworth digital filter")
-    validate_numeric(x)
+    validate_numeric(x, env = env)
     validate_numeric(
-        order, 1, c(1, Inf), integer = TRUE, msg1 = "one-element positive"
+        order, 1, c(1, Inf), integer = TRUE, msg1 = "one-element positive",
+        env = env
     )
     type <- match.arg(type)
     W_n <- if (type %in% c("low", "high")) 1 else 2
     validate_numeric(
         W, W_n, c(0, 1), inclusive = FALSE,
         msg1 = paste0(W_n, "-element positive"),
-        msg2 = "between {col_blue('[0, 1]')}."
+        msg2 = "between {col_blue('[0, 1]')}.",
+        env = env
     )
     edges <- match.arg(edges)
 
@@ -714,7 +745,7 @@ filter_butter <- function(
         cli_abort(c(
             "x" = "{.arg x} contains internal {.val {NA}}'s.",
             "i" = "Set {.arg na.rm = TRUE} to ignore {.val {NA}}'s."
-        ))
+        ), call = env)
     }
 
     if (edges == "none") {

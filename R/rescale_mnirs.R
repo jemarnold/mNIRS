@@ -123,13 +123,16 @@ rescale_mnirs <- function(
     )
 
     ## rescale range per group ================================
+    ## report conditions raised in the lambda from this function
+    env <- environment()
     rescaled <- lapply(names(group_channels), \(.key) {
         .range <- per_group[[.key]]$range
         .cols <- group_channels[[.key]]
         validate_numeric(
             .range, 2,
             msg1 = "two-element",
-            msg2 = "between {col_blue('range[1], range[2]]')}."
+            msg2 = "between {col_blue('range[1], range[2]]')}.",
+            env = env
         )
 
         group_data <- as.matrix(data[, .cols, drop = FALSE])
