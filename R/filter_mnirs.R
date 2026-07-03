@@ -1,23 +1,61 @@
 #' Filter a data frame
 #'
+#' @description
 #' Apply digital filtering/smoothing to numeric vector data within a data frame
 #' using either:
 #'   1. A cubic smoothing spline.
 #'   2. A Butterworth digital filter.
 #'   3. A simple moving average.
 #'
-#' @param method A character string indicating how to filter the data (see
-#'   *Details*).
+#' Note the `method`-specific arguments below.
+#'
+#' @param method A character string indicating how to filter the data.
+#'   Additional arguments must be specified for each method. See *Details*.
 #'   \describe{
-#'      \item{`"smooth_spline"`}{Fits a cubic smoothing spline.}
-#'      \item{`"butterworth"`}{Uses a centred Butterworth digital filter.}
-#'      \item{`"moving_average"`}{Uses a centred moving average filter.}
+#'      \item{`"smooth_spline"`}{Fits a cubic smoothing spline. Additional
+#'      arguments: `spar`.}
+#'      \item{`"butterworth"`}{Uses a centred Butterworth digital filter.
+#'      Additional arguments: `order`, `W` or `fc`, `sample_rate`, `type`,
+#'      `edges`. See [filter_butter()].}
+#'      \item{`"moving_average"`}{Uses a centred moving average filter.
+#'      Additional arguments: `width` or `span`, `partial`. See
+#'      [filter_ma()].}
 #'   }
 #' @param na.rm Logical; default is `FALSE`, propagates any `NA`s to the
 #'   returned vector. If `TRUE`, ignores `NA`s and processes available valid
 #'   samples within the local window. May return errors or warnings. (see
 #'   *Details*).
-#' @param ... Additional method-specific arguments must be specified
+#' @param ... Additional arguments passed to the underlying method function.
+#'   See *Details*.
+#' @param spar **smooth_spline**: A numeric smoothing parameter passed to
+#'   [stats::smooth.spline()]. If `NULL` (*default*), automatically
+#'   determined via penalised log likelihood.
+#' @param order **butterworth**: An integer defining the filter order
+#'   (*default* `order = 2`).
+#' @param W **butterworth**: A one- or two-element numeric vector within
+#'   `[0, 1]` defining the filter cutoff frequency(ies) as a fraction of
+#'   the Nyquist frequency (see *Details*). One of either `W` or `fc` must be
+#'   specified.
+#' @param fc **butterworth**: A one- or two-element numeric vector defining
+#'   the filter absolute cutoff frequency in Hz. Used with `sample_rate` to
+#'   compute `W`. One of either `W` or `fc` must be specified.
+#' @param sample_rate **butterworth**: A numeric sample rate in Hz. Will
+#'   be taken from metadata or estimated from `time_channel` if not
+#'   defined.
+#' @param type **butterworth**: A character string specifying filter type,
+#'   one of: `c("low", "high", "stop", "pass")` (`"low"` is the
+#'   *default*).
+#' @param edges **butterworth**: A character string specifying the edge
+#'   padding, one of: `c("rev", "rep1", "none")` (`"rev"` is the
+#'   *default*). See [filter_butter()].
+#' @param width **moving_average**: An integer number of samples within
+#'   the local window. One of either `width` or `span` must be specified.
+#' @param span **moving_average**: A numeric time duration in units of
+#'   `time_channel` within the local window. One of either `width` or
+#'   `span` must be specified.
+#' @param partial **moving_average**: Logical; default is `FALSE`, only
+#'   returns values where a full window of valid (non-`NA`) samples are
+#'   available. If `TRUE`, ignores `NA` and processes available valid samples
 #'   (see *Details*).
 #' @inheritParams validate_mnirs
 #'
@@ -32,14 +70,6 @@
 #' log likelihood. This usually works well for responses occurring on the
 #' order of minutes or longer. `spar` can be specified typically, but not
 #' necessarily, in the range `spar = [0, 1]`.
-#'
-#' Additional arguments (`...`) accepted when `method = "smooth_spline"`:
-#'
-#' \describe{
-#'   \item{`spar`}{A numeric smoothing parameter passed to
-#'       [stats::smooth.spline()]. If `NULL` (*default*), automatically
-#'       determined via penalised log likelihood.}
-#' }
 #'
 #' ## method = "butterworth"
 #'
@@ -78,23 +108,6 @@
 #' Only one of either `W` or `fc` should be defined. If both are
 #' defined, `W` will be preferred over `fc`.
 #'
-#' Additional arguments (`...`) accepted when `method = "butterworth"`:
-#'
-#' \describe{
-#'   \item{`order`}{An integer for the filter order (*default* `2`).}
-#'   \item{`W`}{A numeric fractional cutoff frequency within `[0, 1]`. One
-#'       of either `W` or `fc` must be specified.}
-#'   \item{`fc`}{A numeric absolute cutoff frequency in Hz. Used with
-#'       `sample_rate` to compute `W`.}
-#'   \item{`sample_rate`}{A numeric sample rate in Hz. Will be taken from
-#'       metadata or estimated from `time_channel` if not defined.}
-#'   \item{`type`}{A character string specifying filter type, one of:
-#'       `c("low", "high", "stop", "pass")` (`"low"` is the default).}
-#'   \item{`edges`}{A character string specifying the edge padding, one of:
-#'       `c("rev", "rep1", "none")` (`"rev"` is the default).
-#'       See [filter_butter()].}
-#' }
-#'
 #' ## method = "moving_average"
 #'
 #' Aliases: `method = c("moving average", "ma")`
@@ -104,18 +117,6 @@
 #' `idx` between `[idx - floor(width/2), idx + floor(width/2)]`. Or by
 #' `span` as the timespan in units of `time_channel` between
 #' `[t - span/2, t + span/2]`.
-#'
-#' Additional arguments (`...`) accepted when `method = "moving_average"`:
-#'
-#' \describe{
-#'   \item{`width` or `span`}{Either an integer number of samples, or a
-#'       numeric time duration in units of `time_channel` within the local
-#'       window. One of either `width` or `span` must be specified.}
-#'   \item{`partial`}{Logical; `FALSE` by default, only returns values
-#'       where a full window of valid (non-`NA`) samples are available.
-#'       If `TRUE`, ignores `NA` and allows calculation over partial windows
-#'       at the edges of the data.}
-#' }
 #'
 #' ## Missing values
 #'
@@ -183,7 +184,17 @@ filter_mnirs <- function(
     method = c("smooth_spline", "butterworth", "moving_average"),
     na.rm = FALSE,
     verbose = TRUE,
-    ...
+    ...,
+    spar = NULL,
+    order = 2L,
+    W = NULL,
+    fc = NULL,
+    sample_rate = NULL,
+    type = c("low", "high", "stop", "pass"),
+    edges = c("rev", "rep1", "none"),
+    width = NULL,
+    span = NULL,
+    partial = FALSE
 ) {
     ## validation ====================================
     validate_mnirs_data(data)
@@ -460,11 +471,11 @@ filter_mnirs.moving_average <- function(
 #' Apply a simple moving average smoothing filter to vector data.
 #' `filter_moving_average()` is an alias of `filter_ma()`.
 #'
-#' @param partial Logical; default is `FALSE`, requires local windows to have
-#'   complete number of samples specified by `width` or `span`. If `TRUE`,
-#'   processes available samples within the local window. See *Details*.
+#' 
+#' @param partial Logical; default is `FALSE`, only returns values where a full
+#'   window of valid (non-`NA`) samples are available. If `TRUE`, ignores `NA`
+#'   and processes available valid samples (see *Details*).
 #' @inheritParams replace_invalid
-#' @inheritParams shift_mnirs
 #' @inheritParams filter_mnirs
 #'
 #' @details
@@ -626,8 +637,9 @@ filter_moving_average <- function(
 #'
 #' @param x A numeric vector.
 #' @param order An integer defining the filter order (*default* `order = 2`).
-#' @param W A one- or two-element numeric vector defining the filter cutoff
-#'   frequency(ies) as a fraction of the Nyquist frequency (see *Details*).
+#' @param W A one- or two-element numeric vector within `[0, 1]` defining the
+#'   filter cutoff frequency(ies) as a fraction of the Nyquist frequency
+#'   (see *Details*).
 #' @param type A character string indicating the digital filter type (see
 #'   *Details*).
 #'   \describe{

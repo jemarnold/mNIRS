@@ -19,8 +19,9 @@ filter_butter(
 
 \item{order}{An integer defining the filter order (\emph{default} \code{order = 2}).}
 
-\item{W}{A one- or two-element numeric vector defining the filter cutoff
-frequency(ies) as a fraction of the Nyquist frequency (see \emph{Details}).}
+\item{W}{A one- or two-element numeric vector within \verb{[0, 1]} defining the
+filter cutoff frequency(ies) as a fraction of the Nyquist frequency
+(see \emph{Details}).}
 
 \item{type}{A character string indicating the digital filter type (see
 \emph{Details}).
@@ -44,8 +45,8 @@ returned vector. If \code{TRUE}, ignores \code{NA}s and processes available vali
 samples within the local window. May return errors or warnings. (see
 \emph{Details}).}
 
-\item{...}{Additional method-specific arguments must be specified
-(see \emph{Details}).}
+\item{...}{Additional arguments passed to the underlying method function.
+See \emph{Details}.}
 }
 \value{
 A numeric vector the same length as \code{x}.

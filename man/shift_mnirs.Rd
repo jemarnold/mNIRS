@@ -55,8 +55,7 @@ channels will be shifted, e.g. shift the minimum value to zero.}
 channels will be shifted, e.g. shift all values up by 10 units.}
 
 \item{width}{An integer defining the local window in number of samples
-centred on \code{idx}, between
-\verb{[idx - floor(width/2), idx + floor(width/2)]}.}
+centred on \code{idx}, between \verb{[idx - floor(width/2), idx + floor(width/2)]}.}
 
 \item{span}{A numeric value defining the local window time span around
 \code{idx} in units of \code{time_channel} or \code{t}, between

@@ -37,9 +37,9 @@ in which to perform the operation, according to \code{align}. In units of
 \emph{"left"}, or \emph{"right"}. Where \emph{"left"} is \emph{forward looking}, and \emph{"right"}
 is \emph{backward looking} from the current sample.}
 
-\item{partial}{Logical; default is \code{FALSE}, requires local windows to have
-complete number of samples specified by \code{width} or \code{span}. If \code{TRUE},
-processes available samples within the local window. See \emph{Details}.}
+\item{partial}{Logical; default is \code{FALSE}, only returns values where a full
+window of valid (non-\code{NA}) samples are available. If \code{TRUE}, ignores \code{NA}
+and processes available valid samples (see \emph{Details}).}
 
 \item{na.rm}{Logical; default is \code{FALSE}, propagates any \code{NA}s to the
 returned vector. If \code{TRUE}, ignores \code{NA}s and processes available valid

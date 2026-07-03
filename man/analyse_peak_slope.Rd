@@ -64,10 +64,9 @@ forward-looking window in which to look for the end of the kinetics fit.
 \code{end_window = Inf} (\emph{default}) returns the global extreme from the full
 range of \code{x} (see \emph{Details}).}
 
-\item{partial}{\strong{moving_average}: Logical; \code{FALSE} by default, only
-returns values where a full window of valid (non-\code{NA}) samples are
-available. If \code{TRUE}, ignores \code{NA} and allows calculation over
-partial windows at the edges of the data.}
+\item{partial}{Logical; default is \code{FALSE}, only returns values where a full
+window of valid (non-\code{NA}) samples are available. If \code{TRUE}, ignores \code{NA}
+and processes available valid samples (see \emph{Details}).}
 
 \item{na.rm}{Logical; default is \code{FALSE}, propagates any \code{NA}s to the
 returned vector. If \code{TRUE}, ignores \code{NA}s and processes available valid

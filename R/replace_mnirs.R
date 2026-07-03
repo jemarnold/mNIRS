@@ -23,8 +23,7 @@
 #'     `outlier_cutoff = 0` Tukey's median filter.
 #'
 #' @param width An integer defining the local window in number of samples
-#'   centred on `idx`, between
-#'   `[idx - floor(width/2), idx + floor(width/2)]`.
+#'   centred on `idx`, between `[idx - floor(width/2), idx + floor(width/2)]`.
 #'
 #' @param span A numeric value defining the local window time span around
 #'   `idx` in units of `time_channel` or `t`, between

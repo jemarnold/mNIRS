@@ -14,7 +14,17 @@ filter_mnirs(
   method = c("smooth_spline", "butterworth", "moving_average"),
   na.rm = FALSE,
   verbose = TRUE,
-  ...
+  ...,
+  spar = NULL,
+  order = 2L,
+  W = NULL,
+  fc = NULL,
+  sample_rate = NULL,
+  type = c("low", "high", "stop", "pass"),
+  edges = c("rev", "rep1", "none"),
+  width = NULL,
+  span = NULL,
+  partial = FALSE
 )
 }
 \arguments{
@@ -35,12 +45,17 @@ Must match a column name in \code{data} exactly.
 used.
 }}
 
-\item{method}{A character string indicating how to filter the data (see
-\emph{Details}).
+\item{method}{A character string indicating how to filter the data.
+Additional arguments must be specified for each method. See \emph{Details}.
 \describe{
-\item{\code{"smooth_spline"}}{Fits a cubic smoothing spline.}
-\item{\code{"butterworth"}}{Uses a centred Butterworth digital filter.}
-\item{\code{"moving_average"}}{Uses a centred moving average filter.}
+\item{\code{"smooth_spline"}}{Fits a cubic smoothing spline. Additional
+arguments: \code{spar}.}
+\item{\code{"butterworth"}}{Uses a centred Butterworth digital filter.
+Additional arguments: \code{order}, \code{W} or \code{fc}, \code{sample_rate}, \code{type},
+\code{edges}. See \code{\link[=filter_butter]{filter_butter()}}.}
+\item{\code{"moving_average"}}{Uses a centred moving average filter.
+Additional arguments: \code{width} or \code{span}, \code{partial}. See
+\code{\link[=filter_ma]{filter_ma()}}.}
 }}
 
 \item{na.rm}{Logical; default is \code{FALSE}, propagates any \code{NA}s to the
@@ -52,7 +67,47 @@ samples within the local window. May return errors or warnings. (see
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
-\item{...}{Additional method-specific arguments must be specified
+\item{...}{Additional arguments passed to the underlying method function.
+See \emph{Details}.}
+
+\item{spar}{\strong{smooth_spline}: A numeric smoothing parameter passed to
+\code{\link[stats:smooth.spline]{stats::smooth.spline()}}. If \code{NULL} (\emph{default}), automatically
+determined via penalised log likelihood.}
+
+\item{order}{\strong{butterworth}: An integer defining the filter order
+(\emph{default} \code{order = 2}).}
+
+\item{W}{\strong{butterworth}: A one- or two-element numeric vector within
+\verb{[0, 1]} defining the filter cutoff frequency(ies) as a fraction of
+the Nyquist frequency (see \emph{Details}). One of either \code{W} or \code{fc} must be
+specified.}
+
+\item{fc}{\strong{butterworth}: A one- or two-element numeric vector defining
+the filter absolute cutoff frequency in Hz. Used with \code{sample_rate} to
+compute \code{W}. One of either \code{W} or \code{fc} must be specified.}
+
+\item{sample_rate}{\strong{butterworth}: A numeric sample rate in Hz. Will
+be taken from metadata or estimated from \code{time_channel} if not
+defined.}
+
+\item{type}{\strong{butterworth}: A character string specifying filter type,
+one of: \code{c("low", "high", "stop", "pass")} (\code{"low"} is the
+\emph{default}).}
+
+\item{edges}{\strong{butterworth}: A character string specifying the edge
+padding, one of: \code{c("rev", "rep1", "none")} (\code{"rev"} is the
+\emph{default}). See \code{\link[=filter_butter]{filter_butter()}}.}
+
+\item{width}{\strong{moving_average}: An integer number of samples within
+the local window. One of either \code{width} or \code{span} must be specified.}
+
+\item{span}{\strong{moving_average}: A numeric time duration in units of
+\code{time_channel} within the local window. One of either \code{width} or
+\code{span} must be specified.}
+
+\item{partial}{\strong{moving_average}: Logical; default is \code{FALSE}, only
+returns values where a full window of valid (non-\code{NA}) samples are
+available. If \code{TRUE}, ignores \code{NA} and processes available valid samples
 (see \emph{Details}).}
 }
 \value{
@@ -67,6 +122,8 @@ using either:
 \item A Butterworth digital filter.
 \item A simple moving average.
 }
+
+Note the \code{method}-specific arguments below.
 }
 \details{
 \subsection{method = "smooth_spline"}{
@@ -79,14 +136,6 @@ which can be left as \code{NULL} and automatically determined via penalised
 log likelihood. This usually works well for responses occurring on the
 order of minutes or longer. \code{spar} can be specified typically, but not
 necessarily, in the range \verb{spar = [0, 1]}.
-
-Additional arguments (\code{...}) accepted when \code{method = "smooth_spline"}:
-
-\describe{
-\item{\code{spar}}{A numeric smoothing parameter passed to
-\code{\link[stats:smooth.spline]{stats::smooth.spline()}}. If \code{NULL} (\emph{default}), automatically
-determined via penalised log likelihood.}
-}
 }
 
 \subsection{method = "butterworth"}{
@@ -125,23 +174,6 @@ in Hz. Where \code{W = fc / (sample_rate / 2)}.
 
 Only one of either \code{W} or \code{fc} should be defined. If both are
 defined, \code{W} will be preferred over \code{fc}.
-
-Additional arguments (\code{...}) accepted when \code{method = "butterworth"}:
-
-\describe{
-\item{\code{order}}{An integer for the filter order (\emph{default} \code{2}).}
-\item{\code{W}}{A numeric fractional cutoff frequency within \verb{[0, 1]}. One
-of either \code{W} or \code{fc} must be specified.}
-\item{\code{fc}}{A numeric absolute cutoff frequency in Hz. Used with
-\code{sample_rate} to compute \code{W}.}
-\item{\code{sample_rate}}{A numeric sample rate in Hz. Will be taken from
-metadata or estimated from \code{time_channel} if not defined.}
-\item{\code{type}}{A character string specifying filter type, one of:
-\code{c("low", "high", "stop", "pass")} (\code{"low"} is the default).}
-\item{\code{edges}}{A character string specifying the edge padding, one of:
-\code{c("rev", "rep1", "none")} (\code{"rev"} is the default).
-See \code{\link[=filter_butter]{filter_butter()}}.}
-}
 }
 
 \subsection{method = "moving_average"}{
@@ -153,18 +185,6 @@ window, defined by either \code{width} as the number of samples around
 \code{idx} between \verb{[idx - floor(width/2), idx + floor(width/2)]}. Or by
 \code{span} as the timespan in units of \code{time_channel} between
 \verb{[t - span/2, t + span/2]}.
-
-Additional arguments (\code{...}) accepted when \code{method = "moving_average"}:
-
-\describe{
-\item{\code{width} or \code{span}}{Either an integer number of samples, or a
-numeric time duration in units of \code{time_channel} within the local
-window. One of either \code{width} or \code{span} must be specified.}
-\item{\code{partial}}{Logical; \code{FALSE} by default, only returns values
-where a full window of valid (non-\code{NA}) samples are available.
-If \code{TRUE}, ignores \code{NA} and allows calculation over partial windows
-at the edges of the data.}
-}
 }
 
 \subsection{Missing values}{

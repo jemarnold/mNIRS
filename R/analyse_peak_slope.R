@@ -189,7 +189,6 @@ rolling_slope <- function(
 #' @inheritParams find_kinetics_idx
 #' @inheritParams compute_local_windows
 #' @inheritParams replace_invalid
-#' @inheritParams filter_mnirs
 #' @inheritParams filter_ma
 #'
 #' @details

@@ -34,16 +34,15 @@ filter_moving_average(
 Default is \code{seq_along(x)}.}
 
 \item{width}{An integer defining the local window in number of samples
-centred on \code{idx}, between
-\verb{[idx - floor(width/2), idx + floor(width/2)]}.}
+centred on \code{idx}, between \verb{[idx - floor(width/2), idx + floor(width/2)]}.}
 
 \item{span}{A numeric value defining the local window time span around
 \code{idx} in units of \code{time_channel} or \code{t}, between
 \verb{[t - span/2, t + span/2]}.}
 
-\item{partial}{Logical; default is \code{FALSE}, requires local windows to have
-complete number of samples specified by \code{width} or \code{span}. If \code{TRUE},
-processes available samples within the local window. See \emph{Details}.}
+\item{partial}{Logical; default is \code{FALSE}, only returns values where a full
+window of valid (non-\code{NA}) samples are available. If \code{TRUE}, ignores \code{NA}
+and processes available valid samples (see \emph{Details}).}
 
 \item{na.rm}{Logical; default is \code{FALSE}, propagates any \code{NA}s to the
 returned vector. If \code{TRUE}, ignores \code{NA}s and processes available valid
