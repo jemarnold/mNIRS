@@ -75,7 +75,7 @@ resolve_channel_args <- function(
                     not recognised.",
                     "i" = "Per-channel named argument lists must match \\
                     {.arg nirs_channels} exactly."
-                ), call = env)
+                ), call = warn_call(env))
             }
             if (all(nzchar(keys))) {
                 omitted <- names(units)[!vapply(names(units), \(.key) {
@@ -85,7 +85,7 @@ resolve_channel_args <- function(
                     cli_warn(c(
                         "i" = "{.arg {(.nm)}}: channel{?s} {.val {omitted}} \\
                         not specified."
-                    ), call = env)
+                    ), call = warn_call(env))
                 }
             }
         })

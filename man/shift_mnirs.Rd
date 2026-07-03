@@ -173,6 +173,6 @@ data
         plot(data, time_labels = TRUE) +
             ggplot2::geom_hline(yintercept = 0, linetype = "dotted")
     }
-}  
+}
 
 }

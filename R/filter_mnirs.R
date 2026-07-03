@@ -546,7 +546,7 @@ filter_ma <- function(
         cli_warn(c(
             "!" = "{.arg x} contains internal {.val {NA}}'s.",
             "i" = "Set {.arg na.rm = TRUE} to ignore {.val {NA}}'s."
-        ), call = env)
+        ), call = warn_call(env))
     }
 
     ## processing ==============================================

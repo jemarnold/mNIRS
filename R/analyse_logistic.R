@@ -598,7 +598,7 @@ analyse_logistic <- function(
             "x" = "{.fn {as.character(fn)}} fit failed for \\
             {.field {(.nirs)}} in {.field {interval_name}}.",
             "!" = "{conditionMessage(e)}"
-        ), call = env)
+        ), call = warn_call(env))
         return(invisible(NULL))
     }
 

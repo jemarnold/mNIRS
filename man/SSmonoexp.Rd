@@ -66,7 +66,7 @@ y3 <- predict(model3, data)
         ggplot2::ggplot(data, ggplot2::aes(t, x)) +
             theme_mnirs() +
             ggplot2::geom_point() +
-            ggplot2::geom_line(ggplot2::aes(y = y4, colour = "4-param")) + 
+            ggplot2::geom_line(ggplot2::aes(y = y4, colour = "4-param")) +
             ggplot2::geom_line(ggplot2::aes(y = y3, colour = "3-param"))
     }
 }

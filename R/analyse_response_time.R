@@ -120,7 +120,7 @@ response_time <- function(
                     "!" = "No observations where {.arg t} <= {.arg t0} = \\
                     {.val {t0}}.",
                     "i" = "{.code x[1]} used as response baseline."
-                ), call = env)
+                ), call = warn_call(env))
             }
             baseline_idx <- 1L
             t0 <- t[baseline_idx]
@@ -154,7 +154,7 @@ response_time <- function(
             cli_warn(c(
                 "!" = "No valid {.val {direction}} extremes after {.arg t0}. \\
                 Returning {.val {NA}}."
-            ), call = env)
+            ), call = warn_call(env))
         }
         response_fitted <- NA_real_
     }

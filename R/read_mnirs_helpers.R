@@ -453,7 +453,7 @@ select_rename_data <- function(
             "!" = "Duplicate channel names detected.",
             "i" = "Renamed: {.val {paste(old, new, sep = ' = ')}}",
             "i" = "Unique channel names can be defined explicitly."
-        ), call = env)
+        ), call = warn_call(env))
     }
 
     return(list(
@@ -528,7 +528,7 @@ convert_type <- function(
             cli_warn(c(
                 "!" = "Channel {.val {(.nm)}} values coerced to {.val {NA}}.",
                 "i" = "Check the source data contents should be numeric values."
-            ), call = env)
+            ), call = warn_call(env))
         })
     }
 
@@ -709,7 +709,7 @@ detect_irregular_samples <- function(
         "!" = "Duplicate or irregular {.arg time_channel} samples detected.",
         "i" = info_msg,
         "i" = "Re-sample with {.fn mnirs::resample_mnirs}."
-    ), call = env)
+    ), call = warn_call(env))
 
     return(invisible())
 }

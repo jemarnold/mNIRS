@@ -406,7 +406,7 @@ analyse_kinetics_channels <- function(
                 poorly fitted or misparameterised model.",
                 "i" = "Check {.arg time_channel} and {.arg t0} values, or \\
                 consider using a different {.fn analyse_kinetics} method."
-            ), call = env)
+            ), call = warn_call(env))
         }
     }
 
@@ -649,7 +649,7 @@ compute_diagnostics <- function(
                 "!" = "{.arg x}, {.arg t}, and {.arg fitted} must be \\
                 {.cls numeric} vectors of equal lengths to return model \\
                 diagnostics."
-            ), call = env)
+            ), call = warn_call(env))
         }
         return(return_na)
     }
@@ -759,7 +759,7 @@ fix_coefs <- function(
         cli_warn(c(
             "x" = "Unknown model coefficient{?s}: {.val {invalid}}.",
             "i" = "Returning model with known coefficients."
-        ), call = env)
+        ), call = warn_call(env))
     }
 
     ## extract data from the model environment

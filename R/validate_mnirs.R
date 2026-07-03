@@ -498,7 +498,7 @@ validate_sample_rate <- function(
             `sample_rate = {.val {sample_rate_est}}`.",
             "i" = "Check that your sample rate and {.arg time_channel} \\
             values are consistent."
-        ), call = env)
+        ), call = warn_call(env))
     }
 
     return(sample_rate)
@@ -576,7 +576,7 @@ validate_t0 <- function(
                 "!" = "No observations where {.arg time_channel} <= \\
                 `t0 = {.val {t0}}`.",
                 "i" = "All samples included in response."
-            ), call = env)
+            ), call = warn_call(env))
         }
         t0 <- t_vec[1L]
     }
@@ -603,4 +603,15 @@ findInt_mnirs <- function(..., env = rlang::caller_env()) {
             decreasing, or {.val {NA}}s."
         ), call = env)
     })
+}
+
+
+#' trim caller call to bare function name for warning headers
+#' `env` accepts an environment or a call, e.g. from `sys.call(-1)`
+#' @keywords internal
+warn_call <- function(env = rlang::caller_env()) {
+    if (is.environment(env)) {
+        env <- rlang::frame_call(env)
+    }
+    return(env[1])
 }

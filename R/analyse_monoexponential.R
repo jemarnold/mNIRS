@@ -312,7 +312,7 @@ analyse_monoexponential <- function(
         if (n_params == 4L) {
             msg <- c(msg, "i" = "Attempting 3-parameter {.fn SSmonoexp} fit.")
         }
-        cli_warn(msg, call = env)
+        cli_warn(msg, call = warn_call(env))
         return(invisible(NULL))
     }
 

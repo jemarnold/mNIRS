@@ -120,13 +120,13 @@ rolling_slope <- function(
         ## return NA with warning
         if (n == 0L) {
             if (verbose) {
-                cli_warn(insufficient_warn, call = env)
+                cli_warn(insufficient_warn, call = warn_call(env))
             }
             return(numeric(0))
         }
         if (n == 1L || all(diff(t) == 0)) {
             if (verbose) {
-                cli_warn(insufficient_warn, call = env)
+                cli_warn(insufficient_warn, call = warn_call(env))
             }
             return(rep(NA_real_, n))
         }
@@ -148,7 +148,7 @@ rolling_slope <- function(
 
     if (n < min_obs) {
         if (verbose) {
-            cli_warn(insufficient_warn, call = env)
+            cli_warn(insufficient_warn, call = warn_call(env))
         }
         return(rep(NA_real_, n))
     }
@@ -163,7 +163,7 @@ rolling_slope <- function(
     )
 
     if (verbose && all(lengths(window_idx) < min_obs)) {
-        cli_warn(insufficient_warn, call = env)
+        cli_warn(insufficient_warn, call = warn_call(env))
     }
 
     slopes <- vapply(window_idx, \(.idx) {
@@ -318,7 +318,10 @@ peak_slope <- function(
 
     if (length(candidates) == 0L) {
         if (verbose) {
-            cli_warn(c("!" = "No {direction} slopes detected."), call = env)
+            cli_warn(
+                c("!" = "No {direction} slopes detected."),
+                call = warn_call(env)
+            )
         }
         return(na_result)
     }

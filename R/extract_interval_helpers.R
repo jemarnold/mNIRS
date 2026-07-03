@@ -282,7 +282,7 @@ resolve_interval <- function(
             "!" = "Unequal lengths for {.arg start} ({col_blue(n_start)}) \\
             and {.arg end} ({col_blue(n_end)}).",
             "i" = "Returning {col_blue(n_intervals)} paired interval{?s}."
-        ), call = env)
+        ), call = warn_call(env))
         start_time <- start_time[seq_len(n_intervals)]
         end_time <- end_time[seq_len(n_intervals)]
     }
@@ -441,7 +441,7 @@ apply_span <- function(
                 "!" = "{n_oob} Interval{?s} {.val {oob_ids}} {n_oob} \\
                 {?is/are} partially outside data bounds.",
                 "i" = "Returning available data only."
-            ), call = env)
+            ), call = warn_call(env))
         }
     }
 
@@ -541,7 +541,7 @@ ensemble_intervals <- function(
             "i" = "Re-sample with {.fn mnirs::resample_mnirs} before \\
             ensemble-averaging.",
             "i" = "Check your resulting data for inconsistent results."
-        ), call = env)
+        ), call = warn_call(env))
     }
 
     col_n <- length(nirs_channels)
@@ -665,7 +665,7 @@ apply_interval_groups <- function(
             "!" = "Duplicates detected of {qty(length(dupes))} \\
             interval{?s} {.val {dupes}}.",
             "i" = "Re-specify {.arg group_intervals} to remove duplicates."
-        ), call = env)
+        ), call = warn_call(env))
     }
 
     ## process each group
