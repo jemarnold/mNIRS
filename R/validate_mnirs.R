@@ -11,21 +11,21 @@
 #'   - If `NULL` (default), the `nirs_channels` metadata attribute of `data` is
 #'     used.
 #'
-#' @param time_channel A character string naming the time or sample column. 
+#' @param time_channel A character string naming the time or sample column.
 #'   Must match a column name in `data` exactly.
 #'   - If `NULL` (default), the `time_channel` metadata attribute of `data` is
 #'     used.
 #'
-#' @param event_channel A character string naming the event/lap column. Must 
+#' @param event_channel A character string naming the event/lap column. Must
 #'   match a column name in `data` exactly.
 #'   - If `NULL` (default), the `event_channel` metadata attribute of `data` is
 #'     used.
 #'
 #' @param as_list Logical. Default is `FALSE`. If `nirs_channels` is specified
 #'   as a list, it will be coerced to a flat character vector and an
-#'   information message is displayed (when `verbose = TRUE`). If `TRUE`,  
-#'   `nirs_channels` is returned as-is, i.e. as a list for callers which 
-#'   require it. 
+#'   information message is displayed (when `verbose = TRUE`). If `TRUE`,
+#'   `nirs_channels` is returned as-is, i.e. as a list for callers which
+#'   require it.
 #'
 #' @param required Logical. Default is `TRUE`. `event_channel` must be
 #'   present or detected in metadata. If `FALSE`, `event_channel` may be `NULL`.
@@ -49,7 +49,7 @@
 #' @param integer Logical. Default is `FALSE`. If `TRUE`, validate `x` as
 #'   integer-like values using [rlang::is_integerish()]. Otherwise tested as a
 #'   numeric value.
-#' 
+#'
 #' @param allow_na Logical. Default is `FALSE`. If `TRUE`, allows pass through
 #'   of `NA` to the returned numeric/integer vector.
 #'
@@ -157,8 +157,8 @@ validate_numeric <- function(
 
 #' @rdname validate_mnirs
 validate_mnirs_data <- function(
-    data, 
-    ncol = 2L, 
+    data,
+    ncol = 2L,
     env = rlang::caller_env()
 ) {
     ## validate is a data frame with at least two columns
@@ -250,7 +250,9 @@ validate_nirs_channels <- function(
     ## parse tidy eval input
     if (rlang::is_quosure(nirs_channels)) {
         nirs_channels <- parse_channel_name(
-            nirs_channels, data, rlang::quo_get_env(nirs_channels)
+            nirs_channels,
+            data,
+            rlang::quo_get_env(nirs_channels)
         )
     }
     nirs_unlisted <- unlist(nirs_channels)
@@ -315,7 +317,9 @@ validate_time_channel <- function(
     ## parse tidy eval input
     if (rlang::is_quosure(time_channel)) {
         time_channel <- parse_channel_name(
-            time_channel, data, rlang::quo_get_env(time_channel)
+            time_channel,
+            data,
+            rlang::quo_get_env(time_channel)
         )
     }
 
@@ -365,7 +369,9 @@ validate_event_channel <- function(
     ## parse tidy eval input
     if (rlang::is_quosure(event_channel)) {
         event_channel <- parse_channel_name(
-            event_channel, data, rlang::quo_get_env(event_channel)
+            event_channel,
+            data,
+            rlang::quo_get_env(event_channel)
         )
     }
     ## if not defined, check metadata
@@ -432,9 +438,7 @@ estimate_sample_rate <- function(x, env = rlang::caller_env()) {
         ), call = env)
     }
 
-    pretty_vals <- c(
-        0.25, 0.5, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 50, 60, 75, 100
-    )
+    pretty_vals <- c(0.25, 0.5, 1:5, seq(10, 30, 5), 50, 60, 75, 100)
     return(pretty_vals[which.min(abs(pretty_vals - sample_rate_raw))])
 }
 
@@ -479,8 +483,14 @@ validate_sample_rate <- function(
 
     ## warn when user-provided sample_rate disagrees with the estimate
     if (
-        verbose && !near_one(sample_rate) &&
-        !isTRUE(all.equal(sample_rate_est, sample_rate, tol = 0.5, scale = 1))
+        verbose &&
+            !near_one(sample_rate) &&
+            !isTRUE(all.equal(
+                sample_rate_est,
+                sample_rate,
+                tol = 0.5,
+                scale = 1
+            ))
     ) {
         cli_warn(c(
             "!" = "`sample_rate = {.val {sample_rate}}` appears to be \\

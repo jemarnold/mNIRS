@@ -21,7 +21,7 @@
 #'         span = c(-60, 120),
 #'         verbose = FALSE
 #'     )
-#' 
+#'
 #' print(x)
 #'
 #' @export
@@ -36,7 +36,7 @@ print.mnirs <- function(x, ...) {
 #'
 #' Generic methods for objects returned from [analyse_kinetics()].
 #'
-#' @param x Object of class `"mnirs_kinetics"` returned from 
+#' @param x Object of class `"mnirs_kinetics"` returned from
 #'   [analyse_kinetics()].
 #' @param ... Additional arguments.
 #'
@@ -131,4 +131,3 @@ print.mnirs_kinetics <- function(x, ...) {
     }
     cat("\n\n")
 }
-

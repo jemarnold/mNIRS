@@ -15,7 +15,9 @@ read_file <- function(file_path, env = rlang::caller_env()) {
         ## sample lines for separator and column count detection
         ## strip whitespace inside quoted fields and around line edges
         lines <- trimws(gsub(
-            '\\s*"\\s*', '"', readLines(file_path, warn = FALSE)
+            '\\s*"\\s*',
+            '"',
+            readLines(file_path, warn = FALSE)
         ))
         nrows <- length(lines)
 
@@ -270,9 +272,11 @@ extract_start_timestamp <- function(file_header) {
 
     ## search for POSIXct values, return the earliest time value
     ## vulnerable to invalid timestamps
-    parsed <- which(!is.na(vapply(header_values, \(.x) {
+    parsed <- which(
+        !is.na(vapply(header_values, \(.x) {
         as.POSIXct(.x, tryFormats = dttm_opts, optional = TRUE)
-    }, numeric(1L))))
+    }, numeric(1L)))
+    )
 
     if (length(parsed) == 0L) {
         return(NULL)
@@ -559,7 +563,8 @@ parse_time_channel <- function(
         t_vec <- as.POSIXct(
             as.character(as.POSIXct(Sys.Date(), "UTC")),
             tz = Sys.timezone()
-        ) + t_vec * 86400
+        ) +
+            t_vec * 86400
     }
 
     ## recalculate numeric time to start from zero
@@ -589,7 +594,9 @@ parse_time_channel <- function(
         ## then return NULL and don't append column
         if (!is.null(start_timestamp)) {
             start_time <- as.POSIXct(
-                start_timestamp, tryFormats = dttm_opts, optional = TRUE
+                start_timestamp,
+                tryFormats = dttm_opts,
+                optional = TRUE
             )
             data$timestamp <- start_time + t_vec
         } else if (!is.null(timestamp_vec)) {

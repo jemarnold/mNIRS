@@ -3,7 +3,7 @@
 #' @description
 #' Fit parametric or non-parametric kinetics for each `nirs_channel` within an
 #' *"mnirs"* data frame, a list of data frames, or a grouped data frame.
-#' 
+#'
 #' Note the `method`-specific arguments below.
 #'
 #' @param data A data frame of class *"mnirs"* containing time series data and

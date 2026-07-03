@@ -20,7 +20,7 @@
 #' single data frame and displayed as faceted panels via
 #' [ggplot2::facet_wrap()].
 #'
-#' Accepts some arguments in `...`, such as `nrow`, `ncol`, and `scales` 
+#' Accepts some arguments in `...`, such as `nrow`, `ncol`, and `scales`
 #' passed to [ggplot2::facet_wrap()]. `n.breaks` overrides the default number
 #' of y-axis breaks. `breaks` overrides the x-axis breaks directly.
 #'
@@ -33,17 +33,17 @@
 #'     time_channel = c(time = "Timestamp (seconds passed)"),
 #'     verbose = FALSE
 #' )
-#' 
+#'
 #' ## plot time labels as "hh:mm:ss"
 #' plot(data, time_labels = TRUE)
-#' 
+#'
 #' data_list <- extract_intervals(
 #'     data,
 #'     start = by_time(2452, 3168),
 #'     span = c(-60, 120),
 #'     verbose = FALSE
 #' )
-#' 
+#'
 #' ## plot a list of mnirs data frames as faceted panels
 #' plot(data_list, time_labels = TRUE)
 #'
@@ -129,10 +129,12 @@ plot.mnirs <- function(
     ## facet when plotting multiple mnirs data frames
     if ("interval" %in% names(x)) {
         facet_args <- intersect(
-            names(args), names(formals(ggplot2::facet_wrap))
+            names(args),
+            names(formals(ggplot2::facet_wrap))
         )
         scales_arg <- args[["scales"]] %||% "free_x"
-        plot <- plot + do.call(
+        plot <- plot +
+            do.call(
             ggplot2::facet_wrap,
             c(
                 list(facets = ~interval, scales = scales_arg),
@@ -211,7 +213,8 @@ as_plot_data <- function(x, env = rlang::caller_env()) {
     }, x, names(x))
     plot_data <- do.call(rbind, unname(x))
     plot_data[["interval"]] <- factor(
-        plot_data[["interval"]], levels = unique(plot_data[["interval"]])
+        plot_data[["interval"]],
+        levels = unique(plot_data[["interval"]])
     )
     attr(plot_data, "nirs_channels") <- nirs_channels
     attr(plot_data, "time_channel") <- time_channels[[1L]]

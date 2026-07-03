@@ -39,13 +39,17 @@ signif_trailing <- function(
     if (format == "digits") {
         validate_numeric(x)
         validate_numeric(digits, 1, c(-Inf, Inf), FALSE, TRUE)
-        if (trim) digits <- min(digits, count_decimals(x))
+        if (trim) {
+            digits <- min(digits, count_decimals(x))
+        }
         formatC_x <- round(x, digits)
         formatC_format <- "f"
     } else {
         ## if whole digits >= sig figs, return rounded whole number
         ## x & digits validated by `signif_whole`
-        if (trim) digits <- min(digits, count_sigfigs(x))
+        if (trim) {
+            digits <- min(digits, count_sigfigs(x))
+        }
         formatC_x <- signif_whole(x, digits)
         formatC_format <- "fg"
     }
@@ -162,8 +166,8 @@ signif_whole <- function(x, digits = 5L) {
 #' `signif_pvalue()` displays p-values as either formatted numeric strings
 #' or significance symbols.
 #'
-#' @param format Indicates how to treat `digits`. Either the desired 
-#'   significance criteria over which to display the absolute p value 
+#' @param format Indicates how to treat `digits`. Either the desired
+#'   significance criteria over which to display the absolute p value
 #'   (`format = "digits"`, the *default*), or the smallest significance
 #'   criteria to print as less than (`format = "signif"`).
 #' @param display Specifies output type, either *"value"* (the *default*) for
@@ -179,7 +183,7 @@ signif_whole <- function(x, digits = 5L) {
 #' `signif_pvalue()`
 #'
 #' - When `format = "digits"` and e.g. `digits = 3`, `x` is rounded to 3
-#'   decimal places, or shown as *"p < 0.001"* below a 3-decimal place 
+#'   decimal places, or shown as *"p < 0.001"* below a 3-decimal place
 #'   significance threshold.
 #' - `digits = 1` with `format = "digits"` displays *"p < `alpha`"*,
 #'   e.g. *"p < 0.05"*.
@@ -247,7 +251,7 @@ signif_pvalue <- function(
         above <- thresholds[thresholds > .p]
         if (length(above) == 0L) NA_real_ else min(above)
     }, numeric(1))
-    
+
     # compute formatted_threshold only for non-NA nearest values
     formatted_threshold <- rep(NA_character_, length(nearest))
     valid <- !is.na(nearest)
@@ -270,7 +274,7 @@ signif_pvalue <- function(
 #' specified step size or a desired output length.
 #'
 #' @param x A numeric vector.
-#' @param by A numeric step size for the output sequence. *Default* is `1`. 
+#' @param by A numeric step size for the output sequence. *Default* is `1`.
 #'   Sign determines order of returned vector (negative `by` returns a
 #'   descending sequence). `direction` takes precedence over `by` sign.
 #' @param length.out A positive integer giving the desired length of the
@@ -307,7 +311,9 @@ seq_range <- function(
         match.arg(direction)
     }
     x_range <- range(x, na.rm = TRUE)
-    if (direction == "down") x_range <- rev(x_range)
+    if (direction == "down") {
+        x_range <- rev(x_range)
+    }
     if (!is.null(length.out)) {
         return(seq(x_range[1L], x_range[2L], length.out = length.out))
     }

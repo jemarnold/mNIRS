@@ -117,7 +117,10 @@ resolve_channel_args <- function(
                 .a <- .a[[1L]]
             }
             .a <- rlang::arg_match0(
-                .a, choices[[.nm]], arg_nm = .nm, error_call = env
+                .a,
+                choices[[.nm]],
+                arg_nm = .nm,
+                error_call = env
             )
         }
         return(.a)
@@ -218,7 +221,8 @@ validate_group_channels <- function(
     ## channels omitted from custom groups are processed independently,
     ## matching `group_intervals` behaviour for unspecified intervals
     group_channels <- c(
-        group_channels, as.list(setdiff(nirs_channels, members))
+        group_channels,
+        as.list(setdiff(nirs_channels, members))
     )
 
     ## name unnamed groups by their first member

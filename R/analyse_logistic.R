@@ -557,7 +557,11 @@ analyse_logistic <- function(
     )
     ## validate resolved args once, before fitting any channel
     per_channel <- validate_kinetics_args(
-        per_channel, data, t_vec, verbose, env = env
+        per_channel,
+        data,
+        t_vec,
+        verbose,
+        env = env
     )
 
     ## NA scaffold (method columns only) for convergence failure
@@ -651,7 +655,12 @@ analyse_logistic <- function(
                 fitted     = fitted_vals
             ),
             diag = compute_diagnostics(
-                x_fit, t_fit, fitted_vals, n_params = 4L, verbose, env
+                x_fit,
+                t_fit,
+                fitted_vals,
+                n_params = 4L,
+                verbose,
+                env
             )
         )
     }

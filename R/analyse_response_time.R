@@ -239,7 +239,11 @@ analyse_response_time <- function(
     )
     ## validate resolved args once, before fitting any channel
     per_channel <- validate_kinetics_args(
-        per_channel, data, t_vec, verbose, env = env
+        per_channel,
+        data,
+        t_vec,
+        verbose,
+        env = env
     )
 
     ## method-specific fit: fractional response time (no model fit)

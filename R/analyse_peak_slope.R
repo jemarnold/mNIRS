@@ -155,7 +155,11 @@ rolling_slope <- function(
 
     ## processing =================================================
     window_idx <- compute_local_windows(
-        t, width = width, span = span, align = align, env = env
+        t,
+        width = width,
+        span = span,
+        align = align,
+        env = env
     )
 
     if (verbose && all(lengths(window_idx) < min_obs)) {
@@ -180,7 +184,7 @@ rolling_slope <- function(
 #' numeric vector using rolling least-squares regression, and return a list
 #' of regression parameters for the peak window. Vector-level companion to
 #' [analyse_kinetics()] when `method = "peak_slope"`.
-#' 
+#'
 #' @param ... Additional arguments.
 #' @inheritParams find_kinetics_idx
 #' @inheritParams compute_local_windows
@@ -221,7 +225,7 @@ rolling_slope <- function(
 #'
 #' ## Missing values
 #'
-#' When `na.rm = FALSE` (the default), any `NA` in a window propagates `NA` 
+#' When `na.rm = FALSE` (the default), any `NA` in a window propagates `NA`
 #' to the returned slope. When `na.rm = TRUE`, `NA`s are ignored and the slope
 #' is computed from the remaining valid samples.
 #'
@@ -425,7 +429,11 @@ analyse_peak_slope <- function(
     )
     ## validate resolved args once, before fitting any channel
     per_channel <- validate_kinetics_args(
-        per_channel, data, t_vec, verbose, env = env
+        per_channel,
+        data,
+        t_vec,
+        verbose,
+        env = env
     )
 
     ## method-specific fit: peak rolling linear slope

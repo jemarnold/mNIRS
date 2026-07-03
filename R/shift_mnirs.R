@@ -33,7 +33,7 @@
 #'
 #' - `group_channels = "distinct"` shifts each channel independently,
 #'   losing relative scaling between channels.
-#' 
+#'
 #' - A `list()` of channel-name vectors (e.g. `list(c("A", "B"), c("C", "D"))`)
 #'   shifts channels `A` & `B` together and `C` & `D` together, preserving
 #'   relative scaling within, but not between groups. `nirs_channels`
@@ -46,7 +46,7 @@
 #'   be defined for each `group_channels`. If both of either pairing are
 #'   defined, `to` will be preferred over `by`, and `width` will be preferred
 #'   over `span`.
-#' 
+#'
 #' - Channels (columns) in `data` not in `nirs_channels` are passed
 #'   through without processing to the output data frame.
 #'
@@ -58,7 +58,7 @@
 #'
 #' Arguments apply globally to all `nirs_channels` by default. Relevant
 #' arguments can instead be supplied uniquely per-channel as a named `list()`,
-#' with names matching either `nirs_channels` or list names in 
+#' with names matching either `nirs_channels` or list names in
 #' `group_channels`, e.g.:
 #'
 #' ```r
@@ -75,8 +75,8 @@
 #'
 #' - A non-list value applies to every channel (the *default* behaviour).
 #' - A `list()` named by `nirs_channels` or `group_channels` applies
-#'   per-channel / per-group values. 
-#' - A single unnamed value in the list will be applied to unlisted channels 
+#'   per-channel / per-group values.
+#' - A single unnamed value in the list will be applied to unlisted channels
 #'   (e.g. `span = list(3, hhb = 5)` gives `hhb` 5 and every other channel 3).
 #'   If no unnamed fallback value in the list, channels not named in the list
 #'   will be returned un-processed (e.g. `span = list(hhb = 5)` will only
@@ -112,7 +112,7 @@
 #'         plot(data, time_labels = TRUE) +
 #'             ggplot2::geom_hline(yintercept = 0, linetype = "dotted")
 #'     }
-#' }  
+#' }
 #'
 #' @export
 shift_mnirs <- function(
@@ -145,7 +145,9 @@ shift_mnirs <- function(
     }
     nirs_channels <- validate_nirs_channels(nirs_parsed, data, verbose)
     group_channels <- validate_group_channels(
-        nirs_channels, enquo(group_channels), data
+        nirs_channels,
+        enquo(group_channels),
+        data
     )
     time_channel <- validate_time_channel(enquo(time_channel), data)
     t_vec <- data[[time_channel]]

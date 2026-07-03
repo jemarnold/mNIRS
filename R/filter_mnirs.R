@@ -13,24 +13,24 @@
 #'      \item{`"butterworth"`}{Uses a centred Butterworth digital filter.}
 #'      \item{`"moving_average"`}{Uses a centred moving average filter.}
 #'   }
-#' @param na.rm Logical; default is `FALSE`, propagates any `NA`s to the 
-#'   returned vector. If `TRUE`, ignores `NA`s and processes available valid 
-#'   samples within the local window. May return errors or warnings. (see 
+#' @param na.rm Logical; default is `FALSE`, propagates any `NA`s to the
+#'   returned vector. If `TRUE`, ignores `NA`s and processes available valid
+#'   samples within the local window. May return errors or warnings. (see
 #'   *Details*).
-#' @param ... Additional method-specific arguments must be specified 
+#' @param ... Additional method-specific arguments must be specified
 #'   (see *Details*).
 #' @inheritParams validate_mnirs
 #'
 #' @details
 #' ## method = "smooth_spline"
-#' 
+#'
 #' Aliases: `method = c("smooth spline", "spline")`
 #'
 #' Applies a non-parametric cubic smoothing spline from
 #' [stats::smooth.spline()]. Smoothing is defined by the parameter `spar`,
 #' which can be left as `NULL` and automatically determined via penalised
-#' log likelihood. This usually works well for responses occurring on the 
-#' order of minutes or longer. `spar` can be specified typically, but not 
+#' log likelihood. This usually works well for responses occurring on the
+#' order of minutes or longer. `spar` can be specified typically, but not
 #' necessarily, in the range `spar = [0, 1]`.
 #'
 #' Additional arguments (`...`) accepted when `method = "smooth_spline"`:
@@ -42,7 +42,7 @@
 #' }
 #'
 #' ## method = "butterworth"
-#' 
+#'
 #' Aliases: `method = c("butter")`
 #'
 #' Applies a centred (two-pass symmetrical) Butterworth digital filter
@@ -72,7 +72,7 @@
 #'
 #' Alternatively, the cutoff frequency can be defined by `fc` and
 #' `sample_rate` together. `fc` represents the desired cutoff frequency
-#' directly in Hz, and `sample_rate` is the sample rate of the recorded data 
+#' directly in Hz, and `sample_rate` is the sample rate of the recorded data
 #' in Hz. Where `W = fc / (sample_rate / 2)`.
 #'
 #' Only one of either `W` or `fc` should be defined. If both are
@@ -91,12 +91,12 @@
 #'   \item{`type`}{A character string specifying filter type, one of:
 #'       `c("low", "high", "stop", "pass")` (`"low"` is the default).}
 #'   \item{`edges`}{A character string specifying the edge padding, one of:
-#'       `c("rev", "rep1", "none")` (`"rev"` is the default). 
+#'       `c("rev", "rep1", "none")` (`"rev"` is the default).
 #'       See [filter_butter()].}
 #' }
 #'
 #' ## method = "moving_average"
-#' 
+#'
 #' Aliases: `method = c("moving average", "ma")`
 #'
 #' Applies a centred (symmetrical) moving average filter in a local
@@ -109,14 +109,14 @@
 #'
 #' \describe{
 #'   \item{`width` or `span`}{Either an integer number of samples, or a
-#'       numeric time duration in units of `time_channel` within the local 
+#'       numeric time duration in units of `time_channel` within the local
 #'       window. One of either `width` or `span` must be specified.}
 #'   \item{`partial`}{Logical; `FALSE` by default, only returns values
-#'       where a full window of valid (non-`NA`) samples are available. 
-#'       If `TRUE`, ignores `NA` and allows calculation over partial windows 
+#'       where a full window of valid (non-`NA`) samples are available.
+#'       If `TRUE`, ignores `NA` and allows calculation over partial windows
 #'       at the edges of the data.}
 #' }
-#' 
+#'
 #' ## Missing values
 #'
 #' Missing values (`NA`) in `nirs_channels` will cause an error for
@@ -148,7 +148,7 @@
 #'         width = 7,
 #'         verbose = FALSE
 #'     )
-#' 
+#'
 #' data
 #'
 #' data_filtered <- filter_mnirs(
@@ -159,7 +159,7 @@
 #'     type = "low",           ## specify a "low-pass" filter
 #'     na.rm = TRUE            ## explicitly ignore NAs
 #' )
-#' 
+#'
 #' ## note the smoothed `smo2` values
 #' data_filtered
 #'
@@ -201,13 +201,13 @@ filter_mnirs <- function(
         ignore.case = TRUE
     )
     method <- match.arg(method)
-    
+
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
 
     UseMethod(
-        "filter_mnirs", 
+        "filter_mnirs",
         structure(data, class = c(method, "mnirs_filtered"))
     )
 }
@@ -461,7 +461,7 @@ filter_mnirs.moving_average <- function(
 #' `filter_moving_average()` is an alias of `filter_ma()`.
 #'
 #' @param partial Logical; default is `FALSE`, requires local windows to have
-#'   complete number of samples specified by `width` or `span`. If `TRUE`, 
+#'   complete number of samples specified by `width` or `span`. If `TRUE`,
 #'   processes available samples within the local window. See *Details*.
 #' @inheritParams replace_invalid
 #' @inheritParams shift_mnirs
@@ -469,7 +469,7 @@ filter_mnirs.moving_average <- function(
 #'
 #' @details
 #' ## Rolling window
-#' 
+#'
 #' Applies a centred (symmetrical) moving average filter in a local
 #' window, defined by either `width` as the number of samples around
 #' `idx` between `[idx - floor(width/2), idx + floor(width/2)]`. Or by
@@ -481,15 +481,15 @@ filter_mnirs.moving_average <- function(
 #' The default `partial = FALSE` requires a complete number of samples
 #' specified by `width` or `span` (estimated from the sample rate of `t` when
 #' `span` is used). `NA` is returned if fewer samples are present in the
-#' local window. 
-#' 
-#' Setting `partial = TRUE` allows computation with only a single valid sample, 
-#' such as at edge conditions. But these values will be more sensitive to 
+#' local window.
+#'
+#' Setting `partial = TRUE` allows computation with only a single valid sample,
+#' such as at edge conditions. But these values will be more sensitive to
 #' noise and should be used with caution.
 #'
 #' ## Missing values
 #'
-#' `na.rm` controls whether missing values (`NA`s) within each local window are 
+#' `na.rm` controls whether missing values (`NA`s) within each local window are
 #' either propagated to the returned vector when `na.rm = FALSE` (the default),
 #' or ignored before processing if `na.rm = TRUE`.
 #'
@@ -551,7 +551,10 @@ filter_ma <- function(
 
     ## processing ==============================================
     window_idx <- compute_local_windows(
-        t, width = width, span = span, env = env
+        t,
+        width = width,
+        span = span,
+        env = env
     )
 
     if (!partial) {
@@ -635,7 +638,7 @@ filter_moving_average <- function(
 #'   }
 #' @param edges A character string indicating edge detection padding for `x`.
 #'   \describe{
-#'      \item{`"rev"`}{Will pad `x` with the preceding 5% data in reverse 
+#'      \item{`"rev"`}{Will pad `x` with the preceding 5% data in reverse
 #'      sequence (*the default*).}
 #'      \item{`"rep1"`}{Will pad `x` by repeating the last preceding value.}
 #'      \item{`"none"`}{Will return the unpadded [signal::filtfilt()] output.}

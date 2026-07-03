@@ -1,4 +1,4 @@
 [format]
 line-width = 80
 indent-width = 4
-skip = ["lapply", "sapply", "vapply", "mapply", "tapply", "do.call", "Map", "Position", "Find", "Reduce", "accumulate", "validate_numeric", "cli_abort", "cli_warn", "cli_inform", "validate_nirs_channels", "validate_time_channel", "validate_event_channel", "validate_sample_rate", "compute_local_windows", "compute_local_fun", "compute_outliers", "find_interval_time"]
+skip = ["lapply", "sapply", "vapply", "mapply", "tapply", "do.call", "Map", "Position", "Find", "Reduce", "accumulate", "cli_abort", "cli_warn", "cli_inform", "validate_numeric", "validate_mnirs_data", "validate_nirs_channels", "validate_time_channel", "validate_event_channel", "validate_sample_rate", "validate_width_span"]

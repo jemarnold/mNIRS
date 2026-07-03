@@ -1,7 +1,7 @@
 #' Extract intervals from *{mnirs}* data
 #'
 #' Extract intervals from *"mnirs"* time series data, specifying interval
-#' start and end boundaries by time value, event label, lap number, or sample 
+#' start and end boundaries by time value, event label, lap number, or sample
 #' index.
 #'
 #' @param nirs_channels A character vector or a `list()` of character vectors
@@ -13,8 +13,8 @@
 #'   - If `NULL` (default), channels are retrieved from *"mnirs"* metadata.
 #'
 #' @param event_channel An *optional* character string giving the name of an
-#'   event/lap column. The column may contain character event labels or integer 
-#'   lap numbers. 
+#'   event/lap column. The column may contain character event labels or integer
+#'   lap numbers.
 #'   - Required when using [by_label()] or [by_lap()] for `start` or `end`.
 #'   - Retrieved from metadata if not defined explicitly.
 #'
@@ -43,16 +43,16 @@
 #'   for lap numbers -- or created with [by_time()], [by_label()], [by_lap()],
 #'   or [by_sample()].
 #'
-#' @param span A one- or two-element numeric vector `c(before, after)` in units 
-#'   of `time_channel`, or a `list()` of such vectors. (*default* 
+#' @param span A one- or two-element numeric vector `c(before, after)` in units
+#'   of `time_channel`, or a `list()` of such vectors. (*default*
 #'   `span = c(-60, 60)`. Applied additively to interval boundaries:
 #'   - When both `start` and `end` are specified: `span[1]` shifts start times,
 #'     `span[2]` shifts end times.
 #'   - When only `start` or only `end` is specified: both `span[1]` and
 #'     `span[2]` apply as a window around the event).
-#'   - A single *positive* value is recycled to shift the end times (e.g. 
+#'   - A single *positive* value is recycled to shift the end times (e.g.
 #'     `span = 60` -> `c(0, 60)`).
-#'   - A single *negative* value is recycled to shift the start times (e.g. 
+#'   - A single *negative* value is recycled to shift the start times (e.g.
 #'     `span = -60` -> `c(-60, 0)`).
 #'
 #' @param zero_time Logical. Default is `FALSE`. If `TRUE`, re-calculates
@@ -67,7 +67,7 @@
 #' @details
 #' ## Interval specification
 #'
-#' Interval `start` and `end` boundaries are specified using helper functions, 
+#' Interval `start` and `end` boundaries are specified using helper functions,
 #' or by passing raw values directly:
 #'
 #' \describe{
@@ -79,10 +79,10 @@
 #'   \item{[by_sample()]}{Integer sample indices (row numbers).}
 #' }
 #'
-#' Raw values supplied to `start`/`end` are auto-coerced: 
+#' Raw values supplied to `start`/`end` are auto-coerced:
 #'   - Numeric -> [by_time()]
 #'   - Character -> [by_label()],
-#'   - Explicit integer (e.g. `2L`) -> [by_lap()]. 
+#'   - Explicit integer (e.g. `2L`) -> [by_lap()].
 #'   - Use [by_sample()] explicitly for sample indices.
 #'
 #' `start` and `end` can use different specification types (e.g., start by
@@ -90,18 +90,18 @@
 #'
 #' ## Time span window
 #'
-#' `span` additively expands the time span window around interval boundaries. 
-#' 
+#' `span` additively expands the time span window around interval boundaries.
+#'
 #' - A two-value vector expands the `start` and `end`, respectively:
-#'   `span = c(-60, 60)` expands the `start` earlier by `60`, and the `end` 
-#'   later by `60`. For example, 
+#'   `span = c(-60, 60)` expands the `start` earlier by `60`, and the `end`
+#'   later by `60`. For example,
 #'   `start = by_time(30), end = by_time(60), span = c(-5, 10)` returns an
 #'   interval of `[25, 70]`.
-#' - A single numeric value is recycled according to the sign: `span = -60` 
-#'   becomes `c(-60, 0)` to expand the `start` earlier. `span = 60` becomes 
+#' - A single numeric value is recycled according to the sign: `span = -60`
+#'   becomes `c(-60, 0)` to expand the `start` earlier. `span = 60` becomes
 #'   `c(0, 60)` to expand the `end` later.
 #' - If only `start` is specified alone, both span values expand the single
-#'   boundary window: `start = by_time(30), span = c(-5, 60)` returns 
+#'   boundary window: `start = by_time(30), span = c(-5, 60)` returns
 #'   `[25, 90]`.
 #'
 #' ## Per-interval nirs_channels for ensemble-averaging
@@ -165,7 +165,7 @@
 #'     verbose = FALSE
 #' ) |>
 #'     ## avoid issues ensemble-averaging irregular samples
-#'     resample_mnirs(method = "linear", verbose = FALSE) 
+#'     resample_mnirs(method = "linear", verbose = FALSE)
 #'
 #' ## ensemble-average across multiple intervals
 #' interval_list <- extract_intervals(
@@ -239,12 +239,10 @@ extract_intervals <- function(
     }
 
     ## resolve event_channel if by_label or by_lap is used
-    uses_event_channel <- (
-        inherits(start, "mnirs_interval") && start$type %in% c("label", "lap")
-    ) || (
-        inherits(end, "mnirs_interval") && end$type %in% c("label", "lap")
-    )
-    
+    uses_event_channel <- (inherits(start, "mnirs_interval") &&
+        start$type %in% c("label", "lap")) ||
+        (inherits(end, "mnirs_interval") && end$type %in% c("label", "lap"))
+
     ## report conditions raised in handlers/lambdas from this function
     env <- environment()
     if (uses_event_channel) {
@@ -268,8 +266,10 @@ extract_intervals <- function(
     }
 
     if (
-        verbose && group_intervals[1L] != "distinct" &&
-            is.null(attr(data, "nirs_channels")) && !is.list(nirs_channels)
+        verbose &&
+            group_intervals[1L] != "distinct" &&
+            is.null(attr(data, "nirs_channels")) &&
+            !is.list(nirs_channels)
     ) {
         cli_inform(c(
             "!" = "{.fn extract_intervals} accepts {.arg nirs_channels} = \\
@@ -293,7 +293,10 @@ extract_intervals <- function(
 
     ## recycle params to match number of intervals
     nirs_channels <- recycle_param(
-        nirs_channels, n_events, group_intervals, verbose
+        nirs_channels,
+        n_events,
+        group_intervals,
+        verbose
     )
     span <- recycle_param(span, n_events, group_intervals, verbose)
 
@@ -305,7 +308,12 @@ extract_intervals <- function(
 
     ## apply grouping logic ====================================
     result <- apply_interval_groups(
-        df_list, nirs_channels, metadata, group_intervals, zero_time, verbose
+        df_list,
+        nirs_channels,
+        metadata,
+        group_intervals,
+        zero_time,
+        verbose
     )
 
     ## add class "mnirs" ========================================

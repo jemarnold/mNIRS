@@ -21,7 +21,7 @@
 #'      \item{`"distinct"`}{Operate on each channel independently, losing
 #'      the relative scaling between channels.}
 #'      \item{`list(c("A", "B"), c("C", "D"))`}{Operate on channels `A` & `B`
-#'      in one group, and `C` & `D` in another group. Groups can be named 
+#'      in one group, and `C` & `D` in another group. Groups can be named
 #'      (e.g. `list(smo2 = c("A", "B"))`).}
 #'   }
 #' @param range A numeric vector in the form `c(min, max)`, indicating the
@@ -43,7 +43,7 @@
 #'   rescales channels `A` & `B` together and `C` & `D` together, preserving
 #'   relative scaling within, but not between groups. `nirs_channels`
 #'   omitted from the list are rescaled independently.
-#' 
+#'
 #' - Channel groups can be named (e.g. `list(smo2 = c("A", "B"))`) and names
 #'   used as keys for per-group `range` argument.
 #'
@@ -74,7 +74,7 @@
 #'         group_channels = "distinct",
 #'         range = c(0, 100)  ## rescale to a 0-100% functional exercise range
 #'     )
-#' 
+#'
 #' data
 #'
 #' \donttest{
@@ -111,7 +111,9 @@ rescale_mnirs <- function(
     }
     nirs_channels <- validate_nirs_channels(nirs_parsed, data, verbose)
     group_channels <- validate_group_channels(
-        nirs_channels, enquo(group_channels), data
+        nirs_channels,
+        enquo(group_channels),
+        data
     )
 
     ## broadcast global args, applying per-channel/per-group overrides

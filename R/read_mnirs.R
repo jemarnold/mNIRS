@@ -165,13 +165,21 @@ read_mnirs <- function(
 
     ## attempt to detect `time_channel` automatically
     time_channel <- detect_time_channel(
-        data, time_channel, nirs_device, verbose
+        data,
+        time_channel,
+        nirs_device,
+        verbose
     )
 
     ## rename from channel names, make duplicates unique, keep columns
     ## return list(data_renamed, nirs_renamed, time_renamed, event_renamed)
     renamed_list <- select_rename_data(
-        data, nirs_channels, time_channel, event_channel, keep_all, verbose
+        data,
+        nirs_channels,
+        time_channel,
+        event_channel,
+        keep_all,
+        verbose
     )
     data <- renamed_list$data
     nirs_renamed <- renamed_list$nirs_channel
@@ -182,12 +190,20 @@ read_mnirs <- function(
     data <- remove_empty_rows_cols(data)
     ## convert char decimal "," to "." and convert column types
     data <- convert_type(
-        data, nirs_renamed, time_renamed, event_renamed, verbose
+        data,
+        nirs_renamed,
+        time_renamed,
+        event_renamed,
+        verbose
     )
     ## convert POSIXct to numeric and/or recalc time from zero
     ## return list(data, start_timestamp) — start_timestamp from time_channel POSIXct
     time_list <- parse_time_channel(
-        data, time_renamed, start_timestamp, add_timestamp, zero_time
+        data,
+        time_renamed,
+        start_timestamp,
+        add_timestamp,
+        zero_time
     )
     data <- time_list$data
 
@@ -200,7 +216,12 @@ read_mnirs <- function(
     ## will write new "time" column if Oxysoft export rate detected
     ## return list(data_sampled, time_renamed, sample_rate)
     sample_list <- parse_sample_rate(
-        data, file_header, time_renamed, sample_rate, nirs_device, verbose
+        data,
+        file_header,
+        time_renamed,
+        sample_rate,
+        nirs_device,
+        verbose
     )
     data <- sample_list$data
     time_renamed <- sample_list$time_channel

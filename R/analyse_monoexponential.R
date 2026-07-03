@@ -163,7 +163,7 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #' 4-parameter model: `x ~ SSmonoexp(t, A, B, tau, TD)`
 #'
 #' The 3-parameter form is recommended for small samples or when no obvious
-#'   time delay is expected, as it converges more reliably. [stats::nls()] 
+#'   time delay is expected, as it converges more reliably. [stats::nls()]
 #'   reads the free parameters from the formula right-hand side, so omitting
 #'   `TD` incurs no degrees-of-freedom penalty.
 #'
@@ -197,7 +197,7 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #'         ggplot2::ggplot(data, ggplot2::aes(t, x)) +
 #'             theme_mnirs() +
 #'             ggplot2::geom_point() +
-#'             ggplot2::geom_line(ggplot2::aes(y = y4, colour = "4-param")) + 
+#'             ggplot2::geom_line(ggplot2::aes(y = y4, colour = "4-param")) +
 #'             ggplot2::geom_line(ggplot2::aes(y = y3, colour = "3-param"))
 #'     }
 #' }
@@ -278,7 +278,11 @@ analyse_monoexponential <- function(
     )
     ## validate resolved args once, before fitting any channel
     per_channel <- validate_kinetics_args(
-        per_channel, data, t_vec, verbose, env = env
+        per_channel,
+        data,
+        t_vec,
+        verbose,
+        env = env
     )
 
     ## NA scaffold (method columns only) for convergence failure
@@ -381,7 +385,12 @@ analyse_monoexponential <- function(
                 fitted     = fitted_vals
             ),
             diag = compute_diagnostics(
-                x_fit, t_fit, fitted_vals, n_params, verbose, env
+                x_fit,
+                t_fit,
+                fitted_vals,
+                n_params,
+                verbose,
+                env
             )
         )
     }

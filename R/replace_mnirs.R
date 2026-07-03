@@ -2,7 +2,7 @@
 #'
 #' Detect and replace local outliers, specified invalid values, and missing
 #' `NA` values across `nirs_channels` within an *"mnirs"* data frame.
-#' `replace_mnirs()` operates on a data frame, extending the vectorised 
+#' `replace_mnirs()` operates on a data frame, extending the vectorised
 #' functions:.
 #'
 #' @param invalid_values A numeric vector of invalid values to be replaced,
@@ -78,8 +78,8 @@
 #' ```
 #'
 #' - A non-list value applies to every channel (the *default* behaviour).
-#' - A `list()` named by `nirs_channels` applies per-channel values. 
-#' - A single unnamed value in the list will be applied to unlisted channels 
+#' - A `list()` named by `nirs_channels` applies per-channel values.
+#' - A single unnamed value in the list will be applied to unlisted channels
 #'   (e.g. `span = list(3, hhb = 5)` gives `hhb` 5 and every other channel 3).
 #'   If no unnamed fallback value in the list, channels not named in the list
 #'   will be returned un-processed (e.g. `span = list(hhb = 5)` will only
@@ -87,7 +87,7 @@
 #' - `list()` names not matching `nirs_channels` are warned about and
 #'   ignored.
 #'
-#' @returns `replace_mnirs()` return a [tibble][tibble::tibble-package] of 
+#' @returns `replace_mnirs()` return a [tibble][tibble::tibble-package] of
 #' class `"mnirs"` with metadata available via `attributes()`.
 #'
 #' @examples
@@ -267,24 +267,24 @@ replace_mnirs <- function(
 
 #' Replace invalid values
 #'
-#' `replace_invalid()` detects specified invalid values or range cutoffs in a 
+#' `replace_invalid()` detects specified invalid values or range cutoffs in a
 #' numeric vector and replace them with the local median value or `NA`.
 #'
 #' @param x A numeric vector of the response variable.
-#' @param t An *optional* numeric vector of the predictor variable (e.g. time). 
+#' @param t An *optional* numeric vector of the predictor variable (e.g. time).
 #'   Default is `seq_along(x)`.
 #' @inheritParams replace_mnirs
 #'
 #' @details
 #' ## Replace invalid values with with replace_invalid()
-#' 
+#'
 #' Specific `invalid_values` can be replaced, such as `c(0, 100, 102.3)`.
-#' Data ranges can be replaced with cutoff values specified by `invalid_above` 
-#' and `invalid_below`, where any values higher or lower than the specified 
-#' cutoff values (respectively) will be replaced, *inclusive* of the cutoff 
+#' Data ranges can be replaced with cutoff values specified by `invalid_above`
+#' and `invalid_below`, where any values higher or lower than the specified
+#' cutoff values (respectively) will be replaced, *inclusive* of the cutoff
 #' values themselves.
 #'
-#' @returns `replace_invalid()` returns a numeric vector the same length as 
+#' @returns `replace_invalid()` returns a numeric vector the same length as
 #' `x` with invalid values replaced.
 #'
 #' @rdname replace_mnirs
@@ -348,7 +348,11 @@ replace_invalid <- function(
         }
 
         window_idx <- compute_local_windows(
-            t, invalid_idx, width, span, env = env
+            t,
+            invalid_idx,
+            width,
+            span,
+            env = env
         )
         local_medians <- compute_local_fun(y, window_idx, median_nona)
         ## if method = "median"
@@ -398,7 +402,7 @@ replace_invalid <- function(
 #'   - `outlier_cutoff = 0` -- Tukey's median filter (every point
 #'     replaced by local median).
 #'
-#' @returns `replace_outliers()` returns a numeric vector the same length as 
+#' @returns `replace_outliers()` returns a numeric vector the same length as
 #' `x` with outliers replaced.
 #'
 #' @rdname replace_mnirs
@@ -435,7 +439,12 @@ replace_outliers <- function(
 
     ## process =====================================================
     outlier_stats <- compute_outliers(
-        x, t, outlier_cutoff, width, span, env = env
+        x,
+        t,
+        outlier_cutoff,
+        width,
+        span,
+        env = env
     )
     local_medians <- outlier_stats$local_medians
     is_outlier <- outlier_stats$is_outlier
@@ -447,7 +456,7 @@ replace_outliers <- function(
     } else {
         NA_real_
     }
-    
+
     return(y)
 }
 

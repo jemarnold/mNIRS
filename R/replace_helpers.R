@@ -65,10 +65,15 @@ compute_local_windows <- function(
             centre = c(-0.5, 0.5),
             left = c(0, 1),
             right = c(-1, 0)
-        ) * span
+        ) *
+            span
         start_idx <- findInt_mnirs(
-            t[idx] + offsets[1L], t, left.open = TRUE, env = env
-        ) + 1L
+            t[idx] + offsets[1L],
+            t,
+            left.open = TRUE,
+            env = env
+        ) +
+            1L
         end_idx <- findInt_mnirs(t[idx] + offsets[2L], t, env = env)
     }
 
@@ -195,7 +200,10 @@ compute_outliers <- function(
     } else {
         ## span: variable-size windows, per-window loop
         window_idx <- compute_local_windows(
-            t, width = NULL, span = span, env = env
+            t,
+            width = NULL,
+            span = span,
+            env = env
         )
         local_stats <- vapply(seq_len(n), \(.i) {
             w <- x[window_idx[[.i]]]
@@ -219,7 +227,7 @@ compute_outliers <- function(
         abs_dev > (L * outlier_cutoff * local_mad)
     ## NAs from is_outlier check should return FALSE
     is_outlier[is.na(is_outlier)] <- FALSE
-    
+
     ## return list of vectors w/ local logicals and medians
     return(list(
         local_medians = local_medians,

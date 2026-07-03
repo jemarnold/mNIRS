@@ -5,8 +5,8 @@
 #' Used internally to disambiguate peak (maximum) from trough (minimum)
 #' detection when `direction = "auto"`.
 #'
-#' @param fallback A numeric vector (*defaults* to `x`) used to resolve 
-#'   direction when the net slope of `x` is zero or `NA`. The absolute 
+#' @param fallback A numeric vector (*defaults* to `x`) used to resolve
+#'   direction when the net slope of `x` is zero or `NA`. The absolute
 #'   maximum and minimum of `fallback` are compared; if `abs(max) >= abs(min)`,
 #'   `"positive"` is returned.
 #' @param direction A character string specifying the kinetics direction to
@@ -53,7 +53,7 @@ detect_direction <- function(
 #' indices of all finite observations up to `end_fit_span` past that extreme.
 #'
 #' @param end_fit_span A numeric value in units of `time_channel` or `t`
-#'   specifying the forward-looking window used to check for subsequent 
+#'   specifying the forward-looking window used to check for subsequent
 #'   greater/lesser values than the candidate extreme. `end_fit_span = Inf`
 #'   (*default*) returns the global extreme from the full range of `x`.
 #' @param direction A character string specifying the response direction to
@@ -160,7 +160,10 @@ find_kinetics_idx <- function(
     ## break t_valid into mod_span-width bins
     bin_breaks <- seq(t_valid[1L], t_valid[n_valid] + mod_span, mod_span)
     bin_idx <- findInt_mnirs(
-        t_valid, bin_breaks, rightmost.closed = TRUE, env = env
+        t_valid,
+        bin_breaks,
+        rightmost.closed = TRUE,
+        env = env
     )
 
     ## extreme index per bin (first occurrence for ties)
@@ -340,7 +343,8 @@ analyse_kinetics_channels <- function(
     t_vec <- data[[time_channel]]
 
     ## per-channel fit; collect parallel pieces keyed by channel
-    fits <- setNames(lapply(nirs_channels, \(.nirs) {
+    fits <- setNames(
+        lapply(nirs_channels, \(.nirs) {
         .a <- per_channel[[.nirs]]
 
         ## filter for valid finite idx before first extreme + end_fit_span
@@ -375,7 +379,9 @@ analyse_kinetics_channels <- function(
             diagnostics  = cbind(data.frame(nirs_channels = .nirs), fit$diag),
             channel_args = data.frame(nirs_channels = .nirs, arg_row)
         )
-    }), nirs_channels)
+    }),
+        nirs_channels
+    )
 
     ## assemble single attributed df (consumed by build_kinetics_results)
     result <- structure(
@@ -389,7 +395,8 @@ analyse_kinetics_channels <- function(
     ## warn when time coefficients are negative (response before t0)
     if (verbose) {
         check_cols <- intersect(
-            c("TD", "tau", "response_time", "peak_slope_time"), names(result)
+            c("TD", "tau", "response_time", "peak_slope_time"),
+            names(result)
         )
 
         if (any(unlist(result[check_cols]) < 0, na.rm = TRUE)) {
@@ -572,8 +579,6 @@ as_data_list <- function(data, env = rlang::caller_env()) {
 }
 
 
-
-
 #' Compute model diagnostics
 #'
 #' @param fitted A numeric vector of the predicted values.
@@ -713,7 +718,6 @@ compute_diagnostics <- function(
         bic = bic
     ))
 }
-
 
 
 #' Update a model object with Fixed coefficients
