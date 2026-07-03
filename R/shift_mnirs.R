@@ -65,11 +65,11 @@
 #' shift_mnirs(
 #'     data,
 #'     nirs_channels = c(A, B, C),
+#'     group_channels = list(smo2 = c(A, B), hhb = C),
 #'     to = list(100, C = 0),
 #'     width = list(smo2 = 3),
 #'     span = list(hhb = 5),
-#'     position = "first",
-#'     group_channels = list(smo2 = c(A, B), hhb = C)
+#'     position = "first"
 #' )
 #' ```
 #'
@@ -99,10 +99,10 @@
 #' ) |>
 #'     shift_mnirs(        ## un-grouped nirs channels to shift separately
 #'         nirs_channels = c(smo2_left, smo2_right),
+#'         group_channels = "distinct",
 #'         to = 0,         ## NIRS values will be shifted to zero
 #'         span = 120,     ## shift the *first* 120 sec of data to zero
-#'         position = "first",
-#'         group_channels = "distinct"
+#'         position = "first"
 #'     )
 #'
 #' data
@@ -119,12 +119,12 @@ shift_mnirs <- function(
     data,
     nirs_channels = NULL,
     time_channel = NULL,
+    group_channels = c("ensemble", "distinct"),
     to = NULL,
     by = NULL,
     width = NULL,
     span = NULL,
     position = c("min", "max", "first"),
-    group_channels = c("ensemble", "distinct"),
     verbose = TRUE
 ) {
     ## validation =============================================

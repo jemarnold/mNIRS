@@ -199,8 +199,8 @@
 #' ) |>
 #'     resample_mnirs(method = "linear", verbose = FALSE) |>
 #'     extract_intervals(
-#'         start = by_time(368, 1084),
 #'         group_intervals = "distinct",
+#'         start = by_time(368, 1084),
 #'         span = c(-20, 90),
 #'         zero_time = TRUE,
 #'         verbose = FALSE

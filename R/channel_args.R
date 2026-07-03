@@ -11,6 +11,11 @@
 #' unnamed lists) is applied globally to every channel.
 #'
 #' @param nirs_channels Character vector of resolved channel names.
+#' @param group_channels An *optional* named list of channel-name vectors
+#'   from [validate_group_channels()]. When supplied, arguments are
+#'   resolved per group: a group-name key or any member-channel key
+#'   applies to the whole group, and conflicting member values within one
+#'   group abort.
 #' @param args Named list of per-channel-capable arguments. Each element is
 #'   either a global value or a per-channel `list()` map. A per-channel map
 #'   may include a single unnamed element as the fallback for unlisted
@@ -23,11 +28,6 @@
 #'   (e.g. `list(method = c("linear", "median", "locf", "none"))`).
 #'   Resolved values are matched per channel; a full default vector
 #'   resolves to its first element, matching [match.arg()] behaviour.
-#' @param group_channels An *optional* named list of channel-name vectors
-#'   from [validate_group_channels()]. When supplied, arguments are
-#'   resolved per group: a group-name key or any member-channel key
-#'   applies to the whole group, and conflicting member values within one
-#'   group abort.
 #' @param env The calling environment, used to report errors as coming
 #'   from the user-facing function (e.g. [rescale_mnirs()]).
 #' @inheritParams validate_mnirs
@@ -39,10 +39,10 @@
 #' @keywords internal
 resolve_channel_args <- function(
     nirs_channels,
+    group_channels = NULL,
     args,
     defaults = list(),
     choices = list(),
-    group_channels = NULL,
     verbose = TRUE,
     env = rlang::caller_env()
 ) {

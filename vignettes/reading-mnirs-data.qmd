@@ -495,7 +495,7 @@ This is a good time to note that here and in most *`mnirs`* functions, data chan
 ```{r}
 data_shifted <- shift_mnirs(
     data_filtered,     ## un-grouped nirs channels to shift separately 
-    nirs_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
+    group_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
     to = 0,            ## NIRS values will be shifted to zero
     span = 120,        ## shift the *first* 120 sec of data to zero
     position = "first"
@@ -536,7 +536,7 @@ We may also want to rescale our data to a new dynamic range, changing the signal
 ```{r}
 data_rescaled <- rescale_mnirs(
     data_filtered,    ## un-grouped nirs channels to rescale separately 
-    nirs_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
+    group_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
     range = c(0, 100) ## rescale to a 0-100% functional exercise range
 )
 
@@ -587,13 +587,13 @@ nirs_data <- read_mnirs(
         na.rm = TRUE
     ) |>
     shift_mnirs(
-        nirs_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
+        group_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
         to = 0,
         span = 60,
         position = "first"
     ) |>
     rescale_mnirs(
-        nirs_channels = list(c(smo2_left, smo2_right)), ## 👈 channels grouped together
+        group_channels = list(c(smo2_left, smo2_right)), ## 👈 channels grouped together
         range = c(0, 100)
     )
 
@@ -659,9 +659,9 @@ When ensemble-averaging across intervals, time will always be re-calculated from
 ## return each interval independently with `group_intervals = "distinct"`
 distinct <- extract_intervals(
     nirs_data,                  ## channels blank for "distinct" grouping
+    group_intervals = "distinct",  ## return a list of data frames for each (2) event
     start = by_time(348, 1064), ## manually identified interval start times
     end = by_time(458, 1174),   ## interval end time (start + 150 sec)
-    group_intervals = "distinct",  ## return a list of data frames for each (2) event
     span = c(0, 0),             ## no boundary modification
     zero_time = FALSE           ## return original time values
 )
@@ -674,8 +674,8 @@ plot(distinct, time_labels = TRUE)
 ensemble <- extract_intervals(
     nirs_data,                  ## channels recycled to all intervals by default
     nirs_channels = c(smo2_left, smo2_right),
-    start = by_time(368, 1084), ## alternatively specify start times + span
     group_intervals = "ensemble",  ## ensemble-average across two intervals
+    start = by_time(368, 1084), ## alternatively specify start times + span
     span = c(-20, 90),          ## span recycled to all intervals by default
     zero_time = TRUE            ## re-calculate common time to start from `0`
 )

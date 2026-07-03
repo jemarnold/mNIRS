@@ -1419,8 +1419,8 @@ test_that("extract_intervals returns list of tibbles", {
 
     result <- extract_intervals(
         data = data,
-        start = by_time(2, 5),
         group_intervals = "distinct",
+        start = by_time(2, 5),
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1438,9 +1438,9 @@ test_that("extract_intervals works with start and end", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = by_time(2, 5),
         end = by_time(4, 8),
-        group_intervals = "distinct",
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1460,8 +1460,8 @@ test_that("extract_intervals works with by_sample", {
 
     result <- extract_intervals(
         data = data,
-        start = by_sample(21, 51),
         group_intervals = "distinct",
+        start = by_sample(21, 51),
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1480,8 +1480,8 @@ test_that("extract_intervals works with by_label", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
-        start = by_label("marker"),
         group_intervals = "distinct",
+        start = by_label("marker"),
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1500,8 +1500,8 @@ test_that("extract_intervals works with by_lap start only", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
-        start = by_lap(3),
         group_intervals = "distinct",
+        start = by_lap(3),
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1517,8 +1517,8 @@ test_that("extract_intervals works with by_lap start only", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
-        start = by_lap(3),
         group_intervals = "distinct",
+        start = by_lap(3),
         span = c(-0.5, 0.5),
         verbose = FALSE
     )
@@ -1535,8 +1535,8 @@ test_that("extract_intervals works with by_lap end only", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
-        end = by_lap(5),
         group_intervals = "distinct",
+        end = by_lap(5),
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1555,9 +1555,9 @@ test_that("extract_intervals works with by_lap start and end", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         start = by_lap(2),
         end = by_lap(4),
-        group_intervals = "distinct",
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1577,9 +1577,9 @@ test_that("extract_intervals works with multiple by_lap pairs", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         start = by_lap(1, 5),
         end = by_lap(2, 7),
-        group_intervals = "distinct",
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1621,8 +1621,8 @@ test_that("extract_intervals coerces raw numeric to by_time", {
 
     result <- extract_intervals(
         data = data,
-        start = 2,
         group_intervals = "distinct",
+        start = 2,
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1635,8 +1635,8 @@ test_that("extract_intervals coerces raw numeric to by_time", {
     obj <- 2
     result <- extract_intervals(
         data = data,
-        start = obj,
         group_intervals = "distinct",
+        start = obj,
         span = c(-0.5, 0.5),
         verbose = FALSE
     )
@@ -1653,8 +1653,8 @@ test_that("extract_intervals coerces raw character to by_label", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
-        start = "marker",
         group_intervals = "distinct",
+        start = "marker",
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1671,9 +1671,9 @@ test_that("extract_intervals coerces raw integer to by_lap", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         start = 2L,
         end = 4L,
-        group_intervals = "distinct",
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1690,9 +1690,9 @@ test_that("extract_intervals recycles positive span scalar", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = by_time(2),
         end = by_time(5),
-        group_intervals = "distinct",
         span = 1,
         verbose = FALSE
     )
@@ -1707,9 +1707,9 @@ test_that("extract_intervals recycles negative span scalar", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = by_time(2),
         end = by_time(5),
-        group_intervals = "distinct",
         span = -1,
         verbose = FALSE
     )
@@ -1724,8 +1724,8 @@ test_that("extract_intervals applies zero_time correctly", {
 
     result <- extract_intervals(
         data = data,
-        start = by_time(5),
         group_intervals = "distinct",
+        start = by_time(5),
         span = c(-1, 1),
         zero_time = TRUE,
         verbose = FALSE
@@ -1740,8 +1740,8 @@ test_that("extract_intervals handles grouping", {
 
     result <- extract_intervals(
         data = data,
-        start = by_time(2, 5, 8),
         group_intervals = "ensemble",
+        start = by_time(2, 5, 8),
         span = c(-0.5, 0.5), ## single span recycled to all events
         verbose = FALSE
     )
@@ -1753,8 +1753,8 @@ test_that("extract_intervals handles grouping", {
 
     result <- extract_intervals(
         data = data,
-        start = by_time(2, 4, 6, 8),
         group_intervals = list(c(1, 3), c(2, 4)),
+        start = by_time(2, 4, 6, 8),
         span = list(c(-0.3, 0.3), c(-0.5, 0.5)),
         verbose = FALSE
     )
@@ -1770,8 +1770,8 @@ test_that("extract_intervals handles different spans per event", {
 
     result <- extract_intervals(
         data = data,
-        start = by_time(2, 5),
         group_intervals = "distinct",
+        start = by_time(2, 5),
         span = list(c(-0.5, 0.5), c(-1, 1)),
         verbose = FALSE
     )
@@ -1798,8 +1798,8 @@ test_that("extract_intervals errors & messages", {
     expect_warning(
         result <- extract_intervals(
             data = data,
-            start = by_time(0.5),
             group_intervals = "distinct",
+            start = by_time(0.5),
             span = c(-1, 1),
             verbose = TRUE
         ),
@@ -1819,8 +1819,8 @@ test_that("extract_intervals respects nirs_channels metadata", {
     result <- extract_intervals(
         data = data,
         nirs_channels = "smo2_left",
-        start = by_time(1, 5),
         group_intervals = "distinct",
+        start = by_time(1, 5),
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1832,8 +1832,8 @@ test_that("extract_intervals respects nirs_channels metadata", {
         data = data,
         nirs_channels = "smo2_left",
         time_channel = "time",
-        start = by_time(1, 5),
         group_intervals = "ensemble",
+        start = by_time(1, 5),
         span = c(-1, 1),
         verbose = TRUE
     )
@@ -1852,9 +1852,9 @@ test_that("extract_intervals informs when nirs_channels is not a list()", {
             data,
             nirs_channels = "smo2_left",
             time_channel = "time",
+            group_intervals = "ensemble",
             start = by_time(1, 4),
             span = c(-0.5, 0.5),
-            group_intervals = "ensemble",
             verbose = TRUE
         ),
         "list\\(\\).*channel grouping"
@@ -1866,9 +1866,9 @@ test_that("extract_intervals informs when nirs_channels is not a list()", {
             data,
             nirs_channels = "smo2_left",
             time_channel = "time",
+            group_intervals = "ensemble",
             start = by_time(1, 4),
             span = c(-0.5, 0.5),
-            group_intervals = "ensemble",
             verbose = FALSE
         )
     )
@@ -1879,9 +1879,9 @@ test_that("extract_intervals informs when nirs_channels is not a list()", {
             data,
             nirs_channels = list("smo2_left"),
             time_channel = "time",
+            group_intervals = "ensemble",
             start = by_time(1, 4),
             span = c(-0.5, 0.5),
-            group_intervals = "ensemble",
             verbose = TRUE
         )
     )
@@ -1892,9 +1892,9 @@ test_that("extract_intervals informs when nirs_channels is not a list()", {
             data,
             nirs_channels = "smo2_left",
             time_channel = "time",
+            group_intervals = "distinct",
             start = by_time(1, 4),
             span = c(-0.5, 0.5),
-            group_intervals = "distinct",
             verbose = TRUE
         )
     )
@@ -1906,9 +1906,9 @@ test_that("extract_intervals informs when nirs_channels is not a list()", {
             data,
             nirs_channels = "smo2_left",
             time_channel = "time",
+            group_intervals = "ensemble",
             start = by_time(1, 4),
             span = c(-0.5, 0.5),
-            group_intervals = "ensemble",
             verbose = TRUE
         )
     )
@@ -1920,8 +1920,8 @@ test_that("extract_intervals returns a list of class mnirs", {
     result <- extract_intervals(
         data = data,
         nirs_channels = "smo2_left",
-        start = by_time(1, 5),
         group_intervals = "distinct",
+        start = by_time(1, 5),
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1991,8 +1991,8 @@ test_that("extract_intervals works on train.red data", {
     result <- extract_intervals(
         data,
         nirs_channels = c("smo2_left", "smo2_right"),
-        start = by_time(2150, 3168),
         group_intervals = "ensemble",
+        start = by_time(2150, 3168),
         span = list(c(-30, 180)),
         zero_time = FALSE,
         verbose = FALSE
@@ -2018,8 +2018,8 @@ test_that("extract_intervals works on train.red data", {
     result <- extract_intervals(
         data,
         nirs_channels = c("smo2_left", "smo2_right"),
-        start = by_time(2150, 3168),
         group_intervals = "distinct",
+        start = by_time(2150, 3168),
         span = list(c(-30, 180)),
         zero_time = FALSE,
         verbose = FALSE
@@ -2075,8 +2075,8 @@ test_that("extract_intervals benchmark", {
     #     bm <- bench::mark(
     #         extract_intervals = extract_intervals(
     #             data_list,
-    #             start = by_time(368, 1084),
     #             group_intervals = "distinct",
+    #             start = by_time(368, 1084),
     #             span = c(-20, 90),
     #             zero_time = TRUE,
     #             verbose = FALSE

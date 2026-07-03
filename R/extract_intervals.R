@@ -22,6 +22,17 @@
 #'   values for ensemble-averaging. If `NULL`, will be estimated from
 #'   `time_channel` (see *Details*).
 #'
+#' @param group_intervals Either a character string or a `list()` of integer
+#'   vectors specifying how to group intervals (see *Details*).
+#'   \describe{
+#'     \item{`"distinct"`}{The default. Extract each interval as an independent
+#'     data frame.}
+#'     \item{`"ensemble"`}{Ensemble-average each specified `nirs_channel` across
+#'     all detected intervals, returning a single data frame.}
+#'     \item{`list(c(1, 2), c(3, 4))`}{Ensemble-average each specified
+#'     `nirs_channel` within each group and return one data frame per group.}
+#'   }
+#'
 #' @param start Specifies where intervals begin. Either raw values -- numeric
 #'   for time values, character for event labels, explicit integer (e.g. `2L`)
 #'   for lap numbers -- or created with [by_time()], [by_label()], [by_lap()],
@@ -44,23 +55,12 @@
 #'   - A single *negative* value is recycled to shift the start times (e.g. 
 #'     `span = -60` -> `c(-60, 0)`).
 #'
-#' @param group_intervals Either a character string or a `list()` of integer
-#'   vectors specifying how to group intervals (see *Details*).
-#'   \describe{
-#'     \item{`"distinct"`}{The default. Extract each interval as an independent
-#'     data frame.}
-#'     \item{`"ensemble"`}{Ensemble-average each specified `nirs_channel` across
-#'     all detected intervals, returning a single data frame.}
-#'     \item{`list(c(1, 2), c(3, 4))`}{Ensemble-average each specified
-#'     `nirs_channel` within each group and return one data frame per group.}
-#'   }
-#'
-#' @param event_groups `r lifecycle::badge("deprecated")` Renamed to
-#'   `group_intervals` for naming consistency across the package.
-#'
 #' @param zero_time Logical. Default is `FALSE`. If `TRUE`, re-calculates
 #'   numeric `time_channel` values to start from zero within each interval
 #'   data frame.
+#'
+#' @param event_groups `r lifecycle::badge("deprecated")` Renamed to
+#'   `group_intervals` for naming consistency across the package.
 #'
 #' @inheritParams validate_mnirs
 #'
@@ -171,9 +171,9 @@
 #' interval_list <- extract_intervals(
 #'     data,                         ## channels recycled to all intervals by default
 #'     nirs_channels = c(smo2_left, smo2_right),
+#'     group_intervals = "ensemble", ## ensemble-average across two intervals
 #'     start = by_time(368, 1084),   ## manually identified interval start times
 #'     span = c(-20, 90),            ## include the last 180-sec of each interval (recycled)
-#'     group_intervals = "ensemble", ## ensemble-average across two intervals
 #'     zero_time = TRUE              ## re-calculate common time to start from `0`
 #' )
 #'
@@ -193,10 +193,10 @@ extract_intervals <- function(
     time_channel = NULL,
     event_channel = NULL,
     sample_rate = NULL,
+    group_intervals = c("distinct", "ensemble"),
     start = NULL,
     end = NULL,
     span = list(c(-60, 60)),
-    group_intervals = c("distinct", "ensemble"),
     zero_time = FALSE,
     verbose = TRUE,
     event_groups = deprecated()

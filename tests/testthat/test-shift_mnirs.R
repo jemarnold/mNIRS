@@ -48,8 +48,8 @@ test_that("shift_mnirs shifts by constant correctly", {
         data,
         nirs_channels = c("ch1", "ch2"),
         time_channel = "time",
-        by = 5,
         group_channels = "distinct",
+        by = 5,
         verbose = FALSE
     )
 
@@ -84,10 +84,10 @@ test_that("shift_mnirs position = 'min' preserves scaling per grouping", {
         data,
         nirs_channels = c("ch1", "ch2"),
         time_channel = "time",
+        group_channels = "distinct",
         to = 0,
         width = 1,
         position = "min",
-        group_channels = "distinct",
         verbose = FALSE
     )
     expect_equal(distinct$ch1, 0:9)
@@ -198,9 +198,9 @@ test_that("shift_mnirs handles multiple channel groups", {
         data,
         nirs_channels = c("ch1", "ch2", "ch3"),
         time_channel = time,
+        group_channels = list(c("ch1", "ch2"), "ch3"),
         to = 0,
-        width = 1,
-        group_channels = list(c("ch1", "ch2"), "ch3")
+        width = 1
     )
 
     ## grouped together: shared min comes from ch1; ch3 in its own group
@@ -308,10 +308,10 @@ test_that("shift_mnirs applies per-group `to` keyed by group name", {
         data,
         nirs_channels = c("ch1", "ch2", "ch3"),
         time_channel = "time",
+        group_channels = list(smo2 = c("ch1", "ch2"), hhb = "ch3"),
         to = list(smo2 = 0, hhb = 5),
         width = 1,
         position = "min",
-        group_channels = list(smo2 = c("ch1", "ch2"), hhb = "ch3"),
         verbose = FALSE
     )
 
@@ -332,10 +332,10 @@ test_that("shift_mnirs applies per-group `to` keyed by member channel", {
         data,
         nirs_channels = c("ch1", "ch2"),
         time_channel = "time",
+        group_channels = list(smo2 = c("ch1", "ch2")),
         to = list(ch2 = 3),
         width = 1,
         position = "min",
-        group_channels = list(smo2 = c("ch1", "ch2")),
         verbose = FALSE
     )
 
@@ -355,8 +355,8 @@ test_that("shift_mnirs applies per-channel `by` with unnamed fallback", {
         data,
         nirs_channels = c("ch1", "ch2", "ch3"),
         time_channel = "time",
-        by = list(5, ch1 = 7),
         group_channels = "distinct",
+        by = list(5, ch1 = 7),
         verbose = FALSE
     )
 
@@ -376,10 +376,10 @@ test_that("shift_mnirs applies per-group `width` override", {
         data,
         nirs_channels = c("ch1", "ch2"),
         time_channel = "time",
+        group_channels = "distinct",
         to = 0,
         position = "first",
         width = list(ch1 = 2, ch2 = 3),
-        group_channels = "distinct",
         verbose = FALSE
     )
 
@@ -398,12 +398,12 @@ test_that("shift_mnirs applies exclusive args per channel", {
         data,
         nirs_channels = c("ch1", "ch2"),
         time_channel = "time",
+        group_channels = "distinct",
         to = list(ch2 = 0),
         by = list(ch1 = -10),
         position = "first",
         width = list(ch1 = 2),
         span = list(ch2 = 2),
-        group_channels = "distinct",
         verbose = FALSE
     )
 
@@ -421,10 +421,10 @@ test_that("shift_mnirs applies per-group `position` override", {
         data,
         nirs_channels = c("ch1", "ch2"),
         time_channel = "time",
+        group_channels = list(g1 = "ch1", g2 = "ch2"),
         to = 0,
         width = 1,
         position = list(g1 = "min", g2 = "max"),
-        group_channels = list(g1 = "ch1", g2 = "ch2"),
         verbose = FALSE
     )
 
@@ -444,10 +444,10 @@ test_that("shift_mnirs aborts on intra-group argument conflict", {
             data,
             nirs_channels = c("ch1", "ch2"),
             time_channel = "time",
+            group_channels = list(g = c("ch1", "ch2")),
             to = list(ch1 = 0, ch2 = 5),
             width = 1,
             position = "min",
-            group_channels = list(g = c("ch1", "ch2")),
             verbose = FALSE
         ),
         "conflicting"
@@ -466,10 +466,10 @@ test_that("shift_mnirs informs when channel omitted from args", {
         data,
         nirs_channels = c(ch1, ch2),
         time_channel = time,
+        group_channels = "distinct",
         to = list(ch1 = 0),
         width = list(ch1 = 1),
-        position = "min",
-        group_channels = "distinct"
+        position = "min"
     ) |> 
         expect_warning("`to`:.*ch2.*not specified") |>
         expect_warning("`width`:.*ch2.*not specified") |>
@@ -481,10 +481,10 @@ test_that("shift_mnirs informs when channel omitted from args", {
         data,
         nirs_channels = c(ch1, ch2),
         time_channel = time,
+        group_channels = "distinct",
         to = list(ch3 = 0),
         width = 1,
-        position = "min",
-        group_channels = "distinct"
+        position = "min"
     ) |>
         expect_warning("`to`:.*ch3.*not recognised") |>
         expect_warning("`to`:.*not specified") |>
@@ -504,11 +504,11 @@ test_that("shift_mnirs `to` overrides `by` once, for the first group", {
             data,
             nirs_channels = c("ch1", "ch2"),
             time_channel = "time",
+            group_channels = list(g1 = "ch1", g2 = "ch2"),
             to = list(g1 = 0, g2 = 10),
             by = list(g1 = 100, g2 = 200),
             width = 1,
             position = "min",
-            group_channels = list(g1 = "ch1", g2 = "ch2"),
             verbose = TRUE
         )
     )
@@ -526,10 +526,10 @@ test_that("shift_mnirs processes omitted channel as its own group", {
         data,
         nirs_channels = c("ch1", "ch2", "ch3"),
         time_channel = "time",
+        group_channels = list(c("ch1", "ch2")),
         to = 0,
         width = 1,
         position = "min",
-        group_channels = list(c("ch1", "ch2")),
         verbose = FALSE
     )
 
@@ -681,9 +681,9 @@ test_that("shift_mnirs resolves group_channels from varied input forms", {
             data,
             c("nirs1", "nirs2"),
             "time",
+            group_channels = groups,
             to = 0,
             width = 5,
-            group_channels = groups,
             verbose = FALSE
         ),
         "mnirs"
@@ -693,9 +693,9 @@ test_that("shift_mnirs resolves group_channels from varied input forms", {
             data,
             c(nirs1, nirs2),
             time,
+            group_channels = list(c(nirs1, nirs2)),
             to = 0,
             width = 5,
-            group_channels = list(c(nirs1, nirs2)),
             verbose = FALSE
         ),
         "mnirs"
@@ -705,9 +705,9 @@ test_that("shift_mnirs resolves group_channels from varied input forms", {
         data,
         c("nirs1", nirs2),
         "time",
+        group_channels = list("nirs1", nirs2),
         to = 0,
         width = 5,
-        group_channels = list("nirs1", nirs2),
         verbose = FALSE
     )
     expect_true(all(c("nirs1", "nirs2") %in% names(result)))
@@ -717,10 +717,10 @@ test_that("shift_mnirs resolves group_channels from varied input forms", {
         data,
         c(nirs1, nirs2),
         time,
+        group_channels = "distinct",
         to = 0,
         width = 5,
         position = "first",
-        group_channels = "distinct",
         verbose = FALSE
     )
     expect_equal(distinct$nirs1[1], data$nirs1[1] - mean(data$nirs1[1:5]))
@@ -744,9 +744,9 @@ test_that("shift_mnirs() works with tidyselect in group_channels", {
         data,
         nirs_channels = c(smo2_left, smo2_right, thb),
         time_channel = time,
+        group_channels = list(tidyselect::starts_with("smo2"), thb),
         to = 0,
         width = 5,
-        group_channels = list(tidyselect::starts_with("smo2"), thb),
         verbose = FALSE
     )
     expect_s3_class(result, "mnirs")
@@ -783,10 +783,10 @@ test_that("shift_mnirs() preserves grouping with external group_channels", {
         data,
         nirs_channels = c("nirs1", "nirs2", "nirs3"),
         time_channel = "time",
+        group_channels = groups,
         to = 0,
         width = 5,
         position = "first",
-        group_channels = groups,
         verbose = FALSE
     )
 
@@ -913,15 +913,15 @@ test_that("shift_mnirs works on Train.Red", {
         data,
         nirs_channels = c("smo2_left", "smo2_right", "o2hb_left", "o2hb_right"),
         time_channel = NULL,
-        to = 0,
-        by = NULL,
-        span = 0,
-        position = "min",
         group_channels = list(
             "smo2_left",
             "smo2_right",
             c("o2hb_left", "o2hb_right")
         ),
+        to = 0,
+        by = NULL,
+        span = 0,
+        position = "min",
         verbose = FALSE
     )
 

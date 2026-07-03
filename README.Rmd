@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 [![Codecov test coverage](https://codecov.io/gh/jemarnold/mnirs/graph/badge.svg)](https://app.codecov.io/gh/jemarnold/mnirs)
 <!-- badges: end -->
 
-*{mnirs}* contains standardised, reproducible methods for reading, processing, and analysing data from muscle near-infrared spectroscopy (mNIRS) devices. Intended for mNIRS researchers and practitioners in exercise physiology, sports science, and clinical rehabilitation with minimal coding experience required.
+*{mnirs}* contains standardised, reproducible methods for reading, processing, and analysing data from muscle near-infrared spectroscopy (mNIRS) devices. Intended for mNIRS researcheyrs and practitioners in exercise physiology, sports science, and clinical rehabilitation with minimal coding experience required.
 
 ## Installation
 
@@ -245,9 +245,9 @@ plot(nirs_data, time_labels = TRUE)
 ## return each interval independently with `group_intervals = "distinct"`
 distinct <- extract_intervals(
     nirs_data,                  ## channels blank for "distinct" grouping
+    group_intervals = "distinct",  ## return a list of data frames for each (2) event
     start = by_time(348, 1064), ## manually identified interval start times
     end = by_time(458, 1174),   ## interval end time (start + 150 sec)
-    group_intervals = "distinct",  ## return a list of data frames for each (2) event
     span = c(0, 0),             ## no boundary modification
     zero_time = FALSE           ## return original time values
 )
@@ -259,8 +259,8 @@ plot(distinct, time_labels = TRUE)
 ## ensemble average both intervals with `group_intervals = "ensemble"`
 ensemble <- extract_intervals(
     nirs_data,                  ## channels recycled to all intervals by default
-    start = by_time(368, 1084), ## alternatively specify start times + span
     group_intervals = "ensemble",  ## ensemble-average across two intervals
+    start = by_time(368, 1084), ## alternatively specify start times + span
     span = c(-20, 90),          ## span recycled to all intervals by default
     zero_time = TRUE            ## re-calculate common time to start from `0`
 )

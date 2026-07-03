@@ -254,8 +254,8 @@ For repeated occlusion testing, the original time information for each occlusion
 ## re-join the returned list of data frames 
 df_list <- extract_intervals(
     df,
-    start = "Occlusion", ## event label used in file
     group_intervals = "distinct", ## return each occlusion event separately
+    start = "Occlusion", ## event label used in file
     span = c(1, 5), ## interval c(start, end) around each event time value
     zero_time = FALSE ## preserve original time values at each event
 )

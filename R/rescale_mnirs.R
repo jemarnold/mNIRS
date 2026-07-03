@@ -7,13 +7,11 @@
 #' rescale_mnirs(
 #'   data,
 #'   nirs_channels = NULL,
-#'   range,
 #'   group_channels = c("ensemble", "distinct"),
+#'   range,
 #'   verbose = TRUE
 #' )
 #'
-#' @param range A numeric vector in the form `c(min, max)`, indicating the
-#'   range of output values to which `nirs_channels` will be rescaled.
 #' @param group_channels Either a character string or a `list()` of
 #'   channel-name vectors specifying how to group `nirs_channels`
 #'   (see *Details*).
@@ -26,6 +24,8 @@
 #'      in one group, and `C` & `D` in another group. Groups can be named 
 #'      (e.g. `list(smo2 = c("A", "B"))`).}
 #'   }
+#' @param range A numeric vector in the form `c(min, max)`, indicating the
+#'   range of output values to which `nirs_channels` will be rescaled.
 #' @inheritParams validate_mnirs
 #'
 #' @details
@@ -71,8 +71,8 @@
 #' ) |>
 #'     rescale_mnirs(        ## un-grouped nirs channels to rescale separately
 #'         nirs_channels = c(smo2_left, smo2_right),
-#'         range = c(0, 100),  ## rescale to a 0-100% functional exercise range
-#'         group_channels = "distinct"
+#'         group_channels = "distinct",
+#'         range = c(0, 100)  ## rescale to a 0-100% functional exercise range
 #'     )
 #' 
 #' data
@@ -88,8 +88,8 @@
 rescale_mnirs <- function(
     data,
     nirs_channels = NULL,
-    range,
     group_channels = c("ensemble", "distinct"),
+    range,
     verbose = TRUE
 ) {
     ## validate =================================

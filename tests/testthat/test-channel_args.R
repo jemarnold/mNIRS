@@ -172,8 +172,8 @@ test_that("resolve_channel_args resolves per group with group_channels", {
     ## group-name key applies to the whole group
     out <- resolve_channel_args(
         c("smo2_l", "smo2_r", "hhb"),
-        args = list(to = list(oxy = 0, hhb = 5)),
         group_channels = groups,
+        args = list(to = list(oxy = 0, hhb = 5)),
         verbose = FALSE
     )
     expect_named(out, c("oxy", "hhb"))
@@ -183,8 +183,8 @@ test_that("resolve_channel_args resolves per group with group_channels", {
     ## member-channel key also applies to the whole group
     out <- resolve_channel_args(
         c("smo2_l", "smo2_r", "hhb"),
-        args = list(to = list(smo2_r = 1)),
         group_channels = groups,
+        args = list(to = list(smo2_r = 1)),
         verbose = FALSE
     )
     expect_equal(out$oxy$to, 1)
@@ -195,8 +195,8 @@ test_that("resolve_channel_args aborts on intra-group conflicts", {
     expect_error(
         resolve_channel_args(
             c("smo2_l", "smo2_r"),
-            args = list(to = list(smo2_l = 0, smo2_r = 5)),
             group_channels = list(oxy = c("smo2_l", "smo2_r")),
+            args = list(to = list(smo2_l = 0, smo2_r = 5)),
             verbose = FALSE
         ),
         "conflicting.*group_channels"
@@ -205,8 +205,8 @@ test_that("resolve_channel_args aborts on intra-group conflicts", {
     ## equal member values do not conflict
     out <- resolve_channel_args(
         c("smo2_l", "smo2_r"),
-        args = list(to = list(smo2_l = 0, smo2_r = 0)),
         group_channels = list(oxy = c("smo2_l", "smo2_r")),
+        args = list(to = list(smo2_l = 0, smo2_r = 0)),
         verbose = FALSE
     )
     expect_equal(out$oxy$to, 0)
@@ -217,8 +217,8 @@ test_that("resolve_channel_args reports errors from the caller's `env`", {
     caller <- function() {
         resolve_channel_args(
             c("smo2_l", "smo2_r"),
-            args = list(to = list(smo2_l = 0, smo2_r = 5)),
             group_channels = list(smo2 = c("smo2_l", "smo2_r")),
+            args = list(to = list(smo2_l = 0, smo2_r = 5)),
             verbose = FALSE
         )
     }

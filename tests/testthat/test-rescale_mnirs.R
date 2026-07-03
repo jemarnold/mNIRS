@@ -22,8 +22,8 @@ test_that("rescale_mnirs handles multiple separate groups", {
     result <- rescale_mnirs(
         data,
         nirs_channels = c("A", "B", "C"),
-        range = c(0, 10),
-        group_channels = list(c("A", "B"), "C")
+        group_channels = list(c("A", "B"), "C"),
+        range = c(0, 10)
     )
 
     expect_equal(result$A, c(1, 10))
@@ -80,8 +80,8 @@ test_that("rescale_mnirs passes through a constant channel", {
     distinct <- rescale_mnirs(
         data,
         nirs_channels = c("A", "B"),
-        range = c(0, 100),
-        group_channels = "distinct"
+        group_channels = "distinct",
+        range = c(0, 100)
     )
     expect_equal(distinct$A, data$A)
     expect_equal(distinct$B, data$B / 2)
@@ -104,8 +104,8 @@ test_that("rescale_mnirs passes through an all-constant group", {
     result <- rescale_mnirs(
         data,
         nirs_channels = c("A", "B"),
-        range = c(0, 100),
-        group_channels = "distinct"
+        group_channels = "distinct",
+        range = c(0, 100)
     )
     expect_equal(result$A, data$A)
     expect_equal(result$B, data$B)
@@ -138,8 +138,8 @@ test_that("rescale_mnirs applies per-group range keyed by group name", {
     result <- rescale_mnirs(
         data,
         nirs_channels = c("A", "B", "C"),
-        range = list(smo2 = c(0, 1), hhb = c(0, 10)),
-        group_channels = list(smo2 = c("A", "B"), hhb = "C")
+        group_channels = list(smo2 = c("A", "B"), hhb = "C"),
+        range = list(smo2 = c(0, 1), hhb = c(0, 10))
     )
 
     ## smo2 group pooled to [0, 1]; hhb group to [0, 10]
@@ -156,8 +156,8 @@ test_that("rescale_mnirs applies per-channel range with unnamed fallback", {
     result <- rescale_mnirs(
         data,
         nirs_channels = c("A", "B"),
-        range = list(c(0, 100), A = c(0, 1)),
-        group_channels = "distinct"
+        group_channels = "distinct",
+        range = list(c(0, 100), A = c(0, 1))
     )
 
     ## A takes its own range; B takes the unnamed fallback
@@ -172,8 +172,8 @@ test_that("rescale_mnirs aborts on intra-group range conflict", {
         rescale_mnirs(
             data,
             nirs_channels = c("A", "B"),
-            range = list(A = c(0, 1), B = c(0, 2)),
-            group_channels = list(g = c("A", "B"))
+            group_channels = list(g = c("A", "B")),
+            range = list(A = c(0, 1), B = c(0, 2))
         ),
         "conflicting"
     )
@@ -185,8 +185,8 @@ test_that("rescale_mnirs updates metadata correctly", {
     result <- rescale_mnirs(
         data,
         nirs_channels = c("A", "B"),
-        range = c(0, 100),
         group_channels = "distinct",
+        range = c(0, 100),
         verbose = FALSE
     )
 
@@ -236,8 +236,8 @@ test_that("rescale_mnirs works on Moxy", {
     result <- rescale_mnirs(
         df,
         nirs_channels = c("smo2_left", "smo2_right"),
-        range = c(0, 100),
-        group_channels = "distinct"
+        group_channels = "distinct",
+        range = c(0, 100)
     )
 
     ## check grouping together: min value should come from smo2_right
@@ -263,12 +263,12 @@ test_that("rescale_mnirs works on Train.Red", {
     result <- rescale_mnirs(
         df,
         nirs_channels = c("smo2_left", "smo2_right", "o2hb_left", "o2hb_right"),
-        range = c(0, 100),
         group_channels = list(
             "smo2_left",
             "smo2_right",
             c("o2hb_left", "o2hb_right")
-        )
+        ),
+        range = c(0, 100),
     )
 
     # plot(df) +
