@@ -13,7 +13,8 @@ analyse_logistic(
   direction = c("auto", "positive", "negative"),
   end_fit_span = Inf,
   verbose = TRUE,
-  ...
+  ...,
+  env = rlang::caller_env()
 )
 }
 \arguments{
@@ -44,12 +45,25 @@ in units of \code{time_channel}. Observations where \code{time_channel <= t0}
 define the pre-response baseline window. If \code{NULL} (\emph{default}), retrieves
 \code{interval_times} from \emph{"mnirs"} metadata, or falls back to \code{0}.}
 
+\item{direction}{A character string specifying the response direction to
+detect -- \code{"auto"} (\emph{default}), \code{"positive"}, or \code{"negative"}. See
+\emph{Details}.}
+
+\item{end_fit_span}{A numeric value in units of \code{time_channel} or \code{t}
+specifying the forward-looking window used to check for subsequent
+greater/lesser values than the candidate extreme. \code{end_fit_span = Inf}
+(\emph{default}) returns the global extreme from the full range of \code{x}.}
+
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Additional arguments passed to the underlying method function.
 See \emph{Details}.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns

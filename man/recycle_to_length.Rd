@@ -4,7 +4,22 @@
 \alias{recycle_to_length}
 \title{Recycle parameter list to target length}
 \usage{
-recycle_to_length(param, n, name = c("event", "group"), verbose = TRUE)
+recycle_to_length(
+  param,
+  n,
+  name = c("event", "group"),
+  verbose = TRUE,
+  env = rlang::caller_env()
+)
+}
+\arguments{
+\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
+warnings and information messages helpful for troubleshooting. Ad
+global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 Recycle parameter list to target length

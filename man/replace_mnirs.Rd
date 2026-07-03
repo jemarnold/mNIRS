@@ -257,8 +257,8 @@ with names matching \code{nirs_channels}, e.g.:
 If no unnamed fallback value in the list, channels not named in the list
 will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
 process \code{hhb}).
-\item A \code{list()} whose names do not match \code{nirs_channels} (e.g.
-\code{control = list(maxiter = 100)}) is treated as a global value.
+\item \code{list()} names not matching \code{nirs_channels} are warned about and
+ignored.
 }
 }
 

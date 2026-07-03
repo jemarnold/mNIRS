@@ -17,7 +17,8 @@ analyse_peak_slope(
   partial = FALSE,
   na.rm = FALSE,
   verbose = TRUE,
-  ...
+  ...,
+  env = rlang::caller_env()
 )
 }
 \arguments{
@@ -77,6 +78,10 @@ warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Additional arguments.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns

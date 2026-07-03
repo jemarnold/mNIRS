@@ -4,7 +4,22 @@
 \alias{apply_span}
 \title{apply span to resolved times and build interval_spec data frame}
 \usage{
-apply_span(interval_list, t_vec, span, verbose = TRUE)
+apply_span(
+  interval_list,
+  t_vec,
+  span,
+  verbose = TRUE,
+  env = rlang::caller_env()
+)
+}
+\arguments{
+\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
+warnings and information messages helpful for troubleshooting. Ad
+global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 apply span to resolved times and build interval_spec data frame

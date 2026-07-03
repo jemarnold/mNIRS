@@ -4,7 +4,15 @@
 \alias{as_data_list}
 \title{Coerce \code{data} input to a named list of data frames}
 \usage{
-as_data_list(data)
+as_data_list(data, env = rlang::caller_env())
+}
+\arguments{
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
+metadata.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 Coerce \code{data} input to a named list of data frames

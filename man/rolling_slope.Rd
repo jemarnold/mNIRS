@@ -14,10 +14,11 @@ rolling_slope(
   partial = FALSE,
   na.rm = FALSE,
   verbose = TRUE,
-  ...
+  ...,
+  env = rlang::caller_env()
 )
 
-slope(x, t = seq_along(x), na.rm = FALSE, ...)
+slope(x, t = seq_along(x), na.rm = FALSE, ..., env = rlang::caller_env())
 }
 \arguments{
 \item{x}{A numeric vector of the response variable.}
@@ -50,6 +51,10 @@ warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Additional arguments.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \value{
 \code{rolling_slope()} returns a numeric vector of rolling local slopes

@@ -86,8 +86,9 @@ of \code{NA} to the returned numeric/integer vector.}
 \item{msg1, msg2}{A character string appended to the \code{\link[cli:cli_abort]{cli::cli_abort()}}
 message when numeric validation fails.}
 
-\item{env}{The calling environment, used to report errors and warnings
-as coming from the user-facing function rather than the validator.}
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 
 \item{data}{A data frame of class \emph{"mnirs"} containing time series data and
 metadata.}

@@ -9,7 +9,8 @@ find_kinetics_idx(
   t = seq_along(x),
   end_fit_span = Inf,
   direction = c("auto", "positive", "negative"),
-  ...
+  ...,
+  env = rlang::caller_env()
 )
 }
 \arguments{
@@ -28,6 +29,10 @@ detect -- \code{"auto"} (\emph{default}), \code{"positive"}, or \code{"negative"
 \emph{Details}.}
 
 \item{...}{Additional arguments.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \value{
 A named list with three elements:

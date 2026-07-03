@@ -8,8 +8,28 @@ detect_time_channel(
   data,
   time_channel = NULL,
   nirs_device = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  env = rlang::caller_env()
 )
+}
+\arguments{
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
+metadata.}
+
+\item{time_channel}{A character string naming the time or sample column.
+Must match a column name in \code{data} exactly.
+\itemize{
+\item If \code{NULL} (default), the \code{time_channel} metadata attribute of \code{data} is
+used.
+}}
+
+\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
+warnings and information messages helpful for troubleshooting. Ad
+global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 Detect time_channel from header row

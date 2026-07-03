@@ -24,8 +24,9 @@ metadata.}
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
-\item{env}{The calling environment, used to report errors and warnings
-as coming from the user-facing function rather than the validator.}
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \value{
 The \code{per_channel} list with mutating validators applied.

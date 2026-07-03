@@ -8,7 +8,6 @@ validate_group_channels(
   nirs_channels,
   group_channels,
   data = NULL,
-  verbose = TRUE,
   env = rlang::caller_env()
 )
 }
@@ -21,10 +20,6 @@ vectors. Lists may be named; unnamed groups are keyed by their first
 member.}
 
 \item{data}{A data frame for parsing bare-symbol group members.}
-
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{env}{Environment for symbol evaluation.}
 }

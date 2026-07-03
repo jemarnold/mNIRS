@@ -8,12 +8,12 @@ shift_mnirs(
   data,
   nirs_channels = NULL,
   time_channel = NULL,
+  group_channels = c("ensemble", "distinct"),
   to = NULL,
   by = NULL,
   width = NULL,
   span = NULL,
   position = c("min", "max", "first"),
-  group_channels = c("ensemble", "distinct"),
   verbose = TRUE
 )
 }
@@ -33,6 +33,19 @@ Must match a column name in \code{data} exactly.
 \itemize{
 \item If \code{NULL} (default), the \code{time_channel} metadata attribute of \code{data} is
 used.
+}}
+
+\item{group_channels}{Either a character string or a \code{list()} of
+channel-name vectors specifying how to group \code{nirs_channels}
+(see \emph{Details}).
+\describe{
+\item{\code{"ensemble"}}{The \emph{default}. Operate on all channels together,
+preserving the relative scaling between channels.}
+\item{\code{"distinct"}}{Operate on each channel independently, losing
+the relative scaling between channels.}
+\item{\code{list(c("A", "B"), c("C", "D"))}}{Operate on channels \code{A} & \code{B}
+in one group, and \code{C} & \code{D} in another group. Groups can be named
+(e.g. \code{list(smo2 = c("A", "B"))}).}
 }}
 
 \item{to}{A numeric value in units of \code{nirs_channels} to which the data
@@ -57,19 +70,6 @@ or \code{by} the specified value.}
 specified values.}
 \item{\code{"first"}}{Will shift first value(s) \code{to} or \code{by} the specified
 values.}
-}}
-
-\item{group_channels}{Either a character string or a \code{list()} of
-channel-name vectors specifying how to group \code{nirs_channels}
-(see \emph{Details}).
-\describe{
-\item{\code{"ensemble"}}{The \emph{default}. Operate on all channels together,
-preserving the relative scaling between channels.}
-\item{\code{"distinct"}}{Operate on each channel independently, losing
-the relative scaling between channels.}
-\item{\code{list(c("A", "B"), c("C", "D"))}}{Operate on channels \code{A} & \code{B}
-in one group, and \code{C} & \code{D} in another group. Groups can be named
-(e.g. \code{list(smo2 = c("A", "B"))}).}
 }}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
@@ -128,11 +128,11 @@ with names matching either \code{nirs_channels} or list names in
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{shift_mnirs(
     data,
     nirs_channels = c(A, B, C),
+    group_channels = list(smo2 = c(A, B), hhb = C),
     to = list(100, C = 0),
     width = list(smo2 = 3),
     span = list(hhb = 5),
-    position = "first",
-    group_channels = list(smo2 = c(A, B), hhb = C)
+    position = "first"
 )
 }\if{html}{\out{</div>}}
 \itemize{
@@ -144,8 +144,8 @@ per-channel / per-group values.
 If no unnamed fallback value in the list, channels not named in the list
 will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
 process \code{hhb}).
-\item A \code{list()} whose names do not match \code{nirs_channels} or \code{group_channels}
-(e.g. \code{control = list(maxiter = 100)}) is treated as a global value.
+\item \code{list()} names not matching \code{nirs_channels} or \code{group_channels} are
+warned about and ignored.
 }
 }
 
@@ -160,10 +160,10 @@ data <- read_mnirs(
 ) |>
     shift_mnirs(        ## un-grouped nirs channels to shift separately
         nirs_channels = c(smo2_left, smo2_right),
+        group_channels = "distinct",
         to = 0,         ## NIRS values will be shifted to zero
         span = 120,     ## shift the *first* 120 sec of data to zero
-        position = "first",
-        group_channels = "distinct"
+        position = "first"
     )
 
 data

@@ -4,7 +4,7 @@
 \alias{fix_coefs}
 \title{Update a model object with Fixed coefficients}
 \usage{
-fix_coefs(model, data = NULL, verbose = TRUE, ...)
+fix_coefs(model, data = NULL, verbose = TRUE, ..., env = rlang::caller_env())
 }
 \arguments{
 \item{model}{An existing model object from \code{lm}, \code{nls}, \code{glm}, and others.}
@@ -17,6 +17,10 @@ warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Named model coefficients to fix.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \value{
 An updated model object with remaining free coefficients.

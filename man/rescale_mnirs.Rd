@@ -7,8 +7,8 @@
 rescale_mnirs(
   data,
   nirs_channels = NULL,
-  range,
   group_channels = c("ensemble", "distinct"),
+  range,
   verbose = TRUE
 )
 }
@@ -23,9 +23,6 @@ operate on. Must match column names in \code{data} exactly.
 used.
 }}
 
-\item{range}{A numeric vector in the form \code{c(min, max)}, indicating the
-range of output values to which \code{nirs_channels} will be rescaled.}
-
 \item{group_channels}{Either a character string or a \code{list()} of
 channel-name vectors specifying how to group \code{nirs_channels}
 (see \emph{Details}).
@@ -38,6 +35,9 @@ the relative scaling between channels.}
 in one group, and \code{C} & \code{D} in another group. Groups can be named
 (e.g. \code{list(smo2 = c("A", "B"))}).}
 }}
+
+\item{range}{A numeric vector in the form \code{c(min, max)}, indicating the
+range of output values to which \code{nirs_channels} will be rescaled.}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
@@ -85,11 +85,11 @@ with names matching either \code{nirs_channels} or list names in
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{shift_mnirs(
     data,
     nirs_channels = c(A, B, C),
+    group_channels = list(smo2 = c(A, B), hhb = C),
     to = list(100, C = 0),
     width = list(smo2 = 3),
     span = list(hhb = 5),
-    position = "first",
-    group_channels = list(smo2 = c(A, B), hhb = C)
+    position = "first"
 )
 }\if{html}{\out{</div>}}
 \itemize{
@@ -101,8 +101,8 @@ per-channel / per-group values.
 If no unnamed fallback value in the list, channels not named in the list
 will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
 process \code{hhb}).
-\item A \code{list()} whose names do not match \code{nirs_channels} or \code{group_channels}
-(e.g. \code{control = list(maxiter = 100)}) is treated as a global value.
+\item \code{list()} names not matching \code{nirs_channels} or \code{group_channels} are
+warned about and ignored.
 }
 }
 
@@ -117,8 +117,8 @@ data <- read_mnirs(
 ) |>
     rescale_mnirs(        ## un-grouped nirs channels to rescale separately
         nirs_channels = c(smo2_left, smo2_right),
-        range = c(0, 100),  ## rescale to a 0-100\% functional exercise range
-        group_channels = "distinct"
+        group_channels = "distinct",
+        range = c(0, 100)  ## rescale to a 0-100\% functional exercise range
     )
 
 data

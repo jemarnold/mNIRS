@@ -4,7 +4,14 @@
 \alias{compute_diagnostics}
 \title{Compute model diagnostics}
 \usage{
-compute_diagnostics(x, t, fitted, n_params = 1L, verbose = TRUE)
+compute_diagnostics(
+  x,
+  t,
+  fitted,
+  n_params = 1L,
+  verbose = TRUE,
+  env = rlang::caller_env()
+)
 }
 \arguments{
 \item{x}{A numeric vector of the response variable.}
@@ -23,6 +30,10 @@ fit by the solver.}
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \value{
 A 1-row \code{data.frame} with columns \code{n_obs}, \code{r2}, \code{adj_r2},

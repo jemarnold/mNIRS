@@ -14,7 +14,8 @@ compute_local_windows(
   idx = seq_along(t),
   width = NULL,
   span = NULL,
-  align = c("centre", "left", "right")
+  align = c("centre", "left", "right"),
+  env = rlang::caller_env()
 )
 
 median_nona(w)
@@ -23,14 +24,22 @@ compute_local_fun(x, window_idx, fn, ...)
 
 col_medians_padded(m)
 
-compute_outliers(x, t, outlier_cutoff, width = NULL, span = NULL)
+compute_outliers(
+  x,
+  t,
+  outlier_cutoff,
+  width = NULL,
+  span = NULL,
+  env = rlang::caller_env()
+)
 
 compute_valid_neighbours(
   x,
   t = seq_along(x),
   width = NULL,
   span = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  env = rlang::caller_env()
 )
 }
 \arguments{
@@ -51,6 +60,10 @@ in which to perform the operation, according to \code{align}. In units of
 \item{align}{Window alignment as \emph{"centre"/"center"} (the \emph{default}),
 \emph{"left"}, or \emph{"right"}. Where \emph{"left"} is \emph{forward looking}, and \emph{"right"}
 is \emph{backward looking} from the current sample.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 
 \item{x}{A numeric vector of the response variable.}
 

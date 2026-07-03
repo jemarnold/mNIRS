@@ -11,8 +11,35 @@ detect_device_channels(
   nirs_channels = NULL,
   time_channel = NULL,
   keep_all = FALSE,
-  verbose = TRUE
+  verbose = TRUE,
+  env = rlang::caller_env()
 )
+}
+\arguments{
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
+metadata.}
+
+\item{nirs_channels}{A character vector giving the names of mNIRS columns to
+operate on. Must match column names in \code{data} exactly.
+\itemize{
+\item If \code{NULL} (default), the \code{nirs_channels} metadata attribute of \code{data} is
+used.
+}}
+
+\item{time_channel}{A character string naming the time or sample column.
+Must match a column name in \code{data} exactly.
+\itemize{
+\item If \code{NULL} (default), the \code{time_channel} metadata attribute of \code{data} is
+used.
+}}
+
+\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
+warnings and information messages helpful for troubleshooting. Ad
+global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 Detect known channels for a device

@@ -1,27 +1,112 @@
 ---
 title: "Untitled"
-format: html
+author:
+  - name: "Jem Arnold  [{{< fa brands github >}}](https://github.com/jemarnold/mnirs) [{{< fa brands bluesky >}}](https://bsky.app/profile/jemarnold.bsky.social) [{{< ai researchgate >}}](https://researchgate.net/profile/Jem-Arnold) [{{< ai orcid >}}](https://orcid.org/0000-0003-3908-9447)"
+format:
+  html:
+    self-contained: true
+    toc: true
+# bibliography: citations.bib
+execute:
+  echo: true
+  message: false
+  warning: false
+  dpi: 300
+  fig-align: center
+  out-width: "100%"
+# knitr:
+#   opts_chunk:
+#     collapse: true
+#     comment: '#>'
 ---
 
-Summary
+```{r setup}
+#| code-fold: true
+#| code-summary: "Show setup code"
 
-Muscle near-infrared spectroscopy (mNIRS) is increasingly used in exercise physiology, sport science, and clinical rehabilitation for non-invasive assessment of local muscle oxygenation and metabolism during exercise. Wearable mNIRS devices have made data collection increasingly accessible outside specialised laboratory environments. However, processing and analysing these data remains inconsistent. Different research groups commonly rely on custom scripts, manual spreadsheets, or proprietary software developed for local workflows, making analyses difficult to reproduce and standardise.
+```
 
-mnirs is an open-source R package for reading, processing, visualising, and preparing mNIRS time-series data for analysis. The package provides a standardised workflow covering the common processing steps used across many mNIRS applications, including importing files from multiple devices, cleaning invalid observations, digital filtering, resampling, shifting and rescaling signals, extracting repeated intervals, and visualising processing decisions. Rather than proposing new analysis methods, mnirs provides a reproducible implementation of commonly used processing approaches within a flexible framework that integrates naturally with the R ecosystem. A companion web application provides access to the core processing workflow through a graphical interface for users with little or no programming experience.
+<!-- [@Adami2018] -> (Adami and Rossiter 2018) -->
+<!-- @Beever2020 -> Beever et al. (2020) -->
 
-Statement of Need
 
-Near-infrared spectroscopy (NIRS) has been used in human physiology research for nearly fifty years to evaluate local oxygen delivery and extraction within biological tissue. In the past decade, wearable continuous-wave mNIRS devices have substantially expanded the use of this technology beyond specialised research laboratories into applied sport science, clinical practice, and field-based exercise physiology.
+## Summary
 
-While collecting mNIRS data is easier than ever, processing and analysing those data remains a challenge. NIRS signals are inherently noisy and sensitive to differences in tissue composition, optical properties, and device-specific signal processing. Continuous-wave devices report relative changes in tissue oxygenation, and the resulting signals are strongly influenced by processing decisions including filtering, interpolation, baseline correction, and normalisation. Consequently, different laboratories frequently develop their own processing workflows tailored to specific devices and research questions.
+Muscle near-infrared spectroscopy (mNIRS) is increasingly used in exercise physiology, sport science, and clinical rehabilitation for non-invasive assessment of local tissue oxygenation and metabolism during exercise. Wearable mNIRS devices have made data collection increasingly accessible outside specialised laboratory environments. However, processing and analysing mNIRS data remains fragmented. NIRS research groups and individual users commonly rely on custom scripts or manual spreadsheets developed ad-hoc over time, making analyses difficult to reproduce and standardise.
 
-In practice, these workflows often consist of combinations of proprietary software, laboratory-specific scripts, and manually edited spreadsheets. Such approaches are entirely reasonable for individual projects, but they can make analyses difficult to reproduce, share, or extend. Processing decisions are frequently embedded within undocumented scripts or spreadsheets that evolve over time, making it difficult for new researchers to understand or reproduce previous work. As mNIRS applications continue to expand, there is increasing value in providing transparent and reproducible software that implements commonly used processing methods within a shared framework.
+`mnirs` is an open-source R package for reading, processing, visualising, and analysing mNIRS time-series data. The package provides a standardised workflow covering common processing steps used for many mNIRS applications. `mnirs` can read files from multiple commercially available devices, clean invalid observations, resample, smooth data with digital filtering, shift and rescale multi-channel signals, extract intervals, and visualise data at every step of the processing pipeline. 
 
-The mnirs package was developed to reduce these barriers. The aim is not to prescribe a single processing pipeline or recommend one filtering strategy over another, but to provide a collection of flexible tools that allow researchers to implement processing workflows appropriate for their application using reproducible R code. Individual functions perform discrete processing tasks and can be combined as required for different experimental protocols. Because the package returns standard R data frames, processed data remain compatible with existing statistical and visualisation packages throughout the R ecosystem.
+Along with a flexible R package, a companion web application provides access to a basic no-code workflow for NIRS users with minimal coding experience. `mnirs` is designed for researchers, practitioners, and individual NIRS users, emphasising accessibility, reproducibility, and transparent processing decisions.
 
-Software Overview
+## Statement of need
 
-The package is organised around the sequence of processing steps typically performed when working with mNIRS recordings. Rather than requiring users to adapt their workflow to a particular data structure, mnirs aims to simplify common tasks while remaining compatible with existing R workflows.
+Near-infrared spectroscopy has been used in human physiology research for nearly fifty years to evaluate local oxygen delivery and extraction within biological tissue [@Jobsis1977]. In the past decade, wearable continuous-wave mNIRS devices have substantially expanded the use of this technology beyond specialised research laboratories into applied sport science, clinical practice, and field-based exercise physiology [@Grassi2016][@Perrey2024][@Jan2026].
+
+While collecting mNIRS data is easier than ever, processing and analysing those data remains a challenge. NIRS signals are inherently noisy and sensitive to differences in tissue composition [@vanBeekvelt2001][@Stuer2024], unknown optical properties [@Hammer2019][@Priovano2021], and device-specific signal processing[@McManus2018][@Feldmann2026]. Continuous-wave CW-NIRS devices report relative changes in optical signals from an arbitrary baseline, and the resulting oxygenation signals are strongly influenced by processing decisions including filtering, interpolation, baseline correction, and normalisation (technical details and applications of NIRS can be found in @Barstow2019, @Hamaoka2019, and @Grassi2016). 
+
+Consequently, laboratories and users frequently develop their own processing workflows tailored to the devices they have, and their particular research questions. In practice, these workflows often consist of in-house proprietary software, ad-hoc scripts, and manually edited spreadsheets. Processing decisions are frequently undocumented, or default parameters can be applied across NIRS devices with very different recording properties.
+
+Such approaches are reasonable for individual projects, but they can stand in the way of multi-centre collaboration and make analyses difficult to share and reproduce. As mNIRS applications continue to expand, there is increasing value in providing transparent and standardised software to implement commonly performed processing methods.
+
+The `mnirs` package was developed to reduce these barriers. The aim is to provide a collection of flexible R functions which allow researchers to implement processing pipelines appropriate for their own applications. Processed data then compatible with further analysis workflows with existing statistical and visualisation packages in the R ecosystem.
+
+## State of the field
+
+Some commercial mNIRS devices are distributed with proprietary software for real-time visualisation and basic signal processing (e.g. Oxysoft, Artinis, Elst, the Netherlands). Others allow for recording to a variety of apps and devices, or will simply export raw data from onboard recording (e.g. Moxy monitor, Fortiori Design LLC., Hutchinson, MN, USA). These commercially available mNIRS devices each export files in different formats, using various names for the common NIRS channels; e.g. SmO<sub>2</sub>, TSI, or StO<sub>2</sub> for an oxygen saturation value [@Feldmann2026].
+
+Within R, software specifically developed for mNIRS processing remains limited. To our knowledge there is currently only one other R package listed on CRAN explicitly related to NIRS analysis [@Wang2020], which does not to be under active maintenance. `mnirs` is currently the only open-source, under active development CRAN package specifically developed to support the complete processing workflow for wearable mNIRS data.
+
+Other biological and health science disciplines have broad representation on CRAN (e.g. biostatistics, ecology & environmental sciences, epidemiology, genetics, and many others) with packages that complement each other to advance and standardise methodology across the field. mNIRS research would benefit from additional open-source development of tools to help users work with data in R, Python, and other platforms.
+
+## Software design
+
+`mnirs` was released as version 0.6.0 on the comprehensive R archive network (CRAN). The official CRAN release can be downloaded directly in the R working environment by calling:
+
+`install.packages("mnirs")`
+
+The latest development version can be downloaded from:
+
+`pak::pak("jemarnold/mnirs")`
+
+The package website has comprehensive documentation of the functions discussed below, and includes vignettes demonstrating common mNIRS data processing pipelines:
+
+`https://jemarnold.github.io/mnirs/articles/reading-mnirs-data.html`
+
+An online app is available as a ‘no-code’ workflow with basic `mnirs` processing functionality, for rapid visualisation and comparison of processing methods:
+
+`https://jemarnold-mnirs-app.share.connect.posit.cloud/`
+
+`mnirs` is designed around an incremental processing pipeline:
+
+```
+read_mnirs()                             # read & import data from file
+  ├─ plot()                              # visualise at each processing step 
+  └─ resample_mnirs()                    # regularise or resample time grid
+      └─ replace_mnirs()                 # clean invalid, outliers, missing
+          └─ filter_mnirs()              # smooth with digital filtering
+              ├─ shift_mnirs()           # shift multi-channel signals
+              └─ rescale_mnirs()         # normalise multi-channel signal range
+                  └─ extract_intervals() # extract for further analysis
+```
+
+`read_mnirs()` will typically be the first function called from `mnirs` to read a file exported from an mNIRS device, and return a data frame of class `"mnirs"` ready for further processing. This function will recognise files from most commercially available mNIRS devices, and can automatically detect the appropriate NIRS and time channels. These can be customised and renamed, and metadata (e.g. sample rate and recording start time) will be extracted if present and stored as attributes of the returned data frame. This allows subsequent `mnirs` functions to automatically detect and apply these values, rather than having to repeatedly specify them manually.
+
+`plot.mnirs()` or the generic `plot()` can be called on `mnirs` data frames to visualise data at each processing step. Visual inspection is an important part of mNIRS processing decisions.
+
+`resample_mnirs()` is used to up- or down-sample mNIRS data for synchronisation with other devices, or to regularise the time grid if a NIRS device records at an irregular sampling rate.
+
+`replace_mnirs()` can detect and replace local outliers, invalid specific values, values outside of a valid range, and fill or interpolate across missing data.
+
+`filter_mnirs()` can be used to apply several methods for smoothing, including simple moving average, a non-parametric smoothing spline, or fully parameterised digital filters. Filtering is one of the most important steps in processing mNIRS data to improve signal-to-noise ratio and capture relevant physiological signals. However, over-parameterised filtering can over-smooth the data and influence interpretations just as much as trying to analyse overly-noisy raw data. It is perfectly valid to choose a filter method by iteratively testing filter parameters until the signal or response of interest
+
+
+
+
+
+
+
+
+The package is organised around the sequence of processing steps typically performed when working with mNIRS recordings. Rather than requiring users to adapt their workflow to a particular data structure, `mnirs` aims to simplify common tasks while remaining compatible with existing R workflows.
 
 The first step is importing data from files exported by commercial mNIRS devices. Manufacturers use different file formats, channel names, and metadata structures, making data import unnecessarily time consuming when working across multiple devices. The read_mnirs() function automatically detects common file formats and channel names, extracts available metadata such as sampling frequency and recording time, and returns a standardised data frame. Metadata are stored alongside the imported data and are recognised automatically by subsequent processing functions, reducing the need to repeatedly specify channel mappings throughout an analysis.
 
@@ -29,7 +114,7 @@ Visual inspection is an important part of mNIRS processing. Processing decisions
 
 Several functions implement common preprocessing operations applied to physiological time-series data. Invalid observations and obvious movement artefacts can be identified and replaced, with optional interpolation of missing values. Recordings can be resampled to regular sampling intervals or converted to different sampling frequencies to facilitate synchronisation with other physiological measurements, including metabolic gas exchange, heart rate, or electromyography. Signal smoothing is available using smoothing splines, Butterworth digital filters, or moving averages, allowing users to select processing methods appropriate for their sampling frequency and experimental application.
 
-Signal shifting and rescaling are also provided because absolute values recorded by continuous-wave mNIRS devices are often not directly comparable between recording sessions, devices, muscle sites, or individuals. Different studies employ different normalisation strategies depending on the experimental question, including baseline correction, functional normalisation, or calibration using vascular occlusion protocols. Rather than enforcing a particular approach, mnirs provides flexible methods for shifting and rescaling either individual channels or groups of channels while preserving transparency regarding the processing decisions applied.
+Signal shifting and rescaling are also provided because absolute values recorded by continuous-wave mNIRS devices are often not directly comparable between recording sessions, devices, muscle sites, or individuals. Different studies employ different normalisation strategies depending on the experimental question, including baseline correction, functional normalisation, or calibration using vascular occlusion protocols. Rather than enforcing a particular approach, `mnirs` provides flexible methods for shifting and rescaling either individual channels or groups of channels while preserving transparency regarding the processing decisions applied.
 
 After preprocessing, analyses are commonly performed on specific periods of interest rather than entire recordings. Exercise bouts, recovery periods, or repeated vascular occlusions can therefore be extracted using event markers, lap counters, timestamps, or sample indices. Multiple extracted intervals may also be ensemble averaged to improve signal-to-noise ratio for repeated protocols, providing a common starting point for subsequent physiological modelling.
 
@@ -37,19 +122,12 @@ The package intentionally focuses on preprocessing rather than statistical analy
 
 Accessibility
 
-Although reproducible analyses are best achieved through scripted workflows, many researchers and practitioners using wearable mNIRS devices have limited programming experience. To improve accessibility, the core processing workflow implemented by mnirs is also available through a freely accessible web application.
+Although reproducible analyses are best achieved through scripted workflows, many researchers and practitioners using wearable mNIRS devices have limited programming experience. To improve accessibility, the core processing workflow implemented by `mnirs` is also available through a freely accessible web application.
 
 The application allows users to upload exported recordings, compare different preprocessing methods, and visualise the effects of filtering and signal transformation without writing code. Because the application uses the same underlying package functions, workflows developed interactively can later be reproduced directly within R if required.
 
 Documentation for the package is provided through a package website, function reference pages, and worked examples demonstrating common processing pipelines.
 
-Comparison with Existing Software
-
-Commercial mNIRS devices are commonly distributed with proprietary software for visualisation and basic signal processing. These applications are often designed around individual hardware platforms and provide limited flexibility for reproducible workflows or integration with statistical software.
-
-Within R, software specifically developed for muscle NIRS processing remains limited. Existing NIRS packages have largely focused on statistical analysis or functional NIRS applications rather than preprocessing skeletal muscle recordings acquired during exercise. To our knowledge, mnirs is currently the only actively maintained CRAN package specifically developed to support the complete preprocessing workflow for wearable muscle NIRS data.
-
-The contribution of mnirs is therefore not the development of new signal-processing algorithms, but the implementation of commonly used processing methods within a transparent, open-source framework designed specifically for muscle NIRS research.
 
 Future Development
 
@@ -59,4 +137,4 @@ As an open-source project, future development will also be guided by contributio
 
 Conclusions
 
-mnirs provides a reproducible workflow for reading, processing, and preparing muscle near-infrared spectroscopy data for analysis in R. By implementing commonly used preprocessing methods within an open-source framework, the package reduces reliance on laboratory-specific scripts and manual spreadsheet workflows while remaining flexible enough to support a wide range of experimental applications. The package is intended to complement existing statistical tools within R and to provide a common foundation upon which future community-developed methods for mNIRS analysis can be built.
+`mnirs` provides a reproducible workflow for reading, processing, and preparing muscle near-infrared spectroscopy data for analysis in R. By implementing commonly used preprocessing methods within an open-source framework, the package reduces reliance on laboratory-specific scripts and manual spreadsheet workflows while remaining flexible enough to support a wide range of experimental applications. The package is intended to complement existing statistical tools within R and to provide a common foundation upon which future community-developed methods for mNIRS analysis can be built.

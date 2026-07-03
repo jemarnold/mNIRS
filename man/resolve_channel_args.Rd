@@ -6,16 +6,22 @@
 \usage{
 resolve_channel_args(
   nirs_channels,
+  group_channels = NULL,
   args,
   defaults = list(),
   choices = list(),
-  group_channels = NULL,
   verbose = TRUE,
   env = rlang::caller_env()
 )
 }
 \arguments{
 \item{nirs_channels}{Character vector of resolved channel names.}
+
+\item{group_channels}{An \emph{optional} named list of channel-name vectors
+from \code{\link[=validate_group_channels]{validate_group_channels()}}. When supplied, arguments are
+resolved per group: a group-name key or any member-channel key
+applies to the whole group, and conflicting member values within one
+group abort.}
 
 \item{args}{Named list of per-channel-capable arguments. Each element is
 either a global value or a per-channel \code{list()} map. A per-channel map
@@ -32,20 +38,11 @@ needed for arguments whose formal default is not \code{NULL} (e.g.
 Resolved values are matched per channel; a full default vector
 resolves to its first element, matching \code{\link[=match.arg]{match.arg()}} behaviour.}
 
-\item{group_channels}{An \emph{optional} named list of channel-name vectors
-from \code{\link[=validate_group_channels]{validate_group_channels()}}. When supplied, arguments are
-resolved per group: a group-name key or any member-channel key
-applies to the whole group, and conflicting member values within one
-group abort.}
-
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
-\item{env}{The calling environment, used to report errors and warnings
-as coming from the user-facing function rather than the validator.}
-
-\item{call}{The calling environment, used to report errors as coming
+\item{env}{The calling environment, used to report errors as coming
 from the user-facing function (e.g. \code{\link[=rescale_mnirs]{rescale_mnirs()}}).}
 }
 \value{
@@ -56,12 +53,12 @@ channel's resolved argument values.
 \description{
 Broadcasts global argument values across \code{nirs_channels}, applying
 per-channel overrides where an argument is supplied as a named \code{list()}
-keyed by channel name. An argument is treated as per-channel only when
-it is a \code{list()} whose named elements all match \code{nirs_channels} or group
-names, with at most one unnamed element acting as the fallback for
-unlisted channels (e.g. \code{width = list(5, q = 7)} gives \code{q} 7 and every
-other channel 5). Any other value (including unnamed vectors and named
-lists such as \code{control = list(maxiter = 100)}) is applied globally to
-every channel.
+keyed by channel name. An argument is treated as per-channel when it is
+a \code{list()} with at least one named element, with at most one unnamed
+element acting as the fallback for unlisted channels (e.g.
+\code{width = list(5, q = 7)} gives \code{q} 7 and every other channel 5). Names
+must match \code{nirs_channels} or group names; unrecognised names are
+warned about and ignored. Any other value (unnamed vectors and fully
+unnamed lists) is applied globally to every channel.
 }
 \keyword{internal}

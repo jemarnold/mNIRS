@@ -10,8 +10,25 @@ apply_interval_groups(
   metadata,
   group_intervals,
   zero_time = FALSE,
-  verbose = TRUE
+  verbose = TRUE,
+  env = rlang::caller_env()
 )
+}
+\arguments{
+\item{nirs_channels}{A character vector giving the names of mNIRS columns to
+operate on. Must match column names in \code{data} exactly.
+\itemize{
+\item If \code{NULL} (default), the \code{nirs_channels} metadata attribute of \code{data} is
+used.
+}}
+
+\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
+warnings and information messages helpful for troubleshooting. Ad
+global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 Apply grouping to intervals

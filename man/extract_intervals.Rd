@@ -10,10 +10,10 @@ extract_intervals(
   time_channel = NULL,
   event_channel = NULL,
   sample_rate = NULL,
+  group_intervals = c("distinct", "ensemble"),
   start = NULL,
   end = NULL,
   span = list(c(-60, 60)),
-  group_intervals = c("distinct", "ensemble"),
   zero_time = FALSE,
   verbose = TRUE,
   event_groups = deprecated()
@@ -52,6 +52,17 @@ lap numbers.
 values for ensemble-averaging. If \code{NULL}, will be estimated from
 \code{time_channel} (see \emph{Details}).}
 
+\item{group_intervals}{Either a character string or a \code{list()} of integer
+vectors specifying how to group intervals (see \emph{Details}).
+\describe{
+\item{\code{"distinct"}}{The default. Extract each interval as an independent
+data frame.}
+\item{\code{"ensemble"}}{Ensemble-average each specified \code{nirs_channel} across
+all detected intervals, returning a single data frame.}
+\item{\code{list(c(1, 2), c(3, 4))}}{Ensemble-average each specified
+\code{nirs_channel} within each group and return one data frame per group.}
+}}
+
 \item{start}{Specifies where intervals begin. Either raw values -- numeric
 for time values, character for event labels, explicit integer (e.g. \code{2L})
 for lap numbers -- or created with \code{\link[=by_time]{by_time()}}, \code{\link[=by_label]{by_label()}}, \code{\link[=by_lap]{by_lap()}},
@@ -74,17 +85,6 @@ of \code{time_channel}, or a \code{list()} of such vectors. (\emph{default}
 \code{span = 60} -> \code{c(0, 60)}).
 \item A single \emph{negative} value is recycled to shift the start times (e.g.
 \code{span = -60} -> \code{c(-60, 0)}).
-}}
-
-\item{group_intervals}{Either a character string or a \code{list()} of integer
-vectors specifying how to group intervals (see \emph{Details}).
-\describe{
-\item{\code{"distinct"}}{The default. Extract each interval as an independent
-data frame.}
-\item{\code{"ensemble"}}{Ensemble-average each specified \code{nirs_channel} across
-all detected intervals, returning a single data frame.}
-\item{\code{list(c(1, 2), c(3, 4))}}{Ensemble-average each specified
-\code{nirs_channel} within each group and return one data frame per group.}
 }}
 
 \item{zero_time}{Logical. Default is \code{FALSE}. If \code{TRUE}, re-calculates
@@ -217,9 +217,9 @@ data <- read_mnirs(
 interval_list <- extract_intervals(
     data,                         ## channels recycled to all intervals by default
     nirs_channels = c(smo2_left, smo2_right),
+    group_intervals = "ensemble", ## ensemble-average across two intervals
     start = by_time(368, 1084),   ## manually identified interval start times
     span = c(-20, 90),            ## include the last 180-sec of each interval (recycled)
-    group_intervals = "ensemble", ## ensemble-average across two intervals
     zero_time = TRUE              ## re-calculate common time to start from `0`
 )
 

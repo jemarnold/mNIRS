@@ -18,7 +18,15 @@ analyse_kinetics(
   direction = c("auto", "positive", "negative"),
   end_fit_span = Inf,
   verbose = TRUE,
-  ...
+  ...,
+  fraction = 0.5,
+  width = NULL,
+  span = NULL,
+  align = c("centre", "left", "right"),
+  partial = FALSE,
+  na.rm = FALSE,
+  use_time_delay = TRUE,
+  shape = c("symmetric", "gompertz", "gompertz_left")
 )
 
 analyze_kinetics(
@@ -86,39 +94,43 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 \item{...}{Additional arguments passed to the underlying method function.
 See \emph{Details}.}
 
-\item{fraction}{A numeric value in the range \verb{[0, 1]} specifying the
-fractional response amplitude to detect. Defaults to \code{0.5} (50\% response,
-i.e. half-response time).}
+\item{fraction}{\strong{response_time}: A numeric value in the range
+\verb{[0, 1]} specifying the fractional response amplitude to detect.
+Defaults to \code{0.5} (50\% response, i.e. half-response time).}
 
-\item{width}{An integer defining the local window in number of samples
-around \code{idx} in which to perform the operation, according to \code{align}.}
+\item{width}{\strong{peak_slope}: An integer defining the local window in
+number of samples around \code{idx} in which to perform the operation,
+according to \code{align}.}
 
-\item{span}{A numeric value defining the local window time span around \code{idx}
-in which to perform the operation, according to \code{align}. In units of
-\code{time_channel} or \code{t}.}
+\item{span}{\strong{peak_slope}: A numeric value defining the local window
+time span around \code{idx} in which to perform the operation, according
+to \code{align}. In units of \code{time_channel}.}
 
-\item{align}{Window alignment as \emph{"centre"/"center"} (the \emph{default}),
-\emph{"left"}, or \emph{"right"}. Where \emph{"left"} is \emph{forward looking}, and \emph{"right"}
-is \emph{backward looking} from the current sample.}
+\item{align}{\strong{peak_slope}: Window alignment as \emph{"centre"/"center"}
+(the \emph{default}), \emph{"left"}, or \emph{"right"}. Where \emph{"left"} is \emph{forward
+looking}, and \emph{"right"} is \emph{backward looking} from the current
+sample.}
 
-\item{partial}{Logical; default is \code{FALSE}, requires local windows to have
-complete number of samples specified by \code{width} or \code{span}. If \code{TRUE},
-processes available samples within the local window. See \emph{Details}.}
+\item{partial}{\strong{peak_slope}: Logical; default is \code{FALSE}, requires
+local windows to have complete number of samples specified by
+\code{width} or \code{span}. If \code{TRUE}, processes available samples within the
+local window. See \emph{Details}.}
 
-\item{na.rm}{Logical; default is \code{FALSE}, propagates any \code{NA}s to the
-returned vector. If \code{TRUE}, ignores \code{NA}s and processes available valid
-samples within the local window. May return errors or warnings. (see
-\emph{Details}).}
+\item{na.rm}{\strong{peak_slope}: Logical; default is \code{FALSE}, propagates
+any \code{NA}s to the returned vector. If \code{TRUE}, ignores \code{NA}s and
+processes available valid samples within the local window. May
+return errors or warnings. (see \emph{Details}).}
 
-\item{use_time_delay}{Logical; default is \code{TRUE} to attempt to fit a
-4-parameter \code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau, TD) with a time delay.
-If the 4-parameter fit fails, or if \code{use_time_delay = FALSE}, attempts to
-fit a reduced 3-parameter \code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau).}
+\item{use_time_delay}{\strong{monoexponential}: Logical; default is \code{TRUE}
+to attempt to fit a 4-parameter \code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau, TD)
+with a time delay. If the 4-parameter fit fails, or if
+\code{use_time_delay = FALSE}, attempts to fit a reduced 3-parameter
+\code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau).}
 
-\item{shape}{Character; the 4-parameter sigmoidal shape to fit. One of
-\code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic]{SSlogistic()}}), \code{"gompertz"}
-(early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or \code{"gompertz_left"}
-(late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
+\item{shape}{\strong{logistic}: Character; the 4-parameter sigmoidal shape
+to fit. One of \code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic]{SSlogistic()}}),
+\code{"gompertz"} (early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or
+\code{"gompertz_left"} (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
 }
 \value{
 A formatted table of printed results, with individual elements
@@ -146,9 +158,10 @@ each \code{nirs_channel} with one row per \code{nirs_channel} per interval.}
 \item{\code{call}}{The matched call.}
 }
 \description{
-Fit parametric curves or estimate non-parametric kinetics for each
-\code{nirs_channel} within an \emph{"mnirs"} data frame, a list of data frames,
-or a grouped data frame.
+Fit parametric or non-parametric kinetics for each \code{nirs_channel} within an
+\emph{"mnirs"} data frame, a list of data frames, or a grouped data frame.
+
+Note the \code{method}-specific arguments below.
 }
 \details{
 \subsection{Data input formats}{
@@ -304,8 +317,8 @@ result <- read_mnirs(
 ) |>
     resample_mnirs(method = "linear", verbose = FALSE) |>
     extract_intervals(
-        start = by_time(368, 1084),
         group_intervals = "distinct",
+        start = by_time(368, 1084),
         span = c(-20, 90),
         zero_time = TRUE,
         verbose = FALSE

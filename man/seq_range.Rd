@@ -4,7 +4,13 @@
 \alias{seq_range}
 \title{Generate numeric sequence from range of a vector}
 \usage{
-seq_range(x, by = 1, length.out = NULL, direction = c("up", "down"))
+seq_range(
+  x,
+  by = 1,
+  length.out = NULL,
+  direction = c("up", "down"),
+  env = rlang::caller_env()
+)
 }
 \arguments{
 \item{x}{A numeric vector.}
@@ -18,6 +24,10 @@ sequence. \emph{Default} is \code{NULL}. If supplied, takes precedence over \cod
 
 \item{direction}{Order of returned vector. Either \code{"up"} for ascending or
 \code{"down"} for descending. If supplied, takes precedence over the \code{by} sign.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \value{
 A numeric vector spanning the range of the input \code{x}.

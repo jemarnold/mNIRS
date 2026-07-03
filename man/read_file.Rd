@@ -4,7 +4,12 @@
 \alias{read_file}
 \title{Read raw data frame from file path}
 \usage{
-read_file(file_path)
+read_file(file_path, env = rlang::caller_env())
+}
+\arguments{
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 Read raw data frame from file path

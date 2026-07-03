@@ -12,7 +12,8 @@ analyse_kinetics_channels(
   fit_fn,
   verbose = TRUE,
   interval_name = NA_character_,
-  extra_args = list()
+  extra_args = list(),
+  env = rlang::caller_env()
 )
 }
 \arguments{
@@ -41,6 +42,10 @@ column of the returned coefficients.}
 
 \item{extra_args}{Named list of additional arguments recorded in the
 \code{channel_args} result attribute.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \value{
 A \code{data.frame} of coefficients (columns \code{interval},
