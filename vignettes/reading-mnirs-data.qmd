@@ -77,7 +77,7 @@ See `read_mnirs()` for more details.
 
 * `file_path`
 
-    Specify the location of the data file, including file extension. e.g. `"./my_file.xlsx"` or `"C:/myfolder/my_file.csv"`.
+    Specify the location of the data file, including file extension. e.g. `"my_file.xlsx"`, `"C:/myfolder/my_file.csv"`, or `here::here("data", "my_file.csv")`.
 
 ::: {.callout-note}
 ### Example data files
@@ -283,7 +283,7 @@ Let's explain the functionality of this data-wide function, and for more details
 
 * `data`
 
-    This function takes in a data frame, resamples all data frame columns to the new sample rate, then returns the processed data frame. *`mnirs`* metadata will be passed to and from this function.
+    This function takes in a data frame, detects and replaces outliers, invalid values, and missing values across the specified channels, then returns the processed data frame. *`mnirs`* metadata will be passed to and from this function.
 
 * `nirs_channels`
 
@@ -459,9 +459,17 @@ We can group NIRS channels together to preserve the absolute and relative scalin
 
 * `nirs_channels`
 
-    Unlike previous functions, `nirs_channels` should provided as a list (e.g. `list(c(A, B), c(C))`). Each list item represents a group to be shifted together to a common scale. Separate list items will be shifted to separate scales. The relative scaling between channels will be preserved within each group, but lost between groups.\
+    Specify which column names in `data` to process. If the data contain *`mnirs`* metadata, these channels will be detected automatically. Channels not specified will be passed through unprocessed to the returned data frame.
+
+* `group_channels`
+
+    Controls how `nirs_channels` are grouped, to preserve absolute or relative scaling. Either a character keyword or a `list()` of channel-name vectors:\
 \
-`nirs_channels` should be specified explicitly to ensure the intended grouping structure is returned. The default *`mnirs`* metadata will group all NIRS channels together.
+`"ensemble"` (the default) shifts all channels together to a common value, preserving the relative scaling between channels.\
+\
+`"distinct"` shifts each channel independently, losing the relative scaling between channels.\
+\
+A `list()` of channel-name vectors (e.g. `list(c(A, B), c(C))`) shifts channels `A` & `B` together and `C` separately, preserving relative scaling within, but not between groups.
 
 * `time_channel`
 
@@ -494,8 +502,8 @@ This is a good time to note that here and in most *`mnirs`* functions, data chan
 
 ```{r}
 data_shifted <- shift_mnirs(
-    data_filtered,     ## un-grouped nirs channels to shift separately 
-    group_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
+    data_filtered,
+    group_channels = list(smo2_left, smo2_right), ## 👈 channels shifted separately
     to = 0,            ## NIRS values will be shifted to zero
     span = 120,        ## shift the *first* 120 sec of data to zero
     position = "first"
@@ -525,9 +533,17 @@ We may also want to rescale our data to a new dynamic range, changing the signal
 
 * `nirs_channels`
 
-    Unlike previous functions, `nirs_channels` should provided as a list (e.g. `list(c(A, B), c(C))`). Each list item represents a group to be rescale together to a common range. Separate list items will be rescaled to separate ranges. The relative scaling between channels will be preserved within each group, but lost between groups.\
+    Specify which column names in `data` to process. If the data contain *`mnirs`* metadata, these channels will be detected automatically. Channels not specified will be passed through unprocessed to the returned data frame.
+
+* `group_channels`
+
+    Controls how `nirs_channels` are grouped, to preserve absolute or relative scaling. Either a character keyword or a `list()` of channel-name vectors:\
 \
-`nirs_channels` should be specified explicitly to ensure the intended grouping structure is returned. The default *`mnirs`* metadata will group all NIRS channels together.
+`"ensemble"` (the default) rescales all channels together to a common range, preserving the relative scaling between channels.\
+\
+`"distinct"` rescales each channel independently, losing the relative scaling between channels.\
+\
+A `list()` of channel-name vectors (e.g. `list(c(A, B), c(C))`) rescales channels `A` & `B` together and `C` separately, preserving relative scaling within, but not between groups.
 
 * `range`
 
@@ -535,8 +551,8 @@ We may also want to rescale our data to a new dynamic range, changing the signal
 
 ```{r}
 data_rescaled <- rescale_mnirs(
-    data_filtered,    ## un-grouped nirs channels to rescale separately 
-    group_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
+    data_filtered,
+    group_channels = list(smo2_left, smo2_right), ## 👈 channels rescaled separately
     range = c(0, 100) ## rescale to a 0-100% functional exercise range
 )
 
@@ -658,12 +674,12 @@ When ensemble-averaging across intervals, time will always be re-calculated from
 
 ## return each interval independently with `group_intervals = "distinct"`
 distinct <- extract_intervals(
-    nirs_data,                  ## channels blank for "distinct" grouping
-    group_intervals = "distinct",  ## return a list of data frames for each (2) event
-    start = by_time(348, 1064), ## manually identified interval start times
-    end = by_time(458, 1174),   ## interval end time (start + 150 sec)
-    span = c(0, 0),             ## no boundary modification
-    zero_time = FALSE           ## return original time values
+    nirs_data,                    ## channels blank for "distinct" grouping
+    group_intervals = "distinct", ## return a list of data frames for each (2) event
+    start = by_time(348, 1064),   ## manually identified interval start times
+    end = by_time(458, 1174),     ## interval end time (start + 150 sec)
+    span = c(0, 0),               ## no boundary modification
+    zero_time = FALSE             ## return original time values
 )
 
 plot(distinct, time_labels = TRUE)
@@ -672,12 +688,11 @@ plot(distinct, time_labels = TRUE)
 ```{r}
 ## ensemble average both intervals with `group_intervals = "ensemble"`
 ensemble <- extract_intervals(
-    nirs_data,                  ## channels recycled to all intervals by default
-    nirs_channels = c(smo2_left, smo2_right),
-    group_intervals = "ensemble",  ## ensemble-average across two intervals
-    start = by_time(368, 1084), ## alternatively specify start times + span
-    span = c(-20, 90),          ## span recycled to all intervals by default
-    zero_time = TRUE            ## re-calculate common time to start from `0`
+    nirs_data,                    ## channels recycled to all intervals by default
+    group_intervals = "ensemble", ## ensemble-average across two intervals
+    start = by_time(368, 1084),   ## alternatively specify start times + span
+    span = c(-20, 90),            ## span recycled to all intervals by default
+    zero_time = TRUE              ## re-calculate common time to start from `0`
 )
 
 plot(ensemble, time_labels = TRUE) + 
