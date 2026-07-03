@@ -452,7 +452,7 @@ make_per_channel <- function(channels, ...) {
     extra <- list(...)
     setNames(
         lapply(channels, \(.ch) {
-            c(list(end_fit_span = Inf, direction = "auto"), extra)
+            c(list(end_window = Inf, direction = "auto"), extra)
         }),
         channels
     )
@@ -606,16 +606,16 @@ test_that("analyse_kinetics_channels silent for valid coefficients", {
 ## find_kinetics_idx ==================================================
 test_that("find_kinetics_idx validates inputs", {
     expect_error(
-        find_kinetics_idx(x = "a", t = 1, end_fit_span = 5),
+        find_kinetics_idx(x = "a", t = 1, end_window = 5),
         "numeric"
     )
     expect_error(
-        find_kinetics_idx(x = 1:5, t = 1:5, end_fit_span = -1),
+        find_kinetics_idx(x = 1:5, t = 1:5, end_window = -1),
         "positive"
     )
-    expect_silent(find_kinetics_idx(x = 1:5, t = 0:4, end_fit_span = Inf))
+    expect_silent(find_kinetics_idx(x = 1:5, t = 0:4, end_window = Inf))
     expect_error(
-        find_kinetics_idx(x = 1:5, t = 1:3, end_fit_span = 5),
+        find_kinetics_idx(x = 1:5, t = 1:3, end_window = 5),
         "equal length"
     )
 })
@@ -623,7 +623,7 @@ test_that("find_kinetics_idx validates inputs", {
 test_that("find_kinetics_idx returns a named list", {
     x <- c(1, 5, 10, 5, 1)
     t <- seq_along(x)
-    result <- find_kinetics_idx(x, t, end_fit_span = 0)
+    result <- find_kinetics_idx(x, t, end_window = 0)
     expect_type(result, "list")
     expect_named(result, c("direction", "extreme", "idx"))
     expect_equal(result$extreme, 3L)
@@ -663,7 +663,7 @@ test_that("find_kinetics_idx finds peak in rise-then-fall", {
     x <- c(seq(1, 20, length.out = 20), seq(19, 1, length.out = 19))
     t <- seq_along(x)
 
-    result <- find_kinetics_idx(x, t, end_fit_span = 0)
+    result <- find_kinetics_idx(x, t, end_window = 0)
     expect_equal(result$idx, seq_len(20L))
     expect_equal(result$extreme, 20L)
     expect_equal(x[result$extreme], max(x))
@@ -674,25 +674,25 @@ test_that("find_kinetics_idx finds trough in fall-then-rise", {
     x <- c(seq(20, 1, length.out = 20), seq(2, 20, length.out = 19))
     t <- seq_along(x)
 
-    result <- find_kinetics_idx(x, t, end_fit_span = 0, direction = "negative")
+    result <- find_kinetics_idx(x, t, end_window = 0, direction = "negative")
     expect_equal(result$idx, seq_len(20L))
     expect_equal(result$extreme, 20L)
     expect_equal(x[result$extreme], min(x))
 })
 
-test_that("find_kinetics_idx works on irregular t with end_fit_span = 0", {
+test_that("find_kinetics_idx works on irregular t with end_window = 0", {
     ## peak at index 20 (value 20), then decline
     x <- c(seq(1, 20, length.out = 20), seq(19, 1, length.out = 19))
     t <- c(1:10, 10, 10, 13:39)/10
 
-    result <- find_kinetics_idx(x, t, end_fit_span = 0, direction = "positive")
+    result <- find_kinetics_idx(x, t, end_window = 0, direction = "positive")
     expect_equal(result$idx, seq_len(12L))
     expect_equal(result$extreme, 12L)
     
     x <- c(1:10, 10, 10, 13:20, seq(19, 1, length.out = 19))
     t <- c(1:10, 10, 10, 13:39)/10
     
-    result <- find_kinetics_idx(x, t, end_fit_span = 0, direction = "positive")
+    result <- find_kinetics_idx(x, t, end_window = 0, direction = "positive")
     ## TODO this fails but negligible real-world concern
     # expect_equal(result$idx, seq_len(10L))
     expect_equal(result$extreme, 10L)
@@ -702,13 +702,13 @@ test_that("find_kinetics_idx propagates auto-detected direction", {
     ## direction detection logic tested in test-detect_direction.R
     ## positive net slope => finds peak
     x_pos <- c(seq(1, 20, length.out = 15), seq(19, 10, length.out = 15))
-    res_pos <- find_kinetics_idx(x_pos, seq_along(x_pos), end_fit_span = 0)
+    res_pos <- find_kinetics_idx(x_pos, seq_along(x_pos), end_window = 0)
     expect_equal(res_pos$extreme, 15L)
     expect_equal(res_pos$direction, "positive")
 
     ## negative net slope => finds trough
     x_neg <- c(seq(20, 1, length.out = 15), seq(2, 10, length.out = 15))
-    res_neg <- find_kinetics_idx(x_neg, seq_along(x_neg), end_fit_span = 0)
+    res_neg <- find_kinetics_idx(x_neg, seq_along(x_neg), end_window = 0)
     expect_equal(res_neg$extreme, 15L)
     expect_equal(res_neg$direction, "negative")
 })
@@ -721,7 +721,7 @@ test_that("find_kinetics_idx ignores negative t values", {
     result <- find_kinetics_idx(
         x,
         t,
-        end_fit_span = 2,
+        end_window = 2,
         direction = "positive"
     )
     ## should not find the peak at t <= 0
@@ -732,7 +732,7 @@ test_that("find_kinetics_idx ignores negative t values", {
 test_that("find_kinetics_idx returns n when all t <= 0", {
     x <- c(5, 10, 3)
     t <- c(-3, -2, -1)
-    result <- find_kinetics_idx(x, t, end_fit_span = 1)
+    result <- find_kinetics_idx(x, t, end_window = 1)
     expect_equal(result$idx, seq_along(x))
     ## no positive-t samples, so n_valid < 2 for extreme detection
     expect_null(result$extreme)
@@ -745,7 +745,7 @@ test_that("find_kinetics_idx handles invalid values", {
     result <- find_kinetics_idx(
         x,
         t,
-        end_fit_span = 3
+        end_window = 3
     )
     expect_equal(result$idx, c(1, 4, 6, 7))
     expect_equal(result$extreme, 4L)
@@ -758,7 +758,7 @@ test_that("find_kinetics_idx returns first tie", {
     result <- find_kinetics_idx(
         x,
         t,
-        end_fit_span = 3,
+        end_window = 3,
         direction = "positive"
     )
     ## should find first peak (index 5), not second (index 15)
@@ -766,14 +766,14 @@ test_that("find_kinetics_idx returns first tie", {
     expect_equal(result$extreme, 5L)
 })
 
-test_that("find_kinetics_idx end_fit_span larger than data range", {
+test_that("find_kinetics_idx end_window larger than data range", {
     x <- c(1, 5, 3, 2)
     t <- seq_along(x)
-    ## end_fit_span covers entire data range
+    ## end_window covers entire data range
     result <- find_kinetics_idx(
         x,
         t,
-        end_fit_span = 100,
+        end_window = 100,
         direction = "positive"
     )
     expect_equal(result$idx, seq_along(x))
@@ -1528,11 +1528,11 @@ test_that("analyse_kinetics.response_time handles unreachable response", {
     ## fitted column exists and is all-finite at baseline/extreme rows,
     ## NA elsewhere (no error from NA subscripted assignment).
     fitted_df <- result$data[[1L]]
-    t0 <- unlist(result$interval_times$interval_times)
+    start_time <- unlist(result$interval_times$interval_times)
     expect_true("smo2_left_fitted" %in% names(fitted_df))
-    expect_false(is.na(fitted_df$smo2_left_fitted[fitted_df$time == t0]))
+    expect_false(is.na(fitted_df$smo2_left_fitted[fitted_df$time == start_time]))
     expect_false(
-        is.na(fitted_df$smo2_left_fitted[which(fitted_df$time == t0) + 1])
+        is.na(fitted_df$smo2_left_fitted[which(fitted_df$time == start_time) + 1])
     )
 })
 
@@ -1743,7 +1743,7 @@ test_that("analyse_kinetics.monoexponential dispatches multiple channels", {
         data,
         nirs_channels = nirs_channels,
         method = "monoexponential",
-        use_time_delay = FALSE,
+        use_TD = FALSE,
         verbose = FALSE
     )
 
@@ -1764,7 +1764,7 @@ test_that("analyse_kinetics.monoexponential uses custom interval name", {
             data,
             nirs_channels = "smo2",
             method = "monoexponential",
-            use_time_delay = FALSE
+            use_TD = FALSE
         ),
         "fit failed for.*smo2.*interval_1" ## call custom interval name
     )
@@ -1786,7 +1786,7 @@ test_that("analyse_kinetics.monoexponential names only the failing interval", {
             data,
             nirs_channels = "smo2",
             method = "monoexponential",
-            use_time_delay = FALSE
+            use_TD = FALSE
         ),
         classes = "warning"
     ))
@@ -1796,9 +1796,9 @@ test_that("analyse_kinetics.monoexponential names only the failing interval", {
     expect_no_match(msg, "good")
 })
 
-## analyse_kinetics.logistic ============================================
-## helper: create logistic test data with known parameters
-create_logistic_data <- function(
+## analyse_kinetics.sigmoidal ============================================
+## helper: create sigmoidal test data with known parameters
+create_sigmoidal_data <- function(
     A = 10,
     B = 100,
     xmid = 30,
@@ -1833,14 +1833,14 @@ create_logistic_data <- function(
 }
 
 
-test_that("analyse_kinetics.logistic dispatches multiple channels", {
+test_that("analyse_kinetics.sigmoidal dispatches multiple channels", {
     nirs_channels <- c("smo2_left", "smo2_right")
-    data <- create_logistic_data(channels = nirs_channels)
+    data <- create_sigmoidal_data(channels = nirs_channels)
 
     result <- analyse_kinetics(
         data,
         nirs_channels = nirs_channels,
-        method = "logistic",
+        method = "sigmoidal",
         shape = "symmetric",
         verbose = FALSE
     )
@@ -1853,15 +1853,15 @@ test_that("analyse_kinetics.logistic dispatches multiple channels", {
     )
 })
 
-test_that("analyse_kinetics.logistic uses custom interval name", {
+test_that("analyse_kinetics.sigmoidal uses custom interval name", {
     ## only 3 observations for a 4-param model
-    data <- create_logistic_data(n = 10, noise_sd = 0.1)
+    data <- create_sigmoidal_data(n = 10, noise_sd = 0.1)
 
     expect_warning(
         result <- analyse_kinetics(
             data,
             nirs_channels = "smo2",
-            method = "logistic",
+            method = "sigmoidal",
             shape = "symmetric",
         ),
         "fit failed for.*smo2.*interval_1" ## call custom interval name
@@ -1872,18 +1872,18 @@ test_that("analyse_kinetics.logistic uses custom interval name", {
     expect_true(is.na(result$coefficients$slope))
 })
 
-test_that("analyse_kinetics.logistic names only the failing interval", {
+test_that("analyse_kinetics.sigmoidal names only the failing interval", {
     ## named list: `good` converges, `bad` has too few points to fit
     data <- list(
-        good = create_logistic_data(n = 60, noise_sd = 2),
-        bad = create_logistic_data(n = 10, noise_sd = 0.1)
+        good = create_sigmoidal_data(n = 60, noise_sd = 2),
+        bad = create_sigmoidal_data(n = 10, noise_sd = 0.1)
     )
 
     msg <- conditionMessage(rlang::catch_cnd(
         analyse_kinetics(
             data,
             nirs_channels = "smo2",
-            method = "logistic",
+            method = "sigmoidal",
             shape = "symmetric"
         ),
         classes = "warning"
@@ -2272,7 +2272,7 @@ test_that("analyse_kinetics works visually on Train.Red", {
             fill = "white"
         )
 
-    result <- analyse_kinetics(data_list, method = "monoexp", use_time_delay = TRUE)
+    result <- analyse_kinetics(data_list, method = "monoexp", use_TD = TRUE)
     # result$diagnostics
     # result$coefficients
 
@@ -2341,7 +2341,7 @@ test_that("analyse_kinetics benchmark", {
     #             analyse_monoexponential(
     #                 .df,
     #                 nirs_channels = c(smo2_left, smo2_right),
-    #                 use_time_delay = TRUE,
+    #                 use_TD = TRUE,
     #                 verbose = FALSE
     #             )
     #         })
@@ -2350,7 +2350,7 @@ test_that("analyse_kinetics benchmark", {
     #         data_list,
     #         nirs_channels = c(smo2_left, smo2_right),
     #         method = "monoexponential",
-    #         use_time_delay = TRUE,
+    #         use_TD = TRUE,
     #         verbose = FALSE
     #     ),
     #     analyse_response = suppressWarnings(

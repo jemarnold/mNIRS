@@ -97,7 +97,7 @@ test_that("analyse_kinetics method errors attribute to the generic", {
     
     err <- expect_error(
         analyse_kinetics(
-            data, method = "logistic", shape = "invalid", verbose = FALSE
+            data, method = "sigmoidal", shape = "invalid", verbose = FALSE
         ),
         "shape"
     )
@@ -105,9 +105,9 @@ test_that("analyse_kinetics method errors attribute to the generic", {
     
     err <- expect_error(
         analyse_kinetics(
-            data, method = "monoexponential", use_time_delay = "invalid", verbose = FALSE
+            data, method = "monoexponential", use_TD = "invalid", verbose = FALSE
         ),
-        "use_time_delay"
+        "use_TD"
     )
     expect_equal(rlang::call_name(conditionCall(err)), "analyse_kinetics")
 })

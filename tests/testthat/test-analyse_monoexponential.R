@@ -72,7 +72,7 @@ test_that("monoexponential() handles zero and negative TD", {
 
 
 ## SSmonoexp() ========================================================
-test_that("SSmonoexp() converges on known parameters", {
+test_that("SSmonoexp() with TD converges on known parameters", {
     set.seed(13)
     t <- 1:60
     A_true <- 10
@@ -109,7 +109,7 @@ test_that("SSmonoexp() converges on known parameters", {
     )
 })
 
-test_that("SSmonoexp() handles falling exponentials", {
+test_that("SSmonoexp() with TD handles falling exponentials", {
     set.seed(456)
     t <- 1:60
     x <- monoexponential(t, A = 100, B = 10, tau = 8, TD = 15) +
@@ -123,7 +123,7 @@ test_that("SSmonoexp() handles falling exponentials", {
     expect_s3_class(model, "nls")
 })
 
-test_that("SSmonoexp() predict() returns correct length", {
+test_that("SSmonoexp() with TD predict() returns correct length", {
     set.seed(202)
     t <- 1:60
     x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
@@ -136,8 +136,7 @@ test_that("SSmonoexp() predict() returns correct length", {
     expect_length(predictions, nrow(data))
 })
 
-## SSmonoexp() ========================================================
-test_that("SSmonoexp() converges on known parameters", {
+test_that("SSmonoexp() without TD converges on known parameters", {
     set.seed(13)
     t <- 1:60-1
     A_true <- 10
@@ -174,7 +173,7 @@ test_that("SSmonoexp() converges on known parameters", {
     expect_disjoint(names(coefs), "TD")
 })
 
-test_that("SSmonoexp() handles falling exponentials", {
+test_that("SSmonoexp() without TD handles falling exponentials", {
     set.seed(456)
     t <- 1:60
     x <- monoexponential(t, A = 100, B = 10, tau = 8, TD = NULL) +
@@ -189,7 +188,7 @@ test_that("SSmonoexp() handles falling exponentials", {
     expect_disjoint(names(coefs), "TD")
 })
 
-test_that("SSmonoexp() handles data with TD near zero", {
+test_that("SSmonoexp() without TD handles data with TD near zero", {
     set.seed(101)
     t <- 1:60
     x <- monoexponential(t, 10, 100, 8, 1) + rnorm(length(t), 0, 3)
@@ -199,7 +198,6 @@ test_that("SSmonoexp() handles data with TD near zero", {
     #     theme_mnirs() +
     #     ggplot2::geom_point()
 
-    ## TODO SSmonoexp4() fails for this test. Would a better initialisation succeed?
     expect_no_error(
         model <- nls(x ~ SSmonoexp(t, A, B, tau), data = data)
     )
@@ -208,6 +206,7 @@ test_that("SSmonoexp() handles data with TD near zero", {
     expect_true(all.equal(coef(model)[["tau"]], 8, tolerance = 1, scale = 1))
     expect_disjoint(names(coef(model)), "TD")
 })
+
 
 ## OxCap modelling ===================================================
 test_that("SSmonoexp() handles OxCap with few data points same as SSasymp", {
@@ -331,7 +330,7 @@ test_that("analyse_monoexponential() returns correct structure", {
     result <- analyse_monoexponential(
         data,
         nirs_channels = "smo2",
-        use_time_delay = FALSE,
+        use_TD = FALSE,
         verbose = FALSE
     )
 
@@ -356,25 +355,25 @@ test_that("analyse_monoexponential() returns correct structure", {
     expect_equal(nrow(attr(result, "channel_args")), 1L)
 })
 
-test_that("analyse_monoexponential() validates use_time_delay argument", {
+test_that("analyse_monoexponential() validates use_TD argument", {
     data <- create_monoexp_data()
 
     expect_error(
         analyse_monoexponential(
             data,
             nirs_channels = "smo2",
-            use_time_delay = "yes"
+            use_TD = "yes"
         ),
-        "use_time_delay.*logical"
+        "use_TD.*logical"
     )
 
     expect_error(
         analyse_monoexponential(
             data,
             nirs_channels = "smo2",
-            use_time_delay = c(TRUE, FALSE)
+            use_TD = c(TRUE, FALSE)
         ),
-        "use_time_delay.*logical"
+        "use_TD.*logical"
     )
 })
 
@@ -390,7 +389,7 @@ test_that("analyse_monoexponential() recovers 3-param known parameters", {
     result <- analyse_monoexponential(
         data,
         nirs_channels = "smo2",
-        use_time_delay = FALSE,
+        use_TD = FALSE,
         verbose = FALSE
     )
 
@@ -415,7 +414,7 @@ test_that("analyse_monoexponential() recovers 4-param known parameters", {
     result <- analyse_monoexponential(
         data,
         nirs_channels = "smo2",
-        use_time_delay = TRUE,
+        use_TD = TRUE,
         verbose = FALSE
     )
 
@@ -429,30 +428,30 @@ test_that("analyse_monoexponential() recovers 4-param known parameters", {
     )
 })
 
-test_that("analyse_monoexponential() uses t0 correctly", {
+test_that("analyse_monoexponential() uses start_time correctly", {
     A <- 50
     B <- 80
     tau <- 25
     TD <- 10
-    t0 <- 12
+    start_time <- 12
 
     data <- create_monoexp_data(
         A = A, B = B, tau = tau, TD = TD, n = 100, noise_sd = 0.3
     )
-    data$time <- data$time + t0
+    data$time <- data$time + start_time
 
     result <- analyse_monoexponential(
         data,
         nirs_channels = "smo2",
-        use_time_delay = TRUE,
-        t0 = t0,
+        use_TD = TRUE,
+        start_time = start_time,
         verbose = FALSE
     )
 
     ## visual check
     # plot(data) +
     #     # ggplot2::coord_cartesian(xlim = c(0, NA)) +
-    #     # ggplot2::geom_vline(xintercept = t0) +
+    #     # ggplot2::geom_vline(xintercept = start_time) +
     #     ggplot2::geom_line(
     #         ggplot2::aes(y = attributes(result)$fitted$smo2$fitted)
     #     )
@@ -473,34 +472,34 @@ test_that("analyse_monoexponential() uses t0 correctly", {
     analyse_monoexponential(
         data,
         nirs_channels = "smo2",
-        use_time_delay = TRUE,
-        t0 = 5,
+        use_TD = TRUE,
+        start_time = 5,
         verbose = FALSE
     )
 })
 
-test_that("analyse_monoexponential() t0 edge cases", {
+test_that("analyse_monoexponential() start_time edge cases", {
     A <- 50
     B <- 80
     tau <- 25
     TD <- 10
-    t0 <- 12
+    start_time <- 12
 
     data <- create_monoexp_data(
         A = A, B = B, tau = tau, TD = TD, n = 100, noise_sd = 0.3
     )
-    data$time <- data$time + t0
+    data$time <- data$time + start_time
 
-    ## t0 specified before time start, falls forward to t[1L]
+    ## start_time specified before time start, falls forward to t[1L]
     expect_warning(
         result <- analyse_monoexponential(
             data,
             nirs_channels = "smo2",
-            use_time_delay = TRUE,
-            t0 = 0,
+            use_TD = TRUE,
+            start_time = 0,
             verbose = TRUE
         ),
-        "No observations.*t0 =.*0"
+        "No observations.*start_time =.*0"
     )
 
     expect_true(all.equal(result$TD, TD, tolerance = 1, scale = 1))
@@ -509,16 +508,16 @@ test_that("analyse_monoexponential() t0 edge cases", {
         all.equal(result$HRT, tau * log(2) + TD, tolerance = 1, scale = 1)
     )
 
-    ## t0 beyond time range
+    ## start_time beyond time range
     expect_error(
         analyse_monoexponential(
             data,
             nirs_channels = "smo2",
-            use_time_delay = TRUE,
-            t0 = max(data$time) + 10,
+            use_TD = TRUE,
+            start_time = max(data$time) + 10,
             verbose = TRUE
         ),
-        "No observations.*before.*t0"
+        "No observations.*before.*start_time"
     )
 })
 
@@ -537,7 +536,7 @@ test_that("analyse_monoexponential() falls back from 4-param to 3-param", {
         result <- analyse_monoexponential(
             data,
             nirs_channels = "smo2",
-            use_time_delay = TRUE,
+            use_TD = TRUE,
             verbose = TRUE
         ),
         "SSmonoexp.*fit failed"
@@ -559,7 +558,7 @@ test_that("analyse_monoexponential() returns NA for failed fit", {
         result <- analyse_monoexponential(
             custom_name,
             nirs_channels = "smo2",
-            use_time_delay = FALSE
+            use_TD = FALSE
         ),
         "fit failed for.*smo2.*custom_name" ## call custom interval name
     )
@@ -577,7 +576,7 @@ test_that("analyse_monoexponential() suppresses fit-failure warning when verbose
         analyse_monoexponential(
             custom_name,
             nirs_channels = "smo2",
-            use_time_delay = FALSE,
+            use_TD = FALSE,
             verbose = FALSE
         )
     )
@@ -590,7 +589,7 @@ test_that("analyse_monoexponential() works with multiple channels", {
     result <- analyse_monoexponential(
         data,
         nirs_channels = nirs_channels,
-        use_time_delay = FALSE
+        use_TD = FALSE
     )
 
     expect_equal(nrow(result), 2L)
@@ -607,7 +606,7 @@ test_that("analyse_monoexponential() channel_args override defaults", {
     result <- analyse_monoexponential(
         data,
         nirs_channels = c("ch1", "ch2"),
-        use_time_delay = list(FALSE, ch2 = TRUE),
+        use_TD = list(FALSE, ch2 = TRUE),
     )
 
     ## ch1 has no TD (3-param), ch2 has TD (4-param)
@@ -616,8 +615,8 @@ test_that("analyse_monoexponential() channel_args override defaults", {
     ca <- attr(result, "channel_args")
     ch1_row <- ca[ca$nirs_channels == "ch1", ]
     ch2_row <- ca[ca$nirs_channels == "ch2", ]
-    expect_false(ch1_row$use_time_delay)
-    expect_true(ch2_row$use_time_delay)
+    expect_false(ch1_row$use_TD)
+    expect_true(ch2_row$use_TD)
 })
 
 test_that("analyse_monoexponential() fitted_data attribute is well-formed", {
@@ -626,7 +625,7 @@ test_that("analyse_monoexponential() fitted_data attribute is well-formed", {
     result <- analyse_monoexponential(
         data,
         nirs_channels = "smo2",
-        use_time_delay = TRUE
+        use_TD = TRUE
     )
 
     fitted_data <- attr(result, "fitted_data")
@@ -649,7 +648,7 @@ test_that("analyse_monoexponential() diagnostics contain expected columns", {
     result <- analyse_monoexponential(
         data,
         nirs_channels = "smo2",
-        use_time_delay = FALSE
+        use_TD = FALSE
     )
 
     diag <- attr(result, "diagnostics")
@@ -658,6 +657,7 @@ test_that("analyse_monoexponential() diagnostics contain expected columns", {
     ))
     expect_true(diag$r2 > 0.9)
 })
+
 
 ## integration tests =============================================
 

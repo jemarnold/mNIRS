@@ -8,12 +8,12 @@ analyse_peak_slope(
   data,
   nirs_channels = NULL,
   time_channel = NULL,
-  t0 = NULL,
+  start_time = NULL,
   width = NULL,
   span = NULL,
   align = c("centre", "left", "right"),
   direction = c("auto", "positive", "negative"),
-  end_fit_span = Inf,
+  end_window = Inf,
   partial = FALSE,
   na.rm = FALSE,
   verbose = TRUE,
@@ -39,10 +39,10 @@ Must match a column name in \code{data} exactly.
 used.
 }}
 
-\item{t0}{A numeric value specifying the start of the kinetics response
-in units of \code{time_channel}. Observations where \code{time_channel <= t0}
-define the pre-response baseline window. If \code{NULL} (\emph{default}), retrieves
-\code{interval_times} from \emph{"mnirs"} metadata, or falls back to \code{0}.}
+\item{start_time}{A numeric value in units of \code{time_channel} specifying the
+time of response onset (effectively kinetics fit time = \code{0}). If \code{NULL}
+(\emph{default}), retrieves \code{interval_times} from \emph{"mnirs"} metadata, or falls
+back to \code{0} (see \emph{Details}).}
 
 \item{width}{An integer defining the local window in number of samples
 around \code{idx} in which to perform the operation, according to \code{align}.}
@@ -59,14 +59,15 @@ is \emph{backward looking} from the current sample.}
 detect -- \code{"auto"} (\emph{default}), \code{"positive"}, or \code{"negative"}. See
 \emph{Details}.}
 
-\item{end_fit_span}{A numeric value in units of \code{time_channel} or \code{t}
-specifying the forward-looking window used to check for subsequent
-greater/lesser values than the candidate extreme. \code{end_fit_span = Inf}
-(\emph{default}) returns the global extreme from the full range of \code{x}.}
+\item{end_window}{A numeric value in units of \code{time_channel} specifying the
+forward-looking window in which to look for the end of the kinetics fit.
+\code{end_window = Inf} (\emph{default}) returns the global extreme from the full
+range of \code{x} (see \emph{Details}).}
 
-\item{partial}{Logical; default is \code{FALSE}, requires local windows to have
-complete number of samples specified by \code{width} or \code{span}. If \code{TRUE},
-processes available samples within the local window. See \emph{Details}.}
+\item{partial}{\strong{moving_average}: Logical; \code{FALSE} by default, only
+returns values where a full window of valid (non-\code{NA}) samples are
+available. If \code{TRUE}, ignores \code{NA} and allows calculation over
+partial windows at the edges of the data.}
 
 \item{na.rm}{Logical; default is \code{FALSE}, propagates any \code{NA}s to the
 returned vector. If \code{TRUE}, ignores \code{NA}s and processes available valid

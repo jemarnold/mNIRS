@@ -1,4 +1,4 @@
-#' Logistic function
+#' Generalised logistic function
 #'
 #' Calculate a 4- or 5-parameter logistic (sigmoidal) curve.
 #'
@@ -21,7 +21,7 @@
 #' ## Implementation
 #'
 #' The 4-parameter symmetric form is fit by [analyse_kinetics()] when
-#' `method = "logistic"` and `shape = "symmetric"` (*default*) via the
+#' `method = "sigmoidal"` and `shape = "symmetric"` (*default*) via the
 #' self-starting wrapper [SSlogistic()].
 #'
 #' The 5-parameter Richards form is exported for advanced use directly with
@@ -46,7 +46,7 @@
 #'
 #' Inflection is at `t = xmid` with `dx/dt = slope` and
 #'   `y(xmid) = A + (B - A) * asym` for any `asym` in `(0, 1)`. At
-#'   `asym = 0.5`, `v = 1` and the model collapses to the 4-parameter form.
+#'   `asym = 0.5 -> v = 1` and the model collapses to the 4-parameter form.
 #'   `asym -> 0` gives an early-acceleration curve (inflection near `A`),
 #'   `asym -> 1` gives a late-acceleration curve (inflection near `B`).
 #'
@@ -114,7 +114,7 @@ logistic <- function(t, A, B, xmid, slope, asym = NULL) {
 #'
 #' ## Implementation
 #'
-#' These models are fit by [analyse_kinetics()] when `method = "logistic"` and
+#' These models are fit by [analyse_kinetics()] when `method = "sigmoidal"` and
 #' `shape = "gompertz"` or `"gompertz_left"` respectively, using [stats::nls()]
 #' via the self-starting wrappers [SSgompertz()] and [SSgompertz_left()].
 #'
@@ -375,7 +375,7 @@ init_inflection <- function(x, t, A_init, B_init) {
 #' 5-parameter model: `x ~ SSlogistic(t, A, B, xmid, slope, asym)`
 #'
 #' The 4-parameter form is used by [analyse_kinetics()] when
-#'   `method = "logistic"` and `shape = "symmetric"`. The 5-parameter
+#'   `method = "sigmoidal"` and `shape = "symmetric"`. The 5-parameter
 #'   asymmetric form is retained as an advanced escape hatch for direct
 #'   [stats::nls()] use only; `analyse_kinetics()` instead dispatches to
 #'   [SSgompertz()] / [SSgompertz_left()] for asymmetric shapes,
@@ -487,8 +487,9 @@ SSgompertz_left <- selfStart(
 
 #' Analyse logistic kinetics across NIRS channels
 #'
-#' Internal channel-level dispatch for `analyse_kinetics(method = "logistic")`.
-#' Fits a 4-parameter sigmoidal curve to each `nirs_channel` within a single
+#' Internal channel-level dispatch for
+#' `analyse_kinetics(method = "sigmoidal")`. Fits a 4-parameter sigmoidal
+#' curve to each `nirs_channel` within a single
 #' *"mnirs"* data frame in one of three asymmetry shapes (`"symmetric"`,
 #' `"gompertz"`, `"gompertz_left"`). See [analyse_kinetics()] for user-facing
 #' documentation.
@@ -521,9 +522,9 @@ analyse_logistic <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     shape = c("symmetric", "gompertz", "gompertz_left"),
-    t0 = NULL,
+    start_time = NULL,
     direction = c("auto", "positive", "negative"),
-    end_fit_span = Inf,
+    end_window = Inf,
     verbose = TRUE,
     ...,
     env = rlang::caller_env()
@@ -544,9 +545,9 @@ analyse_logistic <- function(
         nirs_channels,
         args = list(
             shape = shape,
-            t0 = t0,
+            start_time = start_time,
             direction = direction,
-            end_fit_span = end_fit_span
+            end_window = end_window
         ),
         choices = list(
             shape = c("symmetric", "gompertz", "gompertz_left"),
@@ -630,7 +631,7 @@ analyse_logistic <- function(
 
         fitted_vals <- stats::predict(model)
         coefs <- stats::coef(model)
-        xmid_offset <- coefs[["xmid"]] - .a$t0
+        xmid_offset <- coefs[["xmid"]] - .a$start_time
 
         ## predict response at the inflection point xmid
         xmid_fitted <- ch_predict_fn(

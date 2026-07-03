@@ -1266,7 +1266,7 @@ test_that("analyse_frollslope benchmark", {
     #         df[[1L]],
     #         nirs_channels = c(smo2_left),
     #         method = "monoexp",
-    #         use_time_delay = TRUE,
+    #         use_TD = TRUE,
     #         partial = FALSE,
     #         verbose = FALSE
     #     ),

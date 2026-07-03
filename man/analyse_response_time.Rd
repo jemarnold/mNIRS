@@ -8,10 +8,10 @@ analyse_response_time(
   data,
   nirs_channels = NULL,
   time_channel = NULL,
-  t0 = NULL,
+  start_time = NULL,
   fraction = 0.5,
   direction = c("auto", "positive", "negative"),
-  end_fit_span = Inf,
+  end_window = Inf,
   verbose = TRUE,
   ...,
   env = rlang::caller_env()
@@ -35,10 +35,10 @@ Must match a column name in \code{data} exactly.
 used.
 }}
 
-\item{t0}{A numeric value specifying the start of the kinetics response
-in units of \code{time_channel}. Observations where \code{time_channel <= t0}
-define the pre-response baseline window. If \code{NULL} (\emph{default}), retrieves
-\code{interval_times} from \emph{"mnirs"} metadata, or falls back to \code{0}.}
+\item{start_time}{A numeric value in units of \code{time_channel} specifying the
+time of response onset (effectively kinetics fit time = \code{0}). If \code{NULL}
+(\emph{default}), retrieves \code{interval_times} from \emph{"mnirs"} metadata, or falls
+back to \code{0} (see \emph{Details}).}
 
 \item{fraction}{\strong{response_time}: A numeric value in the range
 \verb{[0, 1]} specifying the fractional response amplitude to detect.
@@ -48,10 +48,10 @@ Defaults to \code{0.5} (50\% response, i.e. half-response time).}
 detect -- \code{"auto"} (\emph{default}), \code{"positive"}, or \code{"negative"}. See
 \emph{Details}.}
 
-\item{end_fit_span}{A numeric value in units of \code{time_channel} or \code{t}
-specifying the forward-looking window used to check for subsequent
-greater/lesser values than the candidate extreme. \code{end_fit_span = Inf}
-(\emph{default}) returns the global extreme from the full range of \code{x}.}
+\item{end_window}{A numeric value in units of \code{time_channel} specifying the
+forward-looking window in which to look for the end of the kinetics fit.
+\code{end_window = Inf} (\emph{default}) returns the global extreme from the full
+range of \code{x} (see \emph{Details}).}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad

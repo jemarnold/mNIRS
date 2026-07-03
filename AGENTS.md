@@ -248,7 +248,7 @@ analyse_kinetics(
     time_channel   = NULL,
     method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
     direction = c("auto", "positive", "negative"),
-    end_fit_span   = Inf,    # truncate fit after extreme; Inf = global extreme
+    end_window     = Inf,    # truncate fit after extreme; Inf = global extreme
     channel_args   = list(), # per nirs_channel argument overrides
     verbose        = TRUE,
     ...
@@ -275,17 +275,17 @@ analyse_kinetics(
 | `"response_time"` | `"half time"`, `"response\|recovery time"`, `"HRT"` |
 | `"peak_slope"` | `"peak slope"`, `"slope"` |
 | `"monoexponential"` | `"monoexp"`, `"exponential"`, `"MRT"`, `"tau"` |
-| `"sigmoidal"` | `"logistic"`, `"xmid"` |
+| `"sigmoidal"` | `"logistic"`, `"sigmoid"`, `"xmid"` |
 
 **Input:** single df → `"interval_1"`; named list → each separate; grouped df → split by group.
 
 **Per-method args `...`:**
 
-`"response_time"`: `t0` (default `0`), `fraction` (default `0.5`; `0.632` ≈ MRT)
+`"response_time"`: `start_time` (default `0`), `fraction` (default `0.5`; `0.632` ≈ MRT)
 
 `"peak_slope"`: `width` or `span` (one required); `align` (`"centre"`, `"left"`, `"right"`); `partial` (default `FALSE`)
 
-`"monoexponential"`: `use_time_delay` (default `TRUE`; 4-param → 3-param fallback); accepts `stats::nls()` args
+`"monoexponential"`: `use_TD` (default `TRUE`; 4-param → 3-param fallback); accepts `stats::nls()` args
 
 **Per-channel overrides:**
 ```r
@@ -318,8 +318,8 @@ peak_slope(x, t = seq_along(x), width = NULL, span = NULL,
     partial = FALSE, na.rm = FALSE, verbose = TRUE)
 ## returns: slope, intercept, y, t, idx, fitted, window_idx, model
 
-response_time(x, t = seq_along(x), t0 = 0, fraction = 0.5,
-    end_fit_span = Inf, direction = c("auto", "positive", "negative"),
+response_time(x, t = seq_along(x), start_time = 0, fraction = 0.5,
+    end_window = Inf, direction = c("auto", "positive", "negative"),
     verbose = TRUE)
 ## returns: A, B, response_time, response_value, fitted,
 ##          baseline_idx, response_idx, extreme_idx

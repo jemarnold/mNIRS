@@ -40,7 +40,7 @@ The modified \code{\link[=gompertz_left]{gompertz_left()}} curve has the inflect
 ending asymptote \code{B} (slow departure from \code{A}, late acceleration toward \code{B}).
 \subsection{Implementation}{
 
-These models are fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "logistic"} and
+These models are fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "sigmoidal"} and
 \code{shape = "gompertz"} or \code{"gompertz_left"} respectively, using \code{\link[stats:nls]{stats::nls()}}
 via the self-starting wrappers \code{\link[=SSgompertz]{SSgompertz()}} and \code{\link[=SSgompertz_left]{SSgompertz_left()}}.
 }

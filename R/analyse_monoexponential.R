@@ -217,9 +217,9 @@ SSmonoexp <- selfStart(
 #' curve to each `nirs_channel` within a single *"mnirs"* data frame. See
 #' [analyse_kinetics()] for user-facing documentation.
 #'
-#' @param use_time_delay Logical; default is `TRUE` to attempt to fit a
+#' @param use_TD Logical; default is `TRUE` to attempt to fit a
 #'   4-parameter [SSmonoexp()] model (A, B, tau, TD) with a time delay.
-#'   If the 4-parameter fit fails, or if `use_time_delay = FALSE`, attempts to
+#'   If the 4-parameter fit fails, or if `use_TD = FALSE`, attempts to
 #'   fit a reduced 3-parameter [SSmonoexp()] model (A, B, tau).
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
@@ -244,10 +244,10 @@ analyse_monoexponential <- function(
     data,
     nirs_channels = NULL,
     time_channel = NULL,
-    use_time_delay = TRUE, #! better arg name?
-    t0 = NULL, #! better arg name?
+    use_TD = TRUE,
+    start_time = NULL,
     direction = c("auto", "positive", "negative"),
-    end_fit_span = Inf,
+    end_window = Inf,
     verbose = TRUE,
     ...,
     env = rlang::caller_env()
@@ -267,10 +267,10 @@ analyse_monoexponential <- function(
     per_channel <- resolve_channel_args(
         nirs_channels,
         args = list(
-            use_time_delay = use_time_delay,
-            t0 = t0,
+            use_TD = use_TD,
+            start_time = start_time,
             direction = direction,
-            end_fit_span = end_fit_span
+            end_window = end_window
         ),
         choices = list(direction = c("auto", "positive", "negative")),
         verbose = verbose,
@@ -318,8 +318,8 @@ analyse_monoexponential <- function(
 
     ## method-specific fit: self-starting monoexponential via nls
     monoexponential_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
-        ## derive n_params from use_time_delay for internal use
-        n_params <- if (.a$use_time_delay) 4L else 3L
+        ## derive n_params from use_TD for internal use
+        n_params <- if (.a$use_TD) 4L else 3L
         fit_data <- data.frame(.x = x_fit, .t = t_fit)
 
         ## attempt nls fit on 4-param then fall back to 3-param on failure
@@ -352,7 +352,7 @@ analyse_monoexponential <- function(
 
         fitted_vals <- stats::predict(model)
         coefs <- stats::coef(model)
-        TD_arg <- if (n_params == 4L) coefs[["TD"]] - .a$t0 else NULL
+        TD_arg <- if (n_params == 4L) coefs[["TD"]] - .a$start_time else NULL
         TD_val <- TD_arg %||% NA_real_
         MRT_val <- sum(TD_arg, coefs[["tau"]])
         HRT_val <- sum(TD_arg, coefs[["tau"]] * log(2))

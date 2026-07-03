@@ -3,7 +3,7 @@ test_that("response_time returns correct structure", {
     x <- c(rep(10, 5), seq(10, 60, length.out = 15), rep(60, 5))
     t <- seq_along(x)
 
-    result <- response_time(x, t, t0 = 5, fraction = 0.5)
+    result <- response_time(x, t, start_time = 5, fraction = 0.5)
 
     expect_type(result, "list")
     expect_named( result, c(
@@ -26,7 +26,7 @@ test_that("response_time computes correct values", {
     ## baseline idx 0-5, ramp from 6 to 16 plateau 16-20
     x <- c(rep(0, 5), seq(0, 20, length.out = 10), rep(20, 5))
     t <- seq_along(x) - 1  ## t = 0 at index 1
-    result <- response_time(x, t, t0 = 0, fraction = 0.5)
+    result <- response_time(x, t, start_time = 0, fraction = 0.5)
 
     ## A = mean baseline (t <= 0 = first element = 0)
     expect_equal(result$A, 0)
@@ -52,7 +52,7 @@ test_that("response_time validates inputs", {
         response_time(1:5, fraction = -0.1),
         "fraction.*valid.*numeric"
     )
-    expect_silent(response_time(1:5, t = 0:4, end_fit_span = Inf))
+    expect_silent(response_time(1:5, t = 0:4, end_window = Inf))
     expect_error(
         response_time(x = "a"),
         "x.*valid.*numeric"
@@ -64,17 +64,17 @@ test_that("response_time validates inputs", {
 })
 
 test_that("response_time respects `bypass_checks`", {
-    ## expect NOT warning "No observations.*t.*<=.*t0"
+    ## expect NOT warning "No observations.*t.*<=.*start_time"
     expect_warning(
         response_time(
-            1:5, t0 = -5, bypass_checks = TRUE
+            1:5, start_time = -5, bypass_checks = TRUE
         ),
         "No valid.*auto"
     )
-    ## expect NOT error "No observations in.*t.*before.*st0"
+    ## expect NOT error "No observations in.*t.*before.*sstart_time"
     expect_warning(
         response_time(
-            1:5, t0 = 10, bypass_checks = TRUE
+            1:5, start_time = 10, bypass_checks = TRUE
         ),
         "No valid.*auto"
     )
@@ -117,41 +117,41 @@ test_that("response_time respects manual direction", {
     t <- seq_along(x)
 
     result_pos <- response_time(
-        x, t, t0 = 5, direction = "positive", verbose = FALSE
+        x, t, start_time = 5, direction = "positive", verbose = FALSE
     )
     result_neg <- response_time(
-        x, t, t0 = 5, direction = "negative", verbose = FALSE
+        x, t, start_time = 5, direction = "negative", verbose = FALSE
     )
 
     ## positive: extreme = max; negative: extreme = min
     expect_equal(result_pos$B, max(x))
     expect_equal(result_neg$B, min(x))
-    expect_equal(result_neg$response_time, 1) ## t0 + 1L idx
+    expect_equal(result_neg$response_time, 1) ## start_time + 1L idx
     expect_equal(result_neg$response_value, min(x))
     expect_equal(result_neg$fitted, min(x))
-    expect_equal(result_neg$response_idx, 6) ## t0 + 1
+    expect_equal(result_neg$response_idx, 6) ## start_time + 1
 })
 
 test_that("response_time warns when no baseline observations", {
     x <- seq(0, 20, length.out = 20)
     t <- seq_along(x)
 
-    ## t0 is below min(t), so no baseline
+    ## start_time is below min(t), so no baseline
     expect_warning(
-        result <- response_time(x, t, t0 = 0),
+        result <- response_time(x, t, start_time = 0),
         "No observations"
     )
     ## falls back to x[1] as baseline
     expect_equal(result$baseline_idx, 1L)
 })
 
-test_that("response_time warns when extreme precedes t0", {
-    ## peak at index 3, but t0 = 5 → baseline spans indices 1:5 including peak
+test_that("response_time warns when extreme precedes start_time", {
+    ## peak at index 3, but start_time = 5 → baseline spans indices 1:5 including peak
     x <- c(0, 5, 20, 10, 5, 1, 1, 1, 1, 1)
     t <- seq_along(x)
 
     expect_warning(
-        result <- response_time(x, t, t0 = 5, direction = "positive"),
+        result <- response_time(x, t, start_time = 5, direction = "positive"),
         "No valid.*extremes"
     )
     
@@ -161,25 +161,25 @@ test_that("response_time warns when extreme precedes t0", {
     expect_true(is.na(result$fitted))
 })
 
-test_that("response_time errors when t0 exceeds max(t)", {
+test_that("response_time errors when start_time exceeds max(t)", {
     x <- 1:10
     t <- seq_along(x)
 
     expect_error(
-        response_time(x, t, t0 = 11),
+        response_time(x, t, start_time = 11),
         "No observations in"
     )
 })
 
 
-test_that("response_time response_time is relative to t0", {
+test_that("response_time response_time is relative to start_time", {
     x <- c(rep(10, 10), seq(10, 50, length.out = 20))
     t <- seq(0, 290, by = 10)  ## 0:290 seconds
 
-    result_0 <- response_time(x, t, t0 = 0, verbose = FALSE)
-    result_100 <- response_time(x, t, t0 = 100, verbose = FALSE)
+    result_0 <- response_time(x, t, start_time = 0, verbose = FALSE)
+    result_100 <- response_time(x, t, start_time = 100, verbose = FALSE)
 
-    ## response_time = t[response_idx] - t0
+    ## response_time = t[response_idx] - start_time
     expect_equal(result_0$response_time, t[result_0$response_idx] - 0)
     expect_equal(result_100$response_time, t[result_100$response_idx] - 100)
 })
@@ -189,7 +189,7 @@ test_that("response_time handles NA in x", {
     x <- c(rep(0, 5), NA, seq(0, 20, length.out = 10), NA)
     t <- seq_along(x)
 
-    result <- response_time(x, t, t0 = 5, verbose = FALSE)
+    result <- response_time(x, t, start_time = 5, verbose = FALSE)
 
     expect_false(is.na(result$A))
     expect_false(is.na(result$B))
@@ -207,7 +207,7 @@ test_that("analyse_response_time returns correct structure", {
         nirs_channels = c("x", "q"),
         time_channel = "t"
     )
-    result <- analyse_response_time(df, t0 = 5, verbose = FALSE)
+    result <- analyse_response_time(df, start_time = 5, verbose = FALSE)
 
     expect_s3_class(result, "data.frame")
     expect_equal(nrow(result), 2L)
@@ -248,7 +248,7 @@ test_that("analyse_response_time computes correct values", {
         nirs_channels = "x",
         time_channel = "t"
     )
-    result <- analyse_response_time(df, t0 = 0, fraction = 0.5)
+    result <- analyse_response_time(df, start_time = 0, fraction = 0.5)
 
     ## A = baseline mean ~ 0
     expect_equal(result$A, 0)
@@ -292,7 +292,7 @@ test_that("analyse_response_time processes multiple channels independently", {
         nirs_channels = c("x", "q"),
         time_channel = "t"
     )
-    result <- analyse_response_time(df, t0 = 5, verbose = FALSE)
+    result <- analyse_response_time(df, start_time = 5, verbose = FALSE)
 
     ## x: B > A; q: B < A
     expect_gt(
@@ -317,7 +317,7 @@ test_that("analyse_response_time channel_args override defaults", {
     )
     result <- analyse_response_time(
         df,
-        t0 = 5,
+        start_time = 5,
         fraction = list(0.5, q = 0.25),
         verbose = FALSE
     )
@@ -339,7 +339,7 @@ test_that("analyse_response_time fitted_data contains baseline, response, extrem
         nirs_channels = "x",
         time_channel = "t"
     )
-    result <- analyse_response_time(df, t0 = 5, verbose = FALSE)
+    result <- analyse_response_time(df, start_time = 5, verbose = FALSE)
 
     fd <- attr(result, "fitted_data")$x
 
@@ -360,7 +360,7 @@ test_that("analyse_response_time diagnostics structure", {
         nirs_channels = "x",
         time_channel = "t"
     )
-    result <- analyse_response_time(df, t0 = 5, verbose = FALSE)
+    result <- analyse_response_time(df, start_time = 5, verbose = FALSE)
 
     diag <- attr(result, "diagnostics")
 
@@ -404,7 +404,7 @@ test_that("analyse_response_time works visually on Moxy", {
     result <- analyse_response_time(
         data, 
         nirs_channels = smo2_right,
-        t0 = 878,
+        start_time = 878,
         fraction = 0.5
     )
 

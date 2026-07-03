@@ -556,10 +556,10 @@ validate_x_t <- function(
 }
 
 
-#' Validate t0
+#' Validate start_time
 #' @keywords internal
-validate_t0 <- function(
-    t0,
+validate_start_time <- function(
+    start_time,
     data,
     t_vec,
     verbose = TRUE,
@@ -567,28 +567,29 @@ validate_t0 <- function(
 ) {
     ## fall back to metadata or zero
     ## TODO fall back to first non-zero time value rather than 0?
-    t0 <- t0 %||% attr(data, "interval_times") %||% 0
-    validate_numeric(t0, 1L, env = env)
+    start_time <- start_time %||% attr(data, "interval_times") %||% 0
+    validate_numeric(start_time, 1L, env = env)
 
-    if (length(which(t_vec <= t0)) == 0L) {
+    if (length(which(t_vec <= start_time)) == 0L) {
         if (verbose) {
             cli_warn(c(
                 "!" = "No observations where {.arg time_channel} <= \\
-                `t0 = {.val {t0}}`.",
+                `start_time = {.val {start_time}}`.",
                 "i" = "All samples included in response."
             ), call = warn_call(env))
         }
-        t0 <- t_vec[1L]
+        start_time <- t_vec[1L]
     }
-    if (t0 > t_vec[length(t_vec)]) {
+    if (start_time > t_vec[length(t_vec)]) {
         cli_abort(c(
-            "x" = "No observations in {.arg time_channel} before {.arg t0}.",
-            "i" = "{.arg t0} must be specified within the range of \\
-            {.arg time_channel}."
+            "x" = "No observations in {.arg time_channel} before \\
+            {.arg start_time}.",
+            "i" = "{.arg start_time} must be specified within the range \\
+            of {.arg time_channel}."
         ), call = env)
     }
 
-    return(t0)
+    return(start_time)
 }
 
 

@@ -722,50 +722,50 @@ test_that("validate_x_t() validates inputs", {
 })
 
 
-## validate_t0() ==============================
-test_that("validate_t0() uses explicit t0 when provided", {
+## validate_start_time() ==============================
+test_that("validate_start_time() uses explicit start_time when provided", {
     data <- create_test_data()
     attr(data, "interval_times") <- 3
-    expect_equal(validate_t0(5, data, data[["time"]]), 5)
+    expect_equal(validate_start_time(5, data, data[["time"]]), 5)
 })
 
-test_that("validate_t0() falls back to interval_times attribute", {
+test_that("validate_start_time() falls back to interval_times attribute", {
     data <- create_test_data()
     attr(data, "interval_times") <- 3
-    expect_equal(validate_t0(NULL, data, data[["time"]]), 3)
+    expect_equal(validate_start_time(NULL, data, data[["time"]]), 3)
 })
 
-test_that("validate_t0() falls back to zero when no t0 or attribute", {
+test_that("validate_start_time() falls back to zero when no start_time or attribute", {
     data <- create_test_data()
-    expect_equal(validate_t0(NULL, data, data[["time"]]), 0)
+    expect_equal(validate_start_time(NULL, data, data[["time"]]), 0)
 })
 
-test_that("validate_t0() rejects non-numeric or multi-element t0", {
+test_that("validate_start_time() rejects non-numeric or multi-element start_time", {
     data <- create_test_data()
-    expect_error(validate_t0("5", data, data[["time"]]), "numeric")
-    expect_error(validate_t0(c(1, 2), data, data[["time"]]), "numeric")
-    expect_error(validate_t0(NA, data, data[["time"]]), "numeric")
+    expect_error(validate_start_time("5", data, data[["time"]]), "numeric")
+    expect_error(validate_start_time(c(1, 2), data, data[["time"]]), "numeric")
+    expect_error(validate_start_time(NA, data, data[["time"]]), "numeric")
 })
 
-test_that("validate_t0() warns and resets when no observations <= t0", {
+test_that("validate_start_time() warns and resets when no observations <= start_time", {
     data <- create_test_data()
     expect_warning(
-        result <- validate_t0(-1, data, data[["time"]]),
+        result <- validate_start_time(-1, data, data[["time"]]),
         "No observations.*time_channel"
     )
     expect_equal(result, data[["time"]][1L])
 
     ## verbose = FALSE suppresses warning, still resets
     expect_silent(
-        result <- validate_t0(-1, data, data[["time"]], verbose = FALSE)
+        result <- validate_start_time(-1, data, data[["time"]], verbose = FALSE)
     )
     expect_equal(result, data[["time"]][1L])
 })
 
-test_that("validate_t0() errors when t0 exceeds time range", {
+test_that("validate_start_time() errors when start_time exceeds time range", {
     data <- create_test_data(time_max = 10)
     expect_error(
-        validate_t0(100, data, data[["time"]]),
+        validate_start_time(100, data, data[["time"]]),
         "No observations.*before"
     )
 })

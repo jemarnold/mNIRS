@@ -390,12 +390,12 @@ analyse_peak_slope <- function(
     data,
     nirs_channels = NULL,
     time_channel = NULL,
-    t0 = NULL,
+    start_time = NULL,
     width = NULL,
     span = NULL,
     align = c("centre", "left", "right"),
     direction = c("auto", "positive", "negative"),
-    end_fit_span = Inf,
+    end_window = Inf,
     partial = FALSE,
     na.rm = FALSE,
     verbose = TRUE,
@@ -417,12 +417,12 @@ analyse_peak_slope <- function(
     per_channel <- resolve_channel_args(
         nirs_channels,
         args = list(
-            t0 = t0,
+            start_time = start_time,
             width = width,
             span = span,
             align = align,
             direction = direction,
-            end_fit_span = end_fit_span,
+            end_window = end_window,
             partial = partial,
             na.rm = na.rm
         ),
@@ -453,7 +453,7 @@ analyse_peak_slope <- function(
                 slope           = slopes$slope,
                 intercept       = slopes$intercept,
                 fitted          = slopes$y, ## predicted response value at idx
-                peak_slope_time = slopes$t - .a$t0,
+                peak_slope_time = slopes$t - .a$start_time,
                 idx             = slopes$idx
             ),
             model = slopes$model,

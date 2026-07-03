@@ -819,69 +819,69 @@ test_that("analyse_logistic() recovers gompertz_left known parameters", {
     expect_true(all.equal(result$slope, slope, tolerance = 0.3, scale = 1))
 })
 
-test_that("analyse_logistic() uses t0 correctly", {
+test_that("analyse_logistic() uses start_time correctly", {
     A <- 10
     B <- 100
     xmid <- 30
     slope <- 4
-    t0 <- 12
+    start_time <- 12
 
     data <- create_logistic_data(
         A = A, B = B, xmid = xmid, slope = slope, n = 100, noise_sd = 1
     )
-    data$time <- data$time + t0
+    data$time <- data$time + start_time
 
     result <- analyse_logistic(
         data,
         nirs_channels = "smo2",
         shape = "symmetric",
-        t0 = t0,
+        start_time = start_time,
         verbose = FALSE
     )
 
-    ## xmid reported as offset from t0 — should match original xmid
+    ## xmid reported as offset from start_time — should match original xmid
     expect_true(all.equal(result$A, A, tolerance = 1, scale = 1))
     expect_true(all.equal(result$B, B, tolerance = 1, scale = 1))
     expect_true(all.equal(result$xmid, xmid, tolerance = 1, scale = 1))
     expect_true(all.equal(result$slope, slope, tolerance = 0.2, scale = 1))
 })
 
-test_that("analyse_logistic() t0 edge cases", {
+test_that("analyse_logistic() start_time edge cases", {
     A <- 10
     B <- 100
     xmid <- 30
     slope <- 4
-    t0 <- 12
+    start_time <- 12
 
     data <- create_logistic_data(
         A = A, B = B, xmid = xmid, slope = slope, n = 100, noise_sd = 1
     )
-    data$time <- data$time + t0
+    data$time <- data$time + start_time
 
-    ## t0 specified before time start, falls forward to t[1L]
+    ## start_time specified before time start, falls forward to t[1L]
     expect_warning(
         result <- analyse_logistic(
             data,
             nirs_channels = "smo2",
             shape = "symmetric",
-            t0 = 0,
+            start_time = 0,
             verbose = TRUE
         ),
-        "No observations.*t0 =.*0"
+        "No observations.*start_time =.*0"
     )
 
     expect_true(all.equal(result$xmid, xmid, tolerance = 1, scale = 1))
 
-    ## t0 beyond time range
+    ## start_time beyond time range
     expect_error(
         analyse_logistic(
             data,
             nirs_channels = "smo2",
             shape = "symmetric",
-            t0 = max(data$time) + 10,
+            start_time = max(data$time) + 10,
             verbose = TRUE
         ),
-        "No observations.*before.*t0"
+        "No observations.*before.*start_time"
     )
 })
 

@@ -2,7 +2,7 @@
 % Please edit documentation in R/analyse_logistic.R
 \name{logistic}
 \alias{logistic}
-\title{Logistic function}
+\title{Generalised logistic function}
 \usage{
 logistic(t, A, B, xmid, slope, asym = NULL)
 }
@@ -38,7 +38,7 @@ Calculate a 4- or 5-parameter logistic (sigmoidal) curve.
 \subsection{Implementation}{
 
 The 4-parameter symmetric form is fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when
-\code{method = "logistic"} and \code{shape = "symmetric"} (\emph{default}) via the
+\code{method = "sigmoidal"} and \code{shape = "symmetric"} (\emph{default}) via the
 self-starting wrapper \code{\link[=SSlogistic]{SSlogistic()}}.
 
 The 5-parameter Richards form is exported for advanced use directly with
@@ -64,7 +64,7 @@ inflection fraction. Internally:
 
 Inflection is at \code{t = xmid} with \code{dx/dt = slope} and
 \code{y(xmid) = A + (B - A) * asym} for any \code{asym} in \verb{(0, 1)}. At
-\code{asym = 0.5}, \code{v = 1} and the model collapses to the 4-parameter form.
+\code{asym = 0.5 -> v = 1} and the model collapses to the 4-parameter form.
 \code{asym -> 0} gives an early-acceleration curve (inflection near \code{A}),
 \code{asym -> 1} gives a late-acceleration curve (inflection near \code{B}).
 

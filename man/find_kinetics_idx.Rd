@@ -7,7 +7,7 @@
 find_kinetics_idx(
   x,
   t = seq_along(x),
-  end_fit_span = Inf,
+  end_window = Inf,
   direction = c("auto", "positive", "negative"),
   ...,
   env = rlang::caller_env()
@@ -19,9 +19,9 @@ find_kinetics_idx(
 \item{t}{An \emph{optional} numeric vector of the predictor variable (e.g. time).
 Default is \code{seq_along(x)}.}
 
-\item{end_fit_span}{A numeric value in units of \code{time_channel} or \code{t}
+\item{end_window}{A numeric value in units of \code{time_channel} or \code{t}
 specifying the forward-looking window used to check for subsequent
-greater/lesser values than the candidate extreme. \code{end_fit_span = Inf}
+greater/lesser values than the candidate extreme. \code{end_window = Inf}
 (\emph{default}) returns the global extreme from the full range of \code{x}.}
 
 \item{direction}{A character string specifying the response direction to
@@ -44,13 +44,13 @@ first qualifying peak or trough in original \code{x}
 space, or \code{NULL} if no qualifying extreme was found
 (monotonic, horizontal, or degenerate input).}
 \item{\code{idx}}{Integer vector of all valid finite indices,
-truncated at \code{t[extreme] + end_fit_span}.}
+truncated at \code{t[extreme] + end_window}.}
 }
 }
 \description{
 Filters \code{x} and \code{t} to valid finite values, locates the first valid peak
 (maximum) or trough (minimum) where \code{t >= 0}, and returns the integer
-indices of all finite observations up to \code{end_fit_span} past that extreme.
+indices of all finite observations up to \code{end_window} past that extreme.
 }
 \details{
 \subsection{Direction detection}{

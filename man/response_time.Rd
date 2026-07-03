@@ -7,7 +7,7 @@
 response_time(
   x,
   t = seq_along(x),
-  t0 = 0,
+  start_time = 0,
   fraction = 0.5,
   direction = c("auto", "positive", "negative"),
   verbose = TRUE,
@@ -20,9 +20,9 @@ response_time(
 \item{t}{An \emph{optional} numeric vector of the predictor variable (e.g. time).
 Default is \code{seq_along(x)}.}
 
-\item{t0}{A numeric value specifying the start of the kinetics response
-in units of \code{t}. Observations where \code{t <= t0} define the baseline window.
-Defaults to \code{0}.}
+\item{start_time}{A numeric value specifying the start of the kinetics
+response in units of \code{t}. Observations where \code{t <= start_time} define the
+baseline window. Defaults to \code{0}.}
 
 \item{fraction}{A numeric value in the range \verb{[0, 1]} specifying the
 fractional response amplitude to detect. Defaults to \code{0.5} (50\% response,
@@ -40,14 +40,14 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 A named list containing:
-\item{\code{A}}{Mean baseline value (mean of \code{x} where \code{t <= t0}).}
-\item{\code{B}}{Extreme value (maximum or minimum) after \code{t0}.}
-\item{\code{response_time}}{Elapsed time from \code{t0} to the fractional response,
-in units of \code{t}.}
+\item{\code{A}}{Mean baseline value (mean of \code{x} where \code{t <= start_time}).}
+\item{\code{B}}{Extreme value (maximum or minimum) after \code{start_time}.}
+\item{\code{response_time}}{Elapsed time from \code{start_time} to the fractional
+response, in units of \code{t}.}
 \item{\code{response_value}}{The observed signal value at the response index.}
 \item{\code{fitted}}{The predicted fractional response value
 (\code{A + (B - A) * fraction}).}
-\item{\code{baseline_idx}}{Integer indices where \code{t <= t0}.}
+\item{\code{baseline_idx}}{Integer indices where \code{t <= start_time}.}
 \item{\code{response_idx}}{Integer index at the \code{response_value}.}
 \item{\code{extreme_idx}}{Integer index at the extreme value (\code{B}).}
 }
@@ -64,10 +64,10 @@ The target response value is computed as:
 
 \code{response_fitted = A + (B - A) * fraction}
 
-where \code{A} is the mean baseline (\code{t <= t0}) and \code{B} is the extreme (peak
-or trough) value after \code{t0}. The response time is the elapsed time from
-\code{t0} to the first sample where \code{x} reaches the \code{response_fitted} value
-(above for positive direction, below for negative).
+where \code{A} is the mean baseline (\code{t <= start_time}) and \code{B} is the extreme
+(peak or trough) value after \code{start_time}. The response time is the elapsed
+time from \code{start_time} to the first sample where \code{x} reaches the
+\code{response_fitted} value (above for positive direction, below for negative).
 }
 
 \subsection{Direction}{
@@ -76,15 +76,15 @@ When \code{direction = "auto"}, the net slope across \code{x} determines the ove
 trend, and the corresponding extreme (maximum for positive, minimum for
 negative) is used as \code{B}. If the net slope is zero or \code{NA}, the direction
 of greatest absolute change is used. When \code{direction = "positive"} or
-\code{"negative"}, the extreme is the maximum or minimum value after \code{t0},
-respectively.
+\code{"negative"}, the extreme is the maximum or minimum value after
+\code{start_time}, respectively.
 }
 
 \subsection{Baseline}{
 
-When no observations exist where \code{t <= t0}, the first sample \code{x[1]} is
-used as the baseline and a warning is issued. \code{t0} cannot exceed the
-maximum of \code{t}.
+When no observations exist where \code{t <= start_time}, the first sample \code{x[1]}
+is used as the baseline and a warning is issued. \code{start_time} cannot exceed
+the maximum of \code{t}.
 }
 }
 \examples{
@@ -93,10 +93,10 @@ t <- 0:60
 x <- monoexponential(t, A = 20, B = 60, tau = 8, TD = 10) + rnorm(length(t), 0, 1)
 
 ## estimated half-response time
-HRT <- response_time(x, t, t0 = 10, fraction = 0.5)
+HRT <- response_time(x, t, start_time = 10, fraction = 0.5)
 
 ## estimated mean response time (time constant; tau ~= 63.2\% amplitude)
-MRT <- response_time(x, t, t0 = 10, fraction = 0.632)
+MRT <- response_time(x, t, start_time = 10, fraction = 0.632)
 
 plot(t, x, type = "l", col = "grey60", xlab = "t", ylab = "x")
 ## baseline mean across baseline_idx

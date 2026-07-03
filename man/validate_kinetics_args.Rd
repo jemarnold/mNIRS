@@ -35,8 +35,9 @@ The \code{per_channel} list with mutating validators applied.
 Validates each channel's resolved argument list once, before any fitting,
 so an invalid argument fails fast rather than after an expensive fit on an
 earlier channel. Validation is keyed on which arguments are present.
-Mutating validators are applied and written back: \code{\link[=validate_t0]{validate_t0()}} clamps
-\code{t0}, and \code{align} is matched to its choices. Verbose hints are emitted for
-the first channel only to avoid repeating identical messages.
+Mutating validators are applied and written back:
+\code{\link[=validate_start_time]{validate_start_time()}} clamps \code{start_time}, and \code{align} is matched to its
+choices. Verbose hints are emitted for the first channel only to avoid
+repeating identical messages.
 }
 \keyword{internal}

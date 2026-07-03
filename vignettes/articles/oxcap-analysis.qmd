@@ -418,7 +418,7 @@ results <- slopes_df |>
         nirs_channels = slope,
         time_channel = time,
         method = "monoexponential",
-        use_time_delay = FALSE
+        use_TD = FALSE
     )
 
 results

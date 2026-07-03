@@ -44,7 +44,7 @@ symmetric form (A, B, xmid, slope) and the 5-parameter asymmetric form
 5-parameter model: \code{x ~ SSlogistic(t, A, B, xmid, slope, asym)}
 
 The 4-parameter form is used by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when
-\code{method = "logistic"} and \code{shape = "symmetric"}. The 5-parameter
+\code{method = "sigmoidal"} and \code{shape = "symmetric"}. The 5-parameter
 asymmetric form is retained as an advanced escape hatch for direct
 \code{\link[stats:nls]{stats::nls()}} use only; \code{analyse_kinetics()} instead dispatches to
 \code{\link[=SSgompertz]{SSgompertz()}} / \code{\link[=SSgompertz_left]{SSgompertz_left()}} for asymmetric shapes,

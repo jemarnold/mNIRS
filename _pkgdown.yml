@@ -67,6 +67,7 @@ reference:
   - matches("monoexp")
   - matches("response_time")
   - matches("logistic")
+  - matches("sigmoidal")
 - title: Printing & plotting
   desc: |
     Tools for printing functions and pretty plotting with `{ggplot2}`.

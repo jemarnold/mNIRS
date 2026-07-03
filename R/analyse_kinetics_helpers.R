@@ -50,11 +50,11 @@ detect_direction <- function(
 #'
 #' Filters `x` and `t` to valid finite values, locates the first valid peak
 #' (maximum) or trough (minimum) where `t >= 0`, and returns the integer
-#' indices of all finite observations up to `end_fit_span` past that extreme.
+#' indices of all finite observations up to `end_window` past that extreme.
 #'
-#' @param end_fit_span A numeric value in units of `time_channel` or `t`
+#' @param end_window A numeric value in units of `time_channel` or `t`
 #'   specifying the forward-looking window used to check for subsequent
-#'   greater/lesser values than the candidate extreme. `end_fit_span = Inf`
+#'   greater/lesser values than the candidate extreme. `end_window = Inf`
 #'   (*default*) returns the global extreme from the full range of `x`.
 #' @param direction A character string specifying the response direction to
 #'   detect -- `"auto"` (*default*), `"positive"`, or `"negative"`. See
@@ -86,7 +86,7 @@ detect_direction <- function(
 #'       space, or `NULL` if no qualifying extreme was found
 #'       (monotonic, horizontal, or degenerate input).}
 #'     \item{`idx`}{Integer vector of all valid finite indices,
-#'       truncated at `t[extreme] + end_fit_span`.}
+#'       truncated at `t[extreme] + end_window`.}
 #'   }
 #'
 #' @inheritParams validate_mnirs
@@ -94,7 +94,7 @@ detect_direction <- function(
 find_kinetics_idx <- function(
     x,
     t = seq_along(x),
-    end_fit_span = Inf,
+    end_window = Inf,
     direction = c("auto", "positive", "negative"),
     ...,
     env = rlang::caller_env()
@@ -107,7 +107,7 @@ find_kinetics_idx <- function(
     if (!(args$bypass_checks %||% FALSE)) {
         validate_x_t(x, t, allow_na = TRUE, env = env)
         validate_numeric(
-            end_fit_span, 1, c(0, Inf), msg1 = "one-element positive",
+            end_window, 1, c(0, Inf), msg1 = "one-element positive",
             env = env
         )
     }
@@ -145,17 +145,17 @@ find_kinetics_idx <- function(
     }
 
     ## process ==================================================
-    ## bin by end_fit_span, find extreme per bin, then check forward window
+    ## bin by end_window, find extreme per bin, then check forward window
 
-    ## expand end_fit_span to global extreme
-    if (end_fit_span == Inf) {
-        end_fit_span <- t_valid[length(t_valid)]
+    ## expand end_window to global extreme
+    if (end_window == Inf) {
+        end_window <- t_valid[length(t_valid)]
     }
 
-    ## ensure end_fit_span covers at least one adjacent sample when
-    ## end_fit_span is smaller than the minimum time step
+    ## ensure end_window covers at least one adjacent sample when
+    ## end_window is smaller than the minimum time step
     t_diff <- diff(t_valid)
-    mod_span <- max(end_fit_span, min(t_diff[t_diff > 0]))
+    mod_span <- max(end_window, min(t_diff[t_diff > 0]))
 
     ## break t_valid into mod_span-width bins
     bin_breaks <- seq(t_valid[1L], t_valid[n_valid] + mod_span, mod_span)
@@ -183,7 +183,7 @@ find_kinetics_idx <- function(
     if (!is.null(extreme_idx)) {
         ## map extreme back to original index space
         orig_extreme <- which_positive[extreme_idx]
-        t_cutoff <- t[orig_extreme] + end_fit_span
+        t_cutoff <- t[orig_extreme] + end_window
         truncated <- which_valid[t[which_valid] <= t_cutoff]
 
         return(list(
@@ -347,9 +347,9 @@ analyse_kinetics_channels <- function(
         lapply(nirs_channels, \(.nirs) {
         .a <- per_channel[[.nirs]]
 
-        ## filter for valid finite idx before first extreme + end_fit_span
+        ## filter for valid finite idx before first extreme + end_window
         valid <- find_kinetics_idx(
-            data[[.nirs]], t_vec, .a$end_fit_span, .a$direction, env = env
+            data[[.nirs]], t_vec, .a$end_window, .a$direction, env = env
         )
         .a$direction <- valid$direction
         x_fit <- data[[.nirs]][valid$idx]
@@ -392,7 +392,7 @@ analyse_kinetics_channels <- function(
         channel_args = do.call(rbind, lapply(fits, `[[`, "channel_args"))
     )
 
-    ## warn when time coefficients are negative (response before t0)
+    ## warn when time coefficients are negative (response before start_time)
     if (verbose) {
         check_cols <- intersect(
             c("TD", "tau", "response_time", "peak_slope_time"),
@@ -402,10 +402,11 @@ analyse_kinetics_channels <- function(
         if (any(unlist(result[check_cols]) < 0, na.rm = TRUE)) {
             cli_warn(c(
                 "!" = "Negative {.arg time_channel} coefficients imply the \\
-                response occured before {.arg t0}. This may indicate a \\
-                poorly fitted or misparameterised model.",
-                "i" = "Check {.arg time_channel} and {.arg t0} values, or \\
-                consider using a different {.fn analyse_kinetics} method."
+                response occured before {.arg start_time}. This may \\
+                indicate a poorly fitted or misparameterised model.",
+                "i" = "Check {.arg time_channel} and {.arg start_time} \\
+                values, or consider using a different \\
+                {.fn analyse_kinetics} method."
             ), call = warn_call(env))
         }
     }
@@ -419,9 +420,10 @@ analyse_kinetics_channels <- function(
 #' Validates each channel's resolved argument list once, before any fitting,
 #' so an invalid argument fails fast rather than after an expensive fit on an
 #' earlier channel. Validation is keyed on which arguments are present.
-#' Mutating validators are applied and written back: [validate_t0()] clamps
-#' `t0`, and `align` is matched to its choices. Verbose hints are emitted for
-#' the first channel only to avoid repeating identical messages.
+#' Mutating validators are applied and written back:
+#' [validate_start_time()] clamps `start_time`, and `align` is matched to its
+#' choices. Verbose hints are emitted for the first channel only to avoid
+#' repeating identical messages.
 #'
 #' @param per_channel Named list of resolved argument lists, one per channel.
 #' @param t_vec Numeric vector of `time_channel` values.
@@ -445,20 +447,22 @@ validate_kinetics_args <- function(
         .v <- verbose && .nirs == chans[[1L]]
 
         if (
-            !is.null(.a$use_time_delay) &&
-                (!is.logical(.a$use_time_delay) ||
-                    length(.a$use_time_delay) != 1L)
+            !is.null(.a$use_TD) &&
+                (!is.logical(.a$use_TD) ||
+                    length(.a$use_TD) != 1L)
             ) {
             cli_abort(c(
-                "x" = "{.arg use_time_delay} must be a {.cls logical} \\
+                "x" = "{.arg use_TD} must be a {.cls logical} \\
                 either {.val {TRUE}} or {.val {FALSE}}."
             ), call = env)
         }
         ## always resolve: user value > interval_times metadata > 0
-        .a$t0 <- validate_t0(.a$t0, data, t_vec, .v, env = env)
-        if (!is.null(.a$end_fit_span)) {
+        .a$start_time <- validate_start_time(
+            .a$start_time, data, t_vec, .v, env = env
+        )
+        if (!is.null(.a$end_window)) {
             validate_numeric(
-                .a$end_fit_span, 1, c(0, Inf), 
+                .a$end_window, 1, c(0, Inf), 
                 msg1 = "one-element positive", env = env
             )
         }
