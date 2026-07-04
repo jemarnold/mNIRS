@@ -523,6 +523,120 @@ build_na_results <- function(na_coefs) {
 }
 
 
+#' Refit an amplitude-reparameterised model with direction box bounds
+#'
+#' Enforces the response direction on a converged but inverted nls fit by
+#' refitting with amplitude `D = B - A` bounded to the requested sign via
+#' `nls(algorithm = "port")`. Sigmoid models divide by `D`, so its
+#' magnitude is floored strictly above zero.
+#'
+#' @param amp_fn Symbol; exported model fn taking `(t, A, B, ...)`.
+#' @param fit_data Data frame with columns `.x` and `.t`.
+#' @param A,D0 Numeric start values; `D0` sign gives the requested
+#'   direction.
+#' @param extra Named numeric start values for remaining free params, in
+#'   `amp_fn` argument order after `B`.
+#' @param extra_lower,extra_upper Named numeric bound overrides for
+#'   `extra` params. Sign-floor bounds should be data-scaled small values
+#'   (not `.Machine$double.eps`) so pinned-floor degeneracy is detectable.
+#'
+#' @returns A named list `list(model, coefs)` with `coefs` in
+#'   `(A, B, ...)` space, or `NULL` when the refit fails or any
+#'   coefficient is pinned at a sign-floor bound (degenerate flat fit).
+#'
+#' @keywords internal
+refit_direction <- function(
+    amp_fn,
+    fit_data,
+    A,
+    D0,
+    extra,
+    extra_lower = NULL,
+    extra_upper = NULL
+) {
+    want <- sign(D0)
+    D_eps <- diff(range(fit_data$.x)) * 1e-6
+
+    ## build rhs: amp_fn(.t, A, A + D, <extra names>)
+    rhs <- as.call(c(
+        amp_fn,
+        quote(.t),
+        quote(A),
+        call("+", quote(A), quote(D)),
+        lapply(names(extra), as.name)
+    ))
+    nls_formula <- stats::as.formula(call("~", quote(.x), rhs))
+
+    ## box bounds: D sign-constrained with strictly positive magnitude
+    ## floor (sigmoid models divide by D); extras unbounded unless
+    ## overridden
+    start <- c(A = A, D = D0, extra)
+    lower <- c(A = -Inf, D = if (want > 0) D_eps else -Inf,
+               setNames(rep(-Inf, length(extra)), names(extra)))
+    upper <- c(A = Inf, D = if (want > 0) Inf else -D_eps,
+               setNames(rep(Inf, length(extra)), names(extra)))
+    lower[names(extra_lower)] <- extra_lower
+    upper[names(extra_upper)] <- extra_upper
+
+    model <- tryCatch(
+        nls(nls_formula, fit_data, start = start, lower = lower,
+            upper = upper, algorithm = "port"),
+        error = \(e) NULL
+    )
+
+    if (is.null(model)) {
+        return(NULL)
+    }
+
+    ## any coefficient pinned at a sign-floor bound (e.g. D, slope, tau)
+    ## indicates a degenerate flat fit: no genuine response in the
+    ## requested direction
+    cf <- coef(model)
+    floors <- abs(ifelse(is.finite(lower), lower, upper))
+    if (any(is.finite(floors) & abs(cf) <= 2 * floors)) {
+        return(NULL)
+    }
+
+    coefs <- as.list(cf)
+    coefs$B <- coefs$A + coefs$D
+    coefs$D <- NULL
+    return(list(model = model, coefs = coefs))
+}
+
+
+#' Warn when a fit converged against the requested direction
+#'
+#' Emitted when the direction-bounded refit from [refit_direction()]
+#' fails or degenerates, before returning [build_na_results()].
+#'
+#' @param fn Symbol or character; the self-start fn named in the warning.
+#' @param .nirs Character; the channel name.
+#' @param direction Character; the requested direction.
+#' @param interval_name Character; the interval label.
+#' @inheritParams validate_mnirs
+#'
+#' @keywords internal
+wrong_direction_warning <- function(
+    fn,
+    .nirs,
+    direction,
+    interval_name,
+    verbose,
+    env
+) {
+    if (!verbose) {
+        return(invisible(NULL))
+    }
+    cli_warn(c(
+        "x" = "{.fn {as.character(fn)}} fit for {.field {(.nirs)}} in \\
+        {.field {interval_name}} could not satisfy \\
+        {.code direction = {.val {direction}}}.",
+        "i" = "Returning {.val {NA}} coefficients."
+    ), call = warn_call(env))
+    return(invisible(NULL))
+}
+
+
 #' Compute model diagnostics
 #'
 #' @param fitted A numeric vector of the predicted values.

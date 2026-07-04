@@ -659,6 +659,107 @@ test_that("analyse_monoexponential() diagnostics contain expected columns", {
 })
 
 
+## direction =====================================================
+
+test_that("analyse_monoexponential() direction = 'negative' matches auto on falling data", {
+    data <- create_monoexp_data(A = 80, B = 50, n = 100, noise_sd = 0.3)
+
+    result_auto <- analyse_monoexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        direction = "auto",
+        verbose = FALSE
+    )
+    result_neg <- analyse_monoexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        direction = "negative",
+        verbose = FALSE
+    )
+
+    ## matching direction leaves the unconstrained fit untouched
+    expect_equal(result_auto$A, result_neg$A)
+    expect_equal(result_auto$B, result_neg$B)
+    expect_equal(result_auto$tau, result_neg$tau)
+    expect_true(result_auto$B < result_auto$A)
+})
+
+test_that("analyse_monoexponential() direction = 'positive' rejects falling fit", {
+    data <- create_monoexp_data(A = 80, B = 50, n = 100, noise_sd = 0.3)
+
+    expect_warning(
+        result <- analyse_monoexponential(
+            data,
+            nirs_channels = "smo2",
+            use_TD = FALSE,
+            direction = "positive",
+            verbose = TRUE
+        ),
+        "satisfy"
+    )
+
+    ## never returns an inverted (B < A) fit against requested direction
+    expect_true(is.na(result$A))
+    expect_true(is.na(result$B))
+    expect_true(is.na(result$tau))
+})
+
+test_that("analyse_monoexponential() suppresses direction warning when verbose = FALSE", {
+    data <- create_monoexp_data(A = 80, B = 50, n = 100, noise_sd = 0.3)
+
+    expect_no_warning(
+        analyse_monoexponential(
+            data,
+            nirs_channels = "smo2",
+            use_TD = FALSE,
+            direction = "positive",
+            verbose = FALSE
+        )
+    )
+})
+
+test_that("analyse_monoexponential() per-channel direction overrides", {
+    ## both channels falling; ch2 forced positive returns NA
+    data <- create_monoexp_data(
+        A = 80, B = 50, n = 100, noise_sd = 0.3, channels = c("ch1", "ch2")
+    )
+
+    result <- analyse_monoexponential(
+        data,
+        nirs_channels = c("ch1", "ch2"),
+        use_TD = FALSE,
+        direction = list("auto", ch2 = "positive"),
+        verbose = FALSE
+    )
+
+    expect_false(is.na(result$A[result$nirs_channels == "ch1"]))
+    expect_true(is.na(result$A[result$nirs_channels == "ch2"]))
+
+    ## resolved directions recorded in channel_args
+    ca <- attr(result, "channel_args")
+    expect_equal(ca$direction, c("negative", "positive"))
+})
+
+test_that("analyse_kinetics() passes direction to monoexponential method", {
+    data <- create_monoexp_data(A = 80, B = 50, n = 100, noise_sd = 0.3)
+
+    expect_warning(
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = "smo2",
+            method = "monoexponential",
+            use_TD = FALSE,
+            direction = "positive"
+        ),
+        "satisfy"
+    )
+
+    expect_true(is.na(result$coefficients$A))
+})
+
+
 ## integration tests =============================================
 
 test_that("extract model coefs", {

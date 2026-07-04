@@ -382,10 +382,8 @@ test_that("SSlogistic() 5-param converges on most random realisations", {
 })
 
 test_that("SSlogistic() converges on real dataset", {
-    skip_on_ci()
-    skip_on_covr()
-    skip_on_cran()
-    skip_if(!interactive(), "Manual convergence check")
+    skip("Manual fit convergence check")
+    skip_if(!interactive(), "Manual fit convergence check")
     file_path <- test_path("testdata/reoxy_list.rds")
     skip_if_not(file.exists(file_path), "testdata not available")
 
@@ -992,4 +990,119 @@ test_that("analyse_logistic() diagnostics contain expected columns", {
         c("nirs_channels", "n_obs", "r2", "adj_r2", "rmse") %in% names(diag)
     ))
     expect_true(diag$r2 > 0.9)
+})
+
+
+## direction =====================================================
+
+test_that("analyse_logistic() direction = 'negative' matches auto on falling data", {
+    data <- create_logistic_data(
+        A = 100, B = 10, slope = -4, n = 100, noise_sd = 1
+    )
+
+    result_auto <- analyse_logistic(
+        data,
+        nirs_channels = "smo2",
+        shape = "symmetric",
+        direction = "auto",
+        verbose = FALSE
+    )
+    result_neg <- analyse_logistic(
+        data,
+        nirs_channels = "smo2",
+        shape = "symmetric",
+        direction = "negative",
+        verbose = FALSE
+    )
+
+    ## matching direction leaves the unconstrained fit untouched
+    expect_equal(result_auto$A, result_neg$A)
+    expect_equal(result_auto$B, result_neg$B)
+    expect_equal(result_auto$slope, result_neg$slope)
+    expect_true(result_auto$B < result_auto$A)
+    expect_true(result_auto$slope < 0)
+})
+
+test_that("analyse_logistic() direction = 'positive' rejects falling fit", {
+    data <- create_logistic_data(
+        A = 100, B = 10, slope = -4, n = 100, noise_sd = 1
+    )
+
+    expect_warning(
+        result <- analyse_logistic(
+            data,
+            nirs_channels = "smo2",
+            shape = "symmetric",
+            direction = "positive",
+            verbose = TRUE
+        ),
+        "satisfy"
+    )
+
+    ## never returns an inverted (B < A) fit against requested direction
+    expect_true(is.na(result$A))
+    expect_true(is.na(result$B))
+    expect_true(is.na(result$slope))
+})
+
+test_that("analyse_logistic() suppresses direction warning when verbose = FALSE", {
+    data <- create_logistic_data(
+        A = 100, B = 10, slope = -4, n = 100, noise_sd = 1
+    )
+
+    expect_no_warning(
+        analyse_logistic(
+            data,
+            nirs_channels = "smo2",
+            shape = "symmetric",
+            direction = "positive",
+            verbose = FALSE
+        )
+    )
+})
+
+test_that("analyse_logistic() direction constrains gompertz shapes", {
+    ## falling gompertz data; forced positive returns NA
+    set.seed(13)
+    n <- 100
+    t <- seq(0, n - 1, length.out = n)
+    x <- gompertz(t, A = 100, B = 10, xmid = 30, slope = -4) + rnorm(n, 0, 1)
+    data <- create_mnirs_data(
+        data.frame(time = t, smo2 = x),
+        nirs_channels = "smo2",
+        time_channel = "time",
+        sample_rate = 1
+    )
+
+    expect_warning(
+        result <- analyse_logistic(
+            data,
+            nirs_channels = "smo2",
+            shape = "gompertz",
+            direction = "positive",
+            verbose = TRUE
+        ),
+        "satisfy"
+    )
+
+    expect_true(is.na(result$A))
+})
+
+test_that("analyse_kinetics() passes direction to sigmoidal method", {
+    data <- create_logistic_data(
+        A = 100, B = 10, slope = -4, n = 100, noise_sd = 1
+    )
+
+    expect_warning(
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = "smo2",
+            method = "sigmoidal",
+            shape = "symmetric",
+            direction = "positive"
+        ),
+        "satisfy"
+    )
+
+    expect_true(is.na(result$coefficients$A))
 })

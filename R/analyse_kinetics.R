@@ -106,6 +106,11 @@
 #' within the subsequent `end_window`. The fitting window extends to the end
 #' of `end_window` beyond the detected peak/trough.
 #'
+#' For *"monoexponential"* and *"sigmoidal"*, `direction` also constrains the
+#' sign of the fitted amplitude `B - A` (and the sigmoidal `slope`). A fit
+#' that cannot satisfy the requested direction returns `NA` coefficients with
+#' a warning.
+#'
 #' ## method = "response_time"
 #'
 #' Aliases:
@@ -205,7 +210,9 @@
 #'       `nirs_channel`). For `"peak_slope"`, each element is an
 #'       [lm][stats::lm] object; for `"monoexponential"`, an
 #'       [nls][stats::nls] object; for `"response_time"`, `NULL`. `NULL`
-#'       for channels where fitting failed.}
+#'       for channels where fitting failed. When a `direction`-bounded
+#'       refit was required, the stored model is parameterised with
+#'       amplitude `D = B - A` in place of `B`.}
 #'   \item{`coefficients`}{A [tibble][tibble::tibble-package] of coefficients
 #'       with one row per `nirs_channel` per interval, containing columns
 #'       `interval`, `nirs_channels`, and the method-specific parameters.}
@@ -439,7 +446,6 @@ analyse_kinetics.monoexponential <- function(
     use_TD = TRUE
 ) {
     ## TODO: pass additional stats::nls() args
-    ## TODO: implement `direction`
     ## resolve global verbose option when caller omits the argument
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
@@ -457,6 +463,7 @@ analyse_kinetics.monoexponential <- function(
             time_channel = !!enquo(time_channel),
             use_TD = use_TD,
             start_time = start_time,
+            direction = direction,
             end_window = end_window,
             verbose = verbose,
             interval_name = names(data_list)[[.i]],
@@ -491,7 +498,6 @@ analyse_kinetics.sigmoidal <- function(
     shape = c("symmetric", "gompertz", "gompertz_left")
 ) {
     ## TODO: pass additional stats::nls() args
-    ## TODO: implement `direction`
     ## resolve global verbose option when caller omits the argument
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
@@ -509,6 +515,7 @@ analyse_kinetics.sigmoidal <- function(
             time_channel = !!enquo(time_channel),
             shape = shape,
             start_time = start_time,
+            direction = direction,
             end_window = end_window,
             verbose = verbose,
             interval_name = names(data_list)[[.i]],

@@ -574,19 +574,22 @@ analyse_logistic <- function(
         xmid_fitted = NA_real_
     )
 
-    ## shape -> (self-start fn, matching predictor fn) lookup
+    ## shape -> (self-start fn, matching predictor fn, amp-reparam fn) lookup
     shape_dispatch <- list(
         symmetric = list(
             model = quote(SSlogistic),
-            predict = \(t, A, B, xmid, slope) logistic(t, A, B, xmid, slope)
+            predict = \(t, A, B, xmid, slope) logistic(t, A, B, xmid, slope),
+            amp = quote(logistic)
         ),
         gompertz = list(
             model = quote(SSgompertz),
-            predict = gompertz
+            predict = gompertz,
+            amp = quote(gompertz)
         ),
         gompertz_left = list(
             model = quote(SSgompertz_left),
-            predict = gompertz_left
+            predict = gompertz_left,
+            amp = quote(gompertz_left)
         )
     )
 
@@ -631,6 +634,39 @@ analyse_logistic <- function(
 
         fitted_vals <- stats::predict(model)
         coefs <- stats::coef(model)
+
+        ## enforce direction: bounded refit on D = B - A and slope sign
+        want <- if (.a$direction == "positive") 1 else -1
+        if (sign(coefs[["B"]] - coefs[["A"]]) != want) {
+            ## data-scaled slope floor: slope pinned here is a degenerate
+            ## flat fit, not a genuine response
+            slope_eps <- diff(range(x_fit)) / diff(range(t_fit)) * 1e-6
+            refit <- refit_direction(
+                amp_fn = shape_dispatch[[.a$shape]]$amp,
+                fit_data = fit_data,
+                A = coefs[["A"]],
+                D0 = want * max(
+                    abs(coefs[["B"]] - coefs[["A"]]),
+                    diff(range(x_fit)) * 0.1
+                ),
+                extra = c(
+                    xmid = coefs[["xmid"]],
+                    slope = want * max(abs(coefs[["slope"]]), slope_eps)
+                ),
+                extra_lower = c(slope = if (want > 0) slope_eps else -Inf),
+                extra_upper = c(slope = if (want > 0) Inf else -slope_eps)
+            )
+            if (is.null(refit)) {
+                wrong_direction_warning(
+                    ch_fn, .nirs, .a$direction, interval_name, verbose, env
+                )
+                return(build_na_results(na_coefs))
+            }
+            model <- refit$model
+            coefs <- unlist(refit$coefs)
+            fitted_vals <- stats::predict(model)
+        }
+
         xmid_offset <- coefs[["xmid"]] - .a$start_time
 
         ## predict response at the inflection point xmid
