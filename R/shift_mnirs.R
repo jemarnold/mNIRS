@@ -19,9 +19,12 @@
 #'      \item{`"first"`}{Will shift first value(s) `to` or `by` the specified
 #'      values.}
 #'   }
+#' @inheritParams map_mnirs_intervals
 #' @inheritParams validate_mnirs
 #' @inheritParams replace_mnirs
 #' @inheritParams rescale_mnirs
+#'
+#' @inheritSection map_mnirs_intervals Data input formats
 #'
 #' @details
 #' `group_channels` controls how data channels are grouped to preserve
@@ -86,7 +89,8 @@
 #'
 #' @returns
 #' A [tibble][tibble::tibble-package] of class *"mnirs"* with metadata
-#'   available with `attributes()`.
+#'   available with `attributes()`. For list or grouped data frame input,
+#'   returns a named list of *"mnirs"* tibbles, one per interval.
 #'
 #' @examples
 #' ## read example data
@@ -127,6 +131,11 @@ shift_mnirs <- function(
     position = c("min", "max", "first"),
     verbose = TRUE
 ) {
+    ## list or grouped input → normalise to named list, recurse per interval
+    if (inherits(data, "grouped_df") || !is.data.frame(data)) {
+        return(map_mnirs_intervals(data, match.call(), parent.frame()))
+    }
+
     ## validation =============================================
     validate_mnirs_data(data)
     metadata <- attributes(data)

@@ -946,3 +946,59 @@ test_that("shift_mnirs works on Train.Red", {
         data$smo2_left - data$smo2_right
     )))
 })
+
+
+## multi-interval input ================================================
+test_that("shift_mnirs processes a named list of data frames", {
+    make_df <- \(vals) {
+        create_mnirs_data(
+            data.frame(time = 1:5, ch1 = vals),
+            nirs_channels = "ch1",
+            time_channel = "time"
+        )
+    }
+    data_list <- list(a = make_df(51:55), b = make_df(61:65))
+
+    result <- shift_mnirs(
+        data_list,
+        to = 0,
+        width = 1,
+        position = "min",
+        verbose = FALSE
+    )
+
+    expect_type(result, "list")
+    expect_named(result, c("a", "b"))
+    expect_s3_class(result$a, "mnirs")
+    ## each interval's minimum shifted to zero
+    expect_equal(result$a$ch1, c(0, 1, 2, 3, 4))
+    expect_equal(result$b$ch1, c(0, 1, 2, 3, 4))
+})
+
+test_that("shift_mnirs processes grouped data frames", {
+    skip_if_not_installed("dplyr")
+
+    df <- create_mnirs_data(
+        data.frame(
+            time = rep(1:5, 2),
+            ch1 = c(51:55, 61:65),
+            group = rep(c("A", "B"), each = 5)
+        ),
+        nirs_channels = "ch1",
+        time_channel = "time"
+    )
+    grouped_df <- dplyr::group_by(df, group)
+
+    result <- shift_mnirs(
+        grouped_df,
+        to = 0,
+        width = 1,
+        position = "min",
+        verbose = FALSE
+    )
+
+    expect_named(result, c("A", "B"))
+    expect_s3_class(result$A, "mnirs")
+    expect_equal(result$A$ch1, c(0, 1, 2, 3, 4))
+    expect_equal(result$B$ch1, c(0, 1, 2, 3, 4))
+})

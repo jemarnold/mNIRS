@@ -453,3 +453,53 @@ test_that("resample_mnirs works visually on moxy data", {
             ggplot2::aes(y = smo2, colour = "resample")
         )
 })
+
+
+## multi-interval input ================================================
+test_that("resample_mnirs processes a named list of data frames", {
+    make_df <- \(vals) {
+        create_mnirs_data(
+            data.frame(time = c(1, 2, 4, 5), ch1 = vals),
+            nirs_channels = "ch1",
+            time_channel = "time",
+            sample_rate = 1
+        )
+    }
+    data_list <- list(
+        a = make_df(c(50, 51, 53, 54)),
+        b = make_df(c(60, 61, 63, 64))
+    )
+
+    result <- resample_mnirs(data_list, method = "linear", verbose = FALSE)
+
+    expect_type(result, "list")
+    expect_named(result, c("a", "b"))
+    expect_s3_class(result$a, "mnirs")
+    ## gap at t = 3 regularised and filled by interpolation
+    expect_equal(result$a$time, 1:5)
+    expect_equal(result$a$ch1, c(50, 51, 52, 53, 54))
+    expect_equal(result$b$ch1, c(60, 61, 62, 63, 64))
+})
+
+test_that("resample_mnirs processes grouped data frames", {
+    skip_if_not_installed("dplyr")
+
+    df <- create_mnirs_data(
+        data.frame(
+            time = rep(c(1, 2, 4, 5), 2),
+            ch1 = c(50, 51, 53, 54, 60, 61, 63, 64),
+            group = rep(c("A", "B"), each = 4)
+        ),
+        nirs_channels = "ch1",
+        time_channel = "time",
+        sample_rate = 1
+    )
+    grouped_df <- dplyr::group_by(df, group)
+
+    result <- resample_mnirs(grouped_df, method = "linear", verbose = FALSE)
+
+    expect_named(result, c("A", "B"))
+    expect_s3_class(result$A, "mnirs")
+    expect_equal(result$A$ch1, c(50, 51, 52, 53, 54))
+    expect_equal(result$B$ch1, c(60, 61, 62, 63, 64))
+})

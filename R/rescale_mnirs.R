@@ -26,7 +26,10 @@
 #'   }
 #' @param range A numeric vector in the form `c(min, max)`, indicating the
 #'   range of output values to which `nirs_channels` will be rescaled.
+#' @inheritParams map_mnirs_intervals
 #' @inheritParams validate_mnirs
+#'
+#' @inheritSection map_mnirs_intervals Data input formats
 #'
 #' @details
 #' `group_channels` controls how data channels are grouped to preserve
@@ -58,7 +61,8 @@
 #'
 #' @returns
 #' A [tibble][tibble::tibble-package] of class *"mnirs"* with metadata
-#'   available with `attributes()`.
+#'   available with `attributes()`. For list or grouped data frame input,
+#'   returns a named list of *"mnirs"* tibbles, one per interval.
 #'
 #' @examples
 #' ## read example data
@@ -92,6 +96,11 @@ rescale_mnirs <- function(
     range,
     verbose = TRUE
 ) {
+    ## list or grouped input → normalise to named list, recurse per interval
+    if (inherits(data, "grouped_df") || !is.data.frame(data)) {
+        return(map_mnirs_intervals(data, match.call(), parent.frame()))
+    }
+
     ## validate =================================
     validate_mnirs_data(data, ncol = 1)
     metadata <- attributes(data)

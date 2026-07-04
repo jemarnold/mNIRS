@@ -18,8 +18,9 @@ shift_mnirs(
 )
 }
 \arguments{
-\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
-metadata.}
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data
+and metadata, a list of data frames, or a grouped data frame (see
+section \emph{Data input formats}).}
 
 \item{nirs_channels}{A character vector giving the names of mNIRS columns to
 operate on. Must match column names in \code{data} exactly.
@@ -77,7 +78,8 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 A \link[tibble:tibble-package]{tibble} of class \emph{"mnirs"} with metadata
-available with \code{attributes()}.
+available with \code{attributes()}. For list or grouped data frame input,
+returns a named list of \emph{"mnirs"} tibbles, one per interval.
 }
 \description{
 Move the range of data channels in a data frame up or down, while preserving
@@ -145,6 +147,20 @@ will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
 process \code{hhb}).
 \item \code{list()} names not matching \code{nirs_channels} or \code{group_channels} are
 warned about and ignored.
+}
+}
+
+\section{Data input formats}{
+
+
+\emph{{mnirs}} processing functions accept \code{data} in multiple formats:
+\itemize{
+\item A \strong{single \emph{"mnirs"} data frame} is processed and returned directly.
+\item A \strong{list of \emph{"mnirs"} data frames}: each interval is processed
+separately and returned as a named list.
+\item A \strong{grouped \emph{"mnirs"} data frame}, e.g. with \code{dplyr::group_by()}: the
+data frame is split by grouping levels and each group is processed as
+a separate interval, returned as a named list.
 }
 }
 

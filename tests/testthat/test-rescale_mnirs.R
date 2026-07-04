@@ -289,3 +289,57 @@ test_that("rescale_mnirs works on Train.Red", {
     expect_true(any(o2hb_result[[o2hb_min]] == 0, na.rm = TRUE))
     expect_true(any(o2hb_result[[o2hb_max]] == 100, na.rm = TRUE))
 })
+
+
+## multi-interval input ================================================
+test_that("rescale_mnirs processes a named list of data frames", {
+    make_df <- \(vals) {
+        create_mnirs_data(
+            data.frame(time = 1:5, ch1 = vals),
+            nirs_channels = "ch1",
+            time_channel = "time"
+        )
+    }
+    data_list <- list(a = make_df(50:54), b = make_df(60:64))
+
+    result <- rescale_mnirs(
+        data_list,
+        group_channels = "distinct",
+        range = c(0, 100),
+        verbose = FALSE
+    )
+
+    expect_type(result, "list")
+    expect_named(result, c("a", "b"))
+    expect_s3_class(result$a, "mnirs")
+    ## each interval rescaled to its own range
+    expect_equal(result$a$ch1, c(0, 25, 50, 75, 100))
+    expect_equal(result$b$ch1, c(0, 25, 50, 75, 100))
+})
+
+test_that("rescale_mnirs processes grouped data frames", {
+    skip_if_not_installed("dplyr")
+
+    df <- create_mnirs_data(
+        data.frame(
+            time = rep(1:5, 2),
+            ch1 = c(50:54, 60:64),
+            group = rep(c("A", "B"), each = 5)
+        ),
+        nirs_channels = "ch1",
+        time_channel = "time"
+    )
+    grouped_df <- dplyr::group_by(df, group)
+
+    result <- rescale_mnirs(
+        grouped_df,
+        group_channels = "distinct",
+        range = c(0, 100),
+        verbose = FALSE
+    )
+
+    expect_named(result, c("A", "B"))
+    expect_s3_class(result$A, "mnirs")
+    expect_equal(result$A$ch1, c(0, 25, 50, 75, 100))
+    expect_equal(result$B$ch1, c(0, 25, 50, 75, 100))
+})

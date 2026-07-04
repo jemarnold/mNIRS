@@ -664,6 +664,103 @@ test_that("replace_mnirs updates metadata correctly", {
     expect_equal(attr(data, "nirs_channels"), "smo2_left")
 })
 
+test_that("replace_mnirs processes a named list of data frames", {
+    make_df <- \(vals) {
+        create_mnirs_data(
+            data.frame(time = 1:5, ch1 = vals),
+            nirs_channels = "ch1",
+            time_channel = "time"
+        )
+    }
+    data_list <- list(
+        a = make_df(c(50, 999, 52, 53, 54)),
+        b = make_df(c(60, 61, 999, 63, 64))
+    )
+
+    result <- replace_mnirs(
+        data_list,
+        invalid_values = 999,
+        method = "linear",
+        verbose = FALSE
+    )
+
+    expect_type(result, "list")
+    expect_named(result, c("a", "b"))
+    expect_s3_class(result$a, "mnirs")
+    expect_s3_class(result$b, "mnirs")
+    expect_equal(result$a$ch1, c(50, 51, 52, 53, 54))
+    expect_equal(result$b$ch1, c(60, 61, 62, 63, 64))
+})
+
+test_that("replace_mnirs names unnamed list intervals", {
+    df <- create_mnirs_data(
+        data.frame(time = 1:5, ch1 = c(50, 999, 52, 53, 54)),
+        nirs_channels = "ch1",
+        time_channel = "time"
+    )
+
+    ## explicit `nirs_channels` forwarded to each interval
+    result <- replace_mnirs(
+        list(df, df),
+        nirs_channels = "ch1",
+        invalid_values = 999,
+        method = "linear",
+        verbose = FALSE
+    )
+
+    expect_named(result, c("interval_1", "interval_2"))
+    expect_equal(result$interval_1$ch1, c(50, 51, 52, 53, 54))
+})
+
+test_that("replace_mnirs processes grouped data frames", {
+    skip_if_not_installed("dplyr")
+
+    df <- create_mnirs_data(
+        data.frame(
+            time = rep(1:5, 2),
+            ch1 = c(50, 999, 52, 53, 54, 60, 61, 999, 63, 64),
+            group = rep(c("A", "B"), each = 5)
+        ),
+        nirs_channels = "ch1",
+        time_channel = "time",
+        sample_rate = 1
+    ) |> 
+        dplyr::group_by(group)
+
+    result <- replace_mnirs(
+        df,
+        invalid_values = 999,
+        method = "linear",
+        verbose = FALSE
+    )
+
+    expect_type(result, "list")
+    expect_named(result, c("A", "B"))
+    expect_s3_class(result$A, "mnirs")
+    expect_equal(result$A$ch1, c(50, 51, 52, 53, 54))
+    expect_equal(result$B$ch1, c(60, 61, 62, 63, 64))
+    ## metadata copied down to each interval
+    expect_equal(attr(result$A, "sample_rate"), 1)
+    expect_equal(attr(result$B, "sample_rate"), 1)
+})
+
+test_that("replace_mnirs errors on list with non-data frame elements", {
+    df <- create_mnirs_data(
+        data.frame(time = 1:5, ch1 = 50:54),
+        nirs_channels = "ch1",
+        time_channel = "time"
+    )
+
+    expect_error(
+        replace_mnirs(
+            list(df, "not a df"),
+            invalid_values = 999,
+            verbose = FALSE
+        ),
+        "must be a list of data frames"
+    )
+})
+
 test_that("replace_mnirs global verbose works", {
     expect_warning(
         read_mnirs(

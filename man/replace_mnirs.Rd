@@ -56,8 +56,9 @@ replace_missing(
 )
 }
 \arguments{
-\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
-metadata.}
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data
+and metadata, a list of data frames, or a grouped data frame (see
+section \emph{Data input formats}).}
 
 \item{nirs_channels}{A character vector giving the names of mNIRS columns to
 operate on. Must match column names in \code{data} exactly.
@@ -125,8 +126,10 @@ Default is \code{seq_along(x)}.}
 \item{...}{Additional arguments.}
 }
 \value{
-\code{replace_mnirs()} return a \link[tibble:tibble-package]{tibble} of
-class \code{"mnirs"} with metadata available via \code{attributes()}.
+\code{replace_mnirs()} returns a \link[tibble:tibble-package]{tibble} of
+class \code{"mnirs"} with metadata available via \code{attributes()}. For list or
+grouped data frame input, returns a named list of \emph{"mnirs"} tibbles, one
+per interval.
 
 \code{replace_invalid()} returns a numeric vector the same length as
 \code{x} with invalid values replaced.
@@ -140,8 +143,8 @@ class \code{"mnirs"} with metadata available via \code{attributes()}.
 \description{
 Detect and replace local outliers, specified invalid values, and missing
 \code{NA} values across \code{nirs_channels} within an \emph{"mnirs"} data frame.
-\code{replace_mnirs()} operates on a data frame, extending the vectorised
-functions:.
+\code{replace_mnirs()} operates on a data frame, a list of data frames, or a
+grouped data frame, extending the vectorised functions.
 
 \code{replace_invalid()} detects specified invalid values or range cutoffs in a
 numeric vector and replace them with the local median value or \code{NA}.
@@ -258,6 +261,20 @@ will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
 process \code{hhb}).
 \item \code{list()} names not matching \code{nirs_channels} are warned about and
 ignored.
+}
+}
+
+\section{Data input formats}{
+
+
+\emph{{mnirs}} processing functions accept \code{data} in multiple formats:
+\itemize{
+\item A \strong{single \emph{"mnirs"} data frame} is processed and returned directly.
+\item A \strong{list of \emph{"mnirs"} data frames}: each interval is processed
+separately and returned as a named list.
+\item A \strong{grouped \emph{"mnirs"} data frame}, e.g. with \code{dplyr::group_by()}: the
+data frame is split by grouping levels and each group is processed as
+a separate interval, returned as a named list.
 }
 }
 

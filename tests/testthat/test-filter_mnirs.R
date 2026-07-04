@@ -948,3 +948,57 @@ test_that("filter_mnirs works visually on Moxy data", {
             ggplot2::aes(y = smo2, colour = "filt_mnirs")
         )
 })
+
+
+## multi-interval input ================================================
+test_that("filter_mnirs processes a named list of data frames", {
+    make_df <- \(val) {
+        create_mnirs_data(
+            data.frame(time = 1:5, ch1 = rep(val, 5)),
+            nirs_channels = "ch1",
+            time_channel = "time"
+        )
+    }
+    data_list <- list(a = make_df(50), b = make_df(60))
+
+    result <- filter_mnirs(
+        data_list,
+        method = "moving_average",
+        width = 3,
+        verbose = FALSE
+    )
+
+    expect_type(result, "list")
+    expect_named(result, c("a", "b"))
+    expect_s3_class(result$a, "mnirs")
+    ## constant input returns constant means; partial edge windows are NA
+    expect_equal(result$a$ch1, c(NA, 50, 50, 50, NA))
+    expect_equal(result$b$ch1, c(NA, 60, 60, 60, NA))
+})
+
+test_that("filter_mnirs processes grouped data frames", {
+    skip_if_not_installed("dplyr")
+
+    df <- create_mnirs_data(
+        data.frame(
+            time = rep(1:5, 2),
+            ch1 = rep(c(50, 60), each = 5),
+            group = rep(c("A", "B"), each = 5)
+        ),
+        nirs_channels = "ch1",
+        time_channel = "time"
+    )
+    grouped_df <- dplyr::group_by(df, group)
+
+    result <- filter_mnirs(
+        grouped_df,
+        method = "moving_average",
+        width = 3,
+        verbose = FALSE
+    )
+
+    expect_named(result, c("A", "B"))
+    expect_s3_class(result$A, "mnirs")
+    expect_equal(result$A$ch1, c(NA, 50, 50, 50, NA))
+    expect_equal(result$B$ch1, c(NA, 60, 60, 60, NA))
+})

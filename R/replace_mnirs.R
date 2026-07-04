@@ -2,8 +2,8 @@
 #'
 #' Detect and replace local outliers, specified invalid values, and missing
 #' `NA` values across `nirs_channels` within an *"mnirs"* data frame.
-#' `replace_mnirs()` operates on a data frame, extending the vectorised
-#' functions:.
+#' `replace_mnirs()` operates on a data frame, a list of data frames, or a
+#' grouped data frame, extending the vectorised functions.
 #'
 #' @param invalid_values A numeric vector of invalid values to be replaced,
 #'   e.g. `invalid_values = c(0, 100, 102.3)`. Default `NULL` will not replace
@@ -43,7 +43,10 @@
 #'     \item{`"none"`}{Returns `NA`s without replacement.}
 #'   }
 #'
+#' @inheritParams map_mnirs_intervals
 #' @inheritParams validate_mnirs
+#'
+#' @inheritSection map_mnirs_intervals Data input formats
 #'
 #' @details
 #' ## Automatic channel detection
@@ -86,8 +89,10 @@
 #' - `list()` names not matching `nirs_channels` are warned about and
 #'   ignored.
 #'
-#' @returns `replace_mnirs()` return a [tibble][tibble::tibble-package] of
-#' class `"mnirs"` with metadata available via `attributes()`.
+#' @returns `replace_mnirs()` returns a [tibble][tibble::tibble-package] of
+#' class `"mnirs"` with metadata available via `attributes()`. For list or
+#' grouped data frame input, returns a named list of *"mnirs"* tibbles, one
+#' per interval.
 #'
 #' @examples
 #' ## vectorised operations
@@ -158,6 +163,11 @@ replace_mnirs <- function(
     method = c("linear", "median", "locf", "none"),
     verbose = TRUE
 ) {
+    ## list or grouped input → normalise to named list, recurse per interval
+    if (inherits(data, "grouped_df") || !is.data.frame(data)) {
+        return(map_mnirs_intervals(data, match.call(), parent.frame()))
+    }
+
     ## validation ====================================
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
@@ -188,9 +198,7 @@ replace_mnirs <- function(
     ## per-channel replacement criteria: invalid, outliers, missing
     check_list <- lapply(per_channel, \(.a) {
         c(
-            !is.null(c(
-                .a$invalid_values, .a$invalid_above, .a$invalid_below
-            )),
+            !is.null(c(.a$invalid_values, .a$invalid_above, .a$invalid_below)),
             !is.null(.a$outlier_cutoff),
             .a$method != "none"
         )

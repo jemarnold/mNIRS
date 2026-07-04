@@ -14,8 +14,9 @@ resample_mnirs(
 )
 }
 \arguments{
-\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
-metadata.}
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data
+and metadata, a list of data frames, or a grouped data frame (see
+section \emph{Data input formats}).}
 
 \item{time_channel}{A character string naming the time or sample column.
 Must match a column name in \code{data} exactly.
@@ -56,7 +57,9 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 A \link[tibble:tibble-package]{tibble} of class \code{"mnirs"}. Metadata are
-stored as attributes and can be accessed with \code{attributes(data)}.
+stored as attributes and can be accessed with \code{attributes(data)}. For
+list or grouped data frame input, returns a named list of \emph{"mnirs"}
+tibbles, one per interval.
 }
 \description{
 Up- or down-sample an \emph{"mnirs"} data frame to a new sample rate, filling
@@ -98,6 +101,20 @@ Non-numeric columns use the first valid value in each output bin.
 }
 }
 }
+\section{Data input formats}{
+
+
+\emph{{mnirs}} processing functions accept \code{data} in multiple formats:
+\itemize{
+\item A \strong{single \emph{"mnirs"} data frame} is processed and returned directly.
+\item A \strong{list of \emph{"mnirs"} data frames}: each interval is processed
+separately and returned as a named list.
+\item A \strong{grouped \emph{"mnirs"} data frame}, e.g. with \code{dplyr::group_by()}: the
+data frame is split by grouping levels and each group is processed as
+a separate interval, returned as a named list.
+}
+}
+
 \examples{
 ## read example data
 data <- read_mnirs(

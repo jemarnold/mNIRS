@@ -57,7 +57,10 @@
 #'   returns values where a full window of valid (non-`NA`) samples are
 #'   available. If `TRUE`, ignores `NA` and processes available valid samples
 #'   (see *Details*).
+#' @inheritParams map_mnirs_intervals
 #' @inheritParams validate_mnirs
+#'
+#' @inheritSection map_mnirs_intervals Data input formats
 #'
 #' @details
 #' ## method = "smooth_spline"
@@ -133,7 +136,8 @@
 #'
 #' @returns
 #' A [tibble][tibble::tibble-package] of class *"mnirs"* with metadata
-#'   available with `attributes()`.
+#'   available with `attributes()`. For list or grouped data frame input,
+#'   returns a named list of *"mnirs"* tibbles, one per interval.
 #'
 #' @examples
 #' ## read example data and clean for outliers
@@ -196,6 +200,11 @@ filter_mnirs <- function(
     span = NULL,
     partial = FALSE
 ) {
+    ## list or grouped input → normalise to named list, recurse per interval
+    if (inherits(data, "grouped_df") || !is.data.frame(data)) {
+        return(map_mnirs_intervals(data, match.call(), parent.frame()))
+    }
+
     ## validation ====================================
     validate_mnirs_data(data)
     ## normalise method aliases before matching
