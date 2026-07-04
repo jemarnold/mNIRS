@@ -243,8 +243,9 @@ method_aliases <- c(
 #'       `interval`, `nirs_channels`, and the method-specific parameters.}
 #'   \item{`data`}{A list of the original input data frames augmented with a
 #'       `*_fitted` column of fitted values for each `nirs_channel`.}
-#'   \item{`interval_times`}{A data frame of interval times for each
-#'       `nirs_channel` per interval, supplied from [extract_intervals()] if
+#'   \item{`interval_times`}{A data frame with one row per interval and
+#'       numeric column `start_times` (and `end_times` when any interval
+#'       carries an end time), supplied from [extract_intervals()] if
 #'       present in the metadata.}
 #'   \item{`diagnostics`}{A data frame of model diagnostics (`n_obs`, `r2`,
 #'       `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, `bic`) with one

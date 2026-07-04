@@ -257,12 +257,21 @@ build_kinetics_results <- function(
         create_mnirs_data(augmented, metadata)
     }, data_list, result_list)
 
-    ## extract interval_times from each data_list attributes, if exist
-    interval_times_df <- data.frame(interval = names(data_list))
-    interval_times_df$interval_times <- lapply(data_list, \(.df) {
-        interval_times <- attr(.df, "interval_times")
-        if (is.null(interval_times)) NA_real_ else unlist(interval_times)
+    ## interval_times per interval (length 1 = start, 2 = start+end)
+    it_list <- lapply(data_list, \(.df) {
+        it <- attr(.df, "interval_times")
+        if (is.null(it)) NA_real_ else unlist(it)
     })
+    ## split into numeric start/end cols; end_times only if any present
+    it_df <- data.frame(
+        interval = names(data_list),
+        start_times = vapply(it_list, `[`, numeric(1), 1L, USE.NAMES = FALSE)
+    )
+    if (any(lengths(it_list) >= 2L)) {
+        it_df$end_times <- vapply(
+            it_list, `[`, numeric(1), 2L, USE.NAMES = FALSE
+        )
+    }
     ## add `class = "mnirs"` for `plot.mnirs`
     class(fitted_data_list) <- c("mnirs", class(fitted_data_list))
 
@@ -287,7 +296,7 @@ build_kinetics_results <- function(
             model = model_list,
             coefficients = coefs,
             data = fitted_data_list,
-            interval_times = interval_times_df,
+            interval_times = it_df,
             diagnostics = diagnostics,
             channel_args = channel_args,
             call = call
@@ -399,7 +408,9 @@ analyse_kinetics_channels <- function(
     t_vec <- data[[time_channel]]
 
     ## per-channel fit; collect parallel pieces keyed by channel
-    fits <- setNames(nm = nirs_channels, lapply(nirs_channels, \(.nirs) {
+    fits <- setNames(
+        nm = nirs_channels,
+        lapply(nirs_channels, \(.nirs) {
         .a <- per_channel[[.nirs]]
 
         ## filter for valid finite idx before first extreme + end_window
@@ -434,14 +445,15 @@ analyse_kinetics_channels <- function(
             diagnostics  = cbind(data.frame(nirs_channels = .nirs), fit$diag),
             channel_args = data.frame(nirs_channels = .nirs, arg_row)
         )
-    }))
+    })
+    )
 
     ## assemble single attributed df (consumed by build_kinetics_results)
     result <- structure(
         do.call(rbind, lapply(fits, `[[`, "coefficients")),
-        model        = lapply(fits, `[[`, "model"),
-        fitted_data  = lapply(fits, `[[`, "fitted_data"),
-        diagnostics  = do.call(rbind, lapply(fits, `[[`, "diagnostics")),
+        model = lapply(fits, `[[`, "model"),
+        fitted_data = lapply(fits, `[[`, "fitted_data"),
+        diagnostics = do.call(rbind, lapply(fits, `[[`, "diagnostics")),
         channel_args = do.call(rbind, lapply(fits, `[[`, "channel_args"))
     )
 
@@ -631,10 +643,11 @@ enforce_direction <- function(
     }
 
     ## refit start: amplitude D seeded in the requested direction
-    D0 <- want * max(
-        abs(coefs[["B"]] - coefs[["A"]]),
-        diff(range(fit_data$.x)) * 0.1
-    )
+    D0 <- want *
+        max(
+            abs(coefs[["B"]] - coefs[["A"]]),
+            diff(range(fit_data$.x)) * 0.1
+        )
     D_eps <- diff(range(fit_data$.x)) * 1e-6
 
     ## build rhs: amp_fn(.t, A, A + D, <extra names>)
@@ -651,16 +664,28 @@ enforce_direction <- function(
     ## floor (sigmoid models divide by D); extras unbounded unless
     ## overridden
     start <- c(A = coefs[["A"]], D = D0, extra)
-    lower <- c(A = -Inf, D = if (want > 0) D_eps else -Inf,
-               setNames(rep(-Inf, length(extra)), names(extra)))
-    upper <- c(A = Inf, D = if (want > 0) Inf else -D_eps,
-               setNames(rep(Inf, length(extra)), names(extra)))
+    lower <- c(
+        A = -Inf,
+        D = if (want > 0) D_eps else -Inf,
+        setNames(rep(-Inf, length(extra)), names(extra))
+    )
+    upper <- c(
+        A = Inf,
+        D = if (want > 0) Inf else -D_eps,
+        setNames(rep(Inf, length(extra)), names(extra))
+    )
     lower[names(extra_lower)] <- extra_lower
     upper[names(extra_upper)] <- extra_upper
 
     refit <- tryCatch(
-        nls(nls_formula, fit_data, start = start, lower = lower,
-            upper = upper, algorithm = "port"),
+        nls(
+            nls_formula,
+            fit_data,
+            start = start,
+            lower = lower,
+            upper = upper,
+            algorithm = "port"
+        ),
         error = \(e) NULL
     )
 

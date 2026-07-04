@@ -1038,12 +1038,12 @@ test_that("build_kinetics_results interval_times scalar numeric", {
     expect_s3_class(et, "data.frame")
     expect_equal(nrow(et), 2L)
     expect_equal(et$interval, c("baseline", "exercise"))
-    expect_type(et$interval_times, "list")
-    expect_equal(et$interval_times[[1L]], 1.5)
-    expect_equal(et$interval_times[[2L]], 3.0)
+    expect_type(et$start_times, "double")
+    expect_equal(et$start_times, c(1.5, 3.0))
+    expect_false("end_times" %in% names(et))
 })
 
-test_that("build_kinetics_results interval_times unpacks list (ensemble)", {
+test_that("build_kinetics_results interval_times splits start/end (ensemble)", {
     data_list <- list(
         ensemble = make_kinetics_data(interval_times = list(368, 1093))
     )
@@ -1057,8 +1057,10 @@ test_that("build_kinetics_results interval_times unpacks list (ensemble)", {
 
     et <- result$interval_times
     expect_equal(nrow(et), 1L)
-    expect_type(et$interval_times, "list")
-    expect_equal(et$interval_times[[1L]], c(368, 1093))
+    expect_type(et$start_times, "double")
+    expect_type(et$end_times, "double")
+    expect_equal(et$start_times, 368)
+    expect_equal(et$end_times, 1093)
 })
 
 test_that("build_kinetics_results interval_times is NA when attribute is NULL", {
@@ -1073,8 +1075,9 @@ test_that("build_kinetics_results interval_times is NA when attribute is NULL", 
 
     et <- result$interval_times
     expect_equal(nrow(et), 1L)
-    expect_type(et$interval_times, "list")
-    expect_true(is.na(et$interval_times[[1L]]))
+    expect_type(et$start_times, "double")
+    expect_true(is.na(et$start_times))
+    expect_false("end_times" %in% names(et))
 })
 
 test_that("build_kinetics_results diagnostics has interval col and correct rows", {
@@ -1528,7 +1531,7 @@ test_that("analyse_kinetics.response_time handles unreachable response", {
     ## fitted column exists and is all-finite at baseline/extreme rows,
     ## NA elsewhere (no error from NA subscripted assignment).
     fitted_df <- result$data[[1L]]
-    start_time <- unlist(result$interval_times$interval_times)
+    start_time <- result$interval_times$start_times
     expect_true("smo2_left_fitted" %in% names(fitted_df))
     expect_false(is.na(fitted_df$smo2_left_fitted[fitted_df$time == start_time]))
     expect_false(
