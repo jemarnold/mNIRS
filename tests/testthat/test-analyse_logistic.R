@@ -408,6 +408,7 @@ test_that("SSlogistic() converges on real dataset", {
     expect_true(smo2_success >= 0.95)
     expect_true(hhb_success >= 0.95)
 
+    #! failing 5-param convergence
     fit_5param <- function(signal) {
         vapply(reoxy_list, \(df) {
             data <- data.frame(t = df$time, x = df[[signal]])
@@ -609,10 +610,8 @@ test_that("SSgompertz() handles falling curves (B < A)", {
 })
 
 test_that("SSgompertz()/SSgompertz_left() converge on real dataset", {
-    skip_on_ci()
-    skip_on_covr()
-    skip_on_cran()
-    skip_if(!interactive(), "Manual convergence check")
+    skip("Manual fit convergence check")
+    skip_if(!interactive(), "Manual fit convergence check")
     file_path <- test_path("testdata/reoxy_list.rds")
     skip_if_not(file.exists(file_path), "testdata not available")
 

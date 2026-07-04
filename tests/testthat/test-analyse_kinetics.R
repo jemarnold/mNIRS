@@ -1553,6 +1553,38 @@ test_that("analyse_kinetics.response_time dispatches via method aliases", {
     }
 })
 
+test_that("analyse_kinetics.response_time respects global verbose option", {
+    old_verbose <- getOption("mnirs.verbose")
+    on.exit(options(mnirs.verbose = old_verbose), add = TRUE)
+
+    data <- tibble(
+        x = c(0, 5, 20, 10, 5, 1, 1, 1, 1, 1),
+        t = seq_along(x)
+    )
+
+    options(mnirs.verbose = TRUE)
+    expect_warning(
+        analyse_kinetics(
+            data,
+            x,
+            t,
+            method = "response_time"
+        ),
+        "No valid.*negative"
+    )
+
+    ## global option must reach the S3 method when `verbose` is omitted
+    options(mnirs.verbose = FALSE)
+    expect_silent(
+        analyse_kinetics(
+            data,
+            x,
+            t,
+            method = "response_time"
+        )
+    )
+})
+
 
 ## analyse_kinetics.peak_slope =========================================
 ## structure, data formats, grouped data covered by generic tests above

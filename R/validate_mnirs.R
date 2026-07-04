@@ -559,7 +559,7 @@ validate_x_t <- function(
 #' Validate start_time
 #' @keywords internal
 validate_start_time <- function(
-    start_time,
+    start_time = NULL,
     data,
     t_vec,
     verbose = TRUE,
@@ -567,7 +567,10 @@ validate_start_time <- function(
 ) {
     ## fall back to metadata or zero
     ## TODO fall back to first non-zero time value rather than 0?
-    start_time <- start_time %||% attr(data, "interval_times") %||% 0
+    start_time <- start_time %||%
+        attr(data, "interval_times") %||%
+        t_vec[1L] %||%
+        0
     validate_numeric(start_time, 1L, env = env)
 
     if (length(which(t_vec <= start_time)) == 0L) {
