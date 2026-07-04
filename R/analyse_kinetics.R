@@ -1,3 +1,28 @@
+## canonical method for each accepted alias, matched case- and
+## separator-insensitively (" ", "-", "_")
+method_aliases <- c(
+    response_time = "response_time",
+    half_response_time = "response_time",
+    recovery_time = "response_time",
+    half_recovery_time = "response_time",
+    half_time = "response_time",
+    hrt = "response_time",
+    peak_slope = "peak_slope",
+    slope = "peak_slope",
+    monoexponential = "monoexponential",
+    monoexp = "monoexponential",
+    exp = "monoexponential",
+    exponential = "monoexponential",
+    mrt = "monoexponential",
+    tau = "monoexponential",
+    sigmoidal = "sigmoidal",
+    sigmoid = "sigmoidal",
+    logistic = "sigmoidal",
+    gompertz = "sigmoidal",
+    xmid = "sigmoidal"
+)
+
+
 #' Analyse kinetics across mNIRS channels and intervals
 #'
 #' @description
@@ -117,7 +142,7 @@
 #' `method = c("response time", "half recovery time", "half time", "HRT")`.
 #'
 #' A non-parametric approach (estimated directly from the observed data without
-#' assuming a specific mathetmatical shape) to estimate the response time at
+#' assuming a specific mathematical shape) to estimate the response time at
 #' which a signal reaches a specified fraction of its total response amplitude
 #' relative to the baseline. e.g. *half-response time* (`fraction = 0.5`) is
 #' the time from response onset to attain 50% of the total amplitude change.
@@ -198,7 +223,7 @@
 #' for fast-onset, slow-tail responses, and *"gompertz_left"* for slow-onset,
 #' fast-tail responses. See [logistic()], [gompertz()], and [gompertz_left()]
 #' for the model families and [SSlogistic()], [SSgompertz()], and
-#' [SSgompertz_left()] for sel-start initialisations.
+#' [SSgompertz_left()] for self-start initialisations.
 #'
 #' Other arguments (`...`) passed to [stats::nls()] are `<NOT YET IMPLEMENTED>`.
 #'
@@ -288,30 +313,10 @@ analyse_kinetics <- function(
     shape = c("symmetric", "gompertz", "gompertz_left")
 ) {
     ## normalise method aliases before matching
-    method <- gsub(
-        "^HRT$|^(?:((half[ _-])?(response|recovery)[ _-]time)|half[ _-]time)$",
-        "response_time",
-        method,
-        ignore.case = TRUE
-    )
-    method <- gsub(
-        "^peak[ _-]slope$|^slope$",
-        "peak_slope",
-        method,
-        ignore.case = TRUE
-    )
-    method <- gsub(
-        "^monoexp$|^exp$|^exponential$|^MRT$|^tau$",
-        "monoexponential",
-        method,
-        ignore.case = TRUE
-    )
-    method <- gsub(
-        "^logistic$|^gompertz$|^xmid$",
-        "sigmoidal",
-        method,
-        ignore.case = TRUE
-    )
+    key <- gsub("[ -]", "_", tolower(method))
+    method <- unname(ifelse(
+        key %in% names(method_aliases), method_aliases[key], method
+    ))
     method <- match.arg(method)
 
     UseMethod(
@@ -339,34 +344,28 @@ analyse_kinetics.response_time <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## capture eagerly: frame-sensitive calls must not evaluate lazily
+    nirs_quo <- enquo(nirs_channels)
+    time_quo <- enquo(time_channel)
+    call <- match.call()
     ## report conditions as coming from the user-facing generic
     env <- sys.call(-1)
-    ## normalise input to named list of data frames
-    data_list <- as_data_list(data, env = env)
 
-    ## iterate over each interval
-    result_list <- lapply(seq_along(data_list), \(.i) {
-        result <- analyse_response_time(
-            data = data_list[[.i]],
-            nirs_channels = !!enquo(nirs_channels),
-            time_channel = !!enquo(time_channel),
+    return(analyse_kinetics_intervals(
+        data,
+        worker = analyse_response_time,
+        method = "response_time",
+        worker_args = list(
             start_time = start_time,
             fraction = fraction,
             direction = direction,
-            end_window = end_window,
-            verbose = verbose,
-            interval_name = names(data_list)[[.i]],
-            bypass_checks = TRUE,
-            env = env
-        )
-    })
-
-    ## collate and return mnirs_kinetics object
-    return(build_kinetics_results(
-        data_list,
-        result_list,
-        method = "response_time",
-        match.call()
+            end_window = end_window
+        ),
+        nirs_quo = nirs_quo,
+        time_quo = time_quo,
+        verbose = verbose,
+        call = call,
+        env = env
     ))
 }
 
@@ -394,17 +393,18 @@ analyse_kinetics.peak_slope <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## capture eagerly: frame-sensitive calls must not evaluate lazily
+    nirs_quo <- enquo(nirs_channels)
+    time_quo <- enquo(time_channel)
+    call <- match.call()
     ## report conditions as coming from the user-facing generic
     env <- sys.call(-1)
-    ## normalise input to named list of data frames
-    data_list <- as_data_list(data, env = env)
 
-    ## iterate over each interval
-    result_list <- lapply(seq_along(data_list), \(.i) {
-        result <- analyse_peak_slope(
-            data = data_list[[.i]],
-            nirs_channels = !!enquo(nirs_channels),
-            time_channel = !!enquo(time_channel),
+    return(analyse_kinetics_intervals(
+        data,
+        worker = analyse_peak_slope,
+        method = "peak_slope",
+        worker_args = list(
             start_time = start_time,
             width = width,
             span = span,
@@ -412,20 +412,13 @@ analyse_kinetics.peak_slope <- function(
             direction = direction,
             end_window = end_window,
             partial = partial,
-            na.rm = na.rm,
-            verbose = verbose,
-            interval_name = names(data_list)[[.i]],
-            bypass_checks = TRUE,
-            env = env
-        )
-    })
-
-    ## collate and return mnirs_kinetics object
-    return(build_kinetics_results(
-        data_list,
-        result_list,
-        method = "peak_slope",
-        match.call()
+            na.rm = na.rm
+        ),
+        nirs_quo = nirs_quo,
+        time_quo = time_quo,
+        verbose = verbose,
+        call = call,
+        env = env
     ))
 }
 
@@ -450,34 +443,28 @@ analyse_kinetics.monoexponential <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## capture eagerly: frame-sensitive calls must not evaluate lazily
+    nirs_quo <- enquo(nirs_channels)
+    time_quo <- enquo(time_channel)
+    call <- match.call()
     ## report conditions as coming from the user-facing generic
     env <- sys.call(-1)
-    ## normalise input to named list of data frames
-    data_list <- as_data_list(data, env = env)
 
-    ## iterate over each interval
-    result_list <- lapply(seq_along(data_list), \(.i) {
-        analyse_monoexponential(
-            data = data_list[[.i]],
-            nirs_channels = !!enquo(nirs_channels),
-            time_channel = !!enquo(time_channel),
+    return(analyse_kinetics_intervals(
+        data,
+        worker = analyse_monoexponential,
+        method = "monoexponential",
+        worker_args = list(
             use_TD = use_TD,
             start_time = start_time,
             direction = direction,
-            end_window = end_window,
-            verbose = verbose,
-            interval_name = names(data_list)[[.i]],
-            bypass_checks = TRUE,
-            env = env
-        )
-    })
-
-    ## collate and return mnirs_kinetics object
-    return(build_kinetics_results(
-        data_list,
-        result_list,
-        method = "monoexponential",
-        match.call()
+            end_window = end_window
+        ),
+        nirs_quo = nirs_quo,
+        time_quo = time_quo,
+        verbose = verbose,
+        call = call,
+        env = env
     ))
 }
 
@@ -502,34 +489,28 @@ analyse_kinetics.sigmoidal <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## capture eagerly: frame-sensitive calls must not evaluate lazily
+    nirs_quo <- enquo(nirs_channels)
+    time_quo <- enquo(time_channel)
+    call <- match.call()
     ## report conditions as coming from the user-facing generic
     env <- sys.call(-1)
-    ## normalise input to named list of data frames
-    data_list <- as_data_list(data, env = env)
 
-    ## iterate over each interval
-    result_list <- lapply(seq_along(data_list), \(.i) {
-        analyse_logistic(
-            data = data_list[[.i]],
-            nirs_channels = !!enquo(nirs_channels),
-            time_channel = !!enquo(time_channel),
+    return(analyse_kinetics_intervals(
+        data,
+        worker = analyse_logistic,
+        method = "sigmoidal",
+        worker_args = list(
             shape = shape,
             start_time = start_time,
             direction = direction,
-            end_window = end_window,
-            verbose = verbose,
-            interval_name = names(data_list)[[.i]],
-            bypass_checks = TRUE,
-            env = env
-        )
-    })
-
-    ## collate and return mnirs_kinetics object
-    return(build_kinetics_results(
-        data_list,
-        result_list,
-        method = "sigmoidal",
-        match.call()
+            end_window = end_window
+        ),
+        nirs_quo = nirs_quo,
+        time_quo = time_quo,
+        verbose = verbose,
+        call = call,
+        env = env
     ))
 }
 

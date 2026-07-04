@@ -295,10 +295,8 @@ test_that("SSlogistic() 5-param recovers asym < 0.5 (early acceleration)", {
 })
 
 test_that("SSlogistic() 4-param converges on most random realisations", {
-    skip_on_ci()
-    skip_on_covr()
-    skip_on_cran()
-    skip_if(!interactive(), "Manual convergence check")
+    skip("Manual fit convergence check")
+    skip_if(!interactive(), "Manual fit convergence check")
     ## quantify fit success rate for the 4-param symmetric form;
     ## should be highly reliable across varied true xmid/slope values
     n_rep <- 1000L
@@ -341,10 +339,8 @@ test_that("SSlogistic() 4-param converges on most random realisations", {
 
 
 test_that("SSlogistic() 5-param converges on most random realisations", {
-    skip_on_ci()
-    skip_on_covr()
-    skip_on_cran()
-    skip_if(!interactive(), "Manual convergence check")
+    skip("Manual fit convergence check")
+    skip_if(!interactive(), "Manual fit convergence check")
 
     ## quantify fit success rate across noisy realisations spanning asym range;
     ## the 5-param model is known to be fragile

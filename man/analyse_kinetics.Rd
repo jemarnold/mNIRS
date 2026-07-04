@@ -142,7 +142,9 @@ accessible as a structured list of class \emph{"mnirs_kinetics"} containing:
 \code{nirs_channel}). For \code{"peak_slope"}, each element is an
 \link[stats:lm]{lm} object; for \code{"monoexponential"}, an
 \link[stats:nls]{nls} object; for \code{"response_time"}, \code{NULL}. \code{NULL}
-for channels where fitting failed.}
+for channels where fitting failed. When a \code{direction}-bounded
+refit was required, the stored model is parameterised with
+amplitude \code{D = B - A} in place of \code{B}.}
 \item{\code{coefficients}}{A \link[tibble:tibble-package]{tibble} of coefficients
 with one row per \code{nirs_channel} per interval, containing columns
 \code{interval}, \code{nirs_channels}, and the method-specific parameters.}
@@ -207,6 +209,11 @@ defines the end of the kinetics fitting window by locating the first peak
 or trough value (depending on direction) that has no greater/lesser values
 within the subsequent \code{end_window}. The fitting window extends to the end
 of \code{end_window} beyond the detected peak/trough.
+
+For \emph{"monoexponential"} and \emph{"sigmoidal"}, \code{direction} also constrains the
+sign of the fitted amplitude \code{B - A} (and the sigmoidal \code{slope}). A fit
+that cannot satisfy the requested direction returns \code{NA} coefficients with
+a warning.
 }
 
 \subsection{method = "response_time"}{
@@ -215,7 +222,7 @@ Aliases:
 \code{method = c("response time", "half recovery time", "half time", "HRT")}.
 
 A non-parametric approach (estimated directly from the observed data without
-assuming a specific mathetmatical shape) to estimate the response time at
+assuming a specific mathematical shape) to estimate the response time at
 which a signal reaches a specified fraction of its total response amplitude
 relative to the baseline. e.g. \emph{half-response time} (\code{fraction = 0.5}) is
 the time from response onset to attain 50\% of the total amplitude change.
@@ -301,7 +308,7 @@ when no obvious asymmetry is expected. \emph{"gompertz"} growth is appropriate
 for fast-onset, slow-tail responses, and \emph{"gompertz_left"} for slow-onset,
 fast-tail responses. See \code{\link[=logistic]{logistic()}}, \code{\link[=gompertz]{gompertz()}}, and \code{\link[=gompertz_left]{gompertz_left()}}
 for the model families and \code{\link[=SSlogistic]{SSlogistic()}}, \code{\link[=SSgompertz]{SSgompertz()}}, and
-\code{\link[=SSgompertz_left]{SSgompertz_left()}} for sel-start initialisations.
+\code{\link[=SSgompertz_left]{SSgompertz_left()}} for self-start initialisations.
 
 Other arguments (\code{...}) passed to \code{\link[stats:nls]{stats::nls()}} are \verb{<NOT YET IMPLEMENTED>}.
 }

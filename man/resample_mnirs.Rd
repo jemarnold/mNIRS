@@ -16,7 +16,7 @@ resample_mnirs(
 \arguments{
 \item{data}{A data frame of class \emph{"mnirs"} containing time series data
 and metadata, a list of data frames, or a grouped data frame (see
-section \emph{Data input formats}).}
+\emph{Details}).}
 
 \item{time_channel}{A character string naming the time or sample column.
 Must match a column name in \code{data} exactly.

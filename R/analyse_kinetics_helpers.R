@@ -247,7 +247,7 @@ build_kinetics_results <- function(
             fitted_vec
         })
         names(fitted_cols) <- paste0(names(fitted_data), "_fitted")
-        ## agument `<nirs_channels>_fitted` columns to df
+        ## augment `<nirs_channels>_fitted` columns to df
         augmented <- cbind(.df, as.data.frame(fitted_cols))
         
         ## metadata ==================================================
@@ -297,6 +297,62 @@ build_kinetics_results <- function(
 }
 
 
+#' Run a kinetics worker over each interval and collate results
+#'
+#' Shared skeleton for `analyse_kinetics.*` methods: normalises `data`
+#' to a named list of interval data frames, calls the method worker
+#' once per interval, and collates results via
+#' [build_kinetics_results()].
+#'
+#' @param data A data frame, list of data frames, or grouped data frame.
+#' @param worker Function; the interval-level worker, e.g.
+#'   [analyse_monoexponential()].
+#' @param method Character; the canonical method name.
+#' @param worker_args Named list of method-specific arguments passed
+#'   to `worker`.
+#' @param nirs_quo,time_quo Quosures of the caller's `nirs_channels`
+#'   and `time_channel` arguments, captured in the method frame.
+#' @param call The matched call from the user-facing method.
+#' @param env The call recorded for condition reporting.
+#' @inheritParams validate_mnirs
+#'
+#' @returns An *"mnirs_kinetics"* object from
+#'   [build_kinetics_results()].
+#'
+#' @keywords internal
+analyse_kinetics_intervals <- function(
+    data,
+    worker,
+    method,
+    worker_args,
+    nirs_quo,
+    time_quo,
+    verbose,
+    call,
+    env
+) {
+    ## normalise input to named list of data frames
+    data_list <- as_data_list(data, env = env)
+
+    ## iterate over each interval
+    result_list <- lapply(seq_along(data_list), \(.i) {
+        rlang::inject(worker(
+            data = data_list[[.i]],
+            nirs_channels = !!nirs_quo,
+            time_channel = !!time_quo,
+            !!!worker_args,
+            verbose = verbose,
+            interval_name = names(data_list)[[.i]],
+            bypass_checks = TRUE,
+            env = env
+        ))
+    })
+
+    ## collate and return mnirs_kinetics object
+    return(build_kinetics_results(data_list, result_list, method, call))
+}
+
+
 #' Process kinetics fits across NIRS channels
 #'
 #' Shared per-channel skeleton for all `analyse_kinetics()` methods. Resolves
@@ -343,8 +399,7 @@ analyse_kinetics_channels <- function(
     t_vec <- data[[time_channel]]
 
     ## per-channel fit; collect parallel pieces keyed by channel
-    fits <- setNames(
-        lapply(nirs_channels, \(.nirs) {
+    fits <- setNames(nm = nirs_channels, lapply(nirs_channels, \(.nirs) {
         .a <- per_channel[[.nirs]]
 
         ## filter for valid finite idx before first extreme + end_window
@@ -379,9 +434,7 @@ analyse_kinetics_channels <- function(
             diagnostics  = cbind(data.frame(nirs_channels = .nirs), fit$diag),
             channel_args = data.frame(nirs_channels = .nirs, arg_row)
         )
-    }),
-        nirs_channels
-    )
+    }))
 
     ## assemble single attributed df (consumed by build_kinetics_results)
     result <- structure(
@@ -402,7 +455,7 @@ analyse_kinetics_channels <- function(
         if (any(unlist(result[check_cols]) < 0, na.rm = TRUE)) {
             cli_warn(c(
                 "!" = "Negative {.arg time_channel} coefficients imply the \\
-                response occured before {.arg start_time}. This may \\
+                response occurred before {.arg start_time}. This may \\
                 indicate a poorly fitted or misparameterised model.",
                 "i" = "Check {.arg time_channel} and {.arg start_time} \\
                 values, or consider using a different \\
@@ -523,38 +576,65 @@ build_na_results <- function(na_coefs) {
 }
 
 
-#' Refit an amplitude-reparameterised model with direction box bounds
+#' Enforce the requested direction on a converged parametric fit
 #'
-#' Enforces the response direction on a converged but inverted nls fit by
-#' refitting with amplitude `D = B - A` bounded to the requested sign via
-#' `nls(algorithm = "port")`. Sigmoid models divide by `D`, so its
-#' magnitude is floored strictly above zero.
+#' Checks the sign of the fitted amplitude `B - A` against the
+#' requested `direction`. Satisfied fits are returned unchanged.
+#' Inverted fits are refit with amplitude `D = B - A` sign-bounded via
+#' `nls(algorithm = "port")`; sigmoid models divide by `D`, so its
+#' magnitude is floored strictly above zero. A refit that fails or
+#' pins any coefficient at a sign-floor bound (degenerate flat fit)
+#' warns and returns `NULL`.
 #'
-#' @param amp_fn Symbol; exported model fn taking `(t, A, B, ...)`.
+#' @param model A converged [nls][stats::nls] model object.
+#' @param coefs Named numeric coefficient vector including `A`, `B`.
 #' @param fit_data Data frame with columns `.x` and `.t`.
-#' @param A,D0 Numeric start values; `D0` sign gives the requested
-#'   direction.
-#' @param extra Named numeric start values for remaining free params, in
-#'   `amp_fn` argument order after `B`.
+#' @param direction Character; resolved `"positive"` or `"negative"`.
+#' @param amp_fn Symbol; exported model fn taking `(t, A, B, ...)`.
+#' @param extra Named numeric start values for remaining free params,
+#'   in `amp_fn` argument order after `B`.
 #' @param extra_lower,extra_upper Named numeric bound overrides for
-#'   `extra` params. Sign-floor bounds should be data-scaled small values
-#'   (not `.Machine$double.eps`) so pinned-floor degeneracy is detectable.
+#'   `extra` params. Sign-floor bounds should be data-scaled small
+#'   values (not `.Machine$double.eps`) so pinned-floor degeneracy is
+#'   detectable.
+#' @param fn Symbol or character; the self-start fn named in the
+#'   warning.
+#' @param .nirs Character; the channel name.
+#' @param interval_name Character; the interval label.
+#' @inheritParams validate_mnirs
 #'
-#' @returns A named list `list(model, coefs)` with `coefs` in
-#'   `(A, B, ...)` space, or `NULL` when the refit fails or any
-#'   coefficient is pinned at a sign-floor bound (degenerate flat fit).
+#' @returns A named list `list(model, coefs)` with `coefs` a named
+#'   numeric vector in `(A, B, ...)` space, or `NULL` when the
+#'   direction cannot be satisfied (caller returns
+#'   [build_na_results()]).
 #'
 #' @keywords internal
-refit_direction <- function(
-    amp_fn,
+enforce_direction <- function(
+    model,
+    coefs,
     fit_data,
-    A,
-    D0,
+    direction,
+    amp_fn,
     extra,
     extra_lower = NULL,
-    extra_upper = NULL
+    extra_upper = NULL,
+    fn,
+    .nirs,
+    interval_name,
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
-    want <- sign(D0)
+    ## keep the unconstrained fit when direction is already satisfied
+    want <- if (direction == "positive") 1 else -1
+    if (sign(coefs[["B"]] - coefs[["A"]]) == want) {
+        return(list(model = model, coefs = coefs))
+    }
+
+    ## refit start: amplitude D seeded in the requested direction
+    D0 <- want * max(
+        abs(coefs[["B"]] - coefs[["A"]]),
+        diff(range(fit_data$.x)) * 0.1
+    )
     D_eps <- diff(range(fit_data$.x)) * 1e-6
 
     ## build rhs: amp_fn(.t, A, A + D, <extra names>)
@@ -570,7 +650,7 @@ refit_direction <- function(
     ## box bounds: D sign-constrained with strictly positive magnitude
     ## floor (sigmoid models divide by D); extras unbounded unless
     ## overridden
-    start <- c(A = A, D = D0, extra)
+    start <- c(A = coefs[["A"]], D = D0, extra)
     lower <- c(A = -Inf, D = if (want > 0) D_eps else -Inf,
                setNames(rep(-Inf, length(extra)), names(extra)))
     upper <- c(A = Inf, D = if (want > 0) Inf else -D_eps,
@@ -578,62 +658,32 @@ refit_direction <- function(
     lower[names(extra_lower)] <- extra_lower
     upper[names(extra_upper)] <- extra_upper
 
-    model <- tryCatch(
+    refit <- tryCatch(
         nls(nls_formula, fit_data, start = start, lower = lower,
             upper = upper, algorithm = "port"),
         error = \(e) NULL
     )
 
-    if (is.null(model)) {
-        return(NULL)
-    }
-
-    ## any coefficient pinned at a sign-floor bound (e.g. D, slope, tau)
-    ## indicates a degenerate flat fit: no genuine response in the
-    ## requested direction
-    cf <- coef(model)
+    ## any coefficient pinned at a sign-floor bound (e.g. D, slope,
+    ## tau) indicates a degenerate flat fit: no genuine response in
+    ## the requested direction
+    cf <- if (is.null(refit)) NULL else coef(refit)
     floors <- abs(ifelse(is.finite(lower), lower, upper))
-    if (any(is.finite(floors) & abs(cf) <= 2 * floors)) {
+    if (is.null(cf) || any(is.finite(floors) & abs(cf) <= 2 * floors)) {
+        if (verbose) {
+            cli_warn(c(
+                "x" = "{.fn {as.character(fn)}} fit for \\
+                {.field {(.nirs)}} in {.field {interval_name}} could \\
+                not satisfy {.code direction = {.val {direction}}}.",
+                "i" = "Returning {.val {NA}} coefficients."
+            ), call = warn_call(env))
+        }
         return(NULL)
     }
 
-    coefs <- as.list(cf)
-    coefs$B <- coefs$A + coefs$D
-    coefs$D <- NULL
-    return(list(model = model, coefs = coefs))
-}
-
-
-#' Warn when a fit converged against the requested direction
-#'
-#' Emitted when the direction-bounded refit from [refit_direction()]
-#' fails or degenerates, before returning [build_na_results()].
-#'
-#' @param fn Symbol or character; the self-start fn named in the warning.
-#' @param .nirs Character; the channel name.
-#' @param direction Character; the requested direction.
-#' @param interval_name Character; the interval label.
-#' @inheritParams validate_mnirs
-#'
-#' @keywords internal
-wrong_direction_warning <- function(
-    fn,
-    .nirs,
-    direction,
-    interval_name,
-    verbose,
-    env
-) {
-    if (!verbose) {
-        return(invisible(NULL))
-    }
-    cli_warn(c(
-        "x" = "{.fn {as.character(fn)}} fit for {.field {(.nirs)}} in \\
-        {.field {interval_name}} could not satisfy \\
-        {.code direction = {.val {direction}}}.",
-        "i" = "Returning {.val {NA}} coefficients."
-    ), call = warn_call(env))
-    return(invisible(NULL))
+    ## back-transform to (A, B, ...) space
+    cf[["B"]] <- cf[["A"]] + cf[["D"]]
+    return(list(model = refit, coefs = cf[names(cf) != "D"]))
 }
 
 

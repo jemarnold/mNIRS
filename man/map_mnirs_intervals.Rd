@@ -9,7 +9,7 @@ map_mnirs_intervals(data, call, eval_env, env = rlang::caller_env())
 \arguments{
 \item{data}{A data frame of class \emph{"mnirs"} containing time series data
 and metadata, a list of data frames, or a grouped data frame (see
-section \emph{Data input formats}).}
+\emph{Details}).}
 
 \item{call}{The matched call from the user-facing function, re-evaluated
 with \code{data} swapped for each interval data frame.}

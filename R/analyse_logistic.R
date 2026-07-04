@@ -485,6 +485,23 @@ SSgompertz_left <- selfStart(
 )
 
 
+## shape -> (self-start model fn, amplitude-reparam fn) symbols
+shape_dispatch <- list(
+    symmetric = list(
+        model = quote(SSlogistic),
+        amp = quote(logistic)
+    ),
+    gompertz = list(
+        model = quote(SSgompertz),
+        amp = quote(gompertz)
+    ),
+    gompertz_left = list(
+        model = quote(SSgompertz_left),
+        amp = quote(gompertz_left)
+    )
+)
+
+
 #' Analyse logistic kinetics across NIRS channels
 #'
 #' Internal channel-level dispatch for
@@ -574,25 +591,6 @@ analyse_logistic <- function(
         xmid_fitted = NA_real_
     )
 
-    ## shape -> (self-start fn, matching predictor fn, amp-reparam fn) lookup
-    shape_dispatch <- list(
-        symmetric = list(
-            model = quote(SSlogistic),
-            predict = \(t, A, B, xmid, slope) logistic(t, A, B, xmid, slope),
-            amp = quote(logistic)
-        ),
-        gompertz = list(
-            model = quote(SSgompertz),
-            predict = gompertz,
-            amp = quote(gompertz)
-        ),
-        gompertz_left = list(
-            model = quote(SSgompertz_left),
-            predict = gompertz_left,
-            amp = quote(gompertz_left)
-        )
-    )
-
     ## construct warning messages for fit failure
     fit_failed_warning <- function(.nirs, fn, e, verbose) {
         if (!verbose) {
@@ -609,8 +607,8 @@ analyse_logistic <- function(
     ## method-specific fit: self-starting sigmoidal via nls
     logistic_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
         ## resolve per-channel shape and matching self-start fn
-        ch_fn <- shape_dispatch[[.a$shape]]$model
-        ch_predict_fn <- shape_dispatch[[.a$shape]]$predict
+        disp <- shape_dispatch[[.a$shape]]
+        ch_fn <- disp$model
         fit_data <- data.frame(.x = x_fit, .t = t_fit)
 
         ## build nls formula: .x ~ <ch_fn>(.t, A, B, xmid, slope)
@@ -632,50 +630,41 @@ analyse_logistic <- function(
             return(build_na_results(na_coefs))
         }
 
-        fitted_vals <- stats::predict(model)
         coefs <- stats::coef(model)
 
         ## enforce direction: bounded refit on D = B - A and slope sign
+        ## data-scaled slope floor: slope pinned here is a degenerate
+        ## flat fit, not a genuine response
         want <- if (.a$direction == "positive") 1 else -1
-        if (sign(coefs[["B"]] - coefs[["A"]]) != want) {
-            ## data-scaled slope floor: slope pinned here is a degenerate
-            ## flat fit, not a genuine response
-            slope_eps <- diff(range(x_fit)) / diff(range(t_fit)) * 1e-6
-            refit <- refit_direction(
-                amp_fn = shape_dispatch[[.a$shape]]$amp,
-                fit_data = fit_data,
-                A = coefs[["A"]],
-                D0 = want * max(
-                    abs(coefs[["B"]] - coefs[["A"]]),
-                    diff(range(x_fit)) * 0.1
-                ),
-                extra = c(
-                    xmid = coefs[["xmid"]],
-                    slope = want * max(abs(coefs[["slope"]]), slope_eps)
-                ),
-                extra_lower = c(slope = if (want > 0) slope_eps else -Inf),
-                extra_upper = c(slope = if (want > 0) Inf else -slope_eps)
-            )
-            if (is.null(refit)) {
-                wrong_direction_warning(
-                    ch_fn, .nirs, .a$direction, interval_name, verbose, env
-                )
-                return(build_na_results(na_coefs))
-            }
-            model <- refit$model
-            coefs <- unlist(refit$coefs)
-            fitted_vals <- stats::predict(model)
+        slope_eps <- diff(range(x_fit)) / diff(range(t_fit)) * 1e-6
+        enforced <- enforce_direction(
+            model, coefs, fit_data,
+            direction = .a$direction,
+            amp_fn = disp$amp,
+            extra = c(
+                xmid = coefs[["xmid"]],
+                slope = want * max(abs(coefs[["slope"]]), slope_eps)
+            ),
+            extra_lower = c(slope = if (want > 0) slope_eps else -Inf),
+            extra_upper = c(slope = if (want > 0) Inf else -slope_eps),
+            fn = ch_fn,
+            .nirs = .nirs,
+            interval_name = interval_name,
+            verbose = verbose,
+            env = env
+        )
+        if (is.null(enforced)) {
+            return(build_na_results(na_coefs))
         }
+        model <- enforced$model
+        coefs <- enforced$coefs
+        fitted_vals <- stats::predict(model)
 
         xmid_offset <- coefs[["xmid"]] - .a$start_time
 
         ## predict response at the inflection point xmid
-        xmid_fitted <- ch_predict_fn(
-            t = coefs[["xmid"]],
-            A = coefs[["A"]],
-            B = coefs[["B"]],
-            xmid = coefs[["xmid"]],
-            slope = coefs[["slope"]]
+        xmid_fitted <- as.numeric(
+            stats::predict(model, data.frame(.t = coefs[["xmid"]]))
         )
 
         list(

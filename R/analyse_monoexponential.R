@@ -350,38 +350,31 @@ analyse_monoexponential <- function(
             return(build_na_results(na_coefs))
         }
 
-        fitted_vals <- stats::predict(model)
         coefs <- stats::coef(model)
 
-        ## enforce direction: bounded refit on D = B - A when fit inverted
-        want <- if (.a$direction == "positive") 1 else -1
-        if (sign(coefs[["B"]] - coefs[["A"]]) != want) {
-            extra <- c(tau = coefs[["tau"]])
-            if (n_params == 4L) extra <- c(extra, TD = coefs[["TD"]])
-            refit <- refit_direction(
-                amp_fn = quote(monoexponential),
-                fit_data = fit_data,
-                A = coefs[["A"]],
-                D0 = want * max(
-                    abs(coefs[["B"]] - coefs[["A"]]),
-                    diff(range(x_fit)) * 0.1
-                ),
-                extra = extra,
-                ## data-scaled tau floor: tau pinned here is a degenerate
-                ## step fit, not a genuine response
-                extra_lower = c(tau = diff(range(t_fit)) * 1e-6)
-            )
-            if (is.null(refit)) {
-                wrong_direction_warning(
-                    quote(SSmonoexp), .nirs, .a$direction, interval_name,
-                    verbose, env
-                )
-                return(build_na_results(na_coefs))
-            }
-            model <- refit$model
-            coefs <- unlist(refit$coefs)
-            fitted_vals <- stats::predict(model)
+        ## enforce direction: bounded refit on D = B - A when inverted
+        extra <- c(tau = coefs[["tau"]])
+        if (n_params == 4L) extra <- c(extra, TD = coefs[["TD"]])
+        enforced <- enforce_direction(
+            model, coefs, fit_data,
+            direction = .a$direction,
+            amp_fn = quote(monoexponential),
+            extra = extra,
+            ## data-scaled tau floor: tau pinned here is a degenerate
+            ## step fit, not a genuine response
+            extra_lower = c(tau = diff(range(t_fit)) * 1e-6),
+            fn = quote(SSmonoexp),
+            .nirs = .nirs,
+            interval_name = interval_name,
+            verbose = verbose,
+            env = env
+        )
+        if (is.null(enforced)) {
+            return(build_na_results(na_coefs))
         }
+        model <- enforced$model
+        coefs <- enforced$coefs
+        fitted_vals <- stats::predict(model)
 
         TD_arg <- if (n_params == 4L) coefs[["TD"]] - .a$start_time else NULL
         TD_val <- TD_arg %||% NA_real_

@@ -58,7 +58,7 @@ replace_missing(
 \arguments{
 \item{data}{A data frame of class \emph{"mnirs"} containing time series data
 and metadata, a list of data frames, or a grouped data frame (see
-section \emph{Data input formats}).}
+\emph{Details}).}
 
 \item{nirs_channels}{A character vector giving the names of mNIRS columns to
 operate on. Must match column names in \code{data} exactly.
