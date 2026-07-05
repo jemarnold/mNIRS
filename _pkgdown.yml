@@ -14,11 +14,15 @@ navbar:
     - news
     right:
     - search
+    - github
     - bluesky
     - twitter
-    - github
     - lightswitch
   components:
+    github:
+      icon: fa-github
+      href: https://github.com/jemarnold/mnirs
+      aria-label: GitHub
     bluesky:
       icon: fa-brands fa-bluesky
       href: https://bsky.app/profile/jemarnold.bsky.social
@@ -27,10 +31,6 @@ navbar:
       icon: fa-twitter
       href: https://twitter.com/jem_arnold
       aria-label: Twitter
-    github:
-      icon: fa-github
-      href: https://github.com/jemarnold/mnirs
-      aria-label: GitHub
 figures:
   bg: white
 reference:
@@ -41,45 +41,44 @@ reference:
   - read_mnirs
   - example_mnirs
   - create_mnirs_data
-- title: Pre-process data
+- title: Process data
   desc: |
-    Clean, filter, and process data.
+    Clean, filter, and transform data.
   contents:
-  - starts_with("replace")
   - resample_mnirs
-  - filter_mnirs
+  - starts_with("replace")
   - starts_with("filter")
   - shift_mnirs
   - rescale_mnirs
   - correct_blood_volume
-- title: Interval detection
+- title: Detect intervals
   desc: |
     Detect and extract intervals for further analysis
   contents:
   - extract_intervals
-  - by_time
-- title: Process kinetics
+  - starts_with("by_")
+- title: Analyse kinetics
   desc: |
     Estimate response dynamics and kinetic parameters
   contents:
   - analyse_kinetics
+  - matches("response_time")
   - matches("slope")
   - matches("monoexp")
-  - matches("response_time")
-  - matches("logistic")
   - matches("sigmoidal")
-- title: Printing & plotting
+  - matches("logistic")
+- title: Print & plot
   desc: |
     Tools for printing functions and pretty plotting with `{ggplot2}`.
   contents:
+  - print.mnirs
+  - print.mnirs_kinetics
   - plot.mnirs
   - theme_mnirs
   - starts_with("palette")
   - starts_with("scale")
   - breaks_timespan
   - format_hmmss
-  - print.mnirs
-  - print.mnirs_kinetics
 - title: Files
   desc: |
     Example data files included in the package

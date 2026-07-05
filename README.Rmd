@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 [![Codecov test coverage](https://codecov.io/gh/jemarnold/mnirs/graph/badge.svg)](https://app.codecov.io/gh/jemarnold/mnirs)
 <!-- badges: end -->
 
-*{mnirs}* contains standardised, reproducible methods for reading, processing, and analysing data from muscle near-infrared spectroscopy (mNIRS) devices. Intended for mNIRS researchers and practitioners in exercise physiology, sports science, and clinical rehabilitation with minimal coding experience required.
+*{mnirs}* contains standardised, reproducible methods for reading, processing, transforming, and analysing data from muscle near-infrared spectroscopy (mNIRS) devices. Intended for mNIRS researchers and practitioners in exercise physiology, sports science, and clinical practice.
 
 ## Installation
 
@@ -45,7 +45,7 @@ pak::pak("jemarnold/mnirs")
 
 ## Online App
 
-A very basic implementation of this package is hosted at https://jemarnold-mnirs-app.share.connect.posit.cloud/ and can currently be used for reading and pre-processing mNIRS data.
+A very basic implementation of this package is hosted at https://jemarnold-mnirs-app.share.connect.posit.cloud/ and can currently be used for reading and processing mNIRS data.
 
 [![mnirs processing shiny app](https://raw.githubusercontent.com/jemarnold/mnirs/main/man/figures/README-mnirs-app.gif)](https://jemarnold-mnirs-app.share.connect.posit.cloud/)
 
@@ -291,7 +291,7 @@ plot(ensemble, time_labels = TRUE) +
 
 ## mNIRS device compatibility
 
-This package is designed to recognise mNIRS data exported as *.csv* or *.xls(x)* files. It should be flexible for use with many different NIRS devices, and compatibility will improve with continued development.
+This package is designed to recognise file formats exported from common wearable mNIRS devices. It should be flexible for use with other file formats, and compatibility will improve with continued development.
 
 Currently, it has been tested successfully with mNIRS data exported from the following devices and apps:
 

@@ -66,7 +66,7 @@ library(ggplot2)   ## for plotting
 library(mnirs)
 ```
 
-The first function called will often be `read_mnirs()`. This is used to read data from *.csv* or *.xls(x)* files exported from common wearable NIRS devices.
+The first function called will often be `read_mnirs()`. This is used to read data files exported from mNIRS devices in *.xls(x)*, *.csv*, or *.txt* formats.
 
 Exported data files will often have multiple rows of file header metadata before the data table with NIRS recordings begins. `read_mnirs()` can extract and return this data table along with the file metadata for further processing and analysis.
 
@@ -572,7 +572,7 @@ Additionally, the left leg reoxygenates slightly faster than the right during re
 
 # 🔀 Pipe-friendly functions
 
-Most *`mnirs`* functions can be piped together using Base R 4.1+ (`|>`) or `{magrittr}` (`%>%`). The entire pre-processing stage can easily be performed in a sequential pipe.
+Most *`mnirs`* functions can be piped together using Base R 4.1+ (`|>`) or `{magrittr}` (`%>%`). The entire processing workflow can easily be performed in a sequential pipe.
 
 To demonstrate this, we'll read a different example file recorded with *Train.Red FYER* muscle oxygen sensor and pipe it through each processing stage straight to a plot.
 

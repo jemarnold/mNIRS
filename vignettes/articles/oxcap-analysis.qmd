@@ -80,7 +80,7 @@ In the future, this process could be wrapped into a single convenience function 
 For OxCap analysis, we will perform roughly 8 steps:
 
 1. Import an example NIRS file with the repeated occlusions procedure.
-2. Pre-process/clean data, as needed (minimal in this example).
+2. Process/clean data, as needed (minimal in this example).
 3. Iteratively correct NIRS values for changes in blood volume, a required step to ensure valid analysis.
 4. Specify occlusion events in the data and extract a 5-sec interval for each occlusion.
 5. Find the peak 3-sec linear regression NIRS slope within each occlusion interval.
@@ -145,7 +145,7 @@ One thing to note: *Artinis Oxysoft* exports an event label column without a nam
 This file has two sequential occlusion trials. We can separate them for individual analysis by finding the longer gap between consecutive occlusion labels and manually defining intervals before that as trial 1, and after that as trial 2.
 
 ```{r}
-#| label: read file and pre-process
+#| label: read file and process
 
 df <- read_mnirs(
     file_path = example_mnirs("portamon-oxcap.xlsx"),

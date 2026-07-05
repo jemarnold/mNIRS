@@ -18,7 +18,7 @@ read_mnirs(
 }
 \arguments{
 \item{file_path}{Path of the data file to import. Supported file extensions
-are \code{".xlsx"}, \code{".xls"}, and \code{".csv"}.}
+include \code{".xlsx"}, \code{".xls"}, \code{".csv"}, and \code{".txt"}.}
 
 \item{nirs_channels}{A character vector of one or more column names
 containing mNIRS signals to import. Names must match the file header

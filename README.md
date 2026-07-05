@@ -15,10 +15,10 @@ coverage](https://codecov.io/gh/jemarnold/mnirs/graph/badge.svg)](https://app.co
 <!-- badges: end -->
 
 *{mnirs}* contains standardised, reproducible methods for reading,
-processing, and analysing data from muscle near-infrared spectroscopy
-(mNIRS) devices. Intended for mNIRS researcheyrs and practitioners in
-exercise physiology, sports science, and clinical rehabilitation with
-minimal coding experience required.
+processing, transforming, and analysing data from muscle near-infrared
+spectroscopy (mNIRS) devices. Intended for mNIRS researchers and
+practitioners in exercise physiology, sports science, and clinical
+practice.
 
 ## Installation
 
@@ -42,7 +42,7 @@ pak::pak("jemarnold/mnirs")
 
 A very basic implementation of this package is hosted at
 <https://jemarnold-mnirs-app.share.connect.posit.cloud/> and can
-currently be used for reading and pre-processing mNIRS data.
+currently be used for reading and processing mNIRS data.
 
 [![mnirs processing shiny
 app](https://raw.githubusercontent.com/jemarnold/mnirs/main/man/figures/README-mnirs-app.gif)](https://jemarnold-mnirs-app.share.connect.posit.cloud/)
@@ -92,7 +92,7 @@ data_raw <- read_mnirs(
 )
 #> ! Estimated `sample_rate` = 2 Hz.
 #> ℹ Define `sample_rate` explicitly to override.
-#> Warning in read_mnirs(file_path = example_mnirs("moxy_ramp"), nirs_channels = c(smo2_left = "SmO2 Live", : ! Duplicate or irregular `time_channel` samples detected.
+#> Warning in read_mnirs(): ! Duplicate or irregular `time_channel` samples detected.
 #> ℹ `time` = 211.59 and 1183.6.
 #> ℹ Re-sample with `mnirs::resample_mnirs()`.
 
@@ -169,7 +169,7 @@ data_resampled
 #> # ℹ 2,409 more rows
 ```
 
-### `replace_mnirs`: Replace local outliers, invalid values, and missing values
+### `replace_mnirs()`: Replace local outliers, invalid values, and missing values
 
 ``` r
 data_cleaned <- replace_mnirs(
@@ -216,8 +216,8 @@ plot(data_filtered, time_labels = TRUE) +
 
 ``` r
 data_shifted <- shift_mnirs(
-    data_filtered,     ## un-grouped nirs channels to shift separately 
-    group_channels = list(smo2_left, smo2_right), 
+    data_filtered,
+    group_channels = list(smo2_left, smo2_right), ## channels shifted separately
     to = 0,            ## NIRS values will be shifted to zero
     span = 120,        ## shift the *first* 120 sec of data to zero
     position = "first"
@@ -231,8 +231,8 @@ plot(data_shifted, time_labels = TRUE) +
 
 ``` r
 data_rescaled <- rescale_mnirs(
-    data_filtered,    ## un-grouped nirs channels to rescale separately 
-    group_channels = list(smo2_left, smo2_right), 
+    data_filtered,
+    group_channels = list(smo2_left, smo2_right), ## channels rescaled separately
     range = c(0, 100) ## rescale to a 0-100% functional exercise range
 )
 
@@ -290,12 +290,12 @@ plot(nirs_data, time_labels = TRUE)
 ``` r
 ## return each interval independently with `group_intervals = "distinct"`
 distinct <- extract_intervals(
-    nirs_data,                  ## channels blank for "distinct" grouping
-    group_intervals = "distinct",  ## return a list of data frames for each (2) event
-    start = by_time(348, 1064), ## manually identified interval start times
-    end = by_time(458, 1174),   ## interval end time (start + 150 sec)
-    span = c(0, 0),             ## no boundary modification
-    zero_time = FALSE           ## return original time values
+    nirs_data,                    ## channels blank for "distinct" grouping
+    group_intervals = "distinct", ## return a list of data frames for each (2) event
+    start = by_time(348, 1064),   ## manually identified interval start times
+    end = by_time(458, 1174),     ## interval end time (start + 150 sec)
+    span = c(0, 0),               ## no boundary modification
+    zero_time = FALSE             ## return original time values
 )
 
 plot(distinct, time_labels = TRUE)
@@ -306,11 +306,11 @@ plot(distinct, time_labels = TRUE)
 ``` r
 ## ensemble average both intervals with `group_intervals = "ensemble"`
 ensemble <- extract_intervals(
-    nirs_data,                  ## channels recycled to all intervals by default
-    group_intervals = "ensemble",  ## ensemble-average across two intervals
-    start = by_time(368, 1084), ## alternatively specify start times + span
-    span = c(-20, 90),          ## span recycled to all intervals by default
-    zero_time = TRUE            ## re-calculate common time to start from `0`
+    nirs_data,                    ## channels recycled to all intervals by default
+    group_intervals = "ensemble", ## ensemble-average across two intervals
+    start = by_time(368, 1084),   ## alternatively specify start times + span
+    span = c(-20, 90),            ## span recycled to all intervals by default
+    zero_time = TRUE              ## re-calculate common time to start from `0`
 )
 
 plot(ensemble, time_labels = TRUE) + 
@@ -341,9 +341,9 @@ plot(ensemble, time_labels = TRUE) +
 
 ## mNIRS device compatibility
 
-This package is designed to recognise mNIRS data exported as *.csv* or
-*.xls(x)* files. It should be flexible for use with many different NIRS
-devices, and compatibility will improve with continued development.
+This package is designed to recognise file formats exported from common
+wearable mNIRS devices. It should be flexible for use with other file
+formats, and compatibility will improve with continued development.
 
 Currently, it has been tested successfully with mNIRS data exported from
 the following devices and apps:

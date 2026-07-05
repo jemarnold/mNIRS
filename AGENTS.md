@@ -33,15 +33,15 @@ Access metadata with `attributes(data)` or individually, eg: `attr(data, "nirs_c
 
 ```
 read_mnirs()
-  ├─ plot() / print()                   # visualise at each processing step
-  └─ resample_mnirs()                   # regularise time grid
-      └─ replace_mnirs()                # clean invalid/outliers/NA
-          └─ filter_mnirs()             # smooth
-              ├─ shift_mnirs()          # optional: shift baseline
-              ├─ rescale_mnirs()        # optional: normalise range
-              ├─ correct_blood_volume() # optional: blood-volume normalise
-              └─ extract_intervals()    # returns named list of "mnirs" dfs
-                └─ analyse_kinetics()
+└─ resample_mnirs()                 # regularise time grid
+   └─ replace_mnirs()               # clean invalid/outliers/NA
+      └─ filter_mnirs()             # smooth
+         ├─ shift_mnirs()           # optional: shift baseline
+         ├─ rescale_mnirs()         # optional: normalise range
+         ├─ correct_blood_volume()  # optional: blood-volume normalise
+         └─ extract_intervals()     # returns named list of "mnirs" dfs
+            ├─ analyse_kinetics()   # compute response rate & time course
+            └─ plot() / print()     # visualise at each step
 ```
 
 **Order rules:**
@@ -115,34 +115,7 @@ create_mnirs_data(data, ...)  # low-level constructor; wraps df as "mnirs"
 
 ---
 
-### 3.2 Plot and Print
-
-```r
-plot.mnirs(x, points = FALSE, time_labels = FALSE, na.omit = FALSE, ...)
-## needs {ggplot2}; via plot(data); returns ggplot2 object
-## x = "mnirs" df or list of dfs (list → faceted panels)
-## na.omit = TRUE drops NA/non-finite; ... = facet_wrap args, n.breaks, breaks
-
-print(result)  # "mnirs_kinetics"; formatted coefficient table (max 10 rows)
-print(data)    # "mnirs"; strips class, prints tibble
-
-theme_mnirs(base_size = 14, base_family = "sans",
-            border = c("partial", "full"),
-            ink = "black", paper = "white", accent = "#0080ff", ...)
-
-palette_mnirs()              # all 12 named colours
-palette_mnirs(4)             # first 4
-palette_mnirs("red", "blue") # by name
-
-scale_colour_mnirs(...)      # alias: scale_color_mnirs()
-scale_fill_mnirs(...)
-breaks_timespan(unit = "secs", n = 5)
-format_hmmss(x)              # numeric seconds → "mm:ss" or "h:mm:ss"
-```
-
----
-
-### 3.3 Resample
+### 3.2 Resample
 
 ```r
 resample_mnirs(
@@ -161,7 +134,7 @@ resample_mnirs(
 
 ---
 
-### 3.4 Clean
+### 3.3 Clean
 
 ```r
 replace_mnirs(
@@ -195,7 +168,7 @@ replace_missing(x, t, width, span,
 
 ---
 
-### 3.5 Filter
+### 3.4 Filter
 
 ```r
 filter_mnirs(
@@ -225,7 +198,7 @@ filter_butterworth(x, order = 2L, W, type = "low", edges = "rev", na.rm = FALSE)
 
 ---
 
-### 3.6 Transform (optional)
+### 3.5 Transform
 
 ```r
 shift_mnirs(
@@ -247,8 +220,8 @@ rescale_mnirs(
 )
 ```
 
-`shift_mnirs()` preserves absolute amplitude; `rescale_mnirs()`
-expands/reduces range. 
+`shift_mnirs()` moves values up/down, preserves absolute amplitude; 
+`rescale_mnirs()` expands/contracts range. 
 
 **`group_channels`:**
 
@@ -259,6 +232,26 @@ expands/reduces range.
 | `list(c("A", "B"), c("C"))` | A+B share reference; C independent |
 
 Groups can be named (`list(smo2 = c("A", "B"))`); names key per-group args.
+
+---
+
+### 3.6 Correct Blood Volume
+
+```r
+correct_blood_volume(
+    data,
+    oxy_channel   = NULL,   # O2Hb/oxy[haem] column name
+    deoxy_channel = NULL,   # HHb/deoxy[haem] column name
+    total_channel = NULL,   # THb/total[haem] column name (blood-volume proxy)
+    verbose = TRUE
+)
+```
+
+Normalises for blood-volume changes (Beever & Tripp et al, 2020) and 
+accommodates negative values (using `shift_mnirs` internals).
+Requires ≥2 of 3 channels; third derived (`total = oxy + deoxy`, etc.).
+Only specified channels corrected; Names case-sensitive, must match exactly.
+`total[haem]` → 0 definitionally after.
 
 ---
 
@@ -397,23 +390,30 @@ nls(x ~ SSgompertz_left(t, A, B, xmid, slope), data = df)
 
 ---
 
-### 3.9 Correct Blood Volume
+### 3.9 Plot and Print
 
 ```r
-correct_blood_volume(
-    data,
-    oxy_channel   = NULL,   # O2Hb/oxy[haem] column name
-    deoxy_channel = NULL,   # HHb/deoxy[haem] column name
-    total_channel = NULL,   # THb/total[haem] column name (blood-volume proxy)
-    verbose = TRUE
-)
-```
+plot.mnirs(x, points = FALSE, time_labels = FALSE, na.omit = FALSE, ...)
+## needs {ggplot2}; via plot(data); returns ggplot2 object
+## x = "mnirs" df or list of dfs (list → faceted panels)
+## na.omit = TRUE drops NA/non-finite; ... = facet_wrap args, n.breaks, breaks
 
-Normalises for blood-volume changes (Beever & Tripp et al, 2020) and 
-accommodates negative values (using `shift_mnirs` internals).
-Requires ≥2 of 3 channels; third derived (`total = oxy + deoxy`, etc.).
-Only specified channels corrected; Names case-sensitive, must match exactly.
-`total[haem]` → 0 definitionally after.
+print(result)  # "mnirs_kinetics"; formatted coefficient table (max 10 rows)
+print(data)    # "mnirs"; strips class, prints tibble
+
+theme_mnirs(base_size = 14, base_family = "sans",
+            border = c("partial", "full"),
+            ink = "black", paper = "white", accent = "#0080ff", ...)
+
+palette_mnirs()              # all 12 named colours
+palette_mnirs(4)             # first 4
+palette_mnirs("red", "blue") # by name
+
+scale_colour_mnirs(...)      # alias: scale_color_mnirs()
+scale_fill_mnirs(...)
+breaks_timespan(unit = "secs", n = 5)
+format_hmmss(x)              # numeric seconds → "mm:ss" or "h:mm:ss"
+```
 
 ---
 

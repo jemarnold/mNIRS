@@ -5,7 +5,7 @@
 #' metadata.
 #'
 #' @param file_path Path of the data file to import. Supported file extensions
-#'   are `".xlsx"`, `".xls"`, and `".csv"`.
+#'   include `".xlsx"`, `".xls"`, `".csv"`, and `".txt"`.
 #'
 #' @param nirs_channels A character vector of one or more column names
 #'   containing mNIRS signals to import. Names must match the file header

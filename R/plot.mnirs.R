@@ -9,7 +9,7 @@
 #' @param points Logical. Default is `FALSE`. If `TRUE` displays
 #'   `ggplot2::geom_points()`. Otherwise displays `ggplot2::geom_lines()`.
 #' @param time_labels Logical. Default is `FALSE`. If `TRUE` displays x-axis
-#'   time values formatted as *"hh:mm:ss"* using [format_hmmss()]. Otherwise,
+#'   time values formatted as *"h:mm:ss"* using [format_hmmss()]. Otherwise,
 #'   x-axis values are displayed as numeric.
 #' @param na.omit Logical. Default is `FALSE`. If `TRUE` omits missing (`NA`)
 #'   and non-finite `c(Inf, -Inf, NaN)` from display.
@@ -34,7 +34,7 @@
 #'     verbose = FALSE
 #' )
 #'
-#' ## plot time labels as "hh:mm:ss"
+#' ## plot time labels as "h:mm:ss"
 #' plot(data, time_labels = TRUE)
 #'
 #' data_list <- extract_intervals(
@@ -69,7 +69,13 @@ plot.mnirs <- function(
 
     ## pre-compute conditionals
     x_name <- if (time_labels) {
-        paste(time_channel, "(h:mm:ss)")
+        ## match format_hmmss() output: "mm:ss" below one hour
+        units <- if (max(abs(x[[time_channel]]), na.rm = TRUE) < 3600) {
+            "(mm:ss)"
+        } else {
+            "(h:mm:ss)"
+        }
+        paste(time_channel, units)
     } else {
         ggplot2::waiver()
     }

@@ -66,7 +66,7 @@ read_file <- function(file_path, env = rlang::caller_env()) {
         cli_abort(c(
             "x" = "Unsupported file type.",
             "i" = "{.arg file_path} = {.path {file_path}}",
-            "i" = "Only {.var .csv}, {.var .txt}, and {.var .xls(x)} supported."
+            "i" = "Currently only {.var .csv}, {.var .txt}, and {.var .xls(x)} supported."
         ), call = env)
     }
 

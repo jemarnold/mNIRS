@@ -147,15 +147,16 @@ correct_blood_volume <- function(
     total <- total + shift
 
     ## sample-wise blood volume correction factor (Beever & Tripp et al, 2020)
-    beta <- oxy / total
+    ## dropping the first sample to align with incremental diffs
+    beta <- (oxy / total)[-1L]
     diff_total <- diff(total)
 
     ## corrected signals are the cumulative sum of adjusted incremental diffs
     ## first sample starts at zero
     ## total reduces to zero by construction once blood volume is normalised
     corrected <- list(
-        oxy = cumsum(c(0, diff(oxy) - beta[-1L] * diff_total)),
-        deoxy = cumsum(c(0, diff(deoxy) - (1 - beta[-1L]) * diff_total)),
+        oxy = cumsum(c(0, diff(oxy) - beta * diff_total)),
+        deoxy = cumsum(c(0, diff(deoxy) - (1 - beta) * diff_total)),
         total = double(length(total))
     )
 

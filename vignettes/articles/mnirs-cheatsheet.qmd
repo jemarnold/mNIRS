@@ -22,13 +22,13 @@ execute:
 #set par(leading: 0.5em)
 #show heading.where(level: 2): set text(size: 10pt, weight: "bold")
 #show raw.where(block: false): it => box(
-  fill: rgb("#f0f0f0"),
+  fill: rgb("#e6f2ff"),
   stroke: rgb("#cccccc"),
   radius: 2pt,
   inset: (x: 3pt, y: 1pt),
-  text(font: "Monaspace Neon Var", size: 7.5pt, it)
+  text(font: "Monaspace Neon", size: 7.5pt, weight: "extralight", fill: black, it.text)
 )
-#show raw.where(block: true): set text(font: "Monaspace Neon Var", size: 7.5pt)
+#show raw.where(block: true): set text(font: "Monaspace Neon", size: 7.5pt, weight: "extralight")
 
 // Full-width header — spans all columns
 #place(
@@ -47,12 +47,16 @@ execute:
         gutter: 8pt,
         align: horizon,
         [
-          #image("mnirs-hex.svg", height: 1.8cm)
+          #image("mnirs-hex.svg", height: 2.0cm)
         ],
         [
           #text(size: 20pt, weight: "bold", fill: white)[mnirs]
           #h(0.6em)
-          #text(size: 10pt, fill: white.transparentize(30%))[v0.6.5]
+          #text(size: 10pt, fill: white.transparentize(30%))[v0.7.0]
+          #h(1fr)
+          #link("https://jemarnold-mnirs-app.share.connect.posit.cloud/")[
+            #text(size: 10pt, weight: "bold", fill: white, underline[online Shiny app])
+          ]
           #linebreak()
           #text(size: 9pt, weight: "bold", fill: white)[
             Muscle Near-Infrared Spectroscopy Processing and Analysis
@@ -60,7 +64,11 @@ execute:
           #linebreak()
           #v(0.2em)
           #text(size: 9pt, fill: white.transparentize(20%))[
-            Read, process, and analyse data from muscle near-infrared spectroscopy (mNIRS) devices. Import raw data from .csv or .xls(x) files and return a time-series data frame with metadata. Includes standardised methods for cleaning, filtering, and pre-processing mNIRS data for subsequent analysis, with a custom plot theme and colour palette.
+            Read, process, and analyse data from muscle near-infrared
+            spectroscopy (mNIRS) devices. Import raw data from file and return
+            time-series data and metadata. Standardised methods for cleaning,
+            filtering, transforming, and analysing mNIRS data. Custom plot theme
+            and colour palette.
           ]
         ]
       )
@@ -70,14 +78,14 @@ execute:
 
 // Helper: code-shaded chip
 #let chip(t) = box(
-  fill: rgb("#f0f0f0"),
+  fill: rgb("#e6f2ff"),
   stroke: rgb("#cccccc"),
   radius: 2pt,
   inset: (x: 3pt, y: 1pt),
-  text(font: "Monaspace Neon Var", size: 7pt, t)
+  text(font: "Monaspace Neon", size: 7pt, weight: "extralight", t)
 )
 #let tree-line(indent, branch, content) = {
-  text(font: "Monaspace Neon Var", size: 7.5pt)[#indent#branch ]
+  text(font: "Monaspace Neon", size: 7.5pt, weight: "extralight")[#indent#branch ]
   content
   linebreak()
 }
@@ -90,8 +98,8 @@ execute:
   [
       #set align(left)
       #text(size: 12pt, weight: "bold")[Workflow]
-      #v(0.3em)
-      #set text(font: "Monaspace Neon Var", size: 12pt)
+      #v(0.1em)
+      #set text(font: "Monaspace Neon", size: 12pt, weight: "extralight")
       #tree-line("", "├──", chip("read_mnirs()"))
       #tree-line("│   ", "├──", chip("create_mnirs_data()"))
       #tree-line("│   ", "└──", chip("example_mnirs()"))
@@ -105,14 +113,24 @@ execute:
       #tree-line("│   ", "└──", chip("filter_butterworth()"))
       #tree-line("", "├──", chip("shift_mnirs()"))
       #tree-line("", "├──", chip("rescale_mnirs()"))
-      #tree-line("", "├──", chip("plot.mnirs()"))
+      #tree-line("", "├──", chip("correct_blood_volume()"))
       #tree-line("│   ", "├──", chip("theme_mnirs()"))
       #tree-line("│   ", "├──", chip("palette_mnirs()"))
       #tree-line("│   ", "├──", chip("scale_colour_mnirs()"))
       #tree-line("│   ", "├──", chip("scale_fill_mnirs()"))
       #tree-line("│   ", "├──", chip("format_hmmss()"))
       #tree-line("│   ", "└──", chip("breaks_timespan()"))
-      #tree-line("", "└──", chip("extract_intervals()"))
+      #tree-line("", "├──", chip("extract_intervals()"))
+      #tree-line("│   ", "├──", chip("by_time()"))
+      #tree-line("│   ", "├──", chip("by_label()"))
+      #tree-line("│   ", "├──", chip("by_lap()"))
+      #tree-line("│   ", "└──", chip("by_sample()"))
+      #tree-line("", "├──", chip("analyse_kinetics()"))
+      #tree-line("│   ", "├──", chip("response_time()"))
+      #tree-line("│   ", "├──", chip("peak_slope()"))
+      #tree-line("│   ", "├──", chip("monoexponential()"))
+      #tree-line("│   ", "└──", chip("logistic()"))
+      #tree-line("", "└──", chip("plot.mnirs()"))
     ]
 ))
 ```
@@ -123,7 +141,7 @@ execute:
 
 ## Read
 
-`read_mnirs()` — Import mnirs data from .csv or .xls(x)
+`read_mnirs()` — Import mnirs data from exported files
 
 #### Package-level functions
 
@@ -161,7 +179,7 @@ execute:
 
 `filter_butterworth()` — Apply a Butterworth digital filter
 
-`filter_moving_average()` — Apply centred moving average smoothing
+`filter_moving_average()` — Apply moving average smoothing
 
 ---
 
@@ -171,11 +189,41 @@ execute:
 
 `rescale_mnirs()` — Rescale channels data range
 
----
+`correct_blood_volume()` — Correct for blood volume changes
+
+<!-- --- -->
 
 ```{=typst}
 #colbreak()
 ```
+
+## Extract
+
+`extract_intervals()` — Detect events and extract intervals
+
+#### Interval boundary helpers
+
+`by_time()` / `by_label()` / `by_lap()` / `by_sample()` 
+
+— Boundaries by time value, event label, lap number, or row index
+
+---
+
+## Analyse
+
+`analyse_kinetics()` — Analyse response kinetics
+
+#### Vector-level functions
+
+`response_time()` — Compute fractional response time
+
+`peak_slope()` — Find peak linear slope
+
+`monoexponential()` — Monoexponential function
+
+`logistic()` / `gompertz()` — Sigmoidal functions
+
+---
 
 ## Plot
 
@@ -185,19 +233,22 @@ execute:
 
 `palette_mnirs()` — Access the mnirs colour palette
 
-`scale_colour_mnirs()` — Colour scale with mnirs palette
-
-`scale_fill_mnirs()` — Fill scale with mnirs palette
+`scale_*_mnirs()` — Colour & fill scales with mnirs palette
 
 `format_hmmss()` — Plot axis in time units
 
 `breaks_timespan()` — Plot axis with time breaks
 
----
-
-## Extract
-
-`extract_intervals()` — Detect events and extract intervals
+```{=typst}
+// fill remaining column height; image scales to fit without page overflow
+#block(height: 1fr, 
+  align(center + horizon, move(dx: 20pt,
+    box(stroke: 0.5pt + rgb("#cccccc"), radius: 4pt, clip: true,
+      image("README-filter_mnirs-1.png", height: 100%, fit: "contain")
+    )
+  ))
+)
+```
 
 ```{=typst}
 // Footer
