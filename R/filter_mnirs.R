@@ -16,10 +16,10 @@
 #'      arguments: `spar`.}
 #'      \item{`"butterworth"`}{Uses a centred Butterworth digital filter.
 #'      Additional arguments: `order`, `W` or `fc`, `sample_rate`, `type`,
-#'      `edges`. See [filter_butter()].}
+#'      `edges`. See [filter_butterworth()].}
 #'      \item{`"moving_average"`}{Uses a centred moving average filter.
 #'      Additional arguments: `width` or `span`, `partial`. See
-#'      [filter_ma()].}
+#'      [filter_moving_average()].}
 #'   }
 #' @param na.rm Logical; default is `FALSE`, propagates any `NA`s to the
 #'   returned vector. If `TRUE`, ignores `NA`s and processes available valid
@@ -47,7 +47,7 @@
 #'   *default*).
 #' @param edges **butterworth**: A character string specifying the edge
 #'   padding, one of: `c("rev", "rep1", "none")` (`"rev"` is the
-#'   *default*). See [filter_butter()].
+#'   *default*). See [filter_butterworth()].
 #' @param width **moving_average**: An integer number of samples within
 #'   the local window. One of either `width` or `span` must be specified.
 #' @param span **moving_average**: A numeric time duration in units of
@@ -374,7 +374,7 @@ filter_mnirs.butterworth <- function(
         }
 
         fc_n <- if (.a$type %in% c("low", "high")) 1 else 2
-        ## order & W are validated in filter_butter
+        ## order & W are validated in filter_butterworth
         validate_numeric(
             .a$fc, fc_n, c(0, Inf), inclusive = FALSE,
             msg1 = paste0(fc_n, "-element positive"), env = env
@@ -401,7 +401,7 @@ filter_mnirs.butterworth <- function(
             }
         }
 
-        filter_butter(
+        filter_butterworth(
             data[[.nirs]], .a$order, .a$W, .a$type, .a$edges, na.rm, env = env
         )
     }, nirs_channels, per_channel[nirs_channels])
@@ -454,7 +454,7 @@ filter_mnirs.moving_average <- function(
     t_vec <- data[[time_channel]]
 
     data[nirs_channels] <- Map(\(.nirs, .a) {
-        filter_ma(
+        filter_moving_average(
             x = data[[.nirs]],
             t = t_vec,
             width = .a$width,
@@ -478,7 +478,7 @@ filter_mnirs.moving_average <- function(
 #' Apply a moving average filter
 #'
 #' Apply a simple moving average smoothing filter to vector data.
-#' `filter_moving_average()` is an alias of `filter_ma()`.
+#' `filter_ma()` is an alias of `filter_moving_average()`.
 #'
 #' 
 #' @param partial Logical; default is `FALSE`, only returns values where a full
@@ -520,24 +520,24 @@ filter_mnirs.moving_average <- function(
 #' t <- c(0, 1, 2, 4, 5, 6, 7, 10)  ## irregular time with gaps
 #'
 #' ## width: centred window of 3 samples
-#' filter_ma(x, width = 3)
+#' filter_moving_average(x, width = 3)
 #'
 #' ## partial = TRUE fills edge values with a narrower window
-#' filter_ma(x, width = 3, partial = TRUE)
+#' filter_moving_average(x, width = 3, partial = TRUE)
 #'
 #' ## span: centred window of 2 time-units (accounts for irregular sampling)
-#' filter_ma(x, t, span = 2)
+#' filter_moving_average(x, t, span = 2)
 #'
 #' ## na.rm = FALSE (default): any NA in the window propagates to the result
 #' x_na <- c(1, NA, 3, 4, 5, NA, 7, 8)
-#' filter_ma(x_na, width = 3, na.rm = FALSE)
+#' filter_moving_average(x_na, width = 3, na.rm = FALSE)
 #'
 #' ## na.rm = TRUE: skip NAs and return the local mean of local valid values
-#' filter_ma(x_na, width = 3, partial = TRUE, na.rm = TRUE)
+#' filter_moving_average(x_na, width = 3, partial = TRUE, na.rm = TRUE)
 #'
-#' @rdname filter_ma
+#' @rdname filter_moving_average
 #' @export
-filter_ma <- function(
+filter_moving_average <- function(
     x,
     t = seq_along(x),
     width = NULL,
@@ -610,9 +610,9 @@ filter_ma <- function(
 }
 
 
-#' @rdname filter_ma
+#' @rdname filter_moving_average
 #' @export
-filter_moving_average <- function(
+filter_ma <- function(
     x,
     t = seq_along(x),
     width = NULL,
@@ -624,7 +624,7 @@ filter_moving_average <- function(
 ) {
     ## report conditions as coming from this wrapper unless overridden
     env <- list(...)$env %||% environment()
-    filter_ma(
+    filter_moving_average(
         x = x,
         t = t,
         width = width,
@@ -704,13 +704,13 @@ filter_moving_average <- function(
 #' sin <- sin(2 * pi * 1:150 / 50) * 20 + 40
 #' noise <- rnorm(150, mean = 0, sd = 6)
 #' noisy_sin <- sin + noise
-#' without_edge_detection <- filter_butter(
+#' without_edge_detection <- filter_butterworth(
 #'     x = noisy_sin,
 #'     order = 2,
 #'     W = 0.1,
 #'     edges = "none"
 #' )
-#' with_edge_detection <- filter_butter(
+#' with_edge_detection <- filter_butterworth(
 #'     x = noisy_sin,
 #'     order = 2,
 #'     W = 0.1,
@@ -730,7 +730,7 @@ filter_moving_average <- function(
 #'     )
 #'
 #' @export
-filter_butter <- function(
+filter_butterworth <- function(
     x,
     order = 2L,
     W,

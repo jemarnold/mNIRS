@@ -34,7 +34,7 @@ test_that("read_mnirs errors attribute to read_mnirs", {
 test_that("filter_mnirs method errors attribute to the generic", {
     data <- create_test_data()
 
-    ## method -> filter_ma() -> validate_width_span() chain
+    ## method -> filter_moving_average() -> validate_width_span() chain
     err <- expect_error(
         filter_mnirs(data, method = "moving_average", verbose = FALSE),
         "Window size undefined"
@@ -52,9 +52,9 @@ test_that("filter_mnirs method errors attribute to the generic", {
     expect_equal(rlang::call_name(conditionCall(err)), "filter_mnirs")
 })
 
-test_that("filter_ma called directly attributes to itself", {
-    err <- expect_error(filter_ma(1:10), "Window size undefined")
-    expect_equal(rlang::call_name(conditionCall(err)), "filter_ma")
+test_that("filter_moving_average called directly attributes to itself", {
+    err <- expect_error(filter_moving_average(1:10), "Window size undefined")
+    expect_equal(rlang::call_name(conditionCall(err)), "filter_moving_average")
 
     err <- expect_error(filter_moving_average(1:10), "Window size undefined")
     expect_equal(

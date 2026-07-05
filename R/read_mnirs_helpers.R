@@ -14,11 +14,9 @@ read_file <- function(file_path, env = rlang::caller_env()) {
     if (grepl("\\.(csv|tsv|txt)$", file_path, ignore.case = TRUE)) {
         ## sample lines for separator and column count detection
         ## strip whitespace inside quoted fields and around line edges
-        lines <- trimws(gsub(
-            '\\s*"\\s*',
-            '"',
-            readLines(file_path, warn = FALSE)
-        ))
+        lines <- trimws(
+            gsub('\\s*"\\s*', '"', readLines(file_path, warn = FALSE))
+        )
         nrows <- length(lines)
 
         ## detect separator: comma vs tab from first 10 lines

@@ -101,8 +101,8 @@ execute:
       #tree-line("│   ", "├──", chip("replace_outliers()"))
       #tree-line("│   ", "└──", chip("replace_missing()"))
       #tree-line("", "├──", chip("filter_mnirs()"))
-      #tree-line("│   ", "├──", chip("filter_ma()"))
-      #tree-line("│   ", "└──", chip("filter_butter()"))
+      #tree-line("│   ", "├──", chip("filter_moving_average()"))
+      #tree-line("│   ", "└──", chip("filter_butterworth()"))
       #tree-line("", "├──", chip("shift_mnirs()"))
       #tree-line("", "├──", chip("rescale_mnirs()"))
       #tree-line("", "├──", chip("plot.mnirs()"))
@@ -159,9 +159,9 @@ execute:
 
 #### Vector-level functions
 
-`filter_butter()` — Apply a Butterworth digital filter
+`filter_butterworth()` — Apply a Butterworth digital filter
 
-`filter_ma()` — Apply centred moving average smoothing
+`filter_moving_average()` — Apply centred moving average smoothing
 
 ---
 

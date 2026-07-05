@@ -393,7 +393,7 @@ We will discuss the process of choosing a digital filter in more depth in anothe
     The filter type is specified as either `c("low", "high", "stop", "pass")`.
 
 
-For filtering vector data and more details about Butterworth filter parameters, see `filter_butter()`.
+For filtering vector data and more details about Butterworth filter parameters, see `filter_butterworth()`.
 
 
 ### Moving average
@@ -406,7 +406,7 @@ For filtering vector data and more details about Butterworth filter parameters, 
 
     Moving average filtering occurs within a rolling local window specified by one of either `width` or `span`. `width` defines a number of samples centred around the local index being evaluated (`idx`), whereas `span` defines a range of time in units of `time_channel`.
 
-For filtering vector data and more details about the moving average filter, see `filter_ma()`.
+For filtering vector data and more details about the moving average filter, see `filter_moving_average()`.
 
 
 ## Apply the filter

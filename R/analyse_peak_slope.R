@@ -189,7 +189,7 @@ rolling_slope <- function(
 #' @inheritParams find_kinetics_idx
 #' @inheritParams compute_local_windows
 #' @inheritParams replace_invalid
-#' @inheritParams filter_ma
+#' @inheritParams filter_moving_average
 #'
 #' @details
 #' ## Rolling window

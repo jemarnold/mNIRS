@@ -53,10 +53,10 @@ Additional arguments must be specified for each method. See \emph{Details}.
 arguments: \code{spar}.}
 \item{\code{"butterworth"}}{Uses a centred Butterworth digital filter.
 Additional arguments: \code{order}, \code{W} or \code{fc}, \code{sample_rate}, \code{type},
-\code{edges}. See \code{\link[=filter_butter]{filter_butter()}}.}
+\code{edges}. See \code{\link[=filter_butterworth]{filter_butterworth()}}.}
 \item{\code{"moving_average"}}{Uses a centred moving average filter.
 Additional arguments: \code{width} or \code{span}, \code{partial}. See
-\code{\link[=filter_ma]{filter_ma()}}.}
+\code{\link[=filter_moving_average]{filter_moving_average()}}.}
 }}
 
 \item{na.rm}{Logical; default is \code{FALSE}, propagates any \code{NA}s to the
@@ -97,7 +97,7 @@ one of: \code{c("low", "high", "stop", "pass")} (\code{"low"} is the
 
 \item{edges}{\strong{butterworth}: A character string specifying the edge
 padding, one of: \code{c("rev", "rep1", "none")} (\code{"rev"} is the
-\emph{default}). See \code{\link[=filter_butter]{filter_butter()}}.}
+\emph{default}). See \code{\link[=filter_butterworth]{filter_butterworth()}}.}
 
 \item{width}{\strong{moving_average}: An integer number of samples within
 the local window. One of either \code{width} or \code{span} must be specified.}
