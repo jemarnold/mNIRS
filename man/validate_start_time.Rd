@@ -5,7 +5,7 @@
 \title{Validate start_time}
 \usage{
 validate_start_time(
-  start_time,
+  start_time = NULL,
   data,
   t_vec,
   verbose = TRUE,

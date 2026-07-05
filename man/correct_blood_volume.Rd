@@ -16,14 +16,14 @@ correct_blood_volume(
 \item{data}{A data frame of class \emph{"mnirs"} containing time series data and
 metadata.}
 
-\item{oxy_channel}{A character string naming the \code{oxy[haeme]} (oxygenated
+\item{oxy_channel}{A character string naming the \code{oxy[haem]} (oxygenated
 haemoglobin and myoglobin, \emph{O2Hb}) column in \code{data}. Must match exactly.}
 
-\item{deoxy_channel}{A character string naming the \code{deoxy[haeme]}
+\item{deoxy_channel}{A character string naming the \code{deoxy[haem]}
 (deoxygenated haemoglobin and myoglobin, \emph{HHb}) column in \code{data}. Must
 match exactly.}
 
-\item{total_channel}{A character string naming the \code{total[haeme]} (total
+\item{total_channel}{A character string naming the \code{total[haem]} (total
 haemoglobin and myoglobin, \emph{THb}; proxy for blood volume) column in \code{data}.
 Must match exactly.}
 
@@ -65,18 +65,18 @@ If any NIRS channels have negative values, all specified channels will be
 ensemble-shifted by a common offset so that all channels contain only
 positive values. Relative scaling across channels is preserved. This is
 modified from the method in \emph{Beever & Tripp et al, 2020} to properly
-calculate \code{total[haeme]} and the blood volume correction factor \code{beta} when
+calculate \code{total[haem]} and the blood volume correction factor \code{beta} when
 there are negative NIRS values.
 
 The correction factor \code{beta} is effectively the single-channel fractional
-(\%) oxygen saturation used to normalise \code{oxy[haeme]} and \code{deoxy[haeme]}
-relative to an adjusted invariant \code{total[haeme]}. This is computed as the
+(\%) oxygen saturation used to normalise \code{oxy[haem]} and \code{deoxy[haem]}
+relative to an adjusted invariant \code{total[haem]}. This is computed as the
 cumulative sum of adjusted incremental differences:
 
 \deqn{\Delta\text{O2Hb}_c = \Delta\text{O2Hb} - \beta \cdot \Delta\text{THb}}
 \deqn{\Delta\text{HHb}_c = \Delta\text{HHb} - (1 - \beta) \cdot \Delta\text{THb}}
 
-After correction, \code{total[haeme]} is zero (blood volume changes are
+After correction, \code{total[haem]} is zero (blood volume changes are
 normalised).
 }
 }

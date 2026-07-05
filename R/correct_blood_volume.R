@@ -3,12 +3,12 @@
 #' Normalises mNIRS channels for the effects of blood volume changes, following
 #' the sample-wise iterative method of *Beever & Tripp et al, 2020*.
 #'
-#' @param oxy_channel A character string naming the `oxy[haeme]` (oxygenated
+#' @param oxy_channel A character string naming the `oxy[haem]` (oxygenated
 #'   haemoglobin and myoglobin, *O2Hb*) column in `data`. Must match exactly.
-#' @param deoxy_channel A character string naming the `deoxy[haeme]`
+#' @param deoxy_channel A character string naming the `deoxy[haem]`
 #'   (deoxygenated haemoglobin and myoglobin, *HHb*) column in `data`. Must
 #'   match exactly.
-#' @param total_channel A character string naming the `total[haeme]` (total
+#' @param total_channel A character string naming the `total[haem]` (total
 #'   haemoglobin and myoglobin, *THb*; proxy for blood volume) column in `data`.
 #'   Must match exactly.
 #' @inheritParams validate_mnirs
@@ -36,18 +36,18 @@
 #' ensemble-shifted by a common offset so that all channels contain only
 #' positive values. Relative scaling across channels is preserved. This is
 #' modified from the method in *Beever & Tripp et al, 2020* to properly
-#' calculate `total[haeme]` and the blood volume correction factor `beta` when
+#' calculate `total[haem]` and the blood volume correction factor `beta` when
 #' there are negative NIRS values.
 #'
 #' The correction factor `beta` is effectively the single-channel fractional
-#' (%) oxygen saturation used to normalise `oxy[haeme]` and `deoxy[haeme]`
-#' relative to an adjusted invariant `total[haeme]`. This is computed as the
+#' (%) oxygen saturation used to normalise `oxy[haem]` and `deoxy[haem]`
+#' relative to an adjusted invariant `total[haem]`. This is computed as the
 #' cumulative sum of adjusted incremental differences:
 #'
 #' \deqn{\Delta\text{O2Hb}_c = \Delta\text{O2Hb} - \beta \cdot \Delta\text{THb}}
 #' \deqn{\Delta\text{HHb}_c = \Delta\text{HHb} - (1 - \beta) \cdot \Delta\text{THb}}
 #'
-#' After correction, `total[haeme]` is zero (blood volume changes are
+#' After correction, `total[haem]` is zero (blood volume changes are
 #' normalised).
 #'
 #' @returns
