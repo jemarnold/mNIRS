@@ -37,7 +37,7 @@ signif_trailing <- function(
     format <- match.arg(format)
 
     if (format == "digits") {
-        validate_numeric(x)
+        validate_numeric(x, allow_na = TRUE)
         validate_numeric(digits, 1, c(-Inf, Inf), FALSE, TRUE)
         if (trim) {
             digits <- min(digits, count_decimals(x))
@@ -148,7 +148,7 @@ count_sigfigs <- function(x) {
 #' @order 2
 #' @keywords internal
 signif_whole <- function(x, digits = 5L) {
-    validate_numeric(x)
+    validate_numeric(x, allow_na = TRUE)
     validate_numeric(digits, 1, c(-Inf, Inf), FALSE, TRUE)
 
     ## if whole digits >= sig figs, return rounded whole number
@@ -212,7 +212,7 @@ signif_pvalue <- function(
     symbol_repeat = FALSE,
     alpha = 0.05
 ) {
-    validate_numeric(x)
+    validate_numeric(x, allow_na = TRUE)
     validate_numeric(digits, 1, c(0, Inf), FALSE, TRUE)
     format <- match.arg(format)
     display <- match.arg(display)

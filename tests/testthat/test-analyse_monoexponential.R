@@ -706,6 +706,37 @@ test_that("analyse_monoexponential() direction = 'positive' rejects falling fit"
     expect_true(is.na(result$tau))
 })
 
+test_that("enforce_direction() refits and back-transforms an inverted fit", {
+    ## genuinely rising data, but the converged coefs are inverted
+    ## (B < A): forces the sign-mismatch branch, the bounded refit
+    ## recovers the true positive response and back-transforms to
+    ## (A, B, tau) space
+    t <- seq(0, 59)
+    x <- monoexponential(t, A = 50, B = 80, tau = 15)
+    fit_data <- data.frame(.x = x, .t = t)
+
+    result <- enforce_direction(
+        model = NULL,
+        coefs = c(A = 80, B = 50, tau = 15),
+        fit_data = fit_data,
+        direction = "positive",
+        amp_fn = quote(monoexponential),
+        extra = c(tau = 15),
+        extra_lower = c(tau = diff(range(t)) * 1e-6),
+        fn = quote(SSmonoexp),
+        .nirs = "smo2",
+        interval_name = "test",
+        verbose = FALSE
+    )
+
+    expect_named(result, c("model", "coefs"))
+    expect_named(result$coefs, c("A", "B", "tau"))
+    ## refit satisfies the requested positive direction
+    expect_gt(result$coefs[["B"]], result$coefs[["A"]])
+    expect_equal(result$coefs[["A"]], 50, tolerance = 1e-3)
+    expect_equal(result$coefs[["B"]], 80, tolerance = 1e-3)
+})
+
 test_that("analyse_monoexponential() suppresses direction warning when verbose = FALSE", {
     data <- create_monoexp_data(A = 80, B = 50, n = 100, noise_sd = 0.3)
 

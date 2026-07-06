@@ -357,6 +357,21 @@ test_that("filter_butterworth works visually", {
 })
 
 
+test_that("filter_butter() is deprecated and delegates to filter_butterworth()", {
+    x <- sin(2 * pi * seq_len(50) / 20)
+
+    lifecycle::expect_deprecated(
+        result <- filter_butter(x, order = 2, W = 0.1),
+        "filter_butter"
+    )
+
+    expect_equal(
+        suppressWarnings(filter_butter(x, order = 2, W = 0.1)),
+        filter_butterworth(x, order = 2, W = 0.1)
+    )
+})
+
+
 ## moxy_data for filter_mnirs() ==============================================
 moxy_data <- read_mnirs(
     file_path = example_mnirs("moxy_ramp.xlsx"),

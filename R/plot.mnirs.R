@@ -270,7 +270,7 @@ plot.mnirs_kinetics <- function(
         )
         p <- p +
             ggplot2::geom_vline(
-                ggplot2::aes(xintercept = start_times),
+                ggplot2::aes(xintercept = .data$start_times),
                 data = vdata,
                 linetype = "dotted",
                 colour = "grey50"
@@ -300,9 +300,9 @@ plot.mnirs_kinetics <- function(
             p <- p +
                 key_point(
                     ggplot2::aes(
-                        x = start_times,
-                        y = A,
-                        colour = nirs_channels
+                        x = .data$start_times,
+                        y = .data$A,
+                        colour = .data$nirs_channels
                     ),
                     base_pts,
                     inherit.aes = FALSE
@@ -311,7 +311,11 @@ plot.mnirs_kinetics <- function(
             ## single key-point marker for parametric methods
             p <- p +
                 key_point(
-                    ggplot2::aes(x = xval, y = yval, colour = nirs_channels),
+                    ggplot2::aes(
+                        x = .data$xval,
+                        y = .data$yval,
+                        colour = .data$nirs_channels
+                    ),
                     ann[is.finite(ann$xval), , drop = FALSE],
                     inherit.aes = FALSE
                 )
@@ -324,10 +328,10 @@ plot.mnirs_kinetics <- function(
         p <- p +
             ggplot2::geom_text(
                 ggplot2::aes(
-                    y = yval_corner,
-                    label = label,
-                    colour = nirs_channels,
-                    vjust = vjust
+                    y = .data$yval_corner,
+                    label = .data$label,
+                    colour = .data$nirs_channels,
+                    vjust = .data$vjust
                 ),
                 data = ann,
                 x = Inf,

@@ -293,6 +293,12 @@ test_that("validate_group_channels aborts on invalid groups", {
         validate_group_channels(channels, "wrong"),
         "one of.*ensemble.*distinct.*wrong"
     )
+
+    ## neither a shortcut string nor a list
+    expect_error(
+        validate_group_channels(channels, 1L),
+        "must be.*ensemble.*distinct.*list"
+    )
 })
 
 test_that("validate_group_channels reports errors from the caller's `env`", {

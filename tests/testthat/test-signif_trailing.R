@@ -57,13 +57,14 @@ test_that("signif_trailing handles NA values", {
 })
 
 test_that("signif_trailing handles special numeric values", {
-    expect_equal(signif_trailing(0, digits = 2), "0")
+    expect_equal(signif_trailing(0), "0")
 
     ## what do I want Inf, NaN to display?
-    expect_equal(signif_trailing(Inf, digits = 2), "Inf")
-    expect_equal(signif_trailing(-Inf, digits = 2), "-Inf")
-    expect_error(signif_trailing(NaN), "valid.*numeric")
-    expect_equal(signif_trailing(c(1, NaN), digits = 2), c("1", "NaN"))
+    expect_equal(signif_trailing(Inf), "Inf")
+    expect_equal(signif_trailing(-Inf), "-Inf")
+    # expect_error(signif_trailing(NaN), "valid.*numeric")
+    expect_equal(signif_trailing(NaN), "NaN")
+    expect_equal(signif_trailing(c(1, NaN)), c("1", "NaN"))
 })
 
 ## count_decimals() ======================================================

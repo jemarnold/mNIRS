@@ -655,6 +655,43 @@ test_that("SSgompertz()/SSgompertz_left() converge on real dataset", {
 })
 
 
+## init_inflection() fallbacks =======================================
+
+test_that("init_inflection() falls back to sign() slope when t_range == 0", {
+    ## identical t -> non-finite derivative -> slope fallback;
+    ## t_range == 0 so slope is the direction sign of (B - A)
+    x <- 1:6
+    t <- rep(5, 6)
+
+    up <- init_inflection(x, t, A_init = 1, B_init = 6)
+    expect_equal(up$slope, 1)
+
+    down <- init_inflection(x, t, A_init = 6, B_init = 1)
+    expect_equal(down$slope, -1)
+})
+
+test_that("init_inflection() falls back to mean-rate slope on flat response", {
+    ## flat x -> zero smoothed derivative -> slope fallback;
+    ## t_range > 0 so slope is the mean rate (B - A) / t_range
+    x <- rep(3, 6)
+    t <- 0:5
+
+    res <- init_inflection(x, t, A_init = 0, B_init = 10)
+    expect_equal(res$slope, 10 / 5)
+    expect_true(is.finite(res$xmid))
+})
+
+test_that("init_inflection() returns derivative-based estimates on clean sigmoid", {
+    ## non-degenerate data bypasses both fallbacks
+    t <- seq(0, 60, length.out = 200)
+    x <- gompertz(t, A = 10, B = 100, xmid = 30, slope = 4)
+
+    res <- init_inflection(x, t, A_init = 10, B_init = 100)
+    expect_true(all.equal(res$xmid, 30, tolerance = 3, scale = 1))
+    expect_true(res$slope > 0)
+})
+
+
 ## analyse_logistic() ===================================================
 
 ## helper: create logistic test data with known parameters
