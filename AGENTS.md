@@ -33,28 +33,27 @@ Access metadata with `attributes(data)` or individually, eg: `attr(data, "nirs_c
 
 ```
 read_mnirs()
-└─ resample_mnirs()                 # regularise time grid
-   └─ replace_mnirs()               # clean invalid/outliers/NA
-      └─ filter_mnirs()             # smooth
-         ├─ shift_mnirs()           # optional: shift baseline
-         ├─ rescale_mnirs()         # optional: normalise range
-         ├─ correct_blood_volume()  # optional: blood-volume normalise
-         └─ extract_intervals()     # returns named list of "mnirs" dfs
-            ├─ analyse_kinetics()   # compute response rate & time course
-            └─ plot() / print()     # visualise at each step
+└─ plot()                              # visualise "mnirs" data at each step
+   └─ resample_mnirs()                 # regularise time grid
+      └─ replace_mnirs()               # clean invalid/outliers/NA
+         └─ filter_mnirs()             # smooth
+            ├─ shift_mnirs()           # optional: shift baseline
+            ├─ rescale_mnirs()         # optional: normalise range
+            ├─ correct_blood_volume()  # optional: blood-volume normalise
+            └─ extract_intervals()     # returns named list of "mnirs" dfs
+               └─ analyse_kinetics()   # compute response rate & time course
+                  └─ plot()            # plot "mnirs_kinetics": fit + markers
 ```
 
-**Order rules:**
-- `resample` → `replace`: window replacement needs regular `time_channel`
-- `replace` → `filter`: `"smooth_spline"` / `"butterworth"` error on internal `NA` (unless `na.rm = TRUE`)
-- `resample` → `filter("smooth_spline")`: errors on duplicated time values
-- `resample` → `extract_intervals(group_intervals = "ensemble")`: ensemble needs regularised samples
-- `extract_intervals` → `analyse_kinetics` or other list-wise processing functions for multiple intervals
+**Order:** diagram nesting = required sequence; failure modes + fixes in §5.
+`extract_intervals` → `analyse_kinetics` (or other list-wise fns) for
+multiple intervals.
 
 ### Data input formats
 
 `resample_mnirs()`, `replace_mnirs()`, `filter_mnirs()`, `shift_mnirs()`,
-`rescale_mnirs()`, and `analyse_kinetics()` accept `data` as:
+`rescale_mnirs()`, `extract_intervals()`, and `analyse_kinetics()` accept
+`data` as:
 
 - **single `"mnirs"` df** → processed, returned directly.
 - **list of `"mnirs"` dfs** (e.g. from `extract_intervals()`) →
@@ -62,6 +61,7 @@ read_mnirs()
 - **grouped df** (`dplyr::group_by()`, needs `{dplyr}`) → split per
   group; returns a list of dfs.
 
+`extract_intervals()` on list input flattens results (§3.7).
 `plot.mnirs()` takes a list of dfs → faceted panels.
 
 ### Per-channel arguments and grouping
@@ -75,7 +75,8 @@ keyed by channel name:
 - Unrecognised names warned and ignored.
 
 `shift_mnirs()`/`rescale_mnirs()` group channels via `group_channels`;
-`extract_intervals()` groups intervals via `group_intervals` (§3.5, §3.6).
+`extract_intervals()` groups intervals via `group_intervals` and per-group
+channels via `group_channels` (§3.5, §3.7).
 
 ---
 
@@ -259,18 +260,27 @@ Only specified channels corrected; Names case-sensitive, must match exactly.
 
 ```r
 extract_intervals(
-    data, nirs_channels = NULL, time_channel = NULL, event_channel = NULL,
+    data,                   # "mnirs" df OR list of "mnirs" dfs
+    nirs_channels = NULL, time_channel = NULL, event_channel = NULL,
     sample_rate = NULL,
     group_intervals = c("distinct", "ensemble"),
+    group_channels = NULL,  # per-group channel selection (see below)
     start = NULL,  # by_time(numeric)/by_label(char)/by_lap(int)/by_sample(int)
     end   = NULL,  # same; NULL = window (span) around start
     span  = list(c(-60, 60)),  # boundaries c(before, after) per interval
     zero_time = FALSE,         # rebase time to 0 per interval
-    verbose = TRUE
+    verbose = TRUE,
+    event_groups = deprecated()  # renamed → group_intervals (0.7.0)
 )
-## returns list of "mnirs" dfs
-## nirs_channels may be list() for per-ensemble-group channels
+## returns named list of "mnirs" dfs
 ```
+
+**List input:** when `data` is a list of "mnirs" dfs, results are flattened 
+into a single-layer list. Interval names become `interval_<df>.<interval>`; 
+other names (`"ensemble"`, custom group names) suffixed `<name>_<df>`.
+
+**`group_channels`** — selects which `nirs_channels` are ensemble-averaged
+per interval group; only relevant when `group_intervals` ensemble-averages.
 
 **Boundary helpers:**
 
@@ -284,7 +294,7 @@ by_sample(...) # integer row indices
 - Raw coercion: numeric → `by_time()`; character → `by_label()`; explicit integer (`2L`) → `by_lap()`
 - `start`/`end` may mix types; shorter recycled. `by_label()`/`by_lap()` need `event_channel`
 - `span = c(before, after)`: negative shifts start earlier, positive shifts end later; single value recycled by sign (`60` → `c(0, 60)`, `-60` → `c(-60, 0)`)
-- `span`/`nirs_channels` as `list()` recycled per interval/group
+- `span`/`group_channels` as `list()` recycled per interval group
 
 **`group_intervals`:**
 
@@ -398,6 +408,14 @@ plot.mnirs(x, points = FALSE, time_labels = FALSE, na.omit = FALSE, ...)
 ## x = "mnirs" df or list of dfs (list → faceted panels)
 ## na.omit = TRUE drops NA/non-finite; ... = facet_wrap args, n.breaks, breaks
 
+plot.mnirs_kinetics(x, fitted = TRUE, markers = TRUE, labels = TRUE, ...)
+## needs {ggplot2}; via plot(result); returns ggplot2 object
+## observed signal per channel, faceted by interval (builds on plot.mnirs)
+## fitted  = dashed fitted curve (parametric methods; not "response_time")
+## markers = dotted onset line + key coefficient point(s)
+## labels  = per-panel annotation of key coefficient(s)
+## ... passed to plot.mnirs (points, time_labels, nrow, ncol, scales)
+
 print(result)  # "mnirs_kinetics"; formatted coefficient table (max 10 rows)
 print(data)    # "mnirs"; strips class, prints tibble
 
@@ -470,9 +488,9 @@ format_hmmss(x)              # numeric seconds → "mm:ss" or "h:mm:ss"
 | `R/analyse_kinetics_helpers.R` | channel/interval orchestration, `compute_diagnostics()` |
 | `R/analyse_peak_slope.R` | `peak_slope()`, `slope()`, `rolling_slope()` |
 | `R/analyse_monoexponential.R` | `monoexponential()`, `SSmonoexp()` |
-| `R/analyse_logistic.R` | `logistic()`, `gompertz()`, `gompertz_left()`, `SSlogistic/gompertz/gompertz_left()` |
+| `R/analyse_sigmoidal.R` | `logistic()`, `gompertz()`, `gompertz_left()`, `SSlogistic/gompertz/gompertz_left()` |
 | `R/analyse_response_time.R` | `response_time()` |
-| `R/plot.mnirs.R` | `plot.mnirs()`, `theme_mnirs()`, `palette_mnirs()`, scale/format fns |
+| `R/plot.mnirs.R` | `plot.mnirs()`, `plot.mnirs_kinetics()`, `kinetics_annotations()`, `as_plot_data()`, `theme_mnirs()`, `palette_mnirs()`, scale/format fns |
 | `R/mnirs_methods.R` | `print.mnirs()`, `print.mnirs_kinetics()` |
 | `R/channel_args.R` | `resolve_channel_args()` — per-channel/group arg broadcast |
 | `R/as_data_list.R` | `map_mnirs_intervals()`, `as_data_list()` — list/grouped dispatch |
