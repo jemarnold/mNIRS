@@ -30,7 +30,7 @@ This article assumes basic familiarity with the {mnirs} package. For an overview
 :::
 
 ::: {.callout-note}
-Skip to the analysis code, below
+Skip to the [analysis plan](#analysis-plan), below
 :::
 
 ## Muscle oxidative capacity testing
@@ -112,7 +112,7 @@ We will use this function twice for OxCap analysis:
 
 ## Setup
 
-First, load our packages and initial setup options. We will silence {mnirs} info messages and set our ggplot2 theme.
+First, load our packages and initial setup options.
 
 ```{r}
 #| label: setup

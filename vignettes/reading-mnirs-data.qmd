@@ -28,7 +28,7 @@ The `{mnirs}` package aims to provide standardised, reproducible methods for rea
 
 In this vignette we will demonstrate how to:
 
-* 📂 Read data files exported from commercial wearable NIRS devices, and import NIRS channels into a standard data frame format with metadata, ready for further processing.
+* 📂 Read files exported from wearable NIRS devices, and import NIRS channels into a standard data frame format with metadata, ready for further processing.
 
 * 📊 Plot and visualise data frames of class *`"mnirs"`*.
 
@@ -40,7 +40,7 @@ In this vignette we will demonstrate how to:
 
 * 📈️ Apply digital filtering to optimise signal-to-noise ratio for the responses observed in our data.
 
-* ⚖️ Shift and rescale across multiple NIRS channels, to normalise signal dynamic range while preserving absolute or relative scaling between muscle sites and NIRS channels.
+* ⚖️ Shift and rescale across multiple NIRS channels, to transform signal dynamic range while preserving absolute or relative scaling between muscle sites and NIRS channels.
 
 * 🔀 Demonstrate a complete data wrangling process using pipe-friendly functions.
 
@@ -163,13 +163,19 @@ data_raw
 
 # 📊 Plot *`mnirs`* data
 
-*`mnirs`* data can be easily viewed by calling `plot()` (explicitly documented as `plot.mnirs()`). This generic plot function uses *`ggplot2`* and will work on data frames generated or read by *`mnirs`* functions where the metadata contains `class = *"mnirs"*`.
+*`mnirs`* data can be easily viewed by calling `plot()` (explicitly documented as `plot.mnirs()`). This generic plot function uses *`ggplot2`* and will work on data frames (or lists of data frames) processed by *`mnirs`* functions, where the metadata contains `class = *"mnirs"*`.
+
+:::{.callout-note}
+### Processing lists of *`mnirs`* data frames
+
+As of `mnirs v0.7.0`, most processing functions will accept either a single data frame, a list of data frames, or a grouped data frame (requiring `{dplyr}`), and returns a single or list of data frames, respectively. This allows separate processing of NIRS interval data, e.g. filtering and shifting NIRS channels within discrete intervals, rather than on the global data frame.
+:::
 
 ## `plot.mnirs`
 
 * `data`
 
-    This function takes in a data frame of class *`mnirs`* and returns a formatted *`ggplot2`* plot.
+    This function takes in a data frame or list of data frames of class *`mnirs`* and returns a formatted *`ggplot2`* plot. Lists of *`mnirs`* data frames are returned as plot facets.
 
 * `points`
 
@@ -225,7 +231,7 @@ Downsampling can be useful to reduce data size and processing requirement, altho
 
 * `data`
 
-    This function takes in a data frame, applies processing to all channels specified explicitly or implicitly from *`mnirs`* metadata, then returns the processed data frame. *`mnirs`* metadata will be passed to and from this function.\
+    This function takes in a data frame or list of data frames, applies processing to all channels specified explicitly or implicitly from *`mnirs`* metadata, then returns the processed data frame (or list). *`mnirs`* metadata will be passed to and from this function.\
 \
 *`mnirs`* functions are also pipe-friendly for Base R 4.1+ (`|>`) or `{magrittr}` (`%>%`) pipes to chain operations together (see below).
 
@@ -280,10 +286,6 @@ Let's explain the functionality of this data-wide function, and for more details
 
 
 ## `replace_mnirs()`
-
-* `data`
-
-    This function takes in a data frame, detects and replaces outliers, invalid values, and missing values across the specified channels, then returns the processed data frame. *`mnirs`* metadata will be passed to and from this function.
 
 * `nirs_channels`
 
@@ -349,14 +351,6 @@ We will discuss the process of choosing a digital filter in more depth in anothe
 
 
 ## `filter_mnirs()`
-
-* `data`
-
-    This function takes in a data frame, applies processing to all channels specified, then returns the processed data frame. *`mnirs`* metadata will be passed to and from this function.
-
-* `nirs_channels`, `time_channel`, & `sample_rate`
-
-    If the data contain *`mnirs`* metadata, these will be detected automatically, or they can be specified explicitly.
 
 * `na.rm`
 
@@ -453,14 +447,6 @@ We can group NIRS channels together to preserve the absolute and relative scalin
 
 ## `shift_mnirs()`
 
-* `data`
-
-    This function takes in a data frame, applies processing to all channels specified, then returns the processed data frame. *`mnirs`* metadata will be passed to and from this function.
-
-* `nirs_channels`
-
-    Specify which column names in `data` to process. If the data contain *`mnirs`* metadata, these channels will be detected automatically. Channels not specified will be passed through unprocessed to the returned data frame.
-
 * `group_channels`
 
     Controls how `nirs_channels` are grouped, to preserve absolute or relative scaling. Either a character keyword or a `list()` of channel-name vectors:\
@@ -470,10 +456,6 @@ We can group NIRS channels together to preserve the absolute and relative scalin
 `"distinct"` shifts each channel independently, losing the relative scaling between channels.\
 \
 A `list()` of channel-name vectors (e.g. `list(c(A, B), c(C))`) shifts channels `A` & `B` together and `C` separately, preserving relative scaling within, but not between groups.
-
-* `time_channel`
-
-    If the data contain *`mnirs`* metadata, this channel will be detected automatically, or it can be specified explicitly.
 
 * `to` or `by`
 
@@ -526,14 +508,6 @@ This may or may not be an appropriate assumption for your research question; for
 ## `rescale_mnirs()`
 
 We may also want to rescale our data to a new dynamic range, changing the signal amplitude.
-
-* `data`
-
-    This function takes in a data frame, applies processing to all channels specified, then returns the processed data frame. *`mnirs`* metadata will be passed to and from this function.
-
-* `nirs_channels`
-
-    Specify which column names in `data` to process. If the data contain *`mnirs`* metadata, these channels will be detected automatically. Channels not specified will be passed through unprocessed to the returned data frame.
 
 * `group_channels`
 
@@ -634,17 +608,13 @@ We may have marked event labels or have incremental lap numbers in the specified
 
 * `data`
 
-    This function takes in a data frame, applies processing to all channels specified, then returns a list of processed data frames. *`mnirs`* metadata will be passed to and from this function.
+    This function takes in a single data frame, detects and extracts specified intervals, and returns a list of processed data frames. *`mnirs`* metadata will be passed to and from this function.
 
 * `nirs_channels`
 
     If returning a list of *"distinct"* intervals (see `group_intervals` below), `nirs_channels` does not have to be specified, as no channels are processed.\
 \
 Only when *"ensemble"*-averaging, `nirs_channels` should be specified by providing a list of column names (e.g. `list(c(A, B), c(A))`), where each list item specifies the channels to be ensemble-averaged within the respective group (ensemble-groups are specified by `group_intervals` below), in the order in which they are returned. The default *`mnirs`* metadata will ensemble-average all `nirs_channels`.
-
-* `time_channel`, `event_channel`, & `sample_rate`
-
-    If the data contain *`mnirs`* metadata, these will be detected automatically, or they can be specified explicitly.
 
 * `start` & `end`
 
