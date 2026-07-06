@@ -798,3 +798,42 @@ filter_butterworth <- function(
         return(y)
     }
 }
+
+
+#' Apply a Butterworth digital filter
+#'
+#' @description
+#' `r lifecycle::badge("deprecated")`
+#'
+#' `filter_butter()` was renamed to [filter_butterworth()]
+#'
+#' @inheritParams filter_butterworth
+#'
+#' @returns A numeric vector the same length as `x`.
+#'
+#' @keywords internal
+#' @export
+filter_butter <- function(
+    x,
+    order = 2L,
+    W,
+    type = c("low", "high", "stop", "pass"),
+    edges = c("rev", "rep1", "none"),
+    na.rm = FALSE,
+    ...
+) {
+    lifecycle::deprecate_warn(
+        when = "0.7.0",
+        what = "filter_butter()",
+        with = "filter_butterworth()"
+    )
+    filter_butterworth(
+        x = x,
+        order = order,
+        W = W,
+        type = type,
+        edges = edges,
+        na.rm = na.rm,
+        ...
+    )
+}
