@@ -893,7 +893,7 @@ test_that("extract_df_list returns correct number of intervals", {
         data,
         t_vec,
         interval_spec,
-        nirs_channels = list(
+        group_channels = list(
             c("smo2_left", "smo2_right"),
             c("smo2_left", "smo2_right")
         )
@@ -919,7 +919,7 @@ test_that("extract_df_list extracts correct row ranges", {
         data,
         t_vec,
         interval_spec,
-        nirs_channels = list(c("smo2_left", "smo2_right"))
+        group_channels = list(c("smo2_left", "smo2_right"))
     )
 
     expect_equal(nrow(result[[1L]]), 21) # rows 20 to 40 inclusive
@@ -941,7 +941,7 @@ test_that("extract_df_list preserves metadata attributes", {
         data,
         t_vec, 
         interval_spec,
-        nirs_channels = list(c("smo2_left"))
+        group_channels = list(c("smo2_left"))
     )
 
     expect_equal(attr(result[[1L]], "interval_times"), c(1.5, 3.0))
@@ -980,7 +980,7 @@ test_that("ensemble_intervals averages across intervals correctly", {
 
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = c("smo2_left", "smo2_right"),
+        group_channels = c("smo2_left", "smo2_right"),
         metadata = metadata,
         verbose = FALSE
     )
@@ -1001,7 +1001,7 @@ test_that("ensemble_intervals preserves metadata", {
 
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = c("smo2_left", "smo2_right"),
+        group_channels = c("smo2_left", "smo2_right"),
         metadata = metadata,
         verbose = FALSE
     )
@@ -1028,7 +1028,7 @@ test_that("ensemble_intervals warns on irregular samples with verbose", {
     expect_warning(
         ensemble_intervals(
             df_list = df_list,
-            nirs_channels = c("smo2_left", "smo2_right"),
+            group_channels = c("smo2_left", "smo2_right"),
             metadata = metadata,
             verbose = TRUE
         ),
@@ -1045,27 +1045,27 @@ test_that("ensemble_intervals returns the right number of dims", {
     )
     df_list <- list(interval_1 = interval1, interval_2 = interval2)
     metadata <- list(time_channel = "time", sample_rate = 10)
-    nirs_channels = c("smo2_left")
+    group_channels = c("smo2_left")
 
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = nirs_channels,
+        group_channels = group_channels,
         metadata = metadata,
         verbose = FALSE
     )
 
-    expect_equal(ncol(result), length(nirs_channels) + 1)
+    expect_equal(ncol(result), length(group_channels) + 1)
 
-    nirs_channels = c("smo2_left", "smo2_right")
+    group_channels = c("smo2_left", "smo2_right")
 
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = nirs_channels,
+        group_channels = group_channels,
         metadata = metadata,
         verbose = FALSE
     )
 
-    expect_equal(ncol(result), length(nirs_channels) + 1)
+    expect_equal(ncol(result), length(group_channels) + 1)
 })
 
 test_that("ensemble_intervals preserves all metadata attributes", {
@@ -1082,7 +1082,7 @@ test_that("ensemble_intervals preserves all metadata attributes", {
 
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = c("smo2_left", "smo2_right"),
+        group_channels = c("smo2_left", "smo2_right"),
         metadata = metadata,
         verbose = FALSE
     )
@@ -1106,7 +1106,7 @@ test_that("ensemble_intervals deduplicates nirs_channels attr", {
     ## duplicated channel name supplied; attr must be unique
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = c("smo2_left", "smo2_left"),
+        group_channels = c("smo2_left", "smo2_left"),
         metadata = metadata,
         verbose = FALSE
     )
@@ -1124,7 +1124,7 @@ test_that("apply_interval_groups returns distinct intervals unchanged", {
 
     result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = list(
+        group_channels = list(
             c("smo2_left", "smo2_right"),
             c("smo2_left", "smo2_right")
         ),
@@ -1148,7 +1148,7 @@ test_that("apply_interval_groups ensembles all intervals with 'ensemble'", {
 
     result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = list(
+        group_channels = list(
             c("smo2_left", "smo2_right"),
             c("smo2_left", "smo2_right")
         ),
@@ -1179,7 +1179,7 @@ test_that("apply_interval_groups handles custom grouping", {
 
     result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = rep(list(c("smo2_left", "smo2_right")), 4),
+        group_channels = rep(list(c("smo2_left", "smo2_right")), 4),
         metadata = metadata,
         group_intervals = list(c(1, 2), c(3, 4)),
         zero_time = TRUE,
@@ -1193,7 +1193,7 @@ test_that("apply_interval_groups handles custom grouping", {
     expect_message(
         result <- apply_interval_groups(
             df_list = df_list,
-            nirs_channels = rep(list(c("smo2_left", "smo2_right")), 3),
+            group_channels = rep(list(c("smo2_left", "smo2_right")), 3),
             metadata = metadata,
             group_intervals = list(c(1, 2), 4),
             zero_time = TRUE,
@@ -1209,7 +1209,7 @@ test_that("apply_interval_groups handles custom grouping", {
     expect_warning(
         result <- apply_interval_groups(
             df_list = df_list,
-            nirs_channels = rep(list(c("smo2_left", "smo2_right")), 3),
+            group_channels = rep(list(c("smo2_left", "smo2_right")), 3),
             metadata = metadata,
             group_intervals = list(c(1, 2, 3), c(2, 4)),
             zero_time = TRUE,
@@ -1226,7 +1226,7 @@ test_that("apply_interval_groups returns single interval as distinct regardless"
 
     result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = list(c("smo2_left", "smo2_right")),
+        group_channels = list(c("smo2_left", "smo2_right")),
         metadata = metadata,
         group_intervals = "ensemble", # request ensemble but only 1 interval
         zero_time = FALSE,
@@ -1250,7 +1250,7 @@ test_that("apply_interval_groups (distinct) preserves all metadata on each inter
 
     result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = list(
+        group_channels = list(
             c("smo2_left", "smo2_right"),
             c("smo2_left", "smo2_right")
         ),
@@ -1301,7 +1301,7 @@ test_that("apply_interval_groups custom multi-interval groups preserve metadata"
 
     result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = rep(list(c("smo2_left", "smo2_right")), 4),
+        group_channels = rep(list(c("smo2_left", "smo2_right")), 4),
         metadata = metadata,
         group_intervals = list(c(1, 2), c(3, 4)),
         # zero_time = FALSE, ## ensemble auto zeroes
@@ -1358,7 +1358,7 @@ test_that("apply_interval_groups custom single-interval group retains original a
     ## intervals 1+2 ensembled; interval 3 returned as lone group (raw)
     result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = rep(list(c("smo2_left", "smo2_right")), 3),
+        group_channels = rep(list(c("smo2_left", "smo2_right")), 3),
         metadata = metadata,
         group_intervals = list(c(1, 2), 3),
         zero_time = FALSE,
@@ -1375,7 +1375,7 @@ test_that("apply_interval_groups custom single-interval group retains original a
     ## with `zero_time = TRUE`
     result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = rep(list(c("smo2_left", "smo2_right")), 3),
+        group_channels = rep(list(c("smo2_left", "smo2_right")), 3),
         metadata = metadata,
         group_intervals = list(c(1, 2), 3),
         zero_time = TRUE,
@@ -1804,8 +1804,7 @@ test_that("extract_intervals errors & messages", {
             verbose = TRUE
         ),
         regexp = "partially outside"
-    ) |>
-        expect_message("nirs_channels.*grouped together")
+    )
 
     expect_length(result, 1)
     ## start value bounded by time = zero
@@ -1842,39 +1841,11 @@ test_that("extract_intervals respects nirs_channels metadata", {
 })
 
 
-test_that("extract_intervals informs when nirs_channels is not a list()", {
+test_that("extract_intervals errors on deprecated nirs_channels = list()", {
     data <- create_mock_mnirs(n = 60, sample_rate = 10)
-    attr(data, "nirs_channels") <- NULL  ## remove metadata
 
-    ## fires: verbose=TRUE, ensemble, no metadata, non-list channels
-    expect_message(
-        extract_intervals(
-            data,
-            nirs_channels = "smo2_left",
-            time_channel = "time",
-            group_intervals = "ensemble",
-            start = by_time(1, 4),
-            span = c(-0.5, 0.5),
-            verbose = TRUE
-        ),
-        "list\\(\\).*channel grouping"
-    )
-
-    ## silent: verbose=FALSE
-    expect_no_message(
-        extract_intervals(
-            data,
-            nirs_channels = "smo2_left",
-            time_channel = "time",
-            group_intervals = "ensemble",
-            start = by_time(1, 4),
-            span = c(-0.5, 0.5),
-            verbose = FALSE
-        )
-    )
-
-    ## silent: nirs_channels already a list()
-    expect_no_message(
+    ## list-form nirs_channels replaced by group_channels
+    expect_error(
         extract_intervals(
             data,
             nirs_channels = list("smo2_left"),
@@ -1882,36 +1853,78 @@ test_that("extract_intervals informs when nirs_channels is not a list()", {
             group_intervals = "ensemble",
             start = by_time(1, 4),
             span = c(-0.5, 0.5),
-            verbose = TRUE
-        )
+            verbose = FALSE
+        ),
+        "group_channels"
+    )
+})
+
+test_that("extract_intervals group_channels selects channels per interval", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    ## channel excluded from interval 2 contributes no data to its
+    ## ensemble-mean; smo2_right must equal interval 1 values alone
+    result <- extract_intervals(
+        data = data,
+        group_intervals = "ensemble",
+        group_channels = list(c("smo2_left", "smo2_right"), "smo2_left"),
+        start = by_time(2, 5),
+        span = c(-0.5, 0.5),
+        verbose = FALSE
     )
 
-    ## silent: group_intervals = "distinct"
-    expect_no_message(
+    interval1 <- extract_intervals(
+        data = data,
+        start = by_time(2),
+        span = c(-0.5, 0.5),
+        zero_time = TRUE,
+        verbose = FALSE
+    )[[1L]]
+
+    expect_named(result, "ensemble")
+    expect_named(result[[1L]], c("time", "smo2_left", "smo2_right"))
+    expect_equal(result$ensemble$smo2_right, interval1$smo2_right)
+    ## non-excluded channel still averages both intervals
+    expect_false(isTRUE(all.equal(
+        result$ensemble$smo2_left, interval1$smo2_left
+    )))
+
+    ## unknown channels error
+    expect_error(
         extract_intervals(
-            data,
-            nirs_channels = "smo2_left",
-            time_channel = "time",
-            group_intervals = "distinct",
-            start = by_time(1, 4),
+            data = data,
+            group_channels = "bogus",
+            start = by_time(2, 5),
             span = c(-0.5, 0.5),
-            verbose = TRUE
-        )
+            verbose = FALSE
+        ),
+        "not recognised"
+    )
+})
+
+test_that("extract_intervals passes group_intervals names to output", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    result <- extract_intervals(
+        data = data,
+        group_intervals = list(low = c(1, 3), high = c(2, 4)),
+        start = by_time(2, 4, 6, 8),
+        span = c(-0.3, 0.3),
+        verbose = FALSE
     )
 
-    ## silent: data has nirs_channels metadata
-    attr(data, "nirs_channels") <- "smo2_left"
-    expect_no_message(
-        extract_intervals(
-            data,
-            nirs_channels = "smo2_left",
-            time_channel = "time",
-            group_intervals = "ensemble",
-            start = by_time(1, 4),
-            span = c(-0.5, 0.5),
-            verbose = TRUE
-        )
+    expect_named(result, c("low", "high"))
+
+    ## partially named: unnamed groups fall back to interval ids
+    result <- extract_intervals(
+        data = data,
+        group_intervals = list(low = c(1, 3), c(2, 4)),
+        start = by_time(2, 4, 6, 8),
+        span = c(-0.3, 0.3),
+        verbose = FALSE
     )
+
+    expect_named(result, c("low", "interval_2_4"))
 })
 
 test_that("extract_intervals returns a list of class mnirs", {
@@ -2067,21 +2080,21 @@ test_that("extract_intervals benchmark", {
         verbose = FALSE
     )
     
-    for (i in seq_len(3)) {
-        bm <- bench::mark(
-            extract_intervals = extract_intervals(
-                data,
-                group_intervals = "distinct",
-                start = by_label("occlusion", ignore_case = TRUE),
-                span = c(1, 5),
-                zero_time = FALSE,
-                verbose = TRUE
-            ),
-            iterations = 50,
-            check = FALSE
-        )
-        print(bm)
-    }
+    # for (i in seq_len(3)) {
+    #     bm <- bench::mark(
+    #         extract_intervals = extract_intervals(
+    #             data,
+    #             group_intervals = "distinct",
+    #             start = by_label("occlusion", ignore_case = TRUE),
+    #             span = c(1, 5),
+    #             zero_time = FALSE,
+    #             verbose = TRUE
+    #         ),
+    #         iterations = 50,
+    #         check = FALSE
+    #     )
+    #     print(bm)
+    # }
 
     itr_per_sec <- bm$`itr/sec`
     mem_alloc <- as.numeric(bm$mem_alloc)

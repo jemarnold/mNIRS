@@ -681,6 +681,19 @@ test_that("init_inflection() falls back to mean-rate slope on flat response", {
     expect_true(is.finite(res$xmid))
 })
 
+test_that("init_inflection() falls back to half-response point on non-finite xmid", {
+    ## derivative peak lands on a non-finite `t` -> xmid_init non-finite ->
+    ## fallback to the half-response point x = (A + B) / 2
+    x <- c(0, 0, 0, 0, 100, 50, 50, 50)
+    t <- c(0, 1, Inf, 3, 4, 5, 6, 7)
+
+    res <- init_inflection(x, t, A_init = 0, B_init = 100)
+
+    expect_true(is.finite(res$xmid))
+    ## first t where x reaches the half-response (50) is index 6, t = 5
+    expect_equal(res$xmid, 5)
+})
+
 test_that("init_inflection() returns derivative-based estimates on clean sigmoid", {
     ## non-degenerate data bypasses both fallbacks
     t <- seq(0, 60, length.out = 200)

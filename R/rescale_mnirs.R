@@ -118,7 +118,7 @@ rescale_mnirs <- function(
             with = I("the `group_channels` argument")
         )
     }
-    nirs_channels <- validate_nirs_channels(nirs_parsed, data, verbose)
+    nirs_channels <- validate_nirs_channels(nirs_parsed, data)
     group_channels <- validate_group_channels(
         nirs_channels,
         enquo(group_channels),

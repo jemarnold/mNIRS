@@ -27,13 +27,7 @@ validate_numeric(
 
 validate_mnirs_data(data, ncol = 2L, env = rlang::caller_env())
 
-validate_nirs_channels(
-  nirs_channels,
-  data,
-  verbose = FALSE,
-  as_list = FALSE,
-  env = rlang::caller_env()
-)
+validate_nirs_channels(nirs_channels, data, env = rlang::caller_env())
 
 validate_time_channel(time_channel, data, env = rlang::caller_env())
 
@@ -100,16 +94,6 @@ operate on. Must match column names in \code{data} exactly.
 used.
 }}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
-
-\item{as_list}{Logical. Default is \code{FALSE}. If \code{nirs_channels} is specified
-as a list, it will be coerced to a flat character vector and an
-information message is displayed (when \code{verbose = TRUE}). If \code{TRUE},
-\code{nirs_channels} is returned as-is, i.e. as a list for callers which
-require it.}
-
 \item{time_channel}{A character string naming the time or sample column.
 Must match a column name in \code{data} exactly.
 \itemize{
@@ -133,6 +117,10 @@ present or detected in metadata. If \code{FALSE}, \code{event_channel} may be \c
 be used if detected, or the sample rate will be estimated from
 \code{time_channel}.
 }}
+
+\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
+warnings and information messages helpful for troubleshooting. Ad
+global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 Returns the validated object (e.g. a resolved \code{time_channel}

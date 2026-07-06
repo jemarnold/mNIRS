@@ -548,9 +548,7 @@ analyse_logistic <- function(
 ) {
     ## validation ==================================================
     validate_mnirs_data(data, env = env)
-    nirs_channels <- validate_nirs_channels(
-        enquo(nirs_channels), data, verbose, env = env
-    )
+    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, env)
     time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
     t_vec <- data[[time_channel]]
     args <- list(...)

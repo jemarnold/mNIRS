@@ -249,9 +249,7 @@ filter_mnirs.smooth_spline <- function(
     ## report conditions as coming from the user-facing generic
     env <- sys.call(-1)
     metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(
-        enquo(nirs_channels), data, verbose, env = env
-    )
+    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, env)
     time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
 
     ## broadcast global args, applying any per-channel list() overrides
@@ -331,9 +329,7 @@ filter_mnirs.butterworth <- function(
     ## report conditions as coming from the user-facing generic
     env <- sys.call(-1)
     metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(
-        enquo(nirs_channels), data, verbose, env = env
-    )
+    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, env)
     time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
     args <- list(...)
     sample_rate <- args$sample_rate
@@ -431,9 +427,7 @@ filter_mnirs.moving_average <- function(
     ## report conditions as coming from the user-facing generic
     env <- sys.call(-1)
     metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(
-        enquo(nirs_channels), data, verbose, env = env
-    )
+    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, env)
     time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
     args <- list(...)
 

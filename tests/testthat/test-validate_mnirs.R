@@ -238,7 +238,7 @@ test_that("parse_channel_name returns NULL on logical channel", {
 ## validate_nirs_channels() ========================================
 test_that("validate_nirs_channels() uses metadata when NULL", {
     data <- create_test_data()
-    result <- validate_nirs_channels(NULL, data, verbose = FALSE)
+    result <- validate_nirs_channels(NULL, data)
     expect_equal(result, c("nirs1", "nirs2"))
 })
 
@@ -248,7 +248,7 @@ test_that("validate_nirs_channels() uses explicit channels when provided", {
     expect_equal(result, "nirs1")
 })
 
-test_that("validate_nirs_channels() works with nirs_channels = list()", {
+test_that("validate_nirs_channels() accepts vectors and quosures", {
     data <- create_test_data()
     nirs_vec <- c("nirs1", "nirs2")
     result <- validate_nirs_channels(nirs_vec, data)
@@ -256,22 +256,6 @@ test_that("validate_nirs_channels() works with nirs_channels = list()", {
 
     result <- validate_nirs_channels(enquo(nirs_vec), data)
     expect_equal(result, nirs_vec)
-
-    attr(data, "nirs_channels") <- nirs_vec
-    expect_message(
-        result <- validate_nirs_channels(
-            NULL, data, verbose = TRUE, as_list = TRUE
-        ),
-        "`nirs_channels`.*grouped"
-    )
-    expect_equal(result, nirs_vec)
-
-    nirs_list <- list(c("nirs1", "nirs2"), "nirs3")
-    result <- validate_nirs_channels(nirs_list, data, as_list = TRUE)
-    expect_equal(result, nirs_list)
-
-    result <- validate_nirs_channels(enquo(nirs_list), data, as_list = TRUE)
-    expect_equal(result, nirs_list)
 })
 
 test_that("validate_nirs_channels() errors when not in metadata or provided", {
@@ -309,13 +293,11 @@ test_that("validate_nirs_channels() errors when < 2 valid values", {
     )
 })
 
-test_that("validate_nirs_channels() silently flattens list on default path", {
+test_that("validate_nirs_channels() silently flattens list input", {
     data <- create_test_data()
     nirs_list <- list(c("nirs1", "nirs2"), "nirs3")
     expect_no_message(
-        result <- validate_nirs_channels(
-            nirs_list, data, verbose = TRUE, as_list = FALSE
-        )
+        result <- validate_nirs_channels(nirs_list, data)
     )
     expect_equal(result, c("nirs1", "nirs2", "nirs3"))
 })

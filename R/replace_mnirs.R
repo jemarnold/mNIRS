@@ -174,7 +174,7 @@ replace_mnirs <- function(
     }
     validate_mnirs_data(data)
     metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
+    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data)
     time_channel <- validate_time_channel(enquo(time_channel), data)
     t_vec <- data[[time_channel]]
 

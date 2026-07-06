@@ -11,6 +11,7 @@ extract_intervals(
   event_channel = NULL,
   sample_rate = NULL,
   group_intervals = c("distinct", "ensemble"),
+  group_channels = NULL,
   start = NULL,
   end = NULL,
   span = list(c(-60, 60)),
@@ -23,14 +24,12 @@ extract_intervals(
 \item{data}{A data frame of class \emph{"mnirs"} containing time series data and
 metadata, or a \code{list()} of such data frames.}
 
-\item{nirs_channels}{A character vector or a \code{list()} of character vectors
-of mNIRS channel names to operate on within each interval (see \emph{Details}).
-Names must match column names in \code{data} exactly.
+\item{nirs_channels}{A character vector of mNIRS channel names to operate
+on. Names must match column names in \code{data} exactly.
 \itemize{
-\item Must only be specified when \code{group_intervals} contains \emph{"ensemble"}-
-averaged intervals. If \code{group_intervals = "distinct"} no channel
-processing occurs.
 \item If \code{NULL} (default), channels are retrieved from \emph{"mnirs"} metadata.
+\item \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} Passing a \code{list()} for per-group
+channel selection is deprecated; use \code{group_channels}.
 }}
 
 \item{time_channel}{A character string naming the time or sample column.
@@ -61,6 +60,16 @@ data frame.}
 all detected intervals, returning a single data frame.}
 \item{\code{list(c(1, 2), c(3, 4))}}{Ensemble-average each specified
 \code{nirs_channel} within each group and return one data frame per group.}
+}}
+
+\item{group_channels}{A character vector or a \code{list()} of character
+vectors selecting which \code{nirs_channels} are ensemble-averaged within
+each interval group (see \emph{Details}).
+\itemize{
+\item If \code{NULL} (default), all \code{nirs_channels} are used for every group.
+\item Only relevant when \code{group_intervals} contains \emph{"ensemble"}-averaged
+intervals; with \code{group_intervals = "distinct"} no channel processing
+occurs.
 }}
 
 \item{start}{Specifies where intervals begin. Either raw values -- numeric
@@ -156,23 +165,22 @@ boundary window: \verb{start = by_time(30), span = c(-5, 60)} returns
 }
 }
 
-\subsection{Per-interval nirs_channels for ensemble-averaging}{
+\subsection{Per-group channel selection with group_channels}{
 
 When \code{group_intervals = "ensemble"} or a list of numeric grouped intervals,
-\code{nirs_channels} can be specified as a list of column names to override
-ensemble-averaging across interval. For example, to exclude a channel
-in one interval:
+\code{group_channels} can be specified as a list of column names to override
+which channels are ensemble-averaged within each group. For example, to
+exclude a channel from one interval:
 
-\if{html}{\out{<div class="sourceCode r">}}\preformatted{nirs_channels = list(
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{group_channels = list(
   c(A, B, C),
-  c(A, C) ## channel "B" is excluded
+  c(A, C) ## channel "B" data are excluded from the second interval
 )
 }\if{html}{\out{</div>}}
 
-If all grouped intervals can include all \code{nirs_channels}, or if
-\code{group_intervals = "distinct"}, a single \code{nirs_channels} character vector can
-be supplied and recycled to all groups, or left as \code{NULL} for channels to
-be taken from \emph{"mnirs"} metadata.
+If all grouped intervals include all \code{nirs_channels}, \code{group_channels} can
+be left as \code{NULL} (the default) and all channels are ensemble-averaged
+within every group.
 }
 
 \subsection{Grouping intervals}{
@@ -197,7 +205,7 @@ for each group. Any intervals detected but not specified in
 returned list of data frames.
 
 When \code{group_intervals} is a list of numeric interval numbers, list items in
-\code{nirs_channels} and \code{span} are recycled to the number of groups. If lists
+\code{group_channels} and \code{span} are recycled to the number of groups. If lists
 are only partially specified, the final item is recycled forward as needed.
 Extra items are ignored.
 }

@@ -168,6 +168,51 @@ as_mnirs_interval <- function(x, arg = "start", env = rlang::caller_env()) {
 }
 
 
+#' Validate per-group channel selections for ensemble-averaging
+#'
+#' Normalises `group_channels` to a list of channel-name vectors for
+#' recycling across interval groups. `NULL` selects all `nirs_channels` for
+#' every group. Unlike [validate_group_channels()], channels may repeat
+#' across list items: each item is one group's channel selection.
+#'
+#' @inheritParams validate_mnirs
+#' @keywords internal
+validate_interval_channels <- function(
+    group_channels,
+    nirs_channels,
+    data = NULL,
+    env = rlang::caller_env()
+) {
+    ## parse tidy eval input
+    if (rlang::is_quosure(group_channels)) {
+        group_channels <- parse_channel_name(
+            group_channels,
+            data,
+            rlang::quo_get_env(group_channels)
+        )
+    }
+    if (is.null(group_channels)) {
+        return(list(nirs_channels))
+    }
+    if (!is.list(group_channels)) {
+        group_channels <- list(group_channels)
+    }
+
+    ## group members must be known channels
+    members <- unlist(group_channels, use.names = FALSE)
+    unknown <- setdiff(members, nirs_channels)
+    if (!is.character(members) || length(unknown) > 0L) {
+        cli_abort(c(
+            "x" = "{.arg group_channels}: channel{?s} {.val {unknown}} \\
+            not recognised.",
+            "i" = "Grouped channel names must match {.arg nirs_channels} \\
+            exactly."
+        ), call = env)
+    }
+    return(group_channels)
+}
+
+
 #' recycle a single-element span to c(before, after)
 #' positive -> c(0, x), negative -> c(x, 0)
 #' @inheritParams validate_mnirs
@@ -204,8 +249,10 @@ find_interval_time <- function(
         label = {
             ## OR per-label matches; grepl(fixed = TRUE) can't take a|b
             matches <- which(Reduce(`|`, lapply(interval$by_label, \(.p) {
-                grepl(
-                    .p, event_vec, ignore.case = interval$ignore_case, fixed = interval$fixed
+                grepl(.p,
+                    event_vec,
+                    ignore.case = interval$ignore_case,
+                    fixed = interval$fixed
                 )
             })))
             if (length(matches) == 0L) {
@@ -354,33 +401,23 @@ recycle_param <- function(
         list(param)
     }
 
-    ## custom grouping: recycle per group, then map to event order
-    if (is.numeric(group_intervals[[1L]])) {
-        n_groups <- length(group_intervals)
-        groups_unlisted <- unlist(group_intervals)
-
-        ## recycle param to number of groups
-        param <- recycle_to_length(param, n_groups, "group", verbose, env)
-
-        ## create mapping:  event_id -> group_id
-        ## rep(1:n_groups, lengths(group_intervals)) gives group index per event in group_intervals
-        group_for_event <- rep(seq_len(n_groups), lengths(group_intervals))
-
-        ## build lookup:  position i holds group index for event i (NA if ungrouped)
-        event_to_group <- integer(n_events)
-        valid_events <- groups_unlisted[groups_unlisted <= n_events]
-        valid_groups <- group_for_event[groups_unlisted <= n_events]
-        event_to_group[valid_events] <- valid_groups
-
-        ## fill ungrouped (zero) positions with last group index
-        event_to_group[event_to_group == 0L] <- n_groups
-
-        ## index into param by group assignment
-        return(param[event_to_group])
+    ## standard recycling to events for "distinct" or "ensemble"
+    if (!is.numeric(group_intervals[[1L]])) {
+        return(recycle_to_length(param, n_events, "event", verbose, env))
     }
 
-    ## standard recycling for "distinct" or "ensemble"
-    return(recycle_to_length(param, n_events, "event", verbose, env))
+    ## custom grouping: recycle per group, then map to event order;
+    ## ungrouped events take the last group's value
+    n_groups <- length(group_intervals)
+    param <- recycle_to_length(param, n_groups, "group", verbose, env)
+    ids <- unlist(group_intervals, use.names = FALSE)
+    keep <- ids <= n_events
+    event_to_group <- rep(n_groups, n_events)
+    event_to_group[ids[keep]] <- rep(
+        seq_len(n_groups),
+        lengths(group_intervals)
+    )[keep]
+    return(param[event_to_group])
 }
 
 
@@ -463,7 +500,7 @@ extract_df_list <- function(
     data,
     t_vec,
     interval_spec,
-    nirs_channels ## as list
+    group_channels ## list of per-interval channel vectors
 ) {
     n_vec <- seq_len(nrow(interval_spec))
     df_list <- lapply(n_vec, \(.i) {
@@ -474,7 +511,7 @@ extract_df_list <- function(
         ## return interval_data with metadata
         create_mnirs_data(
             interval_data,
-            nirs_channels = nirs_channels[[.i]], ## overwrite for interval data
+            nirs_channels = group_channels[[.i]], ## overwrite for interval data
             interval_times = interval_spec$interval_times[[.i]],
             interval_span = c(
                 interval_spec$span_before[.i],
@@ -498,43 +535,56 @@ zero_offset_data <- function(data, time_channel, t0) {
 
 
 #' Ensemble average multiple intervals
+#'
+#' `group_channels` is a character vector applied to every interval, or a
+#' list of per-interval channel vectors; channels excluded from an interval
+#' do not contribute to that channel's ensemble-mean.
+#'
 #' @inheritParams validate_mnirs
 #' @keywords internal
 ensemble_intervals <- function(
     df_list,
-    nirs_channels,
+    group_channels,
     metadata,
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
     time_channel <- metadata$time_channel
     sample_rate <- metadata$sample_rate
+    if (!is.list(group_channels)) {
+        group_channels <- rep(list(group_channels), length(df_list))
+    }
+    nirs_channels <- unique(unlist(group_channels, use.names = FALSE))
+
     ## extract data & metadata from df_list
-    interval_data <- lapply(df_list, \(.df) {
+    interval_data <- Map(\(.df, .channels) {
         interval_times <- attr(.df, "interval_times")
-        time_channel <- attr(.df, "time_channel")
-        ## zero-offset to start time (first element of interval_times)
+        ## zero-offset to start time (first element of interval_times);
+        ## ensemble-averaging time values makes no sense
         t0 <- interval_times[[1L]]
-        ## return data & metadata from each interval
+        ## NA-out channels excluded from this interval so binned means
+        ## only average member channels
+        excluded <- setdiff(nirs_channels, .channels)
+        if (length(excluded) > 0L) {
+            .df[excluded] <- NA_real_
+        }
         list(
-            ## ensemble-average time values makes no sense, so return zero-offset
-            data = zero_offset_data(.df, time_channel, t0),
+            data = zero_offset_data(.df, attr(.df, "time_channel"), t0),
             interval_times = interval_times - t0, ## zero_time recalc
             interval_span = attr(.df, "interval_span")
         )
-    })
+    }, df_list, group_channels)
 
     ## stack interval data frames
     df_long <- do.call(rbind, lapply(interval_data, `[[`, "data"))
     ## resample times to nearest estimated sample rate for binned ensembling
     time_resampled <- round(df_long[[time_channel]] * sample_rate) / sample_rate
-    ## split row indices by unique time
-    time_groups <- split(seq_len(nrow(df_long)), time_resampled)
-    unique_times <- as.numeric(names(time_groups))
+    unique_times <- sort(unique(time_resampled))
+    bins <- match(time_resampled, unique_times)
 
     ## warn if any time samples have only one value, implying irregular
     ## samples and may result in alternating samples instead of ensemble-means
-    if (verbose && any(lengths(time_groups) < 2L)) {
+    if (verbose && any(tabulate(bins) < 2L)) {
         cli_warn(c(
             "!" = "Duplicate or irregular {.arg time_channel} samples \\
             detected after ensemble-averaging.",
@@ -544,29 +594,24 @@ ensemble_intervals <- function(
         ), call = warn_call(env))
     }
 
-    col_n <- length(nirs_channels)
-    ## nirs_channel-wise means per unique time matrix operation
-    ## nirs_channel must be vectorised and exist in the interval_data
-    channel_matrix <- as.matrix(df_long[, nirs_channels, drop = FALSE])
-    result_matrix <- vapply(time_groups, \(.idx) {
-        colMeans(channel_matrix[.idx, , drop = FALSE], na.rm = TRUE)
-    }, numeric(col_n))
-
-    ## vapply returns channels x times (or vector if 1 channel)
-    ## coerce to times x channels data frame
-    result_df <- if (col_n == 1L) {
-        data.frame(setNames(list(result_matrix), nirs_channels))
-    } else {
-        as.data.frame(t(result_matrix))
-    }
-    result <- data.frame(setNames(list(unique_times), time_channel), result_df)
+    ## channel-wise binned means as one matrix operation;
+    ## sums / non-NA counts matches colMeans(na.rm = TRUE) per bin;
+    ## rows with missing time values are excluded from binning
+    valid <- which(!is.na(bins))
+    channel_matrix <- as.matrix(df_long[valid, nirs_channels, drop = FALSE])
+    channel_sums <- rowsum(channel_matrix, bins[valid], na.rm = TRUE)
+    channel_counts <- rowsum(1L - is.na(channel_matrix), bins[valid])
+    result <- data.frame(
+        setNames(list(unique_times), time_channel),
+        as.data.frame(channel_sums / channel_counts)
+    )
 
     ## return with metadata
     return(
         create_mnirs_data(
             result,
             nirs_device = metadata$nirs_device,
-            nirs_channels = unique(nirs_channels),
+            nirs_channels = nirs_channels,
             time_channel = time_channel,
             event_channel = metadata$event_channel,
             sample_rate = sample_rate,
@@ -581,12 +626,11 @@ ensemble_intervals <- function(
 #' @keywords internal
 preserve_metadata <- function(data, metadata, zero_time = FALSE) {
     if (zero_time) {
-        ## Zero-offset a single interval's time and interval_times attr
+        ## zero-offset a single interval's time and interval_times attr
         interval_times <- attr(data, "interval_times")
         t0 <- interval_times[[1L]]
         data <- zero_offset_data(data, metadata$time_channel, t0)
         attr(data, "interval_times") <- interval_times - t0
-        data
     }
 
     return(
@@ -605,47 +649,25 @@ preserve_metadata <- function(data, metadata, zero_time = FALSE) {
 }
 
 
-#' Apply grouping to intervals
+#' Normalise custom interval grouping to a complete named list
+#'
+#' Adds intervals missing from a custom `group_intervals` list as
+#' single-interval groups, warns on duplicates, and names groups by
+#' user-supplied names with `interval_<ids>` fallback.
+#'
 #' @inheritParams validate_mnirs
 #' @keywords internal
-apply_interval_groups <- function(
-    df_list,
-    nirs_channels,
-    metadata,
+normalise_interval_groups <- function(
     group_intervals,
-    zero_time = FALSE,
+    n_intervals,
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
-    time_channel <- metadata$time_channel
-    n_intervals <- length(df_list)
-
-    ## return distinct intervals
-    if (n_intervals == 1L || group_intervals[[1L]][1L] == "distinct") {
-        return(lapply(df_list, \(.x) {
-            preserve_metadata(.x, metadata, zero_time)
-        }))
-    }
-
-    ## return ensembled intervals
-    if (group_intervals[[1L]][1L] == "ensemble") {
-        return(list(
-            ensemble = ensemble_intervals(
-                df_list,
-                unique(unlist(nirs_channels)),
-                metadata,
-                verbose,
-                env = env
-            )
-        ))
-    }
-
-    ## custom grouping ===================================
-    grouped_ids <- unlist(group_intervals)
-    ungrouped_ids <- setdiff(seq_len(n_intervals), grouped_ids)
+    grouped_ids <- unlist(group_intervals, use.names = FALSE)
 
     ## add ungrouped ids as individual groups, sort by position
-    if (length(ungrouped_ids) > 0) {
+    ungrouped_ids <- setdiff(seq_len(n_intervals), grouped_ids)
+    if (length(ungrouped_ids) > 0L) {
         group_intervals <- c(group_intervals, as.list(ungrouped_ids))
         group_intervals <- group_intervals[
             order(vapply(group_intervals, median, numeric(1), na.rm = TRUE))
@@ -660,7 +682,7 @@ apply_interval_groups <- function(
 
     ## warn for duplicated intervals across groups
     dupes <- grouped_ids[duplicated(grouped_ids)]
-    if (verbose && length(dupes) > 0) {
+    if (verbose && length(dupes) > 0L) {
         cli_warn(c(
             "!" = "Duplicates detected of {qty(length(dupes))} \\
             interval{?s} {.val {dupes}}.",
@@ -668,19 +690,47 @@ apply_interval_groups <- function(
         ), call = warn_call(env))
     }
 
-    ## process each group
-    result <- lapply(group_intervals, \(.g) {
+    ## user-supplied group names win; fall back to member indices
+    id_names <- vapply(group_intervals, \(.g) {
+        paste0("interval_", paste(.g, collapse = "_"))
+    }, character(1))
+    names <- names(group_intervals) %||% character(length(group_intervals))
+    return(setNames(group_intervals, ifelse(nzchar(names), names, id_names)))
+}
+
+
+#' Apply grouping to intervals
+#' @inheritParams validate_mnirs
+#' @keywords internal
+apply_interval_groups <- function(
+    df_list,
+    group_channels,
+    metadata,
+    group_intervals,
+    zero_time = FALSE,
+    verbose = TRUE,
+    env = rlang::caller_env()
+) {
+    n_intervals <- length(df_list)
+    spec <- group_intervals[[1L]][1L]
+
+    ## normalise grouping spec to a named list of interval-index vectors
+    groups <- if (n_intervals == 1L || identical(spec, "distinct")) {
+        setNames(as.list(seq_len(n_intervals)), names(df_list))
+    } else if (identical(spec, "ensemble")) {
+        list(ensemble = seq_len(n_intervals))
+    } else {
+        normalise_interval_groups(group_intervals, n_intervals, verbose, env)
+    }
+
+    ## single-interval groups pass through with metadata; multi-interval
+    ## groups are ensemble-averaged across their member intervals
+    return(lapply(groups, \(.g) {
         if (length(.g) == 1L) {
             return(preserve_metadata(df_list[[.g]], metadata, zero_time))
         }
-        ## multi-interval group: ensemble-average
-        group_nirs <- unique(unlist(nirs_channels[.g]))
-        ensemble_intervals(df_list[.g], group_nirs, metadata, verbose, env)
-    })
-
-    names(result) <- vapply(group_intervals, \(.g) {
-        paste0("interval_", paste(.g, collapse = "_"))
-    }, character(1))
-
-    return(result)
+        ensemble_intervals(
+            df_list[.g], group_channels[.g], metadata, verbose, env
+        )
+    }))
 }

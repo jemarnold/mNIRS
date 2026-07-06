@@ -7,13 +7,11 @@
 #' @param data A data frame of class *"mnirs"* containing time series data and
 #'   metadata, or a `list()` of such data frames.
 #'
-#' @param nirs_channels A character vector or a `list()` of character vectors
-#'   of mNIRS channel names to operate on within each interval (see *Details*).
-#'   Names must match column names in `data` exactly.
-#'   - Must only be specified when `group_intervals` contains *"ensemble"*-
-#'     averaged intervals. If `group_intervals = "distinct"` no channel
-#'     processing occurs.
+#' @param nirs_channels A character vector of mNIRS channel names to operate
+#'   on. Names must match column names in `data` exactly.
 #'   - If `NULL` (default), channels are retrieved from *"mnirs"* metadata.
+#'   - `r lifecycle::badge("deprecated")` Passing a `list()` for per-group
+#'     channel selection is deprecated; use `group_channels`.
 #'
 #' @param event_channel An *optional* character string giving the name of an
 #'   event/lap column. The column may contain character event labels or integer
@@ -35,6 +33,14 @@
 #'     \item{`list(c(1, 2), c(3, 4))`}{Ensemble-average each specified
 #'     `nirs_channel` within each group and return one data frame per group.}
 #'   }
+#'
+#' @param group_channels A character vector or a `list()` of character
+#'   vectors selecting which `nirs_channels` are ensemble-averaged within
+#'   each interval group (see *Details*).
+#'   - If `NULL` (default), all `nirs_channels` are used for every group.
+#'   - Only relevant when `group_intervals` contains *"ensemble"*-averaged
+#'     intervals; with `group_intervals = "distinct"` no channel processing
+#'     occurs.
 #'
 #' @param start Specifies where intervals begin. Either raw values -- numeric
 #'   for time values, character for event labels, explicit integer (e.g. `2L`)
@@ -107,24 +113,23 @@
 #'   boundary window: `start = by_time(30), span = c(-5, 60)` returns
 #'   `[25, 90]`.
 #'
-#' ## Per-interval nirs_channels for ensemble-averaging
+#' ## Per-group channel selection with group_channels
 #'
 #' When `group_intervals = "ensemble"` or a list of numeric grouped intervals,
-#' `nirs_channels` can be specified as a list of column names to override
-#' ensemble-averaging across interval. For example, to exclude a channel
-#' in one interval:
+#' `group_channels` can be specified as a list of column names to override
+#' which channels are ensemble-averaged within each group. For example, to
+#' exclude a channel from one interval:
 #'
 #' ```r
-#' nirs_channels = list(
+#' group_channels = list(
 #'   c(A, B, C),
-#'   c(A, C) ## channel "B" is excluded
+#'   c(A, C) ## channel "B" data are excluded from the second interval
 #' )
 #' ```
 #'
-#' If all grouped intervals can include all `nirs_channels`, or if
-#' `group_intervals = "distinct"`, a single `nirs_channels` character vector can
-#' be supplied and recycled to all groups, or left as `NULL` for channels to
-#' be taken from *"mnirs"* metadata.
+#' If all grouped intervals include all `nirs_channels`, `group_channels` can
+#' be left as `NULL` (the default) and all channels are ensemble-averaged
+#' within every group.
 #'
 #' ## Grouping intervals
 #'
@@ -148,7 +153,7 @@
 #' returned list of data frames.
 #'
 #' When `group_intervals` is a list of numeric interval numbers, list items in
-#' `nirs_channels` and `span` are recycled to the number of groups. If lists
+#' `group_channels` and `span` are recycled to the number of groups. If lists
 #' are only partially specified, the final item is recycled forward as needed.
 #' Extra items are ignored.
 #'
@@ -201,6 +206,7 @@ extract_intervals <- function(
     event_channel = NULL,
     sample_rate = NULL,
     group_intervals = c("distinct", "ensemble"),
+    group_channels = NULL,
     start = NULL,
     end = NULL,
     span = list(c(-60, 60)),
@@ -240,8 +246,19 @@ extract_intervals <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    nirs_channels <- validate_nirs_channels(
-        enquo(nirs_channels), data, verbose, as_list = TRUE
+    nirs_parsed <- parse_channel_name(enquo(nirs_channels), data)
+    if (is.list(nirs_parsed)) {
+        lifecycle::deprecate_stop(
+            when = "0.7.0",
+            what = I(paste(
+                "Passing a `list()` to `nirs_channels` for channel grouping"
+            )),
+            with = I("the `group_channels` argument")
+        )
+    }
+    nirs_channels <- validate_nirs_channels(nirs_parsed, data)
+    group_channels <- validate_interval_channels(
+        enquo(group_channels), nirs_channels, data
     )
     time_channel <- validate_time_channel(enquo(time_channel), data)
     ## avoid floating point precision issues downstream with findInterval()
@@ -291,19 +308,6 @@ extract_intervals <- function(
         event_vec <- NULL
     }
 
-    if (
-        verbose &&
-            group_intervals[1L] != "distinct" &&
-            is.null(attr(data, "nirs_channels")) &&
-            !is.list(nirs_channels)
-    ) {
-        cli_inform(c(
-            "!" = "{.fn extract_intervals} accepts {.arg nirs_channels} = \\
-            {col_blue('list()')} for channel grouping when \\
-            ensemble-averaging. See `?extract_intervals`."
-        ))
-    }
-
     ## expand parameters ====================================
     span <- if (is.list(span)) span else list(span)
     span <- lapply(span, recycle_span, env = env)
@@ -318,8 +322,8 @@ extract_intervals <- function(
     n_events <- length(interval_list$start_time)
 
     ## recycle params to match number of intervals
-    nirs_channels <- recycle_param(
-        nirs_channels,
+    group_channels <- recycle_param(
+        group_channels,
         n_events,
         group_intervals,
         verbose
@@ -330,12 +334,12 @@ extract_intervals <- function(
     interval_spec <- apply_span(interval_list, t_vec, span, verbose)
 
     ## extract interval data ===================================
-    df_list <- extract_df_list(data, t_vec, interval_spec, nirs_channels)
+    df_list <- extract_df_list(data, t_vec, interval_spec, group_channels)
 
     ## apply grouping logic ====================================
     result <- apply_interval_groups(
         df_list,
-        nirs_channels,
+        group_channels,
         metadata,
         group_intervals,
         zero_time,

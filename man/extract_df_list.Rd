@@ -4,7 +4,7 @@
 \alias{extract_df_list}
 \title{Extract interval data by time range}
 \usage{
-extract_df_list(data, t_vec, interval_spec, nirs_channels)
+extract_df_list(data, t_vec, interval_spec, group_channels)
 }
 \description{
 Extract interval data by time range

@@ -6,20 +6,13 @@
 \usage{
 ensemble_intervals(
   df_list,
-  nirs_channels,
+  group_channels,
   metadata,
   verbose = TRUE,
   env = rlang::caller_env()
 )
 }
 \arguments{
-\item{nirs_channels}{A character vector giving the names of mNIRS columns to
-operate on. Must match column names in \code{data} exactly.
-\itemize{
-\item If \code{NULL} (default), the \code{nirs_channels} metadata attribute of \code{data} is
-used.
-}}
-
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
@@ -29,6 +22,8 @@ errors and warnings as coming from the user-facing function rather
 than the validator.}
 }
 \description{
-Ensemble average multiple intervals
+\code{group_channels} is a character vector applied to every interval, or a
+list of per-interval channel vectors; channels excluded from an interval
+do not contribute to that channel's ensemble-mean.
 }
 \keyword{internal}
