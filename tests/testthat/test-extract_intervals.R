@@ -2059,52 +2059,130 @@ test_that("extract_intervals benchmark", {
     ## fails if itr/sec regresses by >10%
     skip("benchmark baseline test")
 
-    data_list <- read_mnirs(
-        example_mnirs("train.red"),
-        nirs_channels = c(
-            smo2_left = "SmO2 unfiltered",
-            smo2_right = "SmO2 unfiltered"
-        ),
-        time_channel = c(time = "Timestamp (seconds passed)"),
-        zero_time = TRUE,
+    data <- read_mnirs(
+        file_path = example_mnirs("portamon"),
+        nirs_channels = c(thb = 2, hhb = 3, o2hb = 4),
+        time_channel = c(sample = 1),
+        event_channel = c(label = "col_6"),
         verbose = FALSE
-    ) |>
-        resample_mnirs(method = "linear", verbose = FALSE)
-
-    # for (i in seq_len(3)) {
-    #     bm <- bench::mark(
-    #         extract_intervals = extract_intervals(
-    #             data_list,
-    #             group_intervals = "distinct",
-    #             start = by_time(368, 1084),
-    #             span = c(-20, 90),
-    #             zero_time = TRUE,
-    #             verbose = FALSE
-    #         ),
-    #         iterations = 50,
-    #         check = FALSE
-    #     )
-    #     print(bm)
-    # }
+    )
+    
+    for (i in seq_len(3)) {
+        bm <- bench::mark(
+            extract_intervals = extract_intervals(
+                data,
+                group_intervals = "distinct",
+                start = by_label("occlusion", ignore_case = TRUE),
+                span = c(1, 5),
+                zero_time = FALSE,
+                verbose = TRUE
+            ),
+            iterations = 50,
+            check = FALSE
+        )
+        print(bm)
+    }
 
     itr_per_sec <- bm$`itr/sec`
+    mem_alloc <- as.numeric(bm$mem_alloc)
 
-    ## baseline: update this value when optimising (seconds)
-    ## run test interactively to calibrate:
-    ##   itr_per_sec will be printed on first failure
-    baseline <- 330
-    threshold <- baseline * 1.10 ## 10% regression budget
+    ## baselines from documented example; update when optimising.
+    ## run test interactively to recalibrate on first failure.
+    itr_baseline <- 10.5          ## iterations per second (higher = better)
+    mem_baseline <- 4.18 * 1024^2 ## bytes (lower = better)
+
+    ## 10% regression budget
+    itr_floor <- itr_baseline * 0.90 ## min acceptable throughput
+    mem_ceiling <- mem_baseline * 1.10 ## max acceptable allocation
+
+    expect_gte(
+        itr_per_sec,
+        itr_floor,
+        label = sprintf(
+            "%.3f itr/sec below 90%% of baseline %.3f (floor %.3f)",
+            itr_per_sec,
+            itr_baseline,
+            itr_floor
+        )
+    )
 
     expect_lte(
-        itr_per_sec,
-        threshold,
+        mem_alloc,
+        mem_ceiling,
         label = sprintf(
-            "%.3f itr/sec exceeds %.0f%% of baseline %.3fs (limit %.3fs)",
-            itr_per_sec,
-            110,
-            baseline,
-            threshold
+            "%.2f MB exceeds 110%% of baseline %.2f MB (ceiling %.2f MB)",
+            mem_alloc / 1024^2,
+            mem_baseline / 1024^2,
+            mem_ceiling / 1024^2
         )
+    )
+})
+
+
+## list input dispatch =========================================
+test_that("extract_intervals flattens a list of data frames", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    result <- extract_intervals(
+        data = list(data, data),
+        group_intervals = "distinct",
+        start = by_time(2, 5),
+        span = c(-1, 1),
+        verbose = FALSE
+    )
+
+    ## single-layer list: 2 dfs x 2 intervals each
+    expect_s3_class(result, "mnirs")
+    expect_length(result, 4)
+    expect_true(all(vapply(result, tibble::is_tibble, logical(1))))
+    ## names follow `interval_<df>.<interval>`
+    expect_equal(
+        names(result),
+        c("interval_1.1", "interval_1.2", "interval_2.1", "interval_2.2")
+    )
+    ## interval data matches single-df output
+    expect_equal(result[[1]]$time[1], 2 - 1)
+    expect_equal(result[[3]]$time[1], 2 - 1)
+
+    ## single df input keeps unnested `interval_<n>` names
+    single <- extract_intervals(
+        data = data,
+        group_intervals = "distinct",
+        start = by_time(2, 5),
+        span = c(-1, 1),
+        verbose = FALSE
+    )
+    expect_equal(names(single), c("interval_1", "interval_2"))
+})
+
+test_that("extract_intervals names ensembles by input df across list inputs", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    result <- extract_intervals(
+        data = list(data, data),
+        nirs_channels = c(smo2_left, smo2_right),
+        group_intervals = "ensemble",
+        start = by_time(2, 5),
+        span = c(-1, 1),
+        verbose = FALSE
+    )
+
+    expect_s3_class(result, "mnirs")
+    expect_length(result, 2)
+    expect_equal(names(result), c("ensemble_1", "ensemble_2"))
+})
+
+test_that("extract_intervals errors on list with non-data-frame element", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    expect_error(
+        extract_intervals(
+            data = list(data, "not a df"),
+            start = by_time(2, 5),
+            span = c(-1, 1),
+            verbose = FALSE
+        ),
+        "must be a list of data frames"
     )
 })
 

@@ -4,6 +4,9 @@
 #' start and end boundaries by time value, event label, lap number, or sample
 #' index.
 #'
+#' @param data A data frame of class *"mnirs"* containing time series data and
+#'   metadata, or a `list()` of such data frames.
+#'
 #' @param nirs_channels A character vector or a `list()` of character vectors
 #'   of mNIRS channel names to operate on within each interval (see *Details*).
 #'   Names must match column names in `data` exactly.
@@ -150,7 +153,11 @@
 #' Extra items are ignored.
 #'
 #' @returns A named `list()` of [tibbles][tibble::tibble-package] of class
-#'   *"mnirs"*, each with metadata available via `attributes()`.
+#'   *"mnirs"*, each with metadata available via `attributes()`. When `data`
+#'   is a list of data frames, results are flattened into a single-layer
+#'   list with interval names indicating nested number of data frame and
+#'   interval as `interval_<df>.<interval>`. Other interval names (e.g.
+#'   `"ensemble"` or custom group names) are suffixed as `<name>_<df>`.
 #'
 #' @examples
 #' ## read example data
@@ -181,7 +188,7 @@
 #'
 #' \donttest{
 #'   if (requireNamespace("ggplot2", quietly = TRUE)) {
-#'     plot(interval_list[[1L]], time_labels = TRUE) +
+#'     plot(interval_list, time_labels = TRUE) +
 #'       ggplot2::geom_vline(xintercept = 0, linetype = "dotted")
 #'   }
 #' }
@@ -201,6 +208,25 @@ extract_intervals <- function(
     verbose = TRUE,
     event_groups = deprecated()
 ) {
+    ## list input → recurse per df, flatten nested interval lists
+    if (!is.data.frame(data)) {
+        nested <- map_mnirs_intervals(data, match.call(), parent.frame())
+        ## rename intervals `interval_<df>.<interval>` before flattening;
+        ## other names (e.g. "ensemble", <custom>) get `<name>_<df>` suffix
+        nested <- lapply(seq_along(nested), \(.i) {
+            .x <- nested[[.i]]
+            names(.x) <- ifelse(
+                startsWith(names(.x), "interval_"),
+                sub("^interval_", paste0("interval_", .i, "."), names(.x)),
+                paste0(names(.x), "_", .i)
+            )
+            .x
+        })
+        result <- unlist(nested, recursive = FALSE)
+        class(result) <- c("mnirs", class(result))
+        return(result)
+    }
+
     ## validation ==============================================
     if (lifecycle::is_present(event_groups)) {
         lifecycle::deprecate_stop(

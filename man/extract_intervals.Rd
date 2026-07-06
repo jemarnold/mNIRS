@@ -21,7 +21,7 @@ extract_intervals(
 }
 \arguments{
 \item{data}{A data frame of class \emph{"mnirs"} containing time series data and
-metadata.}
+metadata, or a \code{list()} of such data frames.}
 
 \item{nirs_channels}{A character vector or a \code{list()} of character vectors
 of mNIRS channel names to operate on within each interval (see \emph{Details}).
@@ -100,7 +100,11 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 A named \code{list()} of \link[tibble:tibble-package]{tibbles} of class
-\emph{"mnirs"}, each with metadata available via \code{attributes()}.
+\emph{"mnirs"}, each with metadata available via \code{attributes()}. When \code{data}
+is a list of data frames, results are flattened into a single-layer
+list with interval names indicating nested number of data frame and
+interval as \verb{interval_<df>.<interval>}. Other interval names (e.g.
+\code{"ensemble"} or custom group names) are suffixed as \verb{<name>_<df>}.
 }
 \description{
 Extract intervals from \emph{"mnirs"} time series data, specifying interval
@@ -227,7 +231,7 @@ interval_list[[1L]]
 
 \donttest{
   if (requireNamespace("ggplot2", quietly = TRUE)) {
-    plot(interval_list[[1L]], time_labels = TRUE) +
+    plot(interval_list, time_labels = TRUE) +
       ggplot2::geom_vline(xintercept = 0, linetype = "dotted")
   }
 }
