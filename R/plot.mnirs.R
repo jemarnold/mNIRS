@@ -153,6 +153,295 @@ plot.mnirs <- function(
 }
 
 
+#' Plot *{mnirs}* kinetics results
+#'
+#' Create a default plot for an *"mnirs_kinetics"* object returned from
+#' [analyse_kinetics()]. Observed signals are drawn per `nirs_channel`, faceted
+#' by interval, with the fitted response overlaid and the key kinetics
+#' coefficient(s) annotated per panel.
+#'
+#' @param x An *"mnirs_kinetics"* object from [analyse_kinetics()].
+#' @param fitted Logical. Default is `TRUE`; overlays a dashed fitted curve for
+#'   parametric methods (`"peak_slope"`, `"monoexponential"`, `"sigmoidal"`).
+#'   `"response_time"` has no fitted curve.
+#' @param markers Logical. Default is `TRUE`; draws a dotted vertical line at
+#'   the response onset (`start_time`) and key coefficient points.
+#' @param labels Logical. Default is `TRUE`; annotates each panel with the key
+#'   coefficient value(s) for the fitted method.
+#' @param ... Additional arguments passed to [plot.mnirs()], such as `points`,
+#'   `time_labels`, `nrow`, `ncol`, or `scales`.
+#'
+#' @returns A [ggplot2][ggplot2::ggplot()] object.
+#'
+#' @seealso [analyse_kinetics()], [plot.mnirs()]
+#'
+#' @examplesIf rlang::is_installed("ggplot2")
+#' result <- read_mnirs(
+#'     example_mnirs("train.red"),
+#'     nirs_channels = c(smo2 = "SmO2"),
+#'     time_channel = c(time = "Timestamp (seconds passed)"),
+#'     zero_time = TRUE,
+#'     verbose = FALSE
+#' ) |>
+#'     resample_mnirs(method = "linear", verbose = FALSE) |>
+#'     extract_intervals(
+#'         group_intervals = "distinct",
+#'         start = by_time(368, 1084),
+#'         span = c(-20, 90),
+#'         zero_time = TRUE,
+#'         verbose = FALSE
+#'     ) |>
+#'     analyse_kinetics(
+#'         method = "peak_slope",
+#'         span = 10,
+#'         verbose = FALSE
+#'     )
+#'
+#' plot(result)
+#'
+#' @export
+plot.mnirs_kinetics <- function(
+    x,
+    fitted = TRUE,
+    markers = TRUE,
+    labels = TRUE,
+    ...
+) {
+    check_installed("ggplot2", reason = "to plot mNIRS data")
+
+    ## open white marker for every kinetics key point
+    key_point <- function(mapping, data, ...) {
+        ggplot2::geom_point(
+            mapping,
+            data = data,
+            size = 3,
+            shape = 21,
+            stroke = 1,
+            fill = "white",
+            show.legend = FALSE,
+            ...
+        )
+    }
+
+    ## observed signal + facet + theme via existing plot.mnirs
+    p <- plot(x$data, ...)
+
+    ## bound frame: interval factor (when >1) + <channel>_fitted columns
+    plot_data <- as_plot_data(x$data)
+    nirs <- attr(plot_data, "nirs_channels")
+    time_channel <- attr(plot_data, "time_channel")
+    faceted <- "interval" %in% names(plot_data)
+
+    ## attach the resolved onset to each row for method-aware fitted overlay
+    onset <- x$interval_times[c("interval", "start_times")]
+    plot_data <- if (faceted) {
+        merge(plot_data, onset, by = "interval", sort = FALSE)
+    } else {
+        transform(plot_data, start_times = onset$start_times[[1L]])
+    }
+
+    ## fitted overlay ==========================================
+    ## parametric methods only: continuous dashed fitted curve in the
+    ## channel colour. response_time has no curve; its points are markers.
+    if (fitted && x$method != "response_time") {
+        p <- p +
+            lapply(nirs, \(.ch) {
+            fcol <- paste0(.ch, "_fitted")
+            ggplot2::geom_line(
+                ggplot2::aes(y = .data[[fcol]], colour = .ch),
+                data = plot_data[is.finite(plot_data[[fcol]]), , drop = FALSE],
+                linetype = "dashed",
+                linewidth = 1,
+                show.legend = FALSE
+            )
+        })
+    }
+
+    ## per-interval-per-channel markers and labels ============
+    ann <- kinetics_annotations(x)
+    if (!faceted) {
+        ann$interval <- NULL
+    }
+
+    if (markers) {
+        ## dotted onset line at the resolved start_time per interval
+        vdata <- unique(
+            ann[intersect(c("interval", "start_times"), names(ann))]
+        )
+        p <- p +
+            ggplot2::geom_vline(
+                ggplot2::aes(xintercept = start_times),
+                data = vdata,
+                linetype = "dotted",
+                colour = "grey50"
+            )
+        if (x$method == "response_time") {
+            ## response and extreme (fitted values after the onset) as points
+            p <- p +
+                lapply(nirs, \(.ch) {
+                fcol <- paste0(.ch, "_fitted")
+                post <- is.finite(plot_data[[fcol]]) &
+                    plot_data[[time_channel]] > plot_data$start_times
+                key_point(
+                    ggplot2::aes(y = .data[[fcol]], colour = .ch),
+                    plot_data[post, , drop = FALSE]
+                )
+            })
+            ## baseline as a single point at the onset (start_time, A)
+            base_pts <- merge(
+                x$coefficients[c("interval", "nirs_channels", "A")],
+                x$interval_times[c("interval", "start_times")],
+                by = "interval",
+                sort = FALSE
+            )
+            if (!faceted) {
+                base_pts$interval <- NULL
+            }
+            p <- p +
+                key_point(
+                    ggplot2::aes(
+                        x = start_times,
+                        y = A,
+                        colour = nirs_channels
+                    ),
+                    base_pts,
+                    inherit.aes = FALSE
+                )
+        } else {
+            ## single key-point marker for parametric methods
+            p <- p +
+                key_point(
+                    ggplot2::aes(x = xval, y = yval, colour = nirs_channels),
+                    ann[is.finite(ann$xval), , drop = FALSE],
+                    inherit.aes = FALSE
+                )
+        }
+    }
+
+    if (labels) {
+        ## anchor to the top or bottom-right corner per row; staggered vjust
+        ## keeps multi-channel labels from overlapping
+        p <- p +
+            ggplot2::geom_text(
+                ggplot2::aes(
+                    y = yval_corner,
+                    label = label,
+                    colour = nirs_channels,
+                    vjust = vjust
+                ),
+                data = ann,
+                x = Inf,
+                hjust = 1.05,
+                size = 4.5,
+                show.legend = FALSE,
+                inherit.aes = FALSE
+            )
+    }
+
+    return(p)
+}
+
+
+#' Build per-panel kinetics marker and label annotations
+#'
+#' Maps a fitted `mnirs_kinetics` method to its key coefficient marker
+#' (`xval`, `yval`) and formatted `label`, one row per `nirs_channel`
+#' per interval, for [plot.mnirs_kinetics()]. Marker x-coordinates are the
+#' resolved onset plus the method's time coefficient. Labels sit in the corner
+#' the fitted curve vacates: `yval_corner` is the top (`Inf`) when the signal
+#' falls (`A > B`) and the bottom (`-Inf`) when it rises, with `vjust`
+#' staggering stacked labels by channel rank within each interval-corner.
+#'
+#' @param x An *"mnirs_kinetics"* object from [analyse_kinetics()].
+#'
+#' @returns A `data.frame` with columns `interval`, `nirs_channels`,
+#'   `start_times`, `xval`, `yval`, `label`, `yval_corner`, and `vjust`.
+#'
+#' @keywords internal
+kinetics_annotations <- function(x) {
+    ## format numbers as display strings, preserving NA
+    fmt <- function(v) {
+        out <- rep("NA", length(v))
+        ok <- !is.na(v)
+        out[ok] <- signif_trailing(v[ok], 3L, "signif")
+        return(out)
+    }
+
+    coefs <- merge(
+        x$coefficients,
+        x$interval_times[c("interval", "start_times")],
+        by = "interval",
+        sort = FALSE
+    )
+
+    ## per-method: time offset (x), fitted value (y), and label formatter
+    spec <- switch(
+        x$method,
+        response_time = list(
+            offset = "response_time",
+            y = NA_character_,
+            label = sprintf("response time = %s s", fmt(coefs$response_time))
+        ),
+        peak_slope = list(
+            offset = "peak_slope_time",
+            y = "fitted",
+            label = sprintf("slope = %s", fmt(coefs$slope))
+        ),
+        monoexponential = list(
+            offset = "MRT",
+            y = "MRT_fitted",
+            label = sprintf(
+                "MRT = %s s\ntau = %s",
+                fmt(coefs$MRT),
+                fmt(coefs$tau)
+            )
+        ),
+        sigmoidal = list(
+            offset = "xmid",
+            y = "xmid_fitted",
+            label = sprintf(
+                "xmid = %s s\nslope = %s",
+                fmt(coefs$xmid),
+                fmt(coefs$slope)
+            )
+        )
+    )
+
+    ann <- data.frame(
+        interval = coefs$interval,
+        nirs_channels = coefs$nirs_channels,
+        start_times = coefs$start_times,
+        xval = coefs$start_times + coefs[[spec$offset]],
+        yval = if (is.na(spec$y)) NA_real_ else coefs[[spec$y]],
+        label = spec$label,
+        stringsAsFactors = FALSE
+    )
+
+    ## place labels in the corner the fitted curve vacates: top-right when
+    ## the signal falls (A > B), bottom-right when it rises. peak_slope has
+    ## no A/B, so fall back to the local slope sign as the trend proxy
+    rises <- if (all(c("A", "B") %in% names(coefs))) {
+        coefs$B > coefs$A
+    } else {
+        coefs$slope > 0
+    }
+    ann$yval_corner <- ifelse(rises, -Inf, Inf)
+
+    ## stagger stacked labels by channel rank within each interval-corner,
+    ## growing down from the top and up from the bottom
+    rank <- stats::ave(
+        seq_len(nrow(ann)),
+        ann$interval,
+        ann$yval_corner,
+        FUN = seq_along
+    ) -
+        1
+    ann$vjust <- ifelse(rises, -0.4 - rank * 1.4, 1.4 + rank * 1.4)
+
+    return(ann)
+}
+
+
 #' Validate and bind a list of mnirs data frames for plotting
 #' @inheritParams validate_mnirs
 #' @keywords internal
@@ -347,19 +636,20 @@ theme_mnirs <- function(
 #'
 #' @export
 palette_mnirs <- function(...) {
-    colours <- c(                         ## NIRS location codes
-        `light blue`  = "#0080ff",      ## "VL"
-        `dark red`    = "#ba2630",      ## "FCR"
-        `light green` = "#5b8c52",      ## "BB" "#7dbf70" alt
-        `pink`        = "#ff80ff",      ## "VM"
-        `orange`      = "#ff7f00",      ## "SCM"
-        `dark blue`   = "#00468Bff",    ## "TA"
-        `light red`   = "#db5555",      ## "ECR"
-        `green`       = "#42B540FF",    ## "DL"
-        `purple`      = "#9f79ee",      ## "RF"
-        `brown`       = "#8b4726",      ## "PS"
-        `blue`        = "#0000ff",      ## "HHb"
-        `red`         = "#ED0000FF"     ## "O2Hb"
+    colours <- c(
+        ## NIRS location codes
+        `light blue` = "#0080ff", ## "VL"
+        `dark red` = "#ba2630", ## "FCR"
+        `light green` = "#5b8c52", ## "BB" "#7dbf70" alt
+        `pink` = "#ff80ff", ## "VM"
+        `orange` = "#ff7f00", ## "SCM"
+        `dark blue` = "#00468Bff", ## "TA"
+        `light red` = "#db5555", ## "ECR"
+        `green` = "#42B540FF", ## "DL"
+        `purple` = "#9f79ee", ## "RF"
+        `brown` = "#8b4726", ## "PS"
+        `blue` = "#0000ff", ## "HHb"
+        `red` = "#ED0000FF" ## "O2Hb"
     )
 
     dots <- list(...)

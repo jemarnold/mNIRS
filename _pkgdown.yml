@@ -71,9 +71,8 @@ reference:
   desc: |
     Tools for printing functions and pretty plotting with `{ggplot2}`.
   contents:
-  - print.mnirs
-  - print.mnirs_kinetics
-  - plot.mnirs
+  - starts_with("print")
+  - starts_with("plot")
   - theme_mnirs
   - starts_with("palette")
   - starts_with("scale")

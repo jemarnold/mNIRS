@@ -257,19 +257,22 @@ build_kinetics_results <- function(
         create_mnirs_data(augmented, metadata)
     }, data_list, result_list)
 
-    ## interval_times per interval (length 1 = start, 2 = start+end)
-    it_list <- lapply(data_list, \(.df) {
+    ## start_times: the resolved fit onset (user value > interval_times
+    ## metadata > first time), uniform across channels within an interval
+    it_df <- data.frame(
+        interval = names(data_list),
+        start_times = vapply(result_list, \(.r) {
+            attr(.r, "channel_args")$start_time[[1L]]
+        }, numeric(1), USE.NAMES = FALSE)
+    )
+    ## end_times sourced from interval_times metadata when any is present
+    it_meta <- lapply(data_list, \(.df) {
         it <- attr(.df, "interval_times")
         if (is.null(it)) NA_real_ else unlist(it)
     })
-    ## split into numeric start/end cols; end_times only if any present
-    it_df <- data.frame(
-        interval = names(data_list),
-        start_times = vapply(it_list, `[`, numeric(1), 1L, USE.NAMES = FALSE)
-    )
-    if (any(lengths(it_list) >= 2L)) {
+    if (any(lengths(it_meta) >= 2L)) {
         it_df$end_times <- vapply(
-            it_list, `[`, numeric(1), 2L, USE.NAMES = FALSE
+            it_meta, `[`, numeric(1), 2L, USE.NAMES = FALSE
         )
     }
     ## add `class = "mnirs"` for `plot.mnirs`
@@ -644,10 +647,7 @@ enforce_direction <- function(
 
     ## refit start: amplitude D seeded in the requested direction
     D0 <- want *
-        max(
-            abs(coefs[["B"]] - coefs[["A"]]),
-            diff(range(fit_data$.x)) * 0.1
-        )
+        max(abs(coefs[["B"]] - coefs[["A"]]), diff(range(fit_data$.x)) * 0.1)
     D_eps <- diff(range(fit_data$.x)) * 1e-6
 
     ## build rhs: amp_fn(.t, A, A + D, <extra names>)
@@ -706,9 +706,10 @@ enforce_direction <- function(
         return(NULL)
     }
 
-    ## back-transform to (A, B, ...) space
+    ## back-transform to (A, B, ...) space, B positioned after A
     cf[["B"]] <- cf[["A"]] + cf[["D"]]
-    return(list(model = refit, coefs = cf[names(cf) != "D"]))
+    keep <- append(setdiff(names(cf), c("B", "D")), "B", after = 1)
+    return(list(model = refit, coefs = cf[keep]))
 }
 
 

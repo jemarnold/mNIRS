@@ -811,7 +811,8 @@ make_kinetics_data <- function(
 make_kinetics_results <- function(
     interval,
     channels = "smo2",
-    n = 10
+    n = 10,
+    start_time = 0
 ) {
     ## this df immitates output of analyse_peak_slope / analyse_monoexponential
     df <- data.frame(
@@ -840,6 +841,7 @@ make_kinetics_results <- function(
     )
     attr(df, "channel_args") <- data.frame(
         nirs_channels = channels,
+        start_time = rep(start_time, length(channels)),
         width = rep(10L, length(channels))
     )
     return(df)
@@ -1024,8 +1026,8 @@ test_that("build_kinetics_results interval_times scalar numeric", {
         exercise = make_kinetics_data(interval_times = 3.0)
     )
     result_list <- list(
-        make_kinetics_results("baseline"),
-        make_kinetics_results("exercise")
+        make_kinetics_results("baseline", start_time = 1.5),
+        make_kinetics_results("exercise", start_time = 3.0)
     )
 
     result <- build_kinetics_results(
@@ -1039,6 +1041,7 @@ test_that("build_kinetics_results interval_times scalar numeric", {
     expect_equal(nrow(et), 2L)
     expect_equal(et$interval, c("baseline", "exercise"))
     expect_type(et$start_times, "double")
+    ## start_times holds the resolved fit onset (from channel_args)
     expect_equal(et$start_times, c(1.5, 3.0))
     expect_false("end_times" %in% names(et))
 })
@@ -1047,7 +1050,7 @@ test_that("build_kinetics_results interval_times splits start/end (ensemble)", {
     data_list <- list(
         ensemble = make_kinetics_data(interval_times = list(368, 1093))
     )
-    result_list <- list(make_kinetics_results("ensemble"))
+    result_list <- list(make_kinetics_results("ensemble", start_time = 368))
 
     result <- build_kinetics_results(
         data_list, result_list,
@@ -1059,13 +1062,14 @@ test_that("build_kinetics_results interval_times splits start/end (ensemble)", {
     expect_equal(nrow(et), 1L)
     expect_type(et$start_times, "double")
     expect_type(et$end_times, "double")
+    ## start_times from channel_args; end_times from interval_times metadata
     expect_equal(et$start_times, 368)
     expect_equal(et$end_times, 1093)
 })
 
-test_that("build_kinetics_results interval_times is NA when attribute is NULL", {
+test_that("build_kinetics_results interval_times uses resolved start when metadata NULL", {
     data_list <- list(int1 = make_kinetics_data(interval_times = NULL))
-    result_list <- list(make_kinetics_results("int1"))
+    result_list <- list(make_kinetics_results("int1", start_time = 0))
 
     result <- build_kinetics_results(
         data_list, result_list,
@@ -1076,7 +1080,8 @@ test_that("build_kinetics_results interval_times is NA when attribute is NULL", 
     et <- result$interval_times
     expect_equal(nrow(et), 1L)
     expect_type(et$start_times, "double")
-    expect_true(is.na(et$start_times))
+    ## start_times is the resolved fit onset, even without metadata
+    expect_equal(et$start_times, 0)
     expect_false("end_times" %in% names(et))
 })
 
@@ -2008,6 +2013,15 @@ test_that("print.mnirs_kinetics shows monoexponential header", {
     expect_true(any(grepl("Monoexponential non-linear Regression", output)))
 })
 
+test_that("print.mnirs_kinetics shows sigmoidal header", {
+    x <- make_print_kinetics(
+        data.frame(interval = "int1", nirs_channels = "smo2", xmid = 5.0),
+        method = "sigmoidal"
+    )
+    output <- capture.output(print(x))
+    expect_true(any(grepl("Sigmoidal non-linear Regression", output)))
+})
+
 test_that("print.mnirs_kinetics shows response_time header", {
     x <- make_print_kinetics(
         data.frame(interval = "int1", nirs_channels = "smo2", tau = 5.0),
@@ -2266,6 +2280,37 @@ test_that("fix_coefs() predictions differ from original model", {
 
     # Should differ if fixed value differs from estimated
     expect_false(identical(pred_orig, pred_fixed))
+})
+
+test_that("fix_coefs() aborts when model data cannot be retrieved", {
+    set.seed(707)
+    t <- 1:60
+    x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
+        rnorm(length(t), 0, 3)
+
+    ## model built without a `data` argument -> `model$call$data` is NULL,
+    ## so eval() returns NULL and the data frame cannot be recovered
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD))
+
+    expect_error(
+        fix_coefs(model, TD = 15),
+        "Cannot retrieve original model data frame"
+    )
+})
+
+test_that("fix_coefs() falls back to parent frames for model data", {
+    set.seed(808)
+    t <- 1:60
+    x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
+        rnorm(length(t), 0, 3)
+    dtmp <- data.frame(t, x)
+    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = dtmp)
+
+    ## strip `dtmp` from the formula environment so the primary eval() errors
+    ## and the parent-frame fallback path is exercised
+    rm("dtmp", envir = environment(stats::formula(model)))
+
+    expect_error(fix_coefs(model, TD = 15), "not found")
 })
 
 

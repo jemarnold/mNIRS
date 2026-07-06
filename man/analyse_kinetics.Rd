@@ -151,9 +151,10 @@ with one row per \code{nirs_channel} per interval, containing columns
 \item{\code{data}}{A list of the original input data frames augmented with a
 \verb{*_fitted} column of fitted values for each \code{nirs_channel}.}
 \item{\code{interval_times}}{A data frame with one row per interval and
-numeric column \code{start_times} (and \code{end_times} when any interval
-carries an end time), supplied from \code{\link[=extract_intervals]{extract_intervals()}} if
-present in the metadata.}
+numeric column \code{start_times} -- the resolved response onset used for
+fitting (the supplied \code{start_time}, else the \code{\link[=extract_intervals]{extract_intervals()}}
+metadata, else the first time value) -- and \code{end_times} when any
+interval carries an end time from the metadata.}
 \item{\code{diagnostics}}{A data frame of model diagnostics (\code{n_obs}, \code{r2},
 \code{adj_r2}, \code{rmse}, \code{snr}, \code{cv_rmse}, \code{aic}, \code{aicc}, \code{bic}) with one
 row per \code{nirs_channel} per interval.}

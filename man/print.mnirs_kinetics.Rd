@@ -35,7 +35,6 @@ result <- read_mnirs(
         verbose = FALSE
     ) |>
     analyse_kinetics(
-        nirs_channels = c(smo2),
         method = "peak_slope",
         span = 10,
         verbose = FALSE

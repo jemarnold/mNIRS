@@ -244,9 +244,10 @@ method_aliases <- c(
 #'   \item{`data`}{A list of the original input data frames augmented with a
 #'       `*_fitted` column of fitted values for each `nirs_channel`.}
 #'   \item{`interval_times`}{A data frame with one row per interval and
-#'       numeric column `start_times` (and `end_times` when any interval
-#'       carries an end time), supplied from [extract_intervals()] if
-#'       present in the metadata.}
+#'       numeric column `start_times` -- the resolved response onset used for
+#'       fitting (the supplied `start_time`, else the [extract_intervals()]
+#'       metadata, else the first time value) -- and `end_times` when any
+#'       interval carries an end time from the metadata.}
 #'   \item{`diagnostics`}{A data frame of model diagnostics (`n_obs`, `r2`,
 #'       `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, `bic`) with one
 #'       row per `nirs_channel` per interval.}

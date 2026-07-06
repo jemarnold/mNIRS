@@ -60,7 +60,6 @@ print.mnirs <- function(x, ...) {
 #'         verbose = FALSE
 #'     ) |>
 #'     analyse_kinetics(
-#'         nirs_channels = c(smo2),
 #'         method = "peak_slope",
 #'         span = 10,
 #'         verbose = FALSE
@@ -88,12 +87,14 @@ print.mnirs_kinetics <- function(x, ...) {
     })
 
     cat("\n")
-    if (x$method == "peak_slope") {
+    if (x$method == "response_time") {
+        cat("Fractional Response Time")
+    } else if (x$method == "peak_slope") {
         cat("Peak Linear Regression Slope")
     } else if (x$method == "monoexponential") {
         cat("Monoexponential non-linear Regression")
-    } else if (x$method == "response_time") {
-        cat("Fractional Response Time")
+    } else if (x$method == "sigmoidal") {
+        cat("Sigmoidal non-linear Regression")
     }
 
     cat("\n")
