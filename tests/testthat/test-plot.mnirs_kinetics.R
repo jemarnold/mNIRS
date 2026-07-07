@@ -309,3 +309,9 @@ test_that("plot.mnirs_kinetics forwards ... to plot.mnirs", {
     p <- plot(kin_peak_slope(), time_labels = TRUE)
     expect_equal(p$labels$x, "time (mm:ss)")
 })
+
+test_that("plot.mnirs_kinetics sets label size", {
+    p <- plot(kin_peak_slope(), label_size = 5)
+    text_layer <- p$layers[[which(layer_geoms(p) == "GeomText")[1L]]]
+    expect_equal(text_layer$aes_params$size, 5)
+})

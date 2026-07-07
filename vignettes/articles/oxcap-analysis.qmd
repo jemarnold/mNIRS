@@ -25,12 +25,12 @@ The [`{mnirs}`](https://github.com/jemarnold/mnirs) package is under active deve
 
 In this article, I will demonstrate how some recently added functionality can be combined to perform muscle oxidative capacity (OxCap) analysis from a repeated ischaemic occlusion protocol, while ensuring reproducibility and adhering to current gold-standard processing methods.
 
-::: {.callout-tip}
+::: {.callout-note}
 This article assumes basic familiarity with the {mnirs} package. For an overview and demonstration of data processing with {mnirs}, please see the original package vignette [*Reading and Cleaning Data with {mnirs}*](https://jemarnold.github.io/mnirs/articles/reading-mnirs-data.html).
 :::
 
-::: {.callout-note}
-Skip to the [analysis plan](#analysis-plan), below
+::: {.callout-tip}
+Skip to the [analysis code](#analysis-plan), below.
 :::
 
 ## Muscle oxidative capacity testing
@@ -79,12 +79,12 @@ In the future, this process could be wrapped into a single convenience function 
 
 For OxCap analysis, we will perform roughly 8 steps:
 
-1. Import an example NIRS file with the repeated occlusions procedure.
+1. Import an example mNIRS file with the repeated occlusions procedure.
 2. Process/clean data, as needed (minimal in this example).
 3. Iteratively correct NIRS values for changes in blood volume, a required step to ensure valid analysis.
 4. Specify occlusion events in the data and extract a 5-sec interval for each occlusion.
 5. Find the peak 3-sec linear regression NIRS slope within each occlusion interval.
-6. Model a monoexponential curve fit across NIRS slope observations for both repeated occlusion trials.
+6. Fit a monoexponential curve across NIRS slope observations for both repeated occlusion trials.
 7. Extract the rate constant (*k*) for each trial exponential curve.
 8. Plot the modelled data.
 
@@ -94,19 +94,19 @@ For OxCap analysis, we will perform roughly 8 steps:
 
 This article serves as a vignette for some of the kinetics analysis functions recently added to the {mnirs} package, and how they can be used together to perform robust OxCap analysis.
 
-* `correct_blood_volume()` is used to normalise values for oxy[haem], deoxy[haem], and total[haem] channels (if present), using an iterative method that properly accommodates negative values, developed from @Beever2020.
+* `correct_blood_volume()` is used to normalise values for oxy[haem], deoxy[haem], and total[haem] channels (if present), using an iterative method that properly accommodates negative values, developed from @Beever2020. See `?correct_blood_volume` for details.
 
-* `extract_intervals()` is used to detect specific events or times in an *"mnirs"* data frame, and extract an interval around each one, returning a list of data frames.\
+* `extract_intervals()` is used to detect specific events or times in an *"mnirs"* data frame, extract an interval around each one, and return a list of data frames.\
 \
-This is useful when a certain event is labelled in `event_channel`, or a list of time values is provided manually for when events occur, such as the start of an exercise interval or occlusion. The returned list of data frames is ready for further analysis. See `?extract_intervals` for more details.
+This is useful when a certain label is given in `event_channel`, or a list of time values can be provided manually for when events occur, such as the start of an exercise interval or occlusion. The returned list of data frames is ready for further analysis. See `?extract_intervals` for details.
 
-* `analyse_kinetics()` is used to evaluate mNIRS response kinetics from a list of (or a single) *"mnirs"* data frame(s) with a selection of methods. It returns a formatted table of model results. Internal model components can be extracted with `attributes(results)`. See `?analyse_kinetics` for details.\
+* `analyse_kinetics()` is used to evaluate mNIRS response kinetics from a single *"mnirs"* data frame or a list of data frames, with a selection of parametric and non-parametric methods. It returns a formatted table of model results. Internal model components can be extracted with `attributes(results)`. See `?analyse_kinetics` for details.\
 \
 We will use this function twice for OxCap analysis:
 
   * `analyse_kinetics(method = "peak_slope")` is used to find the peak linear regression slopes on deoxy[haem] from the extracted occlusion intervals. The steepest (positive or negative) slope is often interpreted as the point of greatest mismatch between O<sub>2</sub> supply and O<sub>2</sub> extraction, such as for muscle OxCap testing. See `?peak_slope` for more details on the vector-level function called by `analyse_kinetics()`.
 
-  * `analyse_kinetics(method = "monoexponential")` is used to then fit an exponential curve through the resulting slope values, to find the rate constant `k`. A self-starting function `SSmonoexp()` is fit with `nls()` and can be called as either a 4-parameter monoexponential model with a time-delay parameter (TD), or a reduced 3-parameter model without TD where the onset of the response is expected to be immediate. See `?monoexponential` and `?SSmonoexp` for more details.
+  * `analyse_kinetics(method = "monoexponential")` is then used to fit an exponential curve through the resulting slope values over time, to find the rate constant `k`. A self-starting function `SSmonoexp()` is fit with `stats::nls()` and can be called as either a 4-parameter monoexponential model with a time-delay parameter (TD), or a reduced 3-parameter model without TD where the onset of the response is expected to be immediate. See `?monoexponential` and `?SSmonoexp` for more details.
 
 
 
@@ -118,17 +118,16 @@ First, load our packages and initial setup options.
 #| label: setup
 #| warning: false
 
-library(dplyr)   ## for convenient data wrangling
-library(purrr)   ## for wrangling lists
+library(dplyr) ## for convenient data wrangling
 library(ggplot2) ## for plotting
 library(mnirs)
 
-options(mnirs.verbose = FALSE) ## globally silence info/warning messages
-theme_set(theme_mnirs())       ## set ggplot2 theme
+options(mnirs.verbose = FALSE) ## globally silence package messages
+theme_set(theme_mnirs()) ## set ggplot2 theme
 ```
 
 
-::: {.callout-note}
+::: {.callout-note title="Acknowledgement"}
 I received this example file from [Dr. Thomas Tripp](https://scholar.google.com/citations?user=A9JwQbYAAAAJ&hl=en), currently a postdoctoral fellow in [Dr. Martin MacInnis](https://scholar.google.com/citations?hl=en&user=tJepNIQAAAAJ)' lab at the University of Calgary. They have kindly allowed me to include this file with the {mnirs} package for users to examine themselves.
 
 It can be accessed by calling `example_mnirs("portamon-oxcap")`.
@@ -140,30 +139,33 @@ It can be accessed by calling `example_mnirs("portamon-oxcap")`.
 
 The included example file has three NIRS channels and a column with sample number, which will automatically be converted to a time value when the `read_mnirs()` function recognises the *Artinis Oxysoft* export format and sample rate (10 Hz). The file does not need to be cleaned for outliers or digitally filtered, so minimal pre-processing is required.
 
-One thing to note: *Artinis Oxysoft* exports an event label column without a named header by default. This is the column we will use to identify our occlusion events by the label *"Occlusion"*, so we need to include it. Currently in {mnirs} an unnamed column like this will be named `"col_*"` with a numeric suffix for the column number in the data file. In our example file, this events column will therefore be `"col_6"`. It's not the most elegant solution, but it works for now!
+One thing to note: by default, *Artinis Oxysoft* exports an event label column without a named header. This is the column we will use to identify our occlusion events by the label *"Occlusion"*. In {mnirs}, an unnamed column like this will be coerced to a name `"col_*"` with a numeric suffix for the column number in the data file. In our example file, this events column will therefore be `"col_6"`. It's not the most elegant solution, but it works for now.
 
-This file has two sequential occlusion trials. We can separate them for individual analysis by finding the longer gap between consecutive occlusion labels and manually defining intervals before that as trial 1, and after that as trial 2.
 
 ```{r}
 #| label: read file and process
 
 df <- read_mnirs(
     file_path = example_mnirs("portamon-oxcap.xlsx"),
-    nirs_channels = c(
-        thb = 2, hhb = 3, o2hb = 4 ## identify and rename NIRS channels
-    ),
+    nirs_channels = c(thb = 2, hhb = 3, o2hb = 4), ## identify and rename channels
     event_channel = c(event = "col_6") ## specify the events column
 )
 
 ## view the structure of our data frame
 df
+```
 
-## "Occlusion" is our pre-specified event string in our events column
-## split into trials wherever consecutive occlusions are >60-sec apart
-df_occl <- df[grepl("Occlusion", df$event), ]
-df_occl$trial <- factor(cumsum(c(0, diff(df_occl$time) > 60)) + 1L)
+This file has two sequential occlusion trials. There are many different ways to identify & separate trials. We will find the long gap between consecutive occlusion labels and split the data frame at that point.
 
-plot(df)
+```{r}
+#| label: split df
+
+## find time gap between occlusion trials
+occl_times <- df$time[grepl("Occlusion", df$event)]
+split_time <- occl_times[which(diff(occl_times) > 60)] + 10
+
+plot(df) +
+    geom_vline(xintercept = split_time, linetype = "dashed")
 ```
 
 
@@ -198,7 +200,7 @@ df <- df |>
 
 ## plot corrected data with occlusion event indicators
 plot(df) +
-    geom_vline(xintercept = df_occl$time, linetype = "dotted", alpha = 0.4)
+    geom_vline(xintercept = occl_times, linetype = "dotted", alpha = 0.4)
 ```
 
 
@@ -209,28 +211,28 @@ We can also plot occlusion event indicators (vertical dotted lines) to visually 
 
 # Extract occlusion intervals
 
-The next step is to identify these occlusion events and extract each interval into a list of data frames which we can continue to analyse iteratively.
+The next step is to identify these occlusion events and extract each interval into a list of data frames which we can continue to analyse iteratively. We can run this function twice to easily separate the occlusions within the two trial.
 
 
 ## `extract_intervals()`
 
 * `data`
 
-    This function takes in a data frame and returns a list of data frames, one per detected interval. *"mnirs"* metadata is passed to and from this function.
+    This function takes in a data frame or list of data frames, and returns a list of data frames, named per detected interval. *"mnirs"* metadata is passed to and from this function.
 
 * `nirs_channels`, `time_channel`, `event_channel`, & `sample_rate`
 
-    Specify which column names in `data` will be processed. `nirs_channels` are the response variables; `time_channel` is the time series variable; `event_channel` specifies where to look for event labels; and `sample_rate` carries the measurement/export samples-per-second rate used when ensemble-averaging across intervals with unequal time samples. If any arguments are not specified, they will be retrieved from *"mnirs"* metadata. Channels in the data but not explicitly specified will be passed through unprocessed to the returned data frames.\
+    Specify which column names in `data` will be processed. `nirs_channels` are the response variables; `time_channel` is the time series predictor variable; `event_channel` specifies where to look for event labels; and `sample_rate` carries the measurement/export samples-per-second rate used when ensemble-averaging across intervals with unequal time samples. If any arguments are not specified, they will be retrieved from *"mnirs"* metadata. Channels in the data not explicitly specified will be passed through unprocessed to the returned data frames.\
 \
-We will analyse OxCap from the deoxy[haem] (HHb) NIRS signal, which is often recommended [@Costalat2025].
+We will analyse OxCap from the deoxy[haem] (HHb) NIRS signal, as often recommended [@Costalat2025].
     
 * `start` & `end`
 
-    Interval boundaries are specified using helper functions: `by_time()` for `time_channel` values; `by_label()` for `event_channel` labels; or `by_sample()` for sample indices (row numbers). Provide both `start` and `end` to define precise intervals, or provide `start` alone with `span` to extract windows around events.\
+    Interval boundaries are specified using helper functions: `by_time()` for `time_channel` values; `by_label()` for `event_channel` labels; `by_lap()` for lap indices in `event_channel`; or `by_sample()` for sample indices (row numbers). Provide both `start` and `end` to define precise intervals, or provide `start` alone with `span` to extract windows around events.\
 \
-Once again, in this example data file, the occlusions are all identified by the event label *"Occlusion"*. This makes it very simple to detect this string in the `event` column as the `start` value to extract each interval.\
+First, we can use `start` and `end` to split the data frame between two trials. Then, since the occlusions are all identified by the event label *"Occlusion"*, it is very simple to detect this string in the `event` column as the `start` value to extract each interval.\
 \
-Detecting intervals by event labels must match a full string exactly or use a regular expression (regex) string such as *"(?i)occlusions?"* or *"start|end"*.
+Detecting intervals by event labels must match a full string exactly or use a regular expression (regex) string such as *"(?i)occlusions?"* or *"start|begin"*.
 
 * `group_intervals`
 
@@ -244,7 +246,7 @@ For this example, we want to analyse each interval separately using `group_inter
 
     A two-element vector of `time_channel` values, specifying a time window as `c(before, after)`, where positive values indicate time after the event sample and negative values indicate time before the event. When both `start` and `end` are provided, `span` shifts boundaries additively: `span[1]` adjusts starts, `span[2]` adjusts ends.\
 \
-All occlusion bouts were held for 5-seconds in this protocol. If the occlusion duration changed across the protocol, we might have to specify a list of time spans. In this case we can provide a single vector which will be recycled.\
+ince all occlusion bouts were held for 5-seconds in this protocol, we can use a 5-sec time span. If the occlusion duration changed through the protocol, we could specify a list of time spans for each (`span = list()`). In this case we can provide a single vector which will be recycled.\
 \
 From visual investigation of the plots (not shown), we noticed that the deoxy[haem] signal was disrupted by the occlusion cuff inflation during the first ~0.5 sec of each occlusion interval. This might influence slope values, so we will exclude the first second by specifying `span = c(1, 5)`, i.e. include from second 1 (rather than 0) to 5 after each *"Occlusion"* event label. To adjust the start boundary earlier, we could specify a negative `span` value, e.g. `span = c(-2.5, 2.5)` to include a 5-sec span centred on the label itself.
 
@@ -257,27 +259,30 @@ For repeated occlusion testing, the original time information for each occlusion
 
 ```{r}
 #| label: extract intervals
+#| fig-width: 9
+#| fig-asp: 0.8
 
-## identify and extract intervals by event label "Occlusion"
-## re-join the returned list of data frames
-df_list <- extract_intervals(
+## split the df at the identified time value
+extract_intervals(
     df,
-    group_intervals = "distinct", ## return each occlusion event separately
-    start = by_label("occlusion", ignore_case = TRUE), ## event label used in file
-    span = c(1, 5), ## interval c(start, end) around each event time value
-    zero_time = FALSE ## preserve original time values at each event
-)
+    group_intervals = "distinct", ## return the two trials separately
+    start = by_time(c(0, split_time)), ## start times at the start and split
+    end = by_time(split_time, tail(df$time, 1)), ## end times at the split and end
+    span = c(0, 0) ## no additional buffer around the start/end boundaries
+) |>
+    ## pipe the list of two trial dfs into another `extract_intervals()`
+    ## identify and extract intervals by event label "Occlusion"
+    extract_intervals(
+        group_intervals = "distinct", ## return each occlusion event separately
+        start = by_label("occlusion", ignore_case = TRUE),
+        span = c(1, 5),   ## interval c(start, end) around each event time value
+        zero_time = FALSE ## preserve original time values at each event
+    ) -> df_list          ## right-assign list of all occlusion intervals
 
 ## visualise facet plot with all occlusion intervals for error checking
-## the steepest slope facets are the first occlusions from each trial (1 & 17)
-plot(df_list) +
-    theme(
-        strip.text = element_blank(),
-        strip.background = element_blank(),
-        strip.placement = "outside",
-        axis.text.x = element_blank(),
-    ) +
-    facet_wrap(~interval, scales = "free_x", nrow = 4)
+## the steepest slope facets are the first occlusions from each trial
+plot(df_list, ncol = 8) +
+    theme(axis.text.x = element_blank())
 ```
 
 
@@ -293,7 +298,7 @@ From here, we want to calculate the slope values for each of these occlusion int
 
 * `data`
 
-    This function takes in a data frame or a list of data frames, analyses all channels within each data frame separately, and returns a formatted table of results. Model components such as coefficients, fitted data frames, input metadata for each channel, and model diagnostics can be retrieved from results metadata with `attributes()` or `names()`. See `?analyse_kinetics` for details.
+    This function takes in a data frame or a list of data frames, analyses all channels within each data frame separately, and returns a formatted table of results. Model components such as coefficients, fitted data frames, input metadata for each channel, and model diagnostics can be retrieved from results metadata with `attributes()` or `names()`.
 
 * `nirs_channels` & `time_channel`
 
@@ -311,7 +316,7 @@ For processing deoxy[haem], we specify `direction = "positive"`, since deoxygena
 
 * `method`
 
-    Four analysis methods are currently available. For this OxCap analysis, we will use two of them: *"peak_slope"* and *"monoexponential"*.
+    Four analysis methods are currently available. For this OxCap analysis, we will need to use two of them: *"peak_slope"* and *"monoexponential"*.
 
 
 
@@ -319,7 +324,7 @@ For processing deoxy[haem], we specify `direction = "positive"`, since deoxygena
 
 * `method = "peak_slope"`
 
-The **peak slope** method is a *semi-parametric* approach: it fits a linear regression model across a sliding local window, returning the single steepest slope along with the time at which it occurs. For OxCap analysis, the steepest local rate of deoxygenation is interpreted as the point of greatest mismatch between O<sub>2</sub> delivery and extraction — a proxy for mV̇O<sub>2</sub> during each occlusion. See `?peak_slope` for details.
+The **peak slope** method is a *semi-parametric* approach: it fits a linear regression model across a sliding local window, returning the single steepest slope along with the time at which it occurs. For OxCap analysis, the steepest local rate of deoxygenation is interpreted as the point of greatest mismatch between O<sub>2</sub> delivery and extraction — a proxy for mV̇O<sub>2</sub> during each occlusion.
 
 * `width`, `span`
 
@@ -343,6 +348,8 @@ A window with fewer samples will tend to return steeper slope values, which may 
 ```{r}
 #| label: find peak slopes
 #| warning: false
+#| fig-width: 9
+#| fig-asp: 0.8
 
 ## analyse local peak slopes within each occlusion interval
 slope_results <- analyse_kinetics(
@@ -358,34 +365,41 @@ slope_results <- analyse_kinetics(
 ## view the formatted results
 slope_results
 
+plot(slope_results, ncol = 8, label_size = 3.5) +
+    theme(axis.text.x = element_blank())
+```
+
+We can quickly visualise the individual kinetics results with the built-in `plot()` function (see `?plot.mnirs_kinetics` for details). But we will build a custom plot to better visualise the exponential response kinetics for mV̇O<sub>2</sub> in each trial.
+
+Next, we will extract the slope values into their own data frame to plug into the kinetics analysis.
+
+
+```{r}
+#| label: create slopes_df
+
 ## extract vector of interval start times from kinetics metadata
 interval_times <- slope_results$interval_times$start_times
 
-## extract a data frame with slope & time values, grouped by trial
+## extract a data frame with slope coef & time values, grouped by trial
 slopes_df <- slope_results$coefficients |>
     mutate(
-        trial = df_occl$trial, ## add trial
+        trial = factor(sub("^[^_]+_(\\d+).*", "\\1", interval)), ## add trial by regex
         ## return centre of linear slope within each occlusion interval
         time = peak_slope_time + interval_times,
         peak_slope_time = NULL,
     ) |>
     group_by(trial) |>
-    mutate(
-        ## recalculate time starting from zero for each trial
-        time = time - time[1L],
-    ) |>
+    ## recalculate time starting from zero for each trial
+    mutate(time = time - time[1L]) |>
     select(trial, time, slope)
-
 ```
 
-
-Plotting the returned slope values gives us a very nice confirmation of the exponential response kinetics for mV̇O<sub>2</sub> after each brief exercise stimulus.
 
 ```{r}
 #| label: plot peak slopes
 
-## create plot foundation
-p <- ggplot(slopes_df, aes(time, slope, colour = trial)) +
+## plot observed slope values for each trial
+p <- ggplot(slopes_df, aes(x = time, y = slope, colour = trial)) +
     coord_cartesian(ylim = c(0, NA)) +
     scale_x_continuous(
         name = "Time (mm:ss)",
@@ -394,15 +408,12 @@ p <- ggplot(slopes_df, aes(time, slope, colour = trial)) +
     ) +
     scale_y_continuous(
         name = expression(bold(HHb ~ Slope ~ '(μM' %.% sec^'-1' * ')')),
-        expand = expansion(c(0, 0.03))
     ) +
-    scale_colour_mnirs()
-
-## plot observed slope values for each trial
-
-p +
+    scale_colour_mnirs() +
     geom_line() +
     geom_point(fill = "white", size = 3, shape = 21, stroke = 1)
+
+p
 ```
 
 
@@ -419,7 +430,7 @@ p +
 
 The **monoexponential** method is a *parametric* approach: it fits a self-starting exponential curve to time series data with `nls()`, using `SSmonoexp()` to initialise. This models how mV̇O<sub>2</sub> recovers back to baseline after the exercise stimulus, and its rate constant *k* is the OxCap outcome.
 
-It fits either a **4-parameter** model `A + (B − A)(1 − exp(−(t − TD) / tau))` with a time delay *TD*, or a reduced **3-parameter** model without *TD* when the response is expected to start immediately. See `?monoexponential` and `?SSmonoexp` for details.
+It fits either a **4-parameter** model `A + (B − A)(1 − exp(−(t − TD) / tau))` with a time delay *TD*, or a reduced **3-parameter** model without *TD* when the response is expected to start immediately.
 
 * `use_TD` (*TD* coefficient)
 
@@ -440,22 +451,26 @@ The rate constant (*k*) is the inverse of the time constant (`k = 1 / tau`) and 
 
 ```{r}
 #| label: monoexponential curve modelling
+
 ## use 3-param monoexponential model for each trial
-## fit models by trial within the data frame with {tidyr} and {purrr}
-## return fitted data and time constant tau coefficient
-monoexp_results <- slopes_df |>
-    analyse_kinetics(
-        nirs_channels = slope,
-        time_channel = time,
-        method = "monoexponential",
-        use_TD = FALSE ## expect immediate response onset
-    )
+## fit models within the data frame grouped by trial
+monoexp_results <- analyse_kinetics(
+    slopes_df,
+    nirs_channels = slope,
+    time_channel = time,
+    method = "monoexponential",
+    use_TD = FALSE ## expect immediate response onset
+)
 
 ## view the formatted results
 monoexp_results
+```
 
-## extract and join the list of data frames with fitted values for plotting
-fitted_data <- purrr::list_rbind(monoexp_results$data)
+```{r}
+#| label: build coef_labels
+
+## extract and bind the list of fitted data for plotting
+fitted_data <- do.call(rbind, monoexp_results$data)
 
 ## extract tau and k coef labels per trial, for plotting
 coef_labels <- monoexp_results$coefficients |>
@@ -479,16 +494,14 @@ p +
     geom_line(
         data = fitted_data,
         aes(y = slope_fitted, group = trial),
-        colour = "black", linewidth = 1
+        linewidth = 0.8, colour = "black"
     ) +
     geom_text(
         data = coef_labels, show.legend = FALSE,
         aes(label = label, colour = trial, group = trial),
         x = Inf, y = Inf,
         size = 5, hjust = 1.1, vjust = c(1.5, 3)
-    ) +
-    geom_line() +
-    geom_point(fill = "white", size = 3, shape = 21, stroke = 1)
+    )
 ```
 
 # Conclusion
@@ -497,6 +510,6 @@ This article demonstrates how muscle oxidative capacity analysis can be performe
 
 In future development, I would like to wrap these analysis steps into a dedicated convenience function with recommended default parameters, to make the analysis process more streamlined.
 
-However, there are always trade-offs between automation and customisation: fitting nonlinear models with relatively sparse data samples (there are 16 occlusions per trial in this example) with real-world noisy biological data can result in unstable fit parameters or inability to converge at all. Manual processing steps may be inevitably required during analysis to accommodate for these automation limitations.
+However, there are always trade-offs between automation and customisation: fitting nonlinear models with relatively sparse data samples (there are only samples per trial in this example) with real-world noisy biological data can result in unstable fit parameters or inability to converge at all. Manual processing steps may be inevitably required during analysis to accommodate for these automation limitations.
 
 # References

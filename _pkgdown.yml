@@ -67,6 +67,7 @@ reference:
   - matches("monoexp")
   - matches("sigmoidal")
   - matches("logistic")
+  - matches("gompertz")
 - title: Print & plot
   desc: |
     Tools for printing functions and pretty plotting with `{ggplot2}`.

@@ -99,6 +99,13 @@ plot.mnirs <- function(
         ggplot2::waiver()
     }
 
+    ## sort facets by appearance
+    if ("interval" %in% names(x) && !is.factor(x[["interval"]])) {
+        x[["interval"]] <- factor(x[["interval"]],
+            levels = unique(x[["interval"]])
+        )
+    }
+
     ## build base plot with axis configuration
     plot <- ggplot2::ggplot(x) +
         ggplot2::aes(x = .data[[time_channel]]) +
@@ -168,8 +175,12 @@ plot.mnirs <- function(
 #'   the response onset (`start_time`) and key coefficient points.
 #' @param labels Logical. Default is `TRUE`; annotates each panel with the key
 #'   coefficient value(s) for the fitted method.
-#' @param ... Additional arguments passed to [plot.mnirs()], such as `points`,
-#'   `time_labels`, `nrow`, `ncol`, or `scales`.
+#' @param ... Additional arguments.
+#' 
+#' @details
+#' Accepts some arguments in `...`, such as `label_size` passed to 
+#' [ggplot2::geom_text()]. Also accepts args passed to [plot.mnirs()], such as
+#' `points`, `time_labels`, `nrow`, `ncol`, or `scales`.
 #'
 #' @returns A [ggplot2][ggplot2::ggplot()] object.
 #'
@@ -222,15 +233,27 @@ plot.mnirs_kinetics <- function(
             ...
         )
     }
+    
 
     ## observed signal + facet + theme via existing plot.mnirs
     p <- plot(x$data, ...)
+    args <- list(...)
 
     ## bound frame: interval factor (when >1) + <channel>_fitted columns
     plot_data <- as_plot_data(x$data)
     nirs <- attr(plot_data, "nirs_channels")
     time_channel <- attr(plot_data, "time_channel")
     faceted <- "interval" %in% names(plot_data)
+
+    ## appearance-ordered facet levels: ggplot2 unions interval levels across
+    ## layers, so any character interval column re-sorts facets alphabetically
+    ## (interval_10 before _2). factor the source frames once; all overlay
+    ## frames derive from them and inherit the factor through merges
+    if (faceted) {
+        lvls <- unique(x$interval_times$interval)
+        x$interval_times$interval <- factor(x$interval_times$interval, lvls)
+        x$coefficients$interval <- factor(x$coefficients$interval, lvls)
+    }
 
     ## attach the resolved onset to each row for method-aware fitted overlay
     onset <- x$interval_times[c("interval", "start_times")]
@@ -336,7 +359,7 @@ plot.mnirs_kinetics <- function(
                 data = ann,
                 x = Inf,
                 hjust = 1.05,
-                size = 4.5,
+                size = args[["label_size"]] %||% 3,
                 show.legend = FALSE,
                 inherit.aes = FALSE
             )

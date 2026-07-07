@@ -414,7 +414,7 @@ plot.mnirs_kinetics(x, fitted = TRUE, markers = TRUE, labels = TRUE, ...)
 ## fitted  = dashed fitted curve (parametric methods; not "response_time")
 ## markers = dotted onset line + key coefficient point(s)
 ## labels  = per-panel annotation of key coefficient(s)
-## ... passed to plot.mnirs (points, time_labels, nrow, ncol, scales)
+## ...     = label_size, others passed to plot.mnirs (points, time_labels, nrow, ncol, scales)
 
 print(result)  # "mnirs_kinetics"; formatted coefficient table (max 10 rows)
 print(data)    # "mnirs"; strips class, prints tibble
