@@ -71,8 +71,8 @@ test_that("monoexponential() handles zero and negative TD", {
 })
 
 
-## SSmonoexp() ========================================================
-test_that("SSmonoexp() with TD converges on known parameters", {
+## SSmonoexponential() ========================================================
+test_that("SSmonoexponential() with TD converges on known parameters", {
     set.seed(13)
     t <- 1:60
     A_true <- 10
@@ -89,7 +89,7 @@ test_that("SSmonoexp() with TD converges on known parameters", {
     #     ggplot2::geom_point() #+
         # ggplot2::geom_line(ggplot2::aes(y = y))
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
 
     expect_s3_class(model, "nls")
     expect_named(coef(model), c("A", "B", "tau", "TD"))
@@ -109,34 +109,34 @@ test_that("SSmonoexp() with TD converges on known parameters", {
     )
 })
 
-test_that("SSmonoexp() with TD handles falling exponentials", {
+test_that("SSmonoexponential() with TD handles falling exponentials", {
     set.seed(456)
     t <- 1:60
     x <- monoexponential(t, A = 100, B = 10, tau = 8, TD = 15) +
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
     coefs <- coef(model)
 
     expect_true(coefs[["A"]] > coefs[["B"]])
     expect_s3_class(model, "nls")
 })
 
-test_that("SSmonoexp() with TD predict() returns correct length", {
+test_that("SSmonoexponential() with TD predict() returns correct length", {
     set.seed(202)
     t <- 1:60
     x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
     predictions <- predict(model, data)
 
     expect_length(predictions, nrow(data))
 })
 
-test_that("SSmonoexp() without TD converges on known parameters", {
+test_that("SSmonoexponential() without TD converges on known parameters", {
     set.seed(13)
     t <- 1:60-1
     A_true <- 10
@@ -148,7 +148,7 @@ test_that("SSmonoexp() without TD converges on known parameters", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
     
-    model <- nls(x ~ SSmonoexp(t, A, B, tau), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau), data = data)
     
     ## visual check
     # y <- fitted(model)
@@ -173,14 +173,14 @@ test_that("SSmonoexp() without TD converges on known parameters", {
     expect_disjoint(names(coefs), "TD")
 })
 
-test_that("SSmonoexp() without TD handles falling exponentials", {
+test_that("SSmonoexponential() without TD handles falling exponentials", {
     set.seed(456)
     t <- 1:60
     x <- monoexponential(t, A = 100, B = 10, tau = 8, TD = NULL) +
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau), data = data)
     coefs <- coef(model)
 
     expect_true(coefs[["A"]] > coefs[["B"]])
@@ -188,7 +188,7 @@ test_that("SSmonoexp() without TD handles falling exponentials", {
     expect_disjoint(names(coefs), "TD")
 })
 
-test_that("SSmonoexp() without TD handles data with TD near zero", {
+test_that("SSmonoexponential() without TD handles data with TD near zero", {
     set.seed(101)
     t <- 1:60
     x <- monoexponential(t, 10, 100, 8, 1) + rnorm(length(t), 0, 3)
@@ -199,7 +199,7 @@ test_that("SSmonoexp() without TD handles data with TD near zero", {
     #     ggplot2::geom_point()
 
     expect_no_error(
-        model <- nls(x ~ SSmonoexp(t, A, B, tau), data = data)
+        model <- nls(x ~ SSmonoexponential(t, A, B, tau), data = data)
     )
 
     expect_s3_class(model, "nls")
@@ -209,7 +209,7 @@ test_that("SSmonoexp() without TD handles data with TD near zero", {
 
 
 ## OxCap modelling ===================================================
-test_that("SSmonoexp() handles OxCap with few data points same as SSasymp", {
+test_that("SSmonoexponential() handles OxCap with few data points same as SSasymp", {
     # fmt: skip
     df <- data.frame(
         time = c(
@@ -224,7 +224,7 @@ test_that("SSmonoexp() handles OxCap with few data points same as SSasymp", {
 
     expect_no_error(
         model <- nls(
-            slope ~ SSmonoexp(time, A, B, tau),
+            slope ~ SSmonoexponential(time, A, B, tau),
             data = df,
         )
     )
@@ -252,7 +252,7 @@ test_that("SSmonoexp() handles OxCap with few data points same as SSasymp", {
     ))
 })
 
-test_that("SSmonoexp() handles OxCap with few data points better than SSasymp", {
+test_that("SSmonoexponential() handles OxCap with few data points better than SSasymp", {
     # fmt: skip
     df <- data.frame(
         time = c(0, 15.9, 30.9, 46, 60.9, 76, 91.5, 106.3, 121.2, 136.2, 151, 
@@ -265,7 +265,7 @@ test_that("SSmonoexp() handles OxCap with few data points better than SSasymp", 
 
     expect_no_error(
         model <- nls(
-            slope ~ SSmonoexp(time, A, B, tau),
+            slope ~ SSmonoexponential(time, A, B, tau),
             data = df,
         )
     )
@@ -539,7 +539,7 @@ test_that("analyse_monoexponential() falls back from 4-param to 3-param", {
             use_TD = TRUE,
             verbose = TRUE
         ),
-        "SSmonoexp.*fit failed"
+        "SSmonoexponential.*fit failed"
     )
 
     ## should still return a valid result via 3-param fallback
@@ -723,7 +723,7 @@ test_that("enforce_direction() refits and back-transforms an inverted fit", {
         amp_fn = quote(monoexponential),
         extra = c(tau = 15),
         extra_lower = c(tau = diff(range(t)) * 1e-6),
-        fn = quote(SSmonoexp),
+        fn = quote(SSmonoexponential),
         .nirs = "smo2",
         interval_name = "test",
         verbose = FALSE
@@ -800,8 +800,63 @@ test_that("extract model coefs", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
     tau <- coef(model)[["tau"]]
     expect_true(all.equal(tau, 8, tolerance = 1, scale = 1))
 
 })
+
+test_that("SSmonoexponential() converges on real dataset", {
+    skip("Manual fit convergence check")
+    skip_if(!interactive(), "Manual fit convergence check")
+    file_path <- test_path("testdata/reoxy_list.rds")
+    skip_if_not(file.exists(file_path), "testdata not available")
+
+    ## 65 real_world reoxy intervals
+    reoxy_list <- readRDS(file_path)
+    
+    ## fit one signal at a time across all data frames; report convergence
+    ## success rate per signal to flag regressions on real reoxygenation data
+    fit_3param <- function(signal) {
+        vapply(reoxy_list, \(df) {
+            data <- data.frame(t = df$time, x = df[[signal]])
+            model <- tryCatch(
+                nls(x ~ SSmonoexponential(t, A, B, tau), data = data),
+                error = \(e) NULL,
+                warning = \(w) NULL
+            )
+            as.integer(!is.null(model))
+        }, integer(1L))
+    }
+
+    smo2_success <- mean(fit_3param("VL_smo2"))
+    smo2_success
+    hhb_success <- mean(fit_3param("VL_HHb"))
+    hhb_success
+
+    #! should be >95?
+    expect_true(smo2_success >= 0.85)
+    expect_true(hhb_success >= 0.85)
+
+    fit_4param <- function(signal) {
+        vapply(reoxy_list, \(df) {
+            data <- data.frame(t = df$time, x = df[[signal]])
+            model <- tryCatch(
+                nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data),
+                error = \(e) NULL,
+                warning = \(w) NULL
+            )
+            as.integer(!is.null(model))
+        }, integer(1L))
+    }
+
+    smo2_success <- mean(fit_4param("VL_smo2"))
+    smo2_success
+    hhb_success <- mean(fit_4param("VL_HHb"))
+    hhb_success
+
+    #! should be >95?
+    expect_true(smo2_success >= 0.95)
+    expect_true(hhb_success >= 0.75)
+})
+

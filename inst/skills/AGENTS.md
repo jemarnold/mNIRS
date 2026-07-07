@@ -388,7 +388,7 @@ peak_slope(x, t = seq_along(x), width = NULL, span = NULL,
 monoexponential(t, A, B, tau, TD = NULL)
 ## 3-param: A + (B - A) * (1 - exp(-t / tau))
 ## 4-param: ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))
-nls(x ~ SSmonoexp(t, A, B, tau, TD), data = df)   # 3- or 4-param
+nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = df)   # 3- or 4-param
 
 logistic(t, A, B, xmid, slope, asym = NULL)  # 4-param symmetric / 5-param Richards
 gompertz(t, A, B, xmid, slope)               # early-inflection
@@ -487,7 +487,7 @@ format_hmmss(x)              # numeric seconds → "mm:ss" or "h:mm:ss"
 | `R/analyse_kinetics.R` | `analyse_kinetics()`/`analyze_kinetics()` + S3 dispatch |
 | `R/analyse_kinetics_helpers.R` | channel/interval orchestration, `compute_diagnostics()` |
 | `R/analyse_peak_slope.R` | `peak_slope()`, `slope()`, `rolling_slope()` |
-| `R/analyse_monoexponential.R` | `monoexponential()`, `SSmonoexp()` |
+| `R/analyse_monoexponential.R` | `monoexponential()`, `SSmonoexponential()` |
 | `R/analyse_sigmoidal.R` | `logistic()`, `gompertz()`, `gompertz_left()`, `SSlogistic/gompertz/gompertz_left()` |
 | `R/analyse_response_time.R` | `response_time()` |
 | `R/plot.mnirs.R` | `plot.mnirs()`, `plot.mnirs_kinetics()`, `kinetics_annotations()`, `as_plot_data()`, `theme_mnirs()`, `palette_mnirs()`, scale/format fns |

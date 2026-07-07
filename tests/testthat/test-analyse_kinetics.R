@@ -2174,7 +2174,7 @@ test_that("fix_coefs() fixes single parameter correctly", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
     model_fixed <- fix_coefs(model, TD = 15)
 
     expect_s3_class(model_fixed, "nls")
@@ -2195,7 +2195,7 @@ test_that("fix_coefs() fixes multiple parameters", {
     #     theme_mnirs() +
     #     ggplot2::geom_point()
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
     model_fixed <- fix_coefs(
         model,
         A = 10,
@@ -2217,7 +2217,7 @@ test_that("fix_coefs() errors when all parameters fixed", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
 
     expect_error(
         fix_coefs(model, A = 10, B = 100, TD = 15, tau = 8),
@@ -2232,7 +2232,7 @@ test_that("fix_coefs() warns for invalid parameter names", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
 
     expect_warning(
         fix_coefs(model, INVALID = 99, verbose = TRUE),
@@ -2251,7 +2251,7 @@ test_that("fix_coefs() accepts explicit data argument", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
 
     expect_no_error(
         model_fixed <- fix_coefs(model, TD = 15, data = data)
@@ -2266,7 +2266,7 @@ test_that("fix_coefs() predictions differ from original model", {
         rnorm(length(t), 0, 3)
     data <- data.frame(t, x)
 
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
     model_fixed <- fix_coefs(model, TD = 20, data = data, verbose = FALSE)
 
     pred_orig <- predict(model, data)
@@ -2284,7 +2284,7 @@ test_that("fix_coefs() aborts when model data cannot be retrieved", {
 
     ## model built without a `data` argument -> `model$call$data` is NULL,
     ## so eval() returns NULL and the data frame cannot be recovered
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD))
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD))
 
     expect_error(
         fix_coefs(model, TD = 15),
@@ -2298,7 +2298,7 @@ test_that("fix_coefs() falls back to parent frames for model data", {
     x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
         rnorm(length(t), 0, 3)
     dtmp <- data.frame(t, x)
-    model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = dtmp)
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = dtmp)
 
     ## strip `dtmp` from the formula environment so the primary eval() errors
     ## and the parent-frame fallback path is exercised

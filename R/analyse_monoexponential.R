@@ -2,7 +2,7 @@
 #'
 #' Calculate a 3- or 4-parameter monoexponential curve. This model family is
 #' fit by [analyse_kinetics()] when `method = "monoexponential"`, and by
-#' [stats::nls()] via the self-starting wrapper [SSmonoexp()].
+#' [stats::nls()] via the self-starting wrapper [SSmonoexponential()].
 #'
 #' @param t A numeric vector of the predictor variable (time).
 #' @param A A numeric parameter for the starting (baseline) value of the
@@ -32,7 +32,7 @@
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
 #'
-#' @seealso [analyse_kinetics()], [SSmonoexp()], [response_time()],
+#' @seealso [analyse_kinetics()], [SSmonoexponential()], [response_time()],
 #'   [peak_slope()]
 #'
 #' @examples
@@ -43,7 +43,7 @@
 #'     rnorm(length(t), 0, 3)
 #' data <- data.frame(t, x)
 #'
-#' model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+#' model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
 #' model
 #'
 #' y <- predict(model, data)
@@ -82,7 +82,7 @@ monoexponential <- function(t, A, B, tau, TD = NULL) {
 #' @param ... Additional arguments.
 #'
 #' @returns [monoexp_init()]: Initial starting estimates for parameters in the
-#'   model called by [SSmonoexp()].
+#'   model called by [SSmonoexponential()].
 #'
 #' @keywords internal
 monoexp_init <- function(mCall, data, LHS, ...) {
@@ -153,14 +153,14 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #' arity is inferred from the formula passed to [stats::nls()].
 #'
 #' @usage
-#' SSmonoexp(t, A, B, tau, TD)
+#' SSmonoexponential(t, A, B, tau, TD)
 #'
 #' @inheritParams monoexponential
 #'
 #' @details
-#' 3-parameter model: `x ~ SSmonoexp(t, A, B, tau)`
+#' 3-parameter model: `x ~ SSmonoexponential(t, A, B, tau)`
 #'
-#' 4-parameter model: `x ~ SSmonoexp(t, A, B, tau, TD)`
+#' 4-parameter model: `x ~ SSmonoexponential(t, A, B, tau, TD)`
 #'
 #' The 3-parameter form is recommended for small samples or when no obvious
 #'   time delay is expected, as it converges more reliably. [stats::nls()]
@@ -182,11 +182,11 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #' data <- data.frame(t, x)
 #'
 #' ## 4-parameter fit
-#' model4 <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+#' model4 <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
 #' model4
 #'
 #' ## 3-parameter fit on the same data
-#' model3 <- nls(x ~ SSmonoexp(t, A, B, tau), data = data)
+#' model3 <- nls(x ~ SSmonoexponential(t, A, B, tau), data = data)
 #' model3
 #'
 #' y4 <- predict(model4, data)
@@ -203,7 +203,7 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #' }
 #'
 #' @export
-SSmonoexp <- selfStart(
+SSmonoexponential <- selfStart(
     model = monoexponential,
     initial = monoexp_init,
     parameters = c("A", "B", "tau", "TD")
@@ -218,9 +218,9 @@ SSmonoexp <- selfStart(
 #' [analyse_kinetics()] for user-facing documentation.
 #'
 #' @param use_TD Logical; default is `TRUE` to attempt to fit a
-#'   4-parameter [SSmonoexp()] model (A, B, tau, TD) with a time delay.
+#'   4-parameter [SSmonoexponential()] model (A, B, tau, TD) with a time delay.
 #'   If the 4-parameter fit fails, or if `use_TD = FALSE`, attempts to
-#'   fit a reduced 3-parameter [SSmonoexp()] model (A, B, tau).
+#'   fit a reduced 3-parameter [SSmonoexponential()] model (A, B, tau).
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
 #'
@@ -237,7 +237,7 @@ SSmonoexp <- selfStart(
 #'   - `"channel_args"`: a `data.frame` with one row per `nirs_channel`
 #'     recording the resolved arguments used.
 #'
-#' @seealso [analyse_kinetics()], [monoexponential()], [SSmonoexp()]
+#' @seealso [analyse_kinetics()], [monoexponential()], [SSmonoexponential()]
 #'
 #' @keywords internal
 analyse_monoexponential <- function(
@@ -303,12 +303,15 @@ analyse_monoexponential <- function(
             return(invisible(NULL))
         }
         msg <- c(
-            "x" = "{n_params}-parameter {.fn SSmonoexp} fit failed for \\
-            {.field {(.nirs)}} in {.field {interval_name}}.",
+            "x" = "{n_params}-parameter {.fn SSmonoexponential} fit failed \\
+            for {.field {(.nirs)}} in {.field {interval_name}}.",
             "!" = "{conditionMessage(e)}"
         )
-        if (n_params == 4L) {
-            msg <- c(msg, "i" = "Attempting 3-parameter {.fn SSmonoexp} fit.")
+        if (retry) {
+            msg <- c(
+                msg,
+                "i" = "Attempting 3-parameter {.fn SSmonoexponential} fit."
+            )
         }
         cli_warn(msg, call = warn_call(env))
         return(invisible(NULL))
@@ -361,7 +364,7 @@ analyse_monoexponential <- function(
             ## data-scaled tau floor: tau pinned here is a degenerate
             ## step fit, not a genuine response
             extra_lower = c(tau = diff(range(t_fit)) * 1e-6),
-            fn = quote(SSmonoexp),
+            fn = quote(SSmonoexponential),
             .nirs = .nirs,
             interval_name = interval_name,
             verbose = verbose,
@@ -410,7 +413,6 @@ analyse_monoexponential <- function(
                 x_fit,
                 t_fit,
                 fitted_vals,
-                n_params,
                 verbose,
                 env
             )

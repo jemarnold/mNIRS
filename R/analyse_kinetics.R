@@ -75,10 +75,10 @@ method_aliases <- c(
 #'   processes available valid samples within the local window. May
 #'   return errors or warnings. (see *Details*).
 #' @param use_TD **monoexponential**: Logical; default is `TRUE`
-#'   to attempt to fit a 4-parameter [SSmonoexp()] model (A, B, tau, TD)
-#'   with a time delay. If the 4-parameter fit fails, or if
+#'   to attempt to fit a 4-parameter [SSmonoexponential()] model (A, B, tau,
+#'   TD) with a time delay. If the 4-parameter fit fails, or if
 #'   `use_TD = FALSE`, attempts to fit a reduced 3-parameter
-#'   [SSmonoexp()] model (A, B, tau).
+#'   [SSmonoexponential()] model (A, B, tau).
 #' @param shape **sigmoidal**: Character; the 4-parameter sigmoidal shape
 #'   to fit. One of `"symmetric"` (*default*; calls [SSlogistic()]),
 #'   `"gompertz"` (early-inflection; calls [SSgompertz()]), or
@@ -175,7 +175,7 @@ method_aliases <- c(
 #' Aliases: `method = c("monoexp", "exponential", "tau", "MRT")`.
 #'
 #' A parametric approach fitting a self-starting monoexponential function to
-#' the response curve using [stats::nls()] with [SSmonoexp()] for either
+#' the response curve using [stats::nls()] with [SSmonoexponential()] for either
 #' a 4-parameter (A, B, tau, TD) or 3-parameter (A, B, tau) model.
 #'
 #' Model equations:
@@ -184,11 +184,11 @@ method_aliases <- c(
 #' - 4-parameter: `ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))`
 #'
 #' `TD` is the *time delay* from the expected response start (defined by
-#' `start_time`) and the onset of the response curve. `tau` is the 
+#' `start_time`) and the onset of the response curve. `tau` is the
 #' *time constant* of the response. The *rate constant* `k` is derived as the
 #' reciprocal (`k = 1 / tau`). The *mean response time* `MRT = TD + tau` and
 #' the *half-response time* `HRT = TD + tau * log(2)` can also be derived. See
-#' [monoexponential()] for the model family and [SSmonoexp()] for self-start
+#' [monoexponential()] for the model family and [SSmonoexponential()] for self-start
 #' initialisation.
 #'
 #' Other arguments (`...`) passed to [stats::nls()] are `<NOT YET IMPLEMENTED>`.
@@ -312,9 +312,9 @@ analyse_kinetics <- function(
 ) {
     ## normalise method aliases before matching
     key <- gsub("[ -]", "_", tolower(method))
-    method <- unname(ifelse(
-        key %in% names(method_aliases), method_aliases[key], method
-    ))
+    method <- unname(
+        ifelse(key %in% names(method_aliases), method_aliases[key], method)
+    )
     method <- match.arg(method)
 
     UseMethod(

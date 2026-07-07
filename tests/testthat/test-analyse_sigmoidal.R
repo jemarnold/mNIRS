@@ -408,7 +408,7 @@ test_that("SSlogistic() converges on real dataset", {
     expect_true(smo2_success >= 0.95)
     expect_true(hhb_success >= 0.95)
 
-    #! failing 5-param convergence
+    #! failing 5-param convergence 0.31 & 0.14
     fit_5param <- function(signal) {
         vapply(reoxy_list, \(df) {
             data <- data.frame(t = df$time, x = df[[signal]])
@@ -647,6 +647,10 @@ test_that("SSgompertz()/SSgompertz_left() converge on real dataset", {
     hhb_right <- fit_shape("VL_HHb", quote(SSgompertz))
     smo2_left <- fit_shape("VL_smo2", quote(SSgompertz_left))
     hhb_left <- fit_shape("VL_HHb", quote(SSgompertz_left))
+    mean(!is.na(smo2_right$A))
+    mean(!is.na(hhb_right$A))
+    mean(!is.na(smo2_left$A))
+    mean(!is.na(hhb_left$A))
 
     expect_true(mean(!is.na(smo2_right$A)) >= 0.9)
     expect_true(mean(!is.na(hhb_right$A)) >= 0.9)

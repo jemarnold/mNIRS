@@ -128,7 +128,7 @@ print.mnirs_kinetics <- function(x, ...) {
         cat(spacer, "\n")
         cat(bottom_lines, sep = "\n")
 
-        #! add instructions how to retrieve returned object?
+        ## TODO add instructions how to retrieve returned object?
     }
     cat("\n\n")
 }

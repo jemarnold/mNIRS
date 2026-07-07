@@ -106,7 +106,7 @@ We will use this function twice for OxCap analysis:
 
   * `analyse_kinetics(method = "peak_slope")` is used to find the peak linear regression slopes on deoxy[haem] from the extracted occlusion intervals. The steepest (positive or negative) slope is often interpreted as the point of greatest mismatch between O<sub>2</sub> supply and O<sub>2</sub> extraction, such as for muscle OxCap testing. See `?peak_slope` for more details on the vector-level function called by `analyse_kinetics()`.
 
-  * `analyse_kinetics(method = "monoexponential")` is then used to fit an exponential curve through the resulting slope values over time, to find the rate constant `k`. A self-starting function `SSmonoexp()` is fit with `stats::nls()` and can be called as either a 4-parameter monoexponential model with a time-delay parameter (TD), or a reduced 3-parameter model without TD where the onset of the response is expected to be immediate. See `?monoexponential` and `?SSmonoexp` for more details.
+  * `analyse_kinetics(method = "monoexponential")` is then used to fit an exponential curve through the resulting slope values over time, to find the rate constant `k`. A self-starting function `SSmonoexponential()` is fit with `stats::nls()` and can be called as either a 4-parameter monoexponential model with a time-delay parameter (TD), or a reduced 3-parameter model without TD where the onset of the response is expected to be immediate. See `?monoexponential` and `?SSmonoexponential` for more details.
 
 
 
@@ -428,7 +428,7 @@ p
 
 * `method = "monoexponential"`
 
-The **monoexponential** method is a *parametric* approach: it fits a self-starting exponential curve to time series data with `nls()`, using `SSmonoexp()` to initialise. This models how mV̇O<sub>2</sub> recovers back to baseline after the exercise stimulus, and its rate constant *k* is the OxCap outcome.
+The **monoexponential** method is a *parametric* approach: it fits a self-starting exponential curve to time series data with `nls()`, using `SSmonoexponential()` to initialise. This models how mV̇O<sub>2</sub> recovers back to baseline after the exercise stimulus, and its rate constant *k* is the OxCap outcome.
 
 It fits either a **4-parameter** model `A + (B − A)(1 − exp(−(t − TD) / tau))` with a time delay *TD*, or a reduced **3-parameter** model without *TD* when the response is expected to start immediately.
 

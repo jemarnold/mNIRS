@@ -544,8 +544,7 @@ validate_start_time <- function(
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
-    ## fall back to metadata or zero
-    ## TODO fall back to first non-zero time value rather than 0?
+    ## fall back to metadata or first value or zero
     start_time <- start_time %||%
         attr(data, "interval_times") %||%
         t_vec[1L] %||%
