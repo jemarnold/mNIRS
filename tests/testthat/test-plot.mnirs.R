@@ -412,6 +412,22 @@ test_that("plot.mnirs works with extract_intervals and faceting", {
     expect_no_error(ggplot2::ggplot_build(p_facet))
 })
 
+test_that("plot.mnirs converts character interval to appearance-order factor", {
+    x <- mock_mnirs()
+
+    ## appearance order differs from alphabetical (interval_10 < interval_2)
+    x$interval <- rep(c("interval_2", "interval_10"), each = 5)
+
+    p <- plot(x)
+    expect_s3_class(p$data$interval, "factor")
+    expect_equal(levels(p$data$interval), c("interval_2", "interval_10"))
+
+    ## existing factor levels pass through unchanged
+    x$interval <- factor(x$interval, levels = c("interval_10", "interval_2"))
+    p2 <- plot(x)
+    expect_equal(levels(p2$data$interval), c("interval_10", "interval_2"))
+})
+
 test_that("plot.mnirs uses waiver() for breaks when scales is unavailable", {
     x <- mock_mnirs()
 

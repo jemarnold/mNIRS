@@ -13,7 +13,9 @@ gompertz_init(mCall, data, LHS, ...)
 
 \item{LHS}{The left-hand side expression of the model formula.}
 
-\item{...}{Additional arguments.}
+\item{...}{Additional arguments, including \code{fixed}, a named list of
+user-fixed parameter values from \code{\link[=init_fixed]{init_fixed()}} used to seed the
+remaining free estimates.}
 }
 \value{
 \code{\link[=gompertz_init]{gompertz_init()}}: Initial starting estimates for parameters

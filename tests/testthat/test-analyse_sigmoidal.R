@@ -709,6 +709,85 @@ test_that("init_inflection() returns derivative-based estimates on clean sigmoid
 })
 
 
+## logistic_init() fallbacks =========================================
+
+## helper: invoke logistic_init() as selfStart() would, building the
+## matched call and named data frame it expects
+call_logistic_init <- function(x, t, asym = FALSE) {
+    data <- data.frame(.t = t, .x = x)
+    ## logistic_init() reads mCall[["t"]] by name and detects the 5-param
+    ## branch via "asym" %in% names(mCall), so args must be named
+    args <- list(
+        t = quote(.t),
+        A = quote(A),
+        B = quote(B),
+        xmid = quote(xmid),
+        slope = quote(slope)
+    )
+    if (asym) {
+        args <- c(args, list(asym = quote(asym)))
+    }
+    mCall <- as.call(c(quote(logistic), args))
+    logistic_init(mCall, data, quote(.x))
+}
+
+test_that("logistic_init() falls back to mean-rate slope when linearisation fails", {
+    ## only 2 distinct points -> fewer than 3 finite linearisation points
+    ## -> xmid_init/slope_init stay NA -> both fallbacks fire. t_range > 0
+    ## so slope is the mean rate (B - A) / t_range == 100 / 10 == 10
+    x <- c(0, 100)
+    t <- c(0, 10)
+
+    res <- call_logistic_init(x, t)
+    expect_equal(res[["slope"]], 10)
+    expect_true(res[["xmid"]] >= min(t) && res[["xmid"]] <= max(t))
+})
+
+test_that("logistic_init() mean-rate slope is negative for falling data", {
+    ## same degenerate path, falling direction -> negative slope fallback
+    ## (B - A) / t_range == -100 / 10 == -10
+    x <- c(100, 0)
+    t <- c(0, 10)
+
+    res <- call_logistic_init(x, t)
+    expect_equal(res[["slope"]], -10)
+    expect_true(is.finite(res[["xmid"]]))
+})
+
+test_that("logistic_init() xmid fallback pins out-of-range xmid to t range", {
+    ## only the early tail of a sigmoid is observed, so the linearised
+    ## xmid extrapolates past max(t); fallback pins it into [min(t), max(t)]
+    t <- 1:30
+    x <- logistic(t, A = 10, B = 100, xmid = 80, slope = 4)
+
+    res <- call_logistic_init(x, t)
+    expect_true(res[["xmid"]] >= min(t) && res[["xmid"]] <= max(t))
+    expect_true(is.finite(res[["slope"]]))
+})
+
+test_that("logistic_init() uses linearisation on a clean sigmoid", {
+    ## non-degenerate data bypasses both fallbacks and recovers params
+    t <- 1:60
+    x <- logistic(t, A = 10, B = 100, xmid = 30, slope = 4)
+
+    res <- call_logistic_init(x, t)
+    expect_true(all.equal(res[["A"]], 10, tolerance = 5, scale = 1))
+    expect_true(all.equal(res[["B"]], 100, tolerance = 5, scale = 1))
+    expect_true(all.equal(res[["xmid"]], 30, tolerance = 5, scale = 1))
+    expect_true(res[["slope"]] > 0)
+})
+
+test_that("logistic_init() 5-param branch returns asym estimate", {
+    t <- 1:60
+    x <- logistic(t, A = 10, B = 100, xmid = 30, slope = 4, asym = 0.5)
+
+    res <- call_logistic_init(x, t, asym = TRUE)
+    expect_named(res, c("A", "B", "xmid", "slope", "asym"))
+    expect_true(res[["asym"]] >= 0.1 && res[["asym"]] <= 0.9)
+    expect_true(res[["xmid"]] >= min(t) && res[["xmid"]] <= max(t))
+})
+
+
 ## analyse_logistic() ===================================================
 
 ## helper: create logistic test data with known parameters
@@ -1154,4 +1233,103 @@ test_that("analyse_kinetics() passes direction to sigmoidal method", {
     )
 
     expect_true(is.na(result$coefficients$A))
+})
+
+
+## fixed parameters ==============================================
+
+test_that("SSlogistic() fixes parameters as constants", {
+    set.seed(15)
+    t <- 1:60
+    x <- logistic(t, A = 0, B = 100, xmid = 30, slope = 4) +
+        rnorm(length(t), 0, 2)
+    data <- data.frame(t, x)
+
+    model <- nls(x ~ SSlogistic(t, A = 0, B, xmid, slope), data = data)
+
+    expect_s3_class(model, "nls")
+    expect_named(coef(model), c("B", "xmid", "slope"))
+    expect_true(all.equal(coef(model)[["B"]], 100, tolerance = 5, scale = 1))
+    expect_true(all.equal(coef(model)[["xmid"]], 30, tolerance = 2, scale = 1))
+
+    ## fix xmid instead of A
+    model_xmid <- nls(x ~ SSlogistic(t, A, B, xmid = 30, slope), data = data)
+    expect_named(coef(model_xmid), c("A", "B", "slope"))
+})
+
+test_that("SSgompertz() / SSgompertz_left() fix parameters as constants", {
+    set.seed(15)
+    t <- 1:60
+    x <- gompertz(t, A = 0, B = 100, xmid = 30, slope = 4) +
+        rnorm(length(t), 0, 2)
+    data <- data.frame(t, x)
+
+    model <- nls(x ~ SSgompertz(t, A = 0, B, xmid, slope), data = data)
+    expect_named(coef(model), c("B", "xmid", "slope"))
+    expect_true(all.equal(coef(model)[["B"]], 100, tolerance = 5, scale = 1))
+
+    set.seed(16)
+    x2 <- gompertz_left(t, A = 0, B = 100, xmid = 30, slope = 4) +
+        rnorm(length(t), 0, 2)
+    data2 <- data.frame(t, x = x2)
+
+    model_left <- nls(
+        x ~ SSgompertz_left(t, A = 0, B, xmid, slope),
+        data = data2
+    )
+    expect_named(coef(model_left), c("B", "xmid", "slope"))
+})
+
+test_that("analyse_logistic() fix holds parameters constant", {
+    data <- create_logistic_data(
+        A = 0, B = 100, xmid = 30, slope = 4, noise_sd = 1
+    )
+
+    result <- analyse_logistic(
+        data,
+        nirs_channels = "smo2",
+        fix = list(A = 0),
+        verbose = FALSE
+    )
+
+    expect_equal(result$A, 0)
+    expect_equal(result$B, 100, tolerance = 5)
+    expect_equal(result$xmid, 30, tolerance = 2)
+
+    ## fixed A excluded from the fitted model coefficients
+    expect_named(coef(attr(result, "model")$smo2), c("B", "xmid", "slope"))
+    expect_equal(attr(result, "channel_args")$fix, "list(A = 0)")
+})
+
+test_that("analyse_logistic() validates fix argument", {
+    data <- create_logistic_data()
+
+    expect_error(
+        analyse_logistic(data, nirs_channels = "smo2", fix = list(tau = 5)),
+        "not recognised"
+    )
+    expect_error(
+        analyse_logistic(
+            data, nirs_channels = "smo2",
+            fix = list(A = 0, B = 100, xmid = 30, slope = 4)
+        ),
+        "Nothing to estimate"
+    )
+})
+
+test_that("analyse_kinetics() passes fix to the sigmoidal method", {
+    data <- create_logistic_data(
+        A = 0, B = 100, xmid = 30, slope = 4, noise_sd = 1
+    )
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "sigmoidal",
+        fix = list(A = 0),
+        verbose = FALSE
+    )
+
+    expect_equal(result$coefficients$A, 0)
+    expect_named(coef(result$model[[1L]]$smo2), c("B", "xmid", "slope"))
 })

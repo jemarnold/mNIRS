@@ -79,7 +79,9 @@ monoexponential <- function(t, A, B, tau, TD = NULL) {
 #' @param mCall A matched call to the function `model`.
 #' @param data A data frame with time `t` and the response variable.
 #' @param LHS The left-hand side expression of the model formula.
-#' @param ... Additional arguments.
+#' @param ... Additional arguments, including `fixed`, a named list of
+#'   user-fixed parameter values from [init_fixed()] used to seed the
+#'   remaining free estimates.
 #'
 #' @returns [monoexp_init()]: Initial starting estimates for parameters in the
 #'   model called by [SSmonoexponential()].
@@ -93,14 +95,17 @@ monoexp_init <- function(mCall, data, LHS, ...) {
     t <- tx[["x"]]
     n <- length(x)
 
+    ## user-fixed parameter values seed the remaining free estimates
+    fixed <- list(...)$fixed %||% list()
+
     ## check if TD parameter exists in the call
     has_TD <- "TD" %in% names(mCall)
 
     ## fit linear model to log-transformed differences from estimated asymptote
     ## asymptotes from 1/5 response signal
     n_asymp <- max(1, ceiling(n / 5))
-    A_init <- mean(x[seq_len(n_asymp)])
-    B_init <- mean(x[seq(n - n_asymp + 1, n)])
+    A_init <- fixed$A %||% mean(x[seq_len(n_asymp)])
+    B_init <- fixed$B %||% mean(x[seq(n - n_asymp + 1, n)])
 
     ## estimate rate constant via linearisation (SSasymp method)
     ## sign +ve for upward (B > A); -ve for downward (B < A).
@@ -113,9 +118,9 @@ monoexp_init <- function(mCall, data, LHS, ...) {
     ## use shifted x to avoid log of negative/zero
     x_shifted <- B_init - x
     x_pos <- x_shifted > 0
-    x_shifted[!x_pos] <- min(x_shifted[x_pos]) / 2
 
     if (sum(x_pos) >= 3) {
+        x_shifted[!x_pos] <- min(x_shifted[x_pos]) / 2
         lm_fit <- stats::lm(log(x_shifted) ~ t)
         rate <- -coef(lm_fit)[2L]
         tau_init <- if (is.finite(rate) && rate > 0) {
@@ -130,13 +135,13 @@ monoexp_init <- function(mCall, data, LHS, ...) {
         tau_init <- max(tau_init, diff(range(t)) / 10)
     }
 
-    tau_init <- max(tau_init, .Machine$double.eps)
+    tau_init <- fixed$tau %||% max(tau_init, .Machine$double.eps)
 
     if (has_TD) {
         ## 4-parameter: estimate time delay from derivative changepoint
         dx_dt <- abs(diff(x) / diff(t))
         td_idx <- which.max(dx_dt)
-        TD_init <- max(t[td_idx] - tau_init * 0.1, 0)
+        TD_init <- fixed$TD %||% max(t[td_idx] - tau_init * 0.1, 0)
         return(c(A = A_init, B = B_init, tau = tau_init, TD = TD_init))
     } else {
         ## 3-parameter: no time delay
@@ -167,6 +172,13 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #'   reads the free parameters from the formula right-hand side, so omitting
 #'   `TD` incurs no degrees-of-freedom penalty.
 #'
+#' ## Fixing parameters
+#'
+#' Any parameter may be held constant by writing a value in place of its
+#'   name in the formula, e.g. `x ~ SSmonoexponential(t, A = 0, B, tau)` fixes the
+#'   baseline at `A = 0`. Fixed parameters are excluded from estimation and
+#'   are not returned by [stats::coef()].
+#'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
 #'
@@ -189,6 +201,10 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #' model3 <- nls(x ~ SSmonoexponential(t, A, B, tau), data = data)
 #' model3
 #'
+#' ## fix the baseline A at a known value
+#' model_fixed <- nls(x ~ SSmonoexponential(t, A = 10, B, tau, TD), data = data)
+#' coef(model_fixed)
+#'
 #' y4 <- predict(model4, data)
 #' y3 <- predict(model3, data)
 #'
@@ -205,7 +221,7 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #' @export
 SSmonoexponential <- selfStart(
     model = monoexponential,
-    initial = monoexp_init,
+    initial = init_fixed(monoexp_init, c("A", "B", "tau", "TD")),
     parameters = c("A", "B", "tau", "TD")
 )
 
@@ -221,6 +237,12 @@ SSmonoexponential <- selfStart(
 #'   4-parameter [SSmonoexponential()] model (A, B, tau, TD) with a time delay.
 #'   If the 4-parameter fit fails, or if `use_TD = FALSE`, attempts to
 #'   fit a reduced 3-parameter [SSmonoexponential()] model (A, B, tau).
+#' @param fix An *optional* named list of model parameters to hold
+#'   constant during fitting, e.g. `fix = list(A = 0)`. Fixed parameters
+#'   are excluded from estimation and reported at their fixed values.
+#'   Applied globally across `nirs_channels`. `TD` is fixable only when
+#'   `use_TD = TRUE` for all channels; a fixed `TD` disables the
+#'   3-parameter fallback.
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
 #'
@@ -245,6 +267,7 @@ analyse_monoexponential <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     use_TD = TRUE,
+    fix = NULL,
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
@@ -283,6 +306,16 @@ analyse_monoexponential <- function(
         env = env
     )
 
+    ## global fixed parameters bypass per-channel resolution: a named
+    ## list would be misread as a channel map. TD is only fixable when
+    ## every channel fits the 4-parameter model
+    use_TD_all <- all(vapply(per_channel, \(.a) .a$use_TD, logical(1)))
+    fix <- validate_fix(
+        fix,
+        c("A", "B", "tau", if (use_TD_all) "TD"),
+        env = env
+    )
+
     ## NA scaffold (method columns only) for convergence failure
     na_coefs <- data.frame(
         A = NA_real_,
@@ -298,7 +331,7 @@ analyse_monoexponential <- function(
     )
 
     ## construct warning messages for fit failure
-    fit_failed_warning <- function(.nirs, n_params, e, verbose) {
+    fit_failed_warning <- function(.nirs, n_params, e, retry, verbose) {
         if (!verbose) {
             return(invisible(NULL))
         }
@@ -319,52 +352,58 @@ analyse_monoexponential <- function(
 
     ## method-specific fit: self-starting monoexponential via nls
     monoexponential_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
-        ## derive n_params from use_TD for internal use
-        n_params <- if (.a$use_TD) 4L else 3L
         fit_data <- data.frame(.x = x_fit, .t = t_fit)
+        params <- c("A", "B", "tau", if (.a$use_TD) "TD")
 
-        ## attempt nls fit on 4-param then fall back to 3-param on failure
-        model <- NULL
-        if (n_params == 4L) {
+        ## attempt nls fit; a failed 4-param fit falls back to the
+        ## 3-param model unless TD is user-fixed
+        retry <- .a$use_TD && !"TD" %in% names(fix)
+        model <- tryCatch(
+            nls(
+                build_ss_formula(quote(SSmonoexponential), params, fix),
+                fit_data
+            ),
+            error = \(e) {
+                fit_failed_warning(.nirs, length(params), e, retry, verbose)
+                NULL
+            }
+        )
+        if (is.null(model) && retry) {
+            params <- setdiff(params, "TD")
             model <- tryCatch(
-                nls(.x ~ SSmonoexp(.t, A, B, tau, TD), fit_data),
+                nls(
+                    build_ss_formula(quote(SSmonoexponential), params, fix),
+                    fit_data
+                ),
                 error = \(e) {
-                    fit_failed_warning(.nirs, n_params, e, verbose)
+                    fit_failed_warning(.nirs, length(params), e, FALSE, verbose)
                     NULL
                 }
             )
-            if (is.null(model)) n_params <- 3L
         }
 
-        if (n_params == 3L) {
-            model <- tryCatch(
-                nls(.x ~ SSmonoexp(.t, A, B, tau), fit_data),
-                error = \(e) {
-                    fit_failed_warning(.nirs, n_params, e, verbose)
-                    NULL
-                }
-            )
-        }
-
-        ## TODO: implement fallback HRT method on convergence failure
         if (is.null(model)) {
             return(build_na_results(na_coefs))
         }
 
-        coefs <- stats::coef(model)
+        coefs <- full_coefs(model, params, fix)
 
         ## enforce direction: bounded refit on D = B - A when inverted
-        extra <- c(tau = coefs[["tau"]])
-        if (n_params == 4L) extra <- c(extra, TD = coefs[["TD"]])
+        free_extra <- setdiff(params, c("A", "B", names(fix)))
         enforced <- enforce_direction(
-            model, coefs, fit_data,
+            model,
+            coefs,
+            fit_data,
             direction = .a$direction,
             amp_fn = quote(monoexponential),
-            extra = extra,
+            extra = coefs[free_extra],
             ## data-scaled tau floor: tau pinned here is a degenerate
             ## step fit, not a genuine response
-            extra_lower = c(tau = diff(range(t_fit)) * 1e-6),
+            extra_lower = if ("tau" %in% free_extra) {
+                c(tau = diff(range(t_fit)) * 1e-6)
+            },
             fn = quote(SSmonoexponential),
+            fix = fix,
             .nirs = .nirs,
             interval_name = interval_name,
             verbose = verbose,
@@ -377,7 +416,7 @@ analyse_monoexponential <- function(
         coefs <- enforced$coefs
         fitted_vals <- stats::predict(model)
 
-        TD_arg <- if (n_params == 4L) coefs[["TD"]] - .a$start_time else NULL
+        TD_arg <- if ("TD" %in% params) coefs[["TD"]] - .a$start_time else NULL
         TD_val <- TD_arg %||% NA_real_
         MRT_val <- sum(TD_arg, coefs[["tau"]])
         HRT_val <- sum(TD_arg, coefs[["tau"]] * log(2))
@@ -413,6 +452,7 @@ analyse_monoexponential <- function(
                 x_fit,
                 t_fit,
                 fitted_vals,
+                n_params = length(stats::coef(model)),
                 verbose,
                 env
             )
@@ -427,7 +467,7 @@ analyse_monoexponential <- function(
         monoexponential_fit,
         verbose,
         interval_name,
-        extra_args = args,
+        extra_args = c(args, list(fix = if (length(fix) > 0L) fix else NULL)),
         env = env
     ))
 }

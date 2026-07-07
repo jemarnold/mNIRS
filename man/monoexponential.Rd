@@ -29,7 +29,7 @@ predictor variable \code{t}.
 \description{
 Calculate a 3- or 4-parameter monoexponential curve. This model family is
 fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "monoexponential"}, and by
-\code{\link[stats:nls]{stats::nls()}} via the self-starting wrapper \code{\link[=SSmonoexp]{SSmonoexp()}}.
+\code{\link[stats:nls]{stats::nls()}} via the self-starting wrapper \code{\link[=SSmonoexponential]{SSmonoexponential()}}.
 }
 \details{
 \subsection{Model equations}{
@@ -54,7 +54,7 @@ x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
     rnorm(length(t), 0, 3)
 data <- data.frame(t, x)
 
-model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
+model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
 model
 
 y <- predict(model, data)
@@ -70,6 +70,6 @@ y <- predict(model, data)
 
 }
 \seealso{
-\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=SSmonoexp]{SSmonoexp()}}, \code{\link[=response_time]{response_time()}},
+\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=SSmonoexponential]{SSmonoexponential()}}, \code{\link[=response_time]{response_time()}},
 \code{\link[=peak_slope]{peak_slope()}}
 }

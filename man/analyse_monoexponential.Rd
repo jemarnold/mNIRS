@@ -9,6 +9,7 @@ analyse_monoexponential(
   nirs_channels = NULL,
   time_channel = NULL,
   use_TD = TRUE,
+  fix = NULL,
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -36,9 +37,16 @@ used.
 }}
 
 \item{use_TD}{Logical; default is \code{TRUE} to attempt to fit a
-4-parameter \code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau, TD) with a time delay.
+4-parameter \code{\link[=SSmonoexponential]{SSmonoexponential()}} model (A, B, tau, TD) with a time delay.
 If the 4-parameter fit fails, or if \code{use_TD = FALSE}, attempts to
-fit a reduced 3-parameter \code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau).}
+fit a reduced 3-parameter \code{\link[=SSmonoexponential]{SSmonoexponential()}} model (A, B, tau).}
+
+\item{fix}{An \emph{optional} named list of model parameters to hold
+constant during fitting, e.g. \code{fix = list(A = 0)}. Fixed parameters
+are excluded from estimation and reported at their fixed values.
+Applied globally across \code{nirs_channels}. \code{TD} is fixable only when
+\code{use_TD = TRUE} for all channels; a fixed \code{TD} disables the
+3-parameter fallback.}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
 time of response onset (effectively kinetics fit time = \code{0}). If \code{NULL}
@@ -88,6 +96,6 @@ curve to each \code{nirs_channel} within a single \emph{"mnirs"} data frame. See
 \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing documentation.
 }
 \seealso{
-\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=monoexponential]{monoexponential()}}, \code{\link[=SSmonoexp]{SSmonoexp()}}
+\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=monoexponential]{monoexponential()}}, \code{\link[=SSmonoexponential]{SSmonoexponential()}}
 }
 \keyword{internal}

@@ -83,6 +83,11 @@ method_aliases <- c(
 #'   to fit. One of `"symmetric"` (*default*; calls [SSlogistic()]),
 #'   `"gompertz"` (early-inflection; calls [SSgompertz()]), or
 #'   `"gompertz_left"` (late-inflection; calls [SSgompertz_left()]).
+#' @param fix **monoexponential, sigmoidal**: An *optional* named list of
+#'   model parameters to hold constant during fitting, e.g.
+#'   `fix = list(A = 0)` fixes the starting amplitude at `0`. Fixed
+#'   parameters are excluded from estimation and reported at their fixed
+#'   values. Applied globally across `nirs_channels`. See *Details*.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
 #'
@@ -191,6 +196,10 @@ method_aliases <- c(
 #' [monoexponential()] for the model family and [SSmonoexponential()] for self-start
 #' initialisation.
 #'
+#' Parameters (`A`, `B`, `tau`, `TD`) may be held constant with `fix`, e.g.
+#' `fix = list(A = 0)`. `TD` is fixable only when `use_TD = TRUE` for all
+#' channels; a fixed `TD` disables the 3-parameter fallback.
+#'
 #' Other arguments (`...`) passed to [stats::nls()] are `<NOT YET IMPLEMENTED>`.
 #'
 #' ## method = "sigmoidal"
@@ -220,6 +229,9 @@ method_aliases <- c(
 #' fast-tail responses. See [logistic()], [gompertz()], and [gompertz_left()]
 #' for the model families and [SSlogistic()], [SSgompertz()], and
 #' [SSgompertz_left()] for self-start initialisations.
+#'
+#' Parameters (`A`, `B`, `xmid`, `slope`) may be held constant with `fix`,
+#' e.g. `fix = list(A = 0)`.
 #'
 #' Other arguments (`...`) passed to [stats::nls()] are `<NOT YET IMPLEMENTED>`.
 #'
@@ -308,7 +320,8 @@ analyse_kinetics <- function(
     partial = FALSE,
     na.rm = FALSE,
     use_TD = TRUE,
-    shape = c("symmetric", "gompertz", "gompertz_left")
+    shape = c("symmetric", "gompertz", "gompertz_left"),
+    fix = NULL
 ) {
     ## normalise method aliases before matching
     key <- gsub("[ -]", "_", tolower(method))
@@ -434,7 +447,8 @@ analyse_kinetics.monoexponential <- function(
     end_window = Inf,
     verbose = TRUE,
     ...,
-    use_TD = TRUE
+    use_TD = TRUE,
+    fix = NULL
 ) {
     ## TODO: pass additional stats::nls() args
     ## resolve global verbose option when caller omits the argument
@@ -454,6 +468,7 @@ analyse_kinetics.monoexponential <- function(
         method = "monoexponential",
         worker_args = list(
             use_TD = use_TD,
+            fix = fix,
             start_time = start_time,
             direction = direction,
             end_window = end_window
@@ -480,7 +495,8 @@ analyse_kinetics.sigmoidal <- function(
     end_window = Inf,
     verbose = TRUE,
     ...,
-    shape = c("symmetric", "gompertz", "gompertz_left")
+    shape = c("symmetric", "gompertz", "gompertz_left"),
+    fix = NULL
 ) {
     ## TODO: pass additional stats::nls() args
     ## resolve global verbose option when caller omits the argument
@@ -500,6 +516,7 @@ analyse_kinetics.sigmoidal <- function(
         method = "sigmoidal",
         worker_args = list(
             shape = shape,
+            fix = fix,
             start_time = start_time,
             direction = direction,
             end_window = end_window

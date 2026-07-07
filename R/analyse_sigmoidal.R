@@ -190,7 +190,9 @@ gompertz_left <- function(t, A, B, xmid, slope) {
 #' @param mCall A matched call to the function `model`.
 #' @param data A data frame with predictor `t` and the response variable.
 #' @param LHS The left-hand side expression of the model formula.
-#' @param ... Additional arguments.
+#' @param ... Additional arguments, including `fixed`, a named list of
+#'   user-fixed parameter values from [init_fixed()] used to seed the
+#'   remaining free estimates.
 #'
 #' @returns [logistic_init()]: Initial starting estimates for parameters in
 #'   the model called by [SSlogistic()].
@@ -203,10 +205,13 @@ logistic_init <- function(mCall, data, LHS, ...) {
     n <- length(x)
     has_asym <- "asym" %in% names(mCall)
 
+    ## user-fixed parameter values seed the remaining free estimates
+    fixed <- list(...)$fixed %||% list()
+
     ## asymptotes from first and last ceiling(n/5) values
     ab <- init_asymptotes(x, n)
-    A_init <- ab$A
-    B_init <- ab$B
+    A_init <- fixed$A %||% ab$A
+    B_init <- fixed$B %||% ab$B
 
     ## linearisation for 4-param: log((B - y) / (y - A)) ~ t
     lo <- min(A_init, B_init)
@@ -247,7 +252,12 @@ logistic_init <- function(mCall, data, LHS, ...) {
     }
 
     if (!has_asym) {
-        return(c(A = A_init, B = B_init, xmid = xmid_init, slope = slope_init))
+        return(c(
+            A = A_init,
+            B = B_init,
+            xmid = fixed$xmid %||% xmid_init,
+            slope = fixed$slope %||% slope_init
+        ))
     }
 
     ## 5-param: empirical inflection from smoothed derivative
@@ -258,9 +268,9 @@ logistic_init <- function(mCall, data, LHS, ...) {
     return(c(
         A = A_init,
         B = B_init,
-        xmid = infl$xmid,
-        slope = infl$slope,
-        asym = asym_init
+        xmid = fixed$xmid %||% infl$xmid,
+        slope = fixed$slope %||% infl$slope,
+        asym = fixed$asym %||% asym_init
     ))
 }
 
@@ -284,10 +294,20 @@ gompertz_init <- function(mCall, data, LHS, ...) {
     t <- tx[["x"]]
     n <- length(x)
 
-    ab <- init_asymptotes(x, n)
-    infl <- init_inflection(x, t, ab$A, ab$B)
+    ## user-fixed parameter values seed the remaining free estimates
+    fixed <- list(...)$fixed %||% list()
 
-    return(c(A = ab$A, B = ab$B, xmid = infl$xmid, slope = infl$slope))
+    ab <- init_asymptotes(x, n)
+    A_init <- fixed$A %||% ab$A
+    B_init <- fixed$B %||% ab$B
+    infl <- init_inflection(x, t, A_init, B_init)
+
+    return(c(
+        A = A_init,
+        B = B_init,
+        xmid = fixed$xmid %||% infl$xmid,
+        slope = fixed$slope %||% infl$slope
+    ))
 }
 
 
@@ -383,6 +403,13 @@ init_inflection <- function(x, t, A_init, B_init) {
 #'   [stats::nls()] reads the free parameters from the formula right-hand
 #'   side, so omitting `asym` incurs no degrees-of-freedom penalty.
 #'
+#' ## Fixing parameters
+#'
+#' Any parameter may be held constant by writing a value in place of its
+#'   name in the formula, e.g. `x ~ SSlogistic(t, A = 0, B, xmid, slope)`
+#'   fixes the starting asymptote at `A = 0`. Fixed parameters are excluded
+#'   from estimation and are not returned by [stats::coef()].
+#'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
 #'
@@ -421,7 +448,10 @@ init_inflection <- function(x, t, A_init, B_init) {
 #' @export
 SSlogistic <- selfStart(
     model = logistic,
-    initial = logistic_init,
+    initial = init_fixed(
+        logistic_init,
+        c("A", "B", "xmid", "slope", "asym")
+    ),
     parameters = c("A", "B", "xmid", "slope", "asym")
 )
 
@@ -442,6 +472,13 @@ SSlogistic <- selfStart(
 #'
 #' @details
 #' Overwrites [stats::SSgompertz()].
+#'
+#' ## Fixing parameters
+#'
+#' Any parameter may be held constant by writing a value in place of its
+#'   name in the formula, e.g. `x ~ SSgompertz(t, A = 0, B, xmid, slope)`
+#'   fixes the starting asymptote at `A = 0`. Fixed parameters are excluded
+#'   from estimation and are not returned by [stats::coef()].
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -471,7 +508,7 @@ SSlogistic <- selfStart(
 #' @export
 SSgompertz <- selfStart(
     model = gompertz,
-    initial = gompertz_init,
+    initial = init_fixed(gompertz_init, c("A", "B", "xmid", "slope")),
     parameters = c("A", "B", "xmid", "slope")
 )
 
@@ -480,7 +517,7 @@ SSgompertz <- selfStart(
 #' @export
 SSgompertz_left <- selfStart(
     model = gompertz_left,
-    initial = gompertz_init,
+    initial = init_fixed(gompertz_init, c("A", "B", "xmid", "slope")),
     parameters = c("A", "B", "xmid", "slope")
 )
 
@@ -515,6 +552,11 @@ shape_dispatch <- list(
 #'   `"symmetric"` (*default*; calls [SSlogistic()]), `"gompertz"`
 #'   (early-inflection; calls [SSgompertz()]), or `"gompertz_left"`
 #'   (late-inflection; calls [SSgompertz_left()]).
+#' @param fix An *optional* named list of model parameters (`A`, `B`,
+#'   `xmid`, `slope`) to hold constant during fitting, e.g.
+#'   `fix = list(A = 0)`. Fixed parameters are excluded from estimation
+#'   and reported at their fixed values. Applied globally across
+#'   `nirs_channels`.
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
 #'
@@ -539,6 +581,7 @@ analyse_logistic <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     shape = c("symmetric", "gompertz", "gompertz_left"),
+    fix = NULL,
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
@@ -580,6 +623,10 @@ analyse_logistic <- function(
         env = env
     )
 
+    ## global fixed parameters bypass per-channel resolution: a named
+    ## list would be misread as a channel map
+    fix <- validate_fix(fix, c("A", "B", "xmid", "slope"), env = env)
+
     ## NA scaffold (method columns only) for convergence failure
     na_coefs <- data.frame(
         A = NA_real_,
@@ -608,13 +655,10 @@ analyse_logistic <- function(
         disp <- shape_dispatch[[.a$shape]]
         ch_fn <- disp$model
         fit_data <- data.frame(.x = x_fit, .t = t_fit)
+        params <- c("A", "B", "xmid", "slope")
 
-        ## build nls formula: .x ~ <ch_fn>(.t, A, B, xmid, slope)
-        rhs <- as.call(c(
-            ch_fn,
-            list(quote(.t), quote(A), quote(B), quote(xmid), quote(slope))
-        ))
-        nls_formula <- stats::as.formula(call("~", quote(.x), rhs))
+        ## build nls formula with any fixed params as constants
+        nls_formula <- build_ss_formula(ch_fn, params, fix)
 
         model <- tryCatch(
             nls(nls_formula, fit_data),
@@ -628,24 +672,31 @@ analyse_logistic <- function(
             return(build_na_results(na_coefs))
         }
 
-        coefs <- stats::coef(model)
+        coefs <- full_coefs(model, params, fix)
 
         ## enforce direction: bounded refit on D = B - A and slope sign
         ## data-scaled slope floor: slope pinned here is a degenerate
         ## flat fit, not a genuine response
         want <- if (.a$direction == "positive") 1 else -1
         slope_eps <- diff(range(x_fit)) / diff(range(t_fit)) * 1e-6
+        free_extra <- setdiff(params, c("A", "B", names(fix)))
+        extra <- coefs[free_extra]
+        if ("slope" %in% free_extra) {
+            extra[["slope"]] <- want * max(abs(coefs[["slope"]]), slope_eps)
+        }
         enforced <- enforce_direction(
             model, coefs, fit_data,
             direction = .a$direction,
             amp_fn = disp$amp,
-            extra = c(
-                xmid = coefs[["xmid"]],
-                slope = want * max(abs(coefs[["slope"]]), slope_eps)
-            ),
-            extra_lower = c(slope = if (want > 0) slope_eps else -Inf),
-            extra_upper = c(slope = if (want > 0) Inf else -slope_eps),
+            extra = extra,
+            extra_lower = if ("slope" %in% free_extra) {
+                c(slope = if (want > 0) slope_eps else -Inf)
+            },
+            extra_upper = if ("slope" %in% free_extra) {
+                c(slope = if (want > 0) Inf else -slope_eps)
+            },
             fn = ch_fn,
+            fix = fix,
             .nirs = .nirs,
             interval_name = interval_name,
             verbose = verbose,
@@ -682,7 +733,7 @@ analyse_logistic <- function(
                 x_fit,
                 t_fit,
                 fitted_vals,
-                n_params = 4L,
+                n_params = length(stats::coef(model)),
                 verbose,
                 env
             )
@@ -697,7 +748,7 @@ analyse_logistic <- function(
         logistic_fit,
         verbose,
         interval_name,
-        extra_args = args,
+        extra_args = c(args, list(fix = if (length(fix) > 0L) fix else NULL)),
         env = env
     ))
 }

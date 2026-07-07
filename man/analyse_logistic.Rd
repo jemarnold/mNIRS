@@ -9,6 +9,7 @@ analyse_logistic(
   nirs_channels = NULL,
   time_channel = NULL,
   shape = c("symmetric", "gompertz", "gompertz_left"),
+  fix = NULL,
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -39,6 +40,12 @@ used.
 \code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic]{SSlogistic()}}), \code{"gompertz"}
 (early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or \code{"gompertz_left"}
 (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
+
+\item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B},
+\code{xmid}, \code{slope}) to hold constant during fitting, e.g.
+\code{fix = list(A = 0)}. Fixed parameters are excluded from estimation
+and reported at their fixed values. Applied globally across
+\code{nirs_channels}.}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
 time of response onset (effectively kinetics fit time = \code{0}). If \code{NULL}

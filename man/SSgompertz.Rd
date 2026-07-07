@@ -38,6 +38,13 @@ cross-shape coefficient comparability.
 }
 \details{
 Overwrites \code{\link[stats:SSgompertz]{stats::SSgompertz()}}.
+\subsection{Fixing parameters}{
+
+Any parameter may be held constant by writing a value in place of its
+name in the formula, e.g. \code{x ~ SSgompertz(t, A = 0, B, xmid, slope)}
+fixes the starting asymptote at \code{A = 0}. Fixed parameters are excluded
+from estimation and are not returned by \code{\link[stats:coef]{stats::coef()}}.
+}
 }
 \examples{
 ## create a Gompertz curve with random noise

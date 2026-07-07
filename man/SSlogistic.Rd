@@ -51,6 +51,13 @@ asymmetric form is retained as an advanced escape hatch for direct
 which are more numerically stable on noisy real-world data.
 \code{\link[stats:nls]{stats::nls()}} reads the free parameters from the formula right-hand
 side, so omitting \code{asym} incurs no degrees-of-freedom penalty.
+\subsection{Fixing parameters}{
+
+Any parameter may be held constant by writing a value in place of its
+name in the formula, e.g. \code{x ~ SSlogistic(t, A = 0, B, xmid, slope)}
+fixes the starting asymptote at \code{A = 0}. Fixed parameters are excluded
+from estimation and are not returned by \code{\link[stats:coef]{stats::coef()}}.
+}
 }
 \examples{
 ## create a logistic curve with random noise

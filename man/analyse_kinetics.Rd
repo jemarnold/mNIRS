@@ -26,7 +26,8 @@ analyse_kinetics(
   partial = FALSE,
   na.rm = FALSE,
   use_TD = TRUE,
-  shape = c("symmetric", "gompertz", "gompertz_left")
+  shape = c("symmetric", "gompertz", "gompertz_left"),
+  fix = NULL
 )
 
 analyze_kinetics(
@@ -123,15 +124,21 @@ processes available valid samples within the local window. May
 return errors or warnings. (see \emph{Details}).}
 
 \item{use_TD}{\strong{monoexponential}: Logical; default is \code{TRUE}
-to attempt to fit a 4-parameter \code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau, TD)
-with a time delay. If the 4-parameter fit fails, or if
+to attempt to fit a 4-parameter \code{\link[=SSmonoexponential]{SSmonoexponential()}} model (A, B, tau,
+TD) with a time delay. If the 4-parameter fit fails, or if
 \code{use_TD = FALSE}, attempts to fit a reduced 3-parameter
-\code{\link[=SSmonoexp]{SSmonoexp()}} model (A, B, tau).}
+\code{\link[=SSmonoexponential]{SSmonoexponential()}} model (A, B, tau).}
 
 \item{shape}{\strong{sigmoidal}: Character; the 4-parameter sigmoidal shape
 to fit. One of \code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic]{SSlogistic()}}),
 \code{"gompertz"} (early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or
 \code{"gompertz_left"} (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
+
+\item{fix}{\strong{monoexponential, sigmoidal}: An \emph{optional} named list of
+model parameters to hold constant during fitting, e.g.
+\code{fix = list(A = 0)} fixes the starting amplitude at \code{0}. Fixed
+parameters are excluded from estimation and reported at their fixed
+values. Applied globally across \code{nirs_channels}. See \emph{Details}.}
 }
 \value{
 A formatted table of printed results, with individual elements
@@ -263,7 +270,7 @@ partial-window behaviour, and the returned vector-level list.
 Aliases: \code{method = c("monoexp", "exponential", "tau", "MRT")}.
 
 A parametric approach fitting a self-starting monoexponential function to
-the response curve using \code{\link[stats:nls]{stats::nls()}} with \code{\link[=SSmonoexp]{SSmonoexp()}} for either
+the response curve using \code{\link[stats:nls]{stats::nls()}} with \code{\link[=SSmonoexponential]{SSmonoexponential()}} for either
 a 4-parameter (A, B, tau, TD) or 3-parameter (A, B, tau) model.
 
 Model equations:
@@ -277,8 +284,12 @@ Model equations:
 \emph{time constant} of the response. The \emph{rate constant} \code{k} is derived as the
 reciprocal (\code{k = 1 / tau}). The \emph{mean response time} \code{MRT = TD + tau} and
 the \emph{half-response time} \code{HRT = TD + tau * log(2)} can also be derived. See
-\code{\link[=monoexponential]{monoexponential()}} for the model family and \code{\link[=SSmonoexp]{SSmonoexp()}} for self-start
+\code{\link[=monoexponential]{monoexponential()}} for the model family and \code{\link[=SSmonoexponential]{SSmonoexponential()}} for self-start
 initialisation.
+
+Parameters (\code{A}, \code{B}, \code{tau}, \code{TD}) may be held constant with \code{fix}, e.g.
+\code{fix = list(A = 0)}. \code{TD} is fixable only when \code{use_TD = TRUE} for all
+channels; a fixed \code{TD} disables the 3-parameter fallback.
 
 Other arguments (\code{...}) passed to \code{\link[stats:nls]{stats::nls()}} are \verb{<NOT YET IMPLEMENTED>}.
 }
@@ -311,6 +322,9 @@ for fast-onset, slow-tail responses, and \emph{"gompertz_left"} for slow-onset,
 fast-tail responses. See \code{\link[=logistic]{logistic()}}, \code{\link[=gompertz]{gompertz()}}, and \code{\link[=gompertz_left]{gompertz_left()}}
 for the model families and \code{\link[=SSlogistic]{SSlogistic()}}, \code{\link[=SSgompertz]{SSgompertz()}}, and
 \code{\link[=SSgompertz_left]{SSgompertz_left()}} for self-start initialisations.
+
+Parameters (\code{A}, \code{B}, \code{xmid}, \code{slope}) may be held constant with \code{fix},
+e.g. \code{fix = list(A = 0)}.
 
 Other arguments (\code{...}) passed to \code{\link[stats:nls]{stats::nls()}} are \verb{<NOT YET IMPLEMENTED>}.
 }

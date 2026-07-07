@@ -591,6 +591,101 @@ build_na_results <- function(na_coefs) {
 }
 
 
+#' Resolve fixed parameters from a self-start model call
+#'
+#' Classifies each self-start model parameter in a matched call as free
+#' (written as its own bare symbol) or fixed (written as any other
+#' value, e.g. `A = 0`). Fixed expressions are evaluated for use as
+#' initialisation seeds; values that cannot be resolved to a finite
+#' numeric scalar return `NULL` and seeds fall back to data-driven
+#' estimates.
+#'
+#' @param mCall A matched call to the `selfStart` model.
+#' @param params Character vector of the model parameter names.
+#' @param data A data frame with the model variables.
+#'
+#' @returns A named list of fixed parameter values, empty when no
+#'   parameters are fixed.
+#'
+#' @keywords internal
+resolve_fixed_params <- function(mCall, params, data) {
+    present <- params[params %in% names(mCall)]
+    fixed <- present[!vapply(
+        present, \(.p) identical(mCall[[.p]], as.name(.p)), logical(1)
+    )]
+    return(lapply(setNames(nm = fixed), \(.p) {
+        val <- tryCatch(eval(mCall[[.p]], data), error = \(e) NULL)
+        if (is.numeric(val) && length(val) == 1L && is.finite(val)) {
+            val
+        } else {
+            NULL
+        }
+    }))
+}
+
+
+#' Wrap a self-start initialiser to support fixed parameters
+#'
+#' Decorates a `selfStart` `initial` function so parameters supplied as
+#' values in the model formula (e.g. `SSmonoexponential(t, A = 0, B, tau)`) are
+#' excluded from the returned start vector. [stats::nls()] reads the
+#' free parameters from the names of that vector, so excluded
+#' parameters are treated as constants in the formula. Fixed values are
+#' forwarded to the wrapped initialiser as a `fixed` list argument to
+#' seed the remaining free estimates.
+#'
+#' @param init A `selfStart` initial function `(mCall, data, LHS, ...)`.
+#' @param params Character vector of the model parameter names.
+#'
+#' @returns A function suitable for the `initial` argument of
+#'   [stats::selfStart()].
+#'
+#' @keywords internal
+init_fixed <- function(init, params) {
+    function(mCall, data, LHS, ...) {
+        fixed <- resolve_fixed_params(mCall, params, data)
+        start <- init(mCall, data, LHS, fixed = fixed, ...)
+        return(start[setdiff(names(start), names(fixed))])
+    }
+}
+
+
+#' Build a self-start model formula with optional fixed parameters
+#'
+#' Constructs `.x ~ fn(.t, ...)` with each free parameter as a bare
+#' symbol and each fixed parameter substituted as its constant value.
+#'
+#' @param fn Symbol; the self-start model function.
+#' @param params Character vector of parameter names in `fn` argument
+#'   order.
+#' @param fix Named list of fixed parameter values.
+#'
+#' @returns A two-sided [formula][stats::formula] on `.x` and `.t`.
+#'
+#' @keywords internal
+build_ss_formula <- function(fn, params, fix = list()) {
+    args <- lapply(setNames(nm = params), \(.p) fix[[.p]] %||% as.name(.p))
+    rhs <- as.call(c(fn, quote(.t), args))
+    return(stats::as.formula(call("~", quote(.x), rhs)))
+}
+
+
+#' Combine fitted and fixed coefficients into the full parameter vector
+#'
+#' @param model An [nls][stats::nls] model of the free parameters.
+#' @param params Character vector of parameter names in model order.
+#' @param fix Named list of fixed parameter values.
+#'
+#' @returns A named numeric vector ordered by `params` containing the
+#'   fitted coefficients with fixed values merged in.
+#'
+#' @keywords internal
+full_coefs <- function(model, params, fix = list()) {
+    coefs <- c(stats::coef(model), unlist(fix))
+    return(coefs[intersect(params, names(coefs))])
+}
+
+
 #' Enforce the requested direction on a converged parametric fit
 #'
 #' Checks the sign of the fitted amplitude `B - A` against the
@@ -599,15 +694,19 @@ build_na_results <- function(na_coefs) {
 #' `nls(algorithm = "port")`; sigmoid models divide by `D`, so its
 #' magnitude is floored strictly above zero. A refit that fails or
 #' pins any coefficient at a sign-floor bound (degenerate flat fit)
-#' warns and returns `NULL`.
+#' warns and returns `NULL`. User-fixed parameters in `fix` are held
+#' constant in the refit: a fixed `A` or `B` is substituted into the
+#' amplitude reparameterisation; when both asymptotes are fixed the
+#' amplitude sign is predetermined, so an inverted fit cannot be
+#' refit and returns `NULL`.
 #'
 #' @param model A converged [nls][stats::nls] model object.
-#' @param coefs Named numeric coefficient vector including `A`, `B`.
+#' @param coefs Named numeric coefficient vector including `A`, `B`
+#'   (fixed values merged in, e.g. from [full_coefs()]).
 #' @param fit_data Data frame with columns `.x` and `.t`.
 #' @param direction Character; resolved `"positive"` or `"negative"`.
 #' @param amp_fn Symbol; exported model fn taking `(t, A, B, ...)`.
-#' @param extra Named numeric start values for remaining free params,
-#'   in `amp_fn` argument order after `B`.
+#' @param extra Named numeric start values for remaining free params.
 #' @param extra_lower,extra_upper Named numeric bound overrides for
 #'   `extra` params. Sign-floor bounds should be data-scaled small
 #'   values (not `.Machine$double.eps`) so pinned-floor degeneracy is
@@ -616,11 +715,12 @@ build_na_results <- function(na_coefs) {
 #'   warning.
 #' @param .nirs Character; the channel name.
 #' @param interval_name Character; the interval label.
+#' @param fix Named list of user-fixed parameter values.
 #' @inheritParams validate_mnirs
 #'
 #' @returns A named list `list(model, coefs)` with `coefs` a named
-#'   numeric vector in `(A, B, ...)` space, or `NULL` when the
-#'   direction cannot be satisfied (caller returns
+#'   numeric vector in `(A, B, ...)` space including fixed values, or
+#'   `NULL` when the direction cannot be satisfied (caller returns
 #'   [build_na_results()]).
 #'
 #' @keywords internal
@@ -636,6 +736,7 @@ enforce_direction <- function(
     fn,
     .nirs,
     interval_name,
+    fix = list(),
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
@@ -645,33 +746,61 @@ enforce_direction <- function(
         return(list(model = model, coefs = coefs))
     }
 
+    direction_failed <- function() {
+        if (verbose) {
+            cli_warn(c(
+                "x" = "{.fn {as.character(fn)}} fit for \\
+                {.field {(.nirs)}} in {.field {interval_name}} could \\
+                not satisfy {.code direction = {.val {direction}}}.",
+                "i" = "Returning {.val {NA}} coefficients."
+            ), call = warn_call(env))
+        }
+        return(NULL)
+    }
+
+    ## both asymptotes fixed: amplitude sign is predetermined and
+    ## contradicts the requested direction; no refit possible
+    A_fixed <- fix[["A"]]
+    B_fixed <- fix[["B"]]
+    if (!is.null(A_fixed) && !is.null(B_fixed)) {
+        return(direction_failed())
+    }
+
     ## refit start: amplitude D seeded in the requested direction
     D0 <- want *
         max(abs(coefs[["B"]] - coefs[["A"]]), diff(range(fit_data$.x)) * 0.1)
     D_eps <- diff(range(fit_data$.x)) * 1e-6
 
-    ## build rhs: amp_fn(.t, A, A + D, <extra names>)
-    rhs <- as.call(c(
-        amp_fn,
-        quote(.t),
-        quote(A),
-        call("+", quote(A), quote(D)),
-        lapply(names(extra), as.name)
-    ))
+    ## build rhs on amplitude D = B - A, substituting any fixed
+    ## asymptote: A free `amp_fn(.t, A, A + D, ...)`, B fixed
+    ## `amp_fn(.t, B - D, B, ...)`. Remaining params ride as named
+    ## args: free as symbols, fixed as constants
+    A_expr <- if (is.null(B_fixed)) {
+        A_fixed %||% quote(A)
+    } else {
+        call("-", B_fixed, quote(D))
+    }
+    B_expr <- B_fixed %||% call("+", A_expr, quote(D))
+    tail_args <- c(
+        fix[setdiff(names(fix), c("A", "B"))],
+        setNames(lapply(names(extra), as.name), names(extra))
+    )
+    rhs <- as.call(c(amp_fn, quote(.t), A_expr, B_expr, tail_args))
     nls_formula <- stats::as.formula(call("~", quote(.x), rhs))
 
     ## box bounds: D sign-constrained with strictly positive magnitude
     ## floor (sigmoid models divide by D); extras unbounded unless
-    ## overridden
-    start <- c(A = coefs[["A"]], D = D0, extra)
+    ## overridden. A drops out when either asymptote is fixed
+    A_free <- is.null(A_fixed) && is.null(B_fixed)
+    start <- c(if (A_free) c(A = coefs[["A"]]), c(D = D0), extra)
     lower <- c(
-        A = -Inf,
-        D = if (want > 0) D_eps else -Inf,
+        if (A_free) c(A = -Inf),
+        c(D = if (want > 0) D_eps else -Inf),
         setNames(rep(-Inf, length(extra)), names(extra))
     )
     upper <- c(
-        A = Inf,
-        D = if (want > 0) Inf else -D_eps,
+        if (A_free) c(A = Inf),
+        c(D = if (want > 0) Inf else -D_eps),
         setNames(rep(Inf, length(extra)), names(extra))
     )
     lower[names(extra_lower)] <- extra_lower
@@ -695,21 +824,22 @@ enforce_direction <- function(
     cf <- if (is.null(refit)) NULL else coef(refit)
     floors <- abs(ifelse(is.finite(lower), lower, upper))
     if (is.null(cf) || any(is.finite(floors) & abs(cf) <= 2 * floors)) {
-        if (verbose) {
-            cli_warn(c(
-                "x" = "{.fn {as.character(fn)}} fit for \\
-                {.field {(.nirs)}} in {.field {interval_name}} could \\
-                not satisfy {.code direction = {.val {direction}}}.",
-                "i" = "Returning {.val {NA}} coefficients."
-            ), call = warn_call(env))
-        }
-        return(NULL)
+        return(direction_failed())
     }
 
-    ## back-transform to (A, B, ...) space, B positioned after A
-    cf[["B"]] <- cf[["A"]] + cf[["D"]]
-    keep <- append(setdiff(names(cf), c("B", "D")), "B", after = 1)
-    return(list(model = refit, coefs = cf[keep]))
+    ## back-transform to full (A, B, ...) space including fixed values
+    A_val <- if (is.null(B_fixed)) {
+        A_fixed %||% cf[["A"]]
+    } else {
+        B_fixed - cf[["D"]]
+    }
+    out <- c(
+        A = unname(A_val),
+        B = unname(A_val + cf[["D"]]),
+        cf[setdiff(names(cf), c("A", "D"))],
+        unlist(fix[setdiff(names(fix), c("A", "B"))])
+    )
+    return(list(model = refit, coefs = out))
 }
 
 

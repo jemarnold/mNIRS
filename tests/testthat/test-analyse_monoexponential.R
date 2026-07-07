@@ -550,6 +550,34 @@ test_that("analyse_monoexponential() falls back from 4-param to 3-param", {
 })
 
 
+test_that("analyse_monoexponential() warns when 3-param fallback also fails", {
+    ## only 3 observations: both the 4-param fit and the 3-param
+    ## fallback fail, exercising the second fit-failure warning
+    data <- create_monoexp_data(n = 3, noise_sd = 0.1)
+
+    warnings <- capture_warnings(
+        result <- analyse_monoexponential(
+            data,
+            nirs_channels = "smo2",
+            use_TD = TRUE,
+            verbose = TRUE
+        )
+    )
+
+    expect_length(warnings, 2L)
+    ## first warning: 4-param failure announces the 3-param retry
+    expect_match(warnings[1], "4-parameter.*SSmonoexponential.*fit failed")
+    expect_match(warnings[1], "Attempting 3-parameter")
+    ## second warning: fallback failure with no further retry notice
+    expect_match(warnings[2], "3-parameter.*SSmonoexponential.*fit failed")
+    expect_no_match(warnings[2], "Attempting")
+
+    ## NA scaffold returned after both fits fail
+    expect_true(is.na(result$A))
+    expect_true(is.na(result$tau))
+    expect_true(is.na(result$TD))
+})
+
 test_that("analyse_monoexponential() returns NA for failed fit", {
     ## only 3 observations for a 3-param model
     custom_name <- create_monoexp_data(n = 3, noise_sd = 0.1)
@@ -860,3 +888,199 @@ test_that("SSmonoexponential() converges on real dataset", {
     expect_true(hhb_success >= 0.75)
 })
 
+
+## fixed parameters ==============================================
+
+test_that("SSmonoexponential() fixes A at a constant", {
+    set.seed(13)
+    t <- 1:60
+    x <- monoexponential(t, A = 0, B = 100, tau = 8, TD = 15) +
+        rnorm(length(t), 0, 3)
+    data <- data.frame(t, x)
+
+    model <- nls(x ~ SSmonoexponential(t, A = 0, B, tau, TD), data = data)
+
+    expect_s3_class(model, "nls")
+    expect_named(coef(model), c("B", "tau", "TD"))
+
+    coefs <- coef(model)
+    expect_true(all.equal(coefs[["B"]], 100, tolerance = 5, scale = 1))
+    expect_true(all.equal(coefs[["tau"]], 8, tolerance = 1, scale = 1))
+    expect_true(all.equal(coefs[["TD"]], 15, tolerance = 2, scale = 1))
+
+    ## fitted baseline pinned exactly at A = 0 before TD
+    expect_equal(unname(predict(model, data.frame(t = 0))[1]), 0)
+})
+
+test_that("SSmonoexponential() fixes TD at a constant", {
+    set.seed(13)
+    t <- 1:60
+    x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
+        rnorm(length(t), 0, 3)
+    data <- data.frame(t, x)
+
+    model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD = 15), data = data)
+
+    expect_named(coef(model), c("A", "B", "tau"))
+    expect_true(all.equal(coef(model)[["A"]], 10, tolerance = 3, scale = 1))
+    expect_true(all.equal(coef(model)[["tau"]], 8, tolerance = 1, scale = 1))
+})
+
+test_that("SSmonoexponential() fixes multiple parameters", {
+    set.seed(13)
+    t <- 1:60
+    x <- monoexponential(t, A = 0, B = 100, tau = 8, TD = 15) +
+        rnorm(length(t), 0, 3)
+    data <- data.frame(t, x)
+
+    model <- nls(x ~ SSmonoexponential(t, A = 0, B = 100, tau, TD), data = data)
+
+    expect_named(coef(model), c("tau", "TD"))
+    expect_true(all.equal(coef(model)[["tau"]], 8, tolerance = 1, scale = 1))
+})
+
+test_that("SSmonoexponential() fixes A in the 3-parameter form", {
+    set.seed(13)
+    t <- 0:59
+    x <- monoexponential(t, A = 0, B = 100, tau = 8) +
+        rnorm(length(t), 0, 3)
+    data <- data.frame(t, x)
+
+    model <- nls(x ~ SSmonoexponential(t, A = 0, B, tau), data = data)
+
+    expect_named(coef(model), c("B", "tau"))
+    expect_true(all.equal(coef(model)[["B"]], 100, tolerance = 3, scale = 1))
+    expect_true(all.equal(coef(model)[["tau"]], 8, tolerance = 1, scale = 1))
+})
+
+test_that("analyse_monoexponential() fix holds parameters constant", {
+    data <- create_monoexp_data(
+        A = 0, B = 30, tau = 25, n = 100, noise_sd = 0.3
+    )
+
+    result <- analyse_monoexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        fix = list(A = 0),
+        verbose = FALSE
+    )
+
+    expect_equal(result$A, 0)
+    expect_equal(result$B, 30, tolerance = 1)
+    expect_equal(result$tau, 25, tolerance = 2)
+
+    ## fixed A excluded from the fitted model coefficients
+    model <- attr(result, "model")$smo2
+    expect_named(coef(model), c("B", "tau"))
+
+    ## fix recorded in channel_args; diagnostics use free-param count
+    expect_equal(attr(result, "channel_args")$fix, "list(A = 0)")
+    expect_false(is.na(attr(result, "diagnostics")$adj_r2))
+})
+
+test_that("analyse_monoexponential() fixed TD disables 3-param fallback", {
+    data <- create_monoexp_data(
+        A = 50, B = 80, tau = 25, TD = 10, n = 100, noise_sd = 0.3
+    )
+
+    result <- analyse_monoexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = TRUE,
+        fix = list(TD = 10),
+        verbose = FALSE
+    )
+
+    expect_equal(result$TD, 10)
+    expect_equal(result$tau, 25, tolerance = 2)
+    expect_named(coef(attr(result, "model")$smo2), c("A", "B", "tau"))
+})
+
+test_that("analyse_monoexponential() validates fix argument", {
+    data <- create_monoexp_data()
+
+    ## unnamed list
+    expect_error(
+        analyse_monoexponential(data, nirs_channels = "smo2", fix = list(0)),
+        "uniquely named"
+    )
+    ## non-numeric value
+    expect_error(
+        analyse_monoexponential(
+            data, nirs_channels = "smo2", fix = list(A = "zero")
+        ),
+        "uniquely named"
+    )
+    ## unknown parameter name
+    expect_error(
+        analyse_monoexponential(
+            data, nirs_channels = "smo2", fix = list(Q = 1)
+        ),
+        "not recognised"
+    )
+    ## TD not fixable when use_TD = FALSE
+    expect_error(
+        analyse_monoexponential(
+            data, nirs_channels = "smo2", use_TD = FALSE, fix = list(TD = 5)
+        ),
+        "not recognised"
+    )
+    ## cannot fix every parameter
+    expect_error(
+        analyse_monoexponential(
+            data, nirs_channels = "smo2", use_TD = FALSE,
+            fix = list(A = 50, B = 80, tau = 25)
+        ),
+        "Nothing to estimate"
+    )
+})
+
+test_that("analyse_monoexponential() fix composes with direction", {
+    ## rising data with fixed baseline satisfies positive direction
+    data <- create_monoexp_data(A = 0, B = 30, n = 100, noise_sd = 0.3)
+
+    result <- analyse_monoexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        fix = list(A = 0),
+        direction = "positive",
+        verbose = FALSE
+    )
+
+    expect_equal(result$A, 0)
+    expect_true(result$B > result$A)
+
+    ## both asymptotes fixed against the requested direction returns NA
+    falling <- create_monoexp_data(A = 80, B = 50, n = 100, noise_sd = 0.3)
+
+    expect_warning(
+        result_na <- analyse_monoexponential(
+            falling,
+            nirs_channels = "smo2",
+            use_TD = FALSE,
+            fix = list(A = 80, B = 50),
+            direction = "positive",
+            verbose = TRUE
+        ),
+        "satisfy"
+    )
+    expect_true(is.na(result_na$tau))
+})
+
+test_that("analyse_kinetics() passes fix to the monoexponential method", {
+    data <- create_monoexp_data(A = 0, B = 30, n = 100, noise_sd = 0.3)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "monoexponential",
+        use_TD = FALSE,
+        fix = list(A = 0),
+        verbose = FALSE
+    )
+
+    expect_equal(result$coefficients$A, 0)
+    expect_named(coef(result$model[[1L]]$smo2), c("B", "tau"))
+})

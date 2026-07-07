@@ -16,6 +16,7 @@ enforce_direction(
   fn,
   .nirs,
   interval_name,
+  fix = list(),
   verbose = TRUE,
   env = rlang::caller_env()
 )
@@ -23,7 +24,8 @@ enforce_direction(
 \arguments{
 \item{model}{A converged \link[stats:nls]{nls} model object.}
 
-\item{coefs}{Named numeric coefficient vector including \code{A}, \code{B}.}
+\item{coefs}{Named numeric coefficient vector including \code{A}, \code{B}
+(fixed values merged in, e.g. from \code{\link[=full_coefs]{full_coefs()}}).}
 
 \item{fit_data}{Data frame with columns \code{.x} and \code{.t}.}
 
@@ -31,8 +33,7 @@ enforce_direction(
 
 \item{amp_fn}{Symbol; exported model fn taking \verb{(t, A, B, ...)}.}
 
-\item{extra}{Named numeric start values for remaining free params,
-in \code{amp_fn} argument order after \code{B}.}
+\item{extra}{Named numeric start values for remaining free params.}
 
 \item{extra_lower, extra_upper}{Named numeric bound overrides for
 \code{extra} params. Sign-floor bounds should be data-scaled small
@@ -46,6 +47,8 @@ warning.}
 
 \item{interval_name}{Character; the interval label.}
 
+\item{fix}{Named list of user-fixed parameter values.}
+
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
@@ -56,8 +59,8 @@ than the validator.}
 }
 \value{
 A named list \code{list(model, coefs)} with \code{coefs} a named
-numeric vector in \verb{(A, B, ...)} space, or \code{NULL} when the
-direction cannot be satisfied (caller returns
+numeric vector in \verb{(A, B, ...)} space including fixed values, or
+\code{NULL} when the direction cannot be satisfied (caller returns
 \code{\link[=build_na_results]{build_na_results()}}).
 }
 \description{
@@ -67,6 +70,10 @@ Inverted fits are refit with amplitude \code{D = B - A} sign-bounded via
 \code{nls(algorithm = "port")}; sigmoid models divide by \code{D}, so its
 magnitude is floored strictly above zero. A refit that fails or
 pins any coefficient at a sign-floor bound (degenerate flat fit)
-warns and returns \code{NULL}.
+warns and returns \code{NULL}. User-fixed parameters in \code{fix} are held
+constant in the refit: a fixed \code{A} or \code{B} is substituted into the
+amplitude reparameterisation; when both asymptotes are fixed the
+amplitude sign is predetermined, so an inverted fit cannot be
+refit and returns \code{NULL}.
 }
 \keyword{internal}

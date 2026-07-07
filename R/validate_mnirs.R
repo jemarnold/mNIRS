@@ -574,6 +574,58 @@ validate_start_time <- function(
 }
 
 
+#' Validate fixed model parameters
+#'
+#' Validates the `fix` argument of parametric [analyse_kinetics()]
+#' methods: a named list of finite numeric scalars whose names match the
+#' model's fixable parameters. At least one parameter must remain free.
+#'
+#' @param fix A named list of model parameters to hold constant, or
+#'   `NULL`.
+#' @param params Character vector of fixable parameter names for the
+#'   model.
+#' @inheritParams validate_mnirs
+#'
+#' @returns `fix` as a named list; an empty list when `NULL`.
+#'
+#' @keywords internal
+validate_fix <- function(fix, params, env = rlang::caller_env()) {
+    if (is.null(fix) || (is.list(fix) && length(fix) == 0L)) {
+        return(list())
+    }
+
+    nms <- names(fix) %||% rep("", length(fix))
+    valid <- is.list(fix) && all(nzchar(nms)) && anyDuplicated(nms) == 0L &&
+        all(vapply(fix, \(.x) {
+            is.numeric(.x) && length(.x) == 1L && is.finite(.x)
+        }, logical(1)))
+    if (!valid) {
+        cli_abort(c(
+            "x" = "{.arg fix} must be a uniquely named {.cls list} of \\
+            finite {.cls numeric} values, e.g. {.code fix = list(A = 0)}."
+        ), call = env)
+    }
+
+    unknown <- setdiff(nms, params)
+    if (length(unknown) > 0L) {
+        cli_abort(c(
+            "x" = "{.arg fix}: parameter{?s} {.field {unknown}} not \\
+            recognised.",
+            "i" = "Fixable parameter{?s}: {.field {params}}."
+        ), call = env)
+    }
+
+    if (length(setdiff(params, nms)) == 0L) {
+        cli_abort(c(
+            "x" = "{.arg fix} cannot fix all model parameters. \\
+            Nothing to estimate."
+        ), call = env)
+    }
+
+    return(fix)
+}
+
+
 #' wrap findInterval: informative 'time_channel' error message
 #' @keywords internal
 findInt_mnirs <- function(..., env = rlang::caller_env()) {
