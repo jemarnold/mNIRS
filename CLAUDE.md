@@ -15,4 +15,5 @@
 
 - Roxygen2 with markdown enabled (`Roxygen: list(markdown = TRUE)`). 
 - Roxygen2 commented with `#'`
+- Don't manually edit Roxygen2-generated files
 - pkgdown site config is in [_pkgdown.yml](_pkgdown.yml)

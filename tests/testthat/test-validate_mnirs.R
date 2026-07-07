@@ -722,6 +722,23 @@ test_that("validate_start_time() falls back to zero when no start_time or attrib
     expect_equal(validate_start_time(NULL, data, data[["time"]]), 0)
 })
 
+test_that("validate_start_time() falls back to first non-negative time", {
+    data <- create_test_data(time_max = 10, sample_rate = 1)
+    ## time = -2.5, -1.5, ..., 7.5: first non-negative value is 0.5
+    data[["time"]] <- data[["time"]] - 2.5
+    expect_equal(validate_start_time(NULL, data, data[["time"]]), 0.5)
+})
+
+test_that("validate_start_time() falls back to zero when all times negative", {
+    data <- create_test_data(time_max = 10, sample_rate = 1)
+    data[["time"]] <- data[["time"]] - 20
+    ## fallback 0 exceeds time range, so errors on range check, not on NA
+    expect_error(
+        validate_start_time(NULL, data, data[["time"]]),
+        "No observations.*before"
+    )
+})
+
 test_that("validate_start_time() rejects non-numeric or multi-element start_time", {
     data <- create_test_data()
     expect_error(validate_start_time("5", data, data[["time"]]), "numeric")

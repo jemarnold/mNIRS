@@ -544,11 +544,10 @@ validate_start_time <- function(
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
-    ## fall back to metadata or first value or zero
+    ## fall back to metadata, first non-negative value, or zero
     start_time <- start_time %||%
         attr(data, "interval_times") %||%
-        t_vec[1L] %||%
-        0
+        c(t_vec[t_vec >= 0], 0)[1L]
     validate_numeric(start_time, 1L, env = env)
 
     if (length(which(t_vec <= start_time)) == 0L) {
