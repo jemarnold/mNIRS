@@ -203,7 +203,7 @@ validate_interval_channels <- function(
     unknown <- setdiff(members, nirs_channels)
     if (!is.character(members) || length(unknown) > 0L) {
         cli_abort(c(
-            "x" = "{.arg group_channels}: channel{?s} {.val {unknown}} \\
+            "x" = "{.arg group_channels}: channel{?s} {.field {unknown}} \\
             not recognised.",
             "i" = "Grouped channel names must match {.arg nirs_channels} \\
             exactly."
@@ -326,9 +326,9 @@ resolve_interval <- function(
     if (n_start != n_end) {
         n_intervals <- min(n_start, n_end)
         cli_warn(c(
-            "!" = "Unequal lengths for {.arg start} ({col_blue(n_start)}) \\
-            and {.arg end} ({col_blue(n_end)}).",
-            "i" = "Returning {col_blue(n_intervals)} paired interval{?s}."
+            "!" = "Unequal lengths for {.arg start} ({.val {n_start}}) \\
+            and {.arg end} ({.val {n_end}}).",
+            "i" = "Returning {.val {n_intervals}} paired interval{?s}."
         ), call = warn_call(env))
         start_time <- start_time[seq_len(n_intervals)]
         end_time <- end_time[seq_len(n_intervals)]
@@ -459,7 +459,7 @@ apply_span <- function(
         oob_ids <- which(entirely_oob)
         n_oob <- qty(length(oob_ids))
         cli_abort(c(
-            "x" = "{n_oob} Interval{?s} {.val {oob_ids}} {n_oob} \\
+            "x" = "{n_oob} Interval{?s} {.field {oob_ids}} {n_oob} \\
             {?is/are} entirely outside data bounds.",
             "i" = "Intervals must be specified within existing data bounds."
         ), call = env)
@@ -475,7 +475,7 @@ apply_span <- function(
             oob_ids <- which(partial_oob)
             n_oob <- qty(length(oob_ids))
             cli_warn(c(
-                "!" = "{n_oob} Interval{?s} {.val {oob_ids}} {n_oob} \\
+                "!" = "{n_oob} Interval{?s} {.field {oob_ids}} {n_oob} \\
                 {?is/are} partially outside data bounds.",
                 "i" = "Returning available data only."
             ), call = warn_call(env))
@@ -685,7 +685,7 @@ normalise_interval_groups <- function(
     if (verbose && length(dupes) > 0L) {
         cli_warn(c(
             "!" = "Duplicates detected of {qty(length(dupes))} \\
-            interval{?s} {.val {dupes}}.",
+            interval{?s} {.field {dupes}}.",
             "i" = "Re-specify {.arg group_intervals} to remove duplicates."
         ), call = warn_call(env))
     }

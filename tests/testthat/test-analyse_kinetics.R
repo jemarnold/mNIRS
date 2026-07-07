@@ -2220,13 +2220,7 @@ test_that("fix_coefs() errors when all parameters fixed", {
     model <- nls(x ~ SSmonoexp(t, A, B, tau, TD), data = data)
 
     expect_error(
-        fix_coefs(
-            model,
-            A = 10,
-            B = 100,
-            TD = 15,
-            tau = 8,
-        ),
+        fix_coefs(model, A = 10, B = 100, TD = 15, tau = 8),
         "Cannot update the model if all parameters are fixed"
     )
 })

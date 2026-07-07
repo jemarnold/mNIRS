@@ -891,7 +891,7 @@ fix_coefs <- function(
     invalid <- setdiff(fixed_names, current_names)
     if (verbose && length(invalid) > 0) {
         cli_warn(c(
-            "x" = "Unknown model coefficient{?s}: {.val {invalid}}.",
+            "x" = "Unknown model coefficient{?s}: {.field {invalid}}.",
             "i" = "Returning model with known coefficients."
         ), call = warn_call(env))
     }

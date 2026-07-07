@@ -476,13 +476,13 @@ as_plot_data <- function(x, env = rlang::caller_env()) {
     if (length(x) == 0L) {
         cli_abort(c(
             "x" = "{.fn plot.mnirs} must contain at least one \\
-            {col_blue('\"mnirs\"')} data frame."
+            {.cls mnirs} data frame."
         ), call = env)
     }
 
     if (any(!vapply(x, is.data.frame, logical(1)))) {
         cli_abort(c(
-            "x" = "{.fn plot.mnirs} must contain all {col_blue('\"mnirs\"')} \\
+            "x" = "{.fn plot.mnirs} must contain all {.cls mnirs} \\
             data frames."
         ), call = env)
     }

@@ -284,7 +284,7 @@ filter_mnirs.smooth_spline <- function(
             t_vec <- t_vec[!na_info$na_idx]
         } else if (anyNA(x)) {
             cli_abort(c(
-                "x" = "{.arg nirs_channels} = {.val {.x}} contains internal \\
+                "x" = "{.arg nirs_channels} = {.field {.x}} contains internal \\
                 {.val {NA}}'s.",
                 "i" = "Set {.arg na.rm = TRUE} to ignore {.val {NA}}'s."
             ), call = env)
@@ -294,7 +294,7 @@ filter_mnirs.smooth_spline <- function(
 
         if (is.null(spar) && verbose) {
             cli_inform(c(
-                "i" = "{.arg nirs_channel} = {.val {.x}}: \\
+                "i" = "{.arg nirs_channels} = {.field {.x}}: \\
                 `smooth.spline(spar = {.val {round(spline_model$spar, 3)}})`"
             ), call = env)
         }
@@ -392,7 +392,7 @@ filter_mnirs.butterworth <- function(
             if (.a$W > 1 | .a$W <= 0) {
                 cli_abort(c(
                     "x" = "{.arg fc} must be between {.val {0}} and half \\
-                    the {.val sample_rate} ({.val {signif(nq, 3)}} Hz)"
+                    the {.arg sample_rate} ({.val {signif(nq, 3)}} Hz)"
                 ), call = env)
             }
         }

@@ -201,7 +201,7 @@ detect_device_channels <- function(
     if (verbose) {
         cli_inform(c(
             "!" = "{.val {nirs_device}} file format detected. \\
-            {.arg nirs_channels} set to {.val {ch_list$nirs_channels}}.",
+            {.arg nirs_channels} set to {.field {ch_list$nirs_channels}}.",
             "i" = "Override by specifying {.arg nirs_channels} explicitly."
         ), call = env)
     }
@@ -335,7 +335,7 @@ detect_time_channel <- function(
         if (verbose) {
             cli_inform(c(
                 "!" = "Detected {.arg time_channel} = \\
-                {col_blue(col_names[time_idx])}."
+                {.field {col_names[time_idx]}}."
             ), call = env)
         }
         return(col_names[time_idx])
@@ -449,7 +449,7 @@ select_rename_data <- function(
         new <- user_vec[renamed]
         cli_warn(c(
             "!" = "Duplicate channel names detected.",
-            "i" = "Renamed: {.val {paste(old, new, sep = ' = ')}}",
+            "i" = "Renamed: {.field {paste(old, new, sep = ' = ')}}",
             "i" = "Unique channel names can be defined explicitly."
         ), call = warn_call(env))
     }
@@ -524,7 +524,7 @@ convert_type <- function(
         all_na <- vapply(data[nirs_cols], \(.x) all(is.na(.x)), logical(1L))
         lapply(nirs_cols[all_na], \(.nm) {
             cli_warn(c(
-                "!" = "Channel {.val {(.nm)}} values coerced to {.val {NA}}.",
+                "!" = "Channel {.field {(.nm)}} values coerced to {.val {NA}}.",
                 "i" = "Check the source data contents should be numeric values."
             ), call = warn_call(env))
         })
@@ -646,7 +646,7 @@ parse_sample_rate <- function(
         if (verbose) {
             cli_inform(c(
                 "!" = "Oxysoft {.arg sample_rate} = {.val {sample_rate}} Hz.",
-                "i" = "{.arg time_channel} = {.val {time_channel}} added to \\
+                "i" = "{.arg time_channel} = {.field {time_channel}} added to \\
                 the data frame, in {.cls seconds}."
             ), call = env)
         }
@@ -696,11 +696,11 @@ detect_irregular_samples <- function(
 
     info_msg <- if (n_total > 5L) {
         ## more than 5: print the first three plus remaining count
-        "{.arg {time_channel}} = {.val {irregular_vec[seq_len(3L)]}} \\
+        "{.field {time_channel}} = {.val {irregular_vec[seq_len(3L)]}} \\
         and {n_total - 3L} more."
     } else {
         ## 5 or fewer: print all
-        "{.arg {time_channel}} = {.val {irregular_vec}}."
+        "{.field {time_channel}} = {.val {irregular_vec}}."
     }
 
     cli_warn(c(

@@ -71,7 +71,7 @@ resolve_channel_args <- function(
             unknown <- setdiff(keys[nzchar(keys)], valid_ch)
             if (length(unknown) > 0L) {
                 cli_warn(c(
-                    "!" = "{.arg {(.nm)}}: channel{?s} {.val {unknown}} \\
+                    "!" = "{.arg {(.nm)}}: channel{?s} {.field {unknown}} \\
                     not recognised.",
                     "i" = "Per-channel named argument lists must match \\
                     {.arg nirs_channels} exactly."
@@ -83,7 +83,7 @@ resolve_channel_args <- function(
                 }, logical(1))]
                 if (length(omitted) > 0L) {
                     cli_warn(c(
-                        "i" = "{.arg {(.nm)}}: channel{?s} {.val {omitted}} \\
+                        "i" = "{.arg {(.nm)}}: channel{?s} {.field {omitted}} \\
                         not specified."
                     ), call = warn_call(env))
                 }
@@ -99,7 +99,7 @@ resolve_channel_args <- function(
             if (length(unique(hits)) > 1L) {
                 cli_abort(c(
                     "x" = "{.arg {(.nm)}} has conflicting values within \\
-                    {.arg group_channels} = {.val {(.key)}}.",
+                    {.arg group_channels} = {.field {(.key)}}.",
                     "i" = "Grouped channels must share one value per \\
                     argument."
                 ), call = env)
@@ -201,7 +201,7 @@ validate_group_channels <- function(
     unknown <- setdiff(members, nirs_channels)
     if (!is.character(members) || length(unknown) > 0L) {
         cli_abort(c(
-            "x" = "{.arg group_channels}: channel{?s} {.val {unknown}} \\
+            "x" = "{.arg group_channels}: channel{?s} {.field {unknown}} \\
             not recognised.",
             "i" = "Grouped channel names must match {.arg nirs_channels} \\
             exactly."
@@ -212,7 +212,7 @@ validate_group_channels <- function(
     if (anyDuplicated(members) > 0L) {
         dupes <- unique(members[duplicated(members)])
         cli_abort(c(
-            "x" = "{.arg group_channels}: channel{?s} {.val {dupes}} \\
+            "x" = "{.arg group_channels}: channel{?s} {.field {dupes}} \\
             assigned to more than one group.",
             "i" = "Each channel may belong to one group only."
         ), call = env)

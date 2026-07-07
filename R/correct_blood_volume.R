@@ -123,7 +123,7 @@ correct_blood_volume <- function(
     missing_cols <- setdiff(unlist(channels), names(data))
     if (length(missing_cols) > 0L) {
         cli_abort(c(
-            "x" = "Column{?s} {.val {missing_cols}} not found in {.arg data}.",
+            "x" = "Column{?s} {.field {missing_cols}} not found in {.arg data}.",
             "i" = "Channel names are case-sensitive and must match exactly."
         ))
     }
