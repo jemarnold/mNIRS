@@ -19,8 +19,7 @@ the response onset (\code{start_time}) and key coefficient points.}
 \item{labels}{Logical. Default is \code{TRUE}; annotates each panel with the key
 coefficient value(s) for the fitted method.}
 
-\item{...}{Additional arguments passed to \code{\link[=plot.mnirs]{plot.mnirs()}}, such as \code{points},
-\code{time_labels}, \code{nrow}, \code{ncol}, or \code{scales}.}
+\item{...}{Additional arguments.}
 }
 \value{
 A \link[ggplot2:ggplot]{ggplot2} object.
@@ -30,6 +29,11 @@ Create a default plot for an \emph{"mnirs_kinetics"} object returned from
 \code{\link[=analyse_kinetics]{analyse_kinetics()}}. Observed signals are drawn per \code{nirs_channel}, faceted
 by interval, with the fitted response overlaid and the key kinetics
 coefficient(s) annotated per panel.
+}
+\details{
+Accepts some arguments in \code{...}, such as \code{label_size} passed to
+\code{\link[ggplot2:geom_text]{ggplot2::geom_text()}}. Also accepts args passed to \code{\link[=plot.mnirs]{plot.mnirs()}}, such as
+\code{points}, \code{time_labels}, \code{nrow}, \code{ncol}, or \code{scales}.
 }
 \examples{
 \dontshow{if (rlang::is_installed("ggplot2")) withAutoprint(\{ # examplesIf}

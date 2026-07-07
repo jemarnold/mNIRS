@@ -5,3 +5,8 @@
 **/*.quarto_ipynb
 *_cache/
 *.docx
+/articles/mnirs-conf-abstract.qmd
+/articles/mnirs-JOSS-manuscript.qmd
+/articles/mnirs-manuscript.qmd
+/articles/socials-walkthrough.qmd
+!oxcap-analysis.html
