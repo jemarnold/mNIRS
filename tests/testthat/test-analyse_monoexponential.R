@@ -499,7 +499,7 @@ test_that("analyse_monoexponential() start_time edge cases", {
             start_time = 0,
             verbose = TRUE
         ),
-        "No observations.*start_time =.*0"
+        "start_time =.*0.*before first valid.*time_channel"
     )
 
     expect_true(all.equal(result$TD, TD, tolerance = 1, scale = 1))

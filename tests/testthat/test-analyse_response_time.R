@@ -139,7 +139,7 @@ test_that("response_time warns when no baseline observations", {
     ## start_time is below min(t), so no baseline
     expect_warning(
         result <- response_time(x, t, start_time = 0),
-        "No observations"
+        "No observations where `t`"
     )
     ## falls back to x[1] as baseline
     expect_equal(result$baseline_idx, 1L)
@@ -167,7 +167,7 @@ test_that("response_time errors when start_time exceeds max(t)", {
 
     expect_error(
         response_time(x, t, start_time = 11),
-        "No observations in"
+        "No observations.*before"
     )
 })
 

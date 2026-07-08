@@ -549,16 +549,17 @@ validate_start_time <- function(
         attr(data, "interval_times") %||%
         c(t_vec[t_vec >= 0], 0)[1L]
     validate_numeric(start_time, 1L, env = env)
+    t1 <- t_vec[1L]
 
-    if (length(which(t_vec <= start_time)) == 0L) {
+    if (start_time < t1) {
         if (verbose) {
             cli_warn(c(
-                "!" = "No observations where {.arg time_channel} <= \\
-                `start_time = {.val {start_time}}`.",
-                "i" = "All samples included in response."
+                "!" = "`start_time = {.val {start_time}}` before first \\
+                valid `time_channel = {.val {t1}}`.",
+                "i" = "{.arg start_time} set to {.val {t1}}."
             ), call = warn_call(env))
         }
-        start_time <- t_vec[1L]
+        start_time <- t1
     }
     if (start_time > t_vec[length(t_vec)]) {
         cli_abort(c(

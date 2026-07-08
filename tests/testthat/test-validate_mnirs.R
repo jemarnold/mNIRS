@@ -750,7 +750,7 @@ test_that("validate_start_time() warns and resets when no observations <= start_
     data <- create_test_data()
     expect_warning(
         result <- validate_start_time(-1, data, data[["time"]]),
-        "No observations.*time_channel"
+        "start_time.*before first valid.*time_channel"
     )
     expect_equal(result, data[["time"]][1L])
 

@@ -993,7 +993,7 @@ test_that("analyse_logistic() start_time edge cases", {
             start_time = 0,
             verbose = TRUE
         ),
-        "No observations.*start_time =.*0"
+        "start_time.*before first valid.*time_channel"
     )
 
     expect_true(all.equal(result$xmid, xmid, tolerance = 1, scale = 1))
