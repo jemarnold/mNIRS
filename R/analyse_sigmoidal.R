@@ -590,18 +590,17 @@ analyse_logistic <- function(
     env = rlang::caller_env()
 ) {
     ## validation ==================================================
-    validate_mnirs_data(data, env = env)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, env)
-    time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
-    t_vec <- data[[time_channel]]
     args <- list(...)
     ## interval label; falls back to the `data` argument name when unsupplied
     interval_name <- args$interval_name %||% deparse(substitute(data))
 
-    ## broadcast global args, applying any per-channel list() overrides
-    per_channel <- resolve_channel_args(
-        nirs_channels,
-        args = list(
+    ## shared prologue: validate data, resolve channels/time, broadcast and
+    ## validate per-channel args
+    setup <- setup_kinetics_worker(
+        data,
+        enquo(nirs_channels),
+        enquo(time_channel),
+        arg_list = list(
             shape = shape,
             start_time = start_time,
             direction = direction,
@@ -614,14 +613,9 @@ analyse_logistic <- function(
         verbose = verbose,
         env = env
     )
-    ## validate resolved args once, before fitting any channel
-    per_channel <- validate_kinetics_args(
-        per_channel,
-        data,
-        t_vec,
-        verbose,
-        env = env
-    )
+    nirs_channels <- setup$nirs_channels
+    time_channel <- setup$time_channel
+    per_channel <- setup$per_channel
 
     ## global fixed parameters bypass per-channel resolution: a named
     ## list would be misread as a channel map

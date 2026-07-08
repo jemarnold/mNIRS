@@ -835,11 +835,13 @@ make_kinetics_results <- function(
         channels
     )
     attr(df, "diagnostics") <- data.frame(
+        interval = interval,
         nirs_channels = channels,
         r2 = rep(0.9, length(channels)),
         rmse = rep(0.1, length(channels))
     )
     attr(df, "channel_args") <- data.frame(
+        interval = interval,
         nirs_channels = channels,
         start_time = rep(start_time, length(channels)),
         width = rep(10L, length(channels))

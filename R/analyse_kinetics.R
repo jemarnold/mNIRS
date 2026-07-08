@@ -46,7 +46,7 @@ method_aliases <- c(
 #' @param start_time A numeric value in units of `time_channel` specifying the
 #'   time of response onset (effectively kinetics fit time = `0`). If `NULL`
 #'   (*default*), retrieves `interval_times` from *"mnirs"* metadata, or falls
-#'   back to `0` (see *Details*). 
+#'   back to `0` (see *Details*).
 #' @param end_window A numeric value in units of `time_channel` specifying the
 #'   forward-looking window in which to look for the end of the kinetics fit.
 #'   `end_window = Inf` (*default*) returns the global extreme from the full
@@ -120,7 +120,7 @@ method_aliases <- c(
 #' and *"sigmoidal"*, the baseline window before `start_time` anchors the
 #' starting amplitude `A` and the onset of the time values `TD` in a
 #' 4-parameter monoexponential model and `xmid` in all sigmoidal models. (see
-#' respective *method* sections below). 
+#' respective *method* sections below).
 #'
 #' ## Response direction and the end of the fitting window
 #'
@@ -217,7 +217,7 @@ method_aliases <- c(
 #'   `A + (B - A) * exp(-exp(-k * (t - xmid)))` with `k = slope * e / (B - A)`.
 #'   Early-acceleration; inflection height fixed at `A + (B - A) / e`.
 #' - `shape = "gompertz_left"` ([SSgompertz_left()]):
-#'   `A + (B - A) * (1 - exp(-exp(k * (t - xmid))))` with 
+#'   `A + (B - A) * (1 - exp(-exp(k * (t - xmid))))` with
 #'   `k = slope * e / (B - A)`. Late-acceleration; inflection height fixed at
 #'   `A + (B - A) * (1 - 1/e)`.
 #'
@@ -355,28 +355,17 @@ analyse_kinetics.response_time <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    ## capture eagerly: frame-sensitive calls must not evaluate lazily
-    nirs_quo <- enquo(nirs_channels)
-    time_quo <- enquo(time_channel)
-    call <- match.call()
-    ## report conditions as coming from the user-facing generic
-    env <- sys.call(-1)
-
+    worker_args <- unlist(kinetics_dispatch[c("common", "response_time")])
     return(analyse_kinetics_intervals(
-        data,
-        worker = analyse_response_time,
-        method = "response_time",
-        worker_args = list(
-            start_time = start_time,
-            fraction = fraction,
-            direction = direction,
-            end_window = end_window
-        ),
-        nirs_quo = nirs_quo,
-        time_quo = time_quo,
-        verbose = verbose,
-        call = call,
-        env = env
+        data        = data,
+        worker      = analyse_response_time,
+        method      = "response_time",
+        worker_args = mget(worker_args),
+        nirs_quo    = enquo(nirs_channels),
+        time_quo    = enquo(time_channel),
+        verbose     = verbose,
+        call        = match.call(),
+        env         = sys.call(-1)
     ))
 }
 
@@ -404,32 +393,17 @@ analyse_kinetics.peak_slope <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    ## capture eagerly: frame-sensitive calls must not evaluate lazily
-    nirs_quo <- enquo(nirs_channels)
-    time_quo <- enquo(time_channel)
-    call <- match.call()
-    ## report conditions as coming from the user-facing generic
-    env <- sys.call(-1)
-
+    worker_args <- unlist(kinetics_dispatch[c("common", "peak_slope")])
     return(analyse_kinetics_intervals(
-        data,
-        worker = analyse_peak_slope,
-        method = "peak_slope",
-        worker_args = list(
-            start_time = start_time,
-            width = width,
-            span = span,
-            align = align,
-            direction = direction,
-            end_window = end_window,
-            partial = partial,
-            na.rm = na.rm
-        ),
-        nirs_quo = nirs_quo,
-        time_quo = time_quo,
-        verbose = verbose,
-        call = call,
-        env = env
+        data        = data,
+        worker      = analyse_peak_slope,
+        method      = "peak_slope",
+        worker_args = mget(worker_args),
+        nirs_quo    = enquo(nirs_channels),
+        time_quo    = enquo(time_channel),
+        verbose     = verbose,
+        call        = match.call(),
+        env         = sys.call(-1)
     ))
 }
 
@@ -455,29 +429,17 @@ analyse_kinetics.monoexponential <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    ## capture eagerly: frame-sensitive calls must not evaluate lazily
-    nirs_quo <- enquo(nirs_channels)
-    time_quo <- enquo(time_channel)
-    call <- match.call()
-    ## report conditions as coming from the user-facing generic
-    env <- sys.call(-1)
-
+    worker_args <- unlist(kinetics_dispatch[c("common", "monoexponential")])
     return(analyse_kinetics_intervals(
-        data,
-        worker = analyse_monoexponential,
-        method = "monoexponential",
-        worker_args = list(
-            use_TD = use_TD,
-            fix = fix,
-            start_time = start_time,
-            direction = direction,
-            end_window = end_window
-        ),
-        nirs_quo = nirs_quo,
-        time_quo = time_quo,
-        verbose = verbose,
-        call = call,
-        env = env
+        data        = data,
+        worker      = analyse_monoexponential,
+        method      = "monoexponential",
+        worker_args = mget(worker_args),
+        nirs_quo    = enquo(nirs_channels),
+        time_quo    = enquo(time_channel),
+        verbose     = verbose,
+        call        = match.call(),
+        env         = sys.call(-1)
     ))
 }
 
@@ -503,29 +465,17 @@ analyse_kinetics.sigmoidal <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    ## capture eagerly: frame-sensitive calls must not evaluate lazily
-    nirs_quo <- enquo(nirs_channels)
-    time_quo <- enquo(time_channel)
-    call <- match.call()
-    ## report conditions as coming from the user-facing generic
-    env <- sys.call(-1)
-
+    worker_args <- unlist(kinetics_dispatch[c("common", "sigmoidal")])
     return(analyse_kinetics_intervals(
-        data,
-        worker = analyse_logistic,
-        method = "sigmoidal",
-        worker_args = list(
-            shape = shape,
-            fix = fix,
-            start_time = start_time,
-            direction = direction,
-            end_window = end_window
-        ),
-        nirs_quo = nirs_quo,
-        time_quo = time_quo,
-        verbose = verbose,
-        call = call,
-        env = env
+        data        = data,
+        worker      = analyse_logistic,
+        method      = "sigmoidal",
+        worker_args = mget(worker_args),
+        nirs_quo    = enquo(nirs_channels),
+        time_quo    = enquo(time_channel),
+        verbose     = verbose,
+        call        = match.call(),
+        env         = sys.call(-1)
     ))
 }
 

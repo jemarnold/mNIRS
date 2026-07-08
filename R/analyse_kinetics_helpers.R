@@ -203,8 +203,7 @@ find_kinetics_idx <- function(
 #' Shared helper for `analyse_kinetics.*` methods. Takes a list of
 #' per-interval (per-data frame) kinetics results data frames (each carrying
 #' `"fitted_data"`, `"channel_args"`, and `"diagnostics"` attributes) and the
-#' original `data_list`. Interval names are read from the `interval` column
-#' that each result data frame already carries.
+#' original `data_list`. Interval names are taken from `names(data_list)`.
 #'
 #' @param data_list Named list of original interval data frames.
 #' @param result_list List of per-interval result data frames with attributes.
@@ -218,18 +217,9 @@ build_kinetics_results <- function(
     method,
     call
 ) {
-    ## interval label per result, taken from each result's `interval` column
-    interval_names <- vapply(result_list, \(.r) unique(.r$interval), "")
-
-    ## tag each channel-level attr df with its interval, then bind rows
+    ## bind channel-level attr dfs; each already carries `interval` col[1]
     flatten_attr <- function(attr_name) {
-        dfs <- Map(\(.res, .interval) {
-            df <- attr(.res, attr_name)
-            df$interval <- .interval
-            return(df)
-        }, result_list, interval_names)
-        df <- do.call(rbind, dfs)
-        df <- df[, c("interval", setdiff(names(df), "interval"))]
+        df <- do.call(rbind, lapply(result_list, attr, attr_name))
         rownames(df) <- NULL
         return(df)
     }
@@ -280,7 +270,7 @@ build_kinetics_results <- function(
 
     ## extract per-interval model lists (named by nirs_channel)
     model_list <- lapply(result_list, attr, "model")
-    names(model_list) <- interval_names
+    names(model_list) <- names(data_list)
 
     ## normalise call: function name to generic, method to canonical form
     call[[1L]] <- quote(analyse_kinetics)
@@ -365,6 +355,76 @@ analyse_kinetics_intervals <- function(
 }
 
 
+## canonical method -> method-specific worker arg names.
+kinetics_dispatch <- list(
+    common = c("start_time", "direction", "end_window"),
+    response_time = c("fraction"),
+    peak_slope = c("width", "span", "align", "partial", "na.rm"),
+    monoexponential = c("use_TD", "fix"),
+    sigmoidal = c("shape", "fix")
+)
+
+
+#' Shared validation prologue for `analyse_<method>()` workers
+#'
+#' Runs the identical per-interval setup shared by every kinetics worker:
+#' validates `data`, resolves `nirs_channels` and `time_channel`,
+#' broadcasts global arguments across channels via [resolve_channel_args()],
+#' and validates the resolved per-channel arguments via
+#' [validate_kinetics_args()].
+#'
+#' @param data A single *"mnirs"* data frame.
+#' @param nirs_quo,time_quo Quosures of the worker's `nirs_channels` and
+#'   `time_channel` arguments (captured with `enquo()` in the worker frame).
+#' @param arg_list Named list of the method's per-channel-capable arguments.
+#' @param choices Named list of valid values for choice-type arguments,
+#'   passed to [resolve_channel_args()].
+#' @inheritParams validate_mnirs
+#'
+#' @returns A named list with `nirs_channels`, `time_channel`, `t_vec`, and
+#'   `per_channel`.
+#'
+#' @keywords internal
+setup_kinetics_worker <- function(
+    data,
+    nirs_quo,
+    time_quo,
+    arg_list,
+    choices = list(),
+    verbose = TRUE,
+    env = rlang::caller_env()
+) {
+    validate_mnirs_data(data, env = env)
+    nirs_channels <- validate_nirs_channels(nirs_quo, data, env)
+    time_channel <- validate_time_channel(time_quo, data, env = env)
+    t_vec <- data[[time_channel]]
+
+    ## broadcast global args (applying per-channel list() overrides), then
+    ## validate the resolved args once, before fitting any channel
+    per_channel <- resolve_channel_args(
+        nirs_channels,
+        args = arg_list,
+        choices = choices,
+        verbose = verbose,
+        env = env
+    )
+    per_channel <- validate_kinetics_args(
+        per_channel,
+        data,
+        t_vec,
+        verbose,
+        env = env
+    )
+
+    return(list(
+        nirs_channels = nirs_channels,
+        time_channel = time_channel,
+        t_vec = t_vec,
+        per_channel = per_channel
+    ))
+}
+
+
 #' Process kinetics fits across NIRS channels
 #'
 #' Shared per-channel skeleton for all `analyse_kinetics()` methods. Resolves
@@ -385,7 +445,7 @@ analyse_kinetics_intervals <- function(
 #'   (`window_idx`/`fitted`), and `diag` (1-row data frame from
 #'   [compute_diagnostics()]).
 #' @param interval_name Character; the interval name recorded in the `interval`
-#'   column of the returned coefficients.
+#'   column of the returned coefficients, `diagnostics`, and `channel_args`.
 #' @param extra_args Named list of additional arguments recorded in the
 #'   `channel_args` result attribute.
 #' @inheritParams validate_mnirs
@@ -414,41 +474,54 @@ analyse_kinetics_channels <- function(
     fits <- setNames(
         nm = nirs_channels,
         lapply(nirs_channels, \(.nirs) {
-        .a <- per_channel[[.nirs]]
+            .a <- per_channel[[.nirs]]
 
-        ## filter for valid finite idx before first extreme + end_window
-        valid <- find_kinetics_idx(
-            data[[.nirs]], t_vec, .a$end_window, .a$direction, env = env
-        )
-        .a$direction <- valid$direction
-        x_fit <- data[[.nirs]][valid$idx]
-        t_fit <- t_vec[valid$idx]
+            ## filter for valid finite idx before first extreme + end_window;
+            ## data columns and `end_window` are already validated upstream
+            valid <- find_kinetics_idx(
+                data[[.nirs]],
+                t_vec,
+                .a$end_window,
+                .a$direction,
+                bypass_checks = TRUE,
+                env = env
+            )
+            .a$direction <- valid$direction
+            x_fit <- data[[.nirs]][valid$idx]
+            t_fit <- t_vec[valid$idx]
 
-        ## method-specific fit; coefs/diag carry method columns only
-        fit <- fit_fn(.nirs, x_fit, t_fit, .a, valid, verbose)
+            ## method-specific fit; coefs/diag carry method columns only
+            fit <- fit_fn(.nirs, x_fit, t_fit, .a, valid, verbose)
 
-        ## serialise resolved args: NULL to NA, list() to its deparse(),
-        ## dropping internal-only args, so they fit a flat data frame row
-        arg_row <- lapply(c(.a, extra_args), \(.x) {
-            if (is.null(.x)) NA else if (is.list(.x)) deparse(.x) else .x
-        })
-        arg_row[c("verbose", "bypass_checks")] <- NULL
+            ## serialise resolved args: NULL to NA, list() to its deparse(),
+            ## dropping internal-only args, so they fit a flat data frame row
+            arg_row <- lapply(c(.a, extra_args), \(.x) {
+                if (is.null(.x)) NA else if (is.list(.x)) deparse(.x) else .x
+            })
+            arg_row[c("verbose", "bypass_checks", "interval_name")] <- NULL
 
-        list(
-            coefficients = cbind(
-                data.frame(
+            list(
+                coefficients = cbind(
+                    data.frame(
+                        interval      = interval_name,
+                        nirs_channels = .nirs,
+                        time_channel  = time_channel
+                    ),
+                    fit$coefs
+                ),
+                model        = fit$model,
+                fitted_data  = fit$fitted_data,
+                diagnostics  = cbind(
+                    data.frame(interval = interval_name, nirs_channels = .nirs),
+                    fit$diag
+                ),
+                channel_args = data.frame(
                     interval      = interval_name,
                     nirs_channels = .nirs,
-                    time_channel  = time_channel
-                ),
-                fit$coefs
-            ),
-            model        = fit$model,
-            fitted_data  = fit$fitted_data,
-            diagnostics  = cbind(data.frame(nirs_channels = .nirs), fit$diag),
-            channel_args = data.frame(nirs_channels = .nirs, arg_row)
-        )
-    })
+                    arg_row
+                )
+            )
+        })
     )
 
     ## assemble single attributed df (consumed by build_kinetics_results)
@@ -610,9 +683,11 @@ build_na_results <- function(na_coefs) {
 #' @keywords internal
 resolve_fixed_params <- function(mCall, params, data) {
     present <- params[params %in% names(mCall)]
-    fixed <- present[!vapply(
-        present, \(.p) identical(mCall[[.p]], as.name(.p)), logical(1)
-    )]
+    fixed <- present[
+        !vapply(present, \(.p) {
+            identical(mCall[[.p]], as.name(.p))
+        }, logical(1))
+    ]
     return(lapply(setNames(nm = fixed), \(.p) {
         val <- tryCatch(eval(mCall[[.p]], data), error = \(e) NULL)
         if (is.numeric(val) && length(val) == 1L && is.finite(val)) {
