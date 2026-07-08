@@ -2520,3 +2520,23 @@ test_that("create_mnirs_data accepts NSE for *_channels", {
     expect_equal(attr(df_list, "nirs_channels"), c("B", "C"))
     expect_equal(attr(df_list, "sample_rate"), 2)
 })
+
+test_that("create_mnirs_data preserves grouping", {
+    skip_if_not_installed("dplyr")
+    
+    df <- tibble(g = c("a", "a", "b"), A = 1:3, B = 4:6)
+    grouped <- dplyr::group_by(df, g)
+
+    df_grp <- create_mnirs_data(grouped, nirs_channels = "B", sample_rate = 1)
+
+    ## grouping survives and mnirs class is intact
+    expect_s3_class(df_grp, "mnirs")
+    expect_true(dplyr::is_grouped_df(df_grp))
+    expect_equal(dplyr::group_vars(df_grp), "g")
+    expect_equal(attr(df_grp, "nirs_channels"), "B")
+
+    ## ungrouped input stays ungrouped
+    df_ungrp <- create_mnirs_data(df, nirs_channels = "B")
+    expect_false(dplyr::is_grouped_df(df_ungrp))
+})
+

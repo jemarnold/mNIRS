@@ -328,9 +328,12 @@ create_mnirs_data <- function(data, ...) {
 
     metadata <- utils::modifyList(attributes(data), incoming_metadata)
 
+    ## preserve grouping: `new_tibble()` resets class, so re-add `grouped_df`
+    grp <- if (inherits(data, "grouped_df")) "grouped_df"
+
     nirs_data <- tibble::new_tibble(
         data,
-        class = "mnirs",
+        class = c("mnirs", grp),
         nirs_device = metadata$nirs_device,
         nirs_channels = metadata$nirs_channels,
         time_channel = metadata$time_channel,
