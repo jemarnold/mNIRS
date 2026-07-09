@@ -9,11 +9,11 @@ monoexponential(t, A, B, tau, TD = NULL)
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
 
-\item{A}{A numeric parameter for the starting (baseline) value of the
-response variable.}
+\item{A}{A numeric parameter for the starting baseline of the response
+variable.}
 
-\item{B}{A numeric parameter for the ending (asymptote) value of the
-response variable.}
+\item{B}{A numeric parameter for the ending asymptote of the response
+variable.}
 
 \item{tau}{A numeric parameter for the time constant \code{tau} (\eqn{\tau})
 of the exponential curve, in units of the predictor variable \code{t}.}
@@ -27,21 +27,22 @@ A numeric vector of predicted values the same length as the
 predictor variable \code{t}.
 }
 \description{
-Calculate a 3- or 4-parameter monoexponential curve. This model family is
-fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "monoexponential"}, and by
-\code{\link[stats:nls]{stats::nls()}} via the self-starting wrapper \code{\link[=SSmonoexponential]{SSmonoexponential()}}.
+Calculate a 3- or 4-parameter monoexponential curve.
 }
 \details{
+This model family is
+fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "monoexponential"}, and by
+\code{\link[stats:nls]{stats::nls()}} via the self-starting wrapper \code{\link[=SSmonoexponential]{SSmonoexponential()}}.
 \subsection{Model equations}{
 
-3-parameter model:
-\code{A + (B - A) * (1 - exp(-t / tau))}
+3-parameter model: \code{A + (B - A) * (1 - exp(-t / tau))}
 
 4-parameter model:
 \code{ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))}
 
-\code{tau} is the time constant, equal to the reciprocal of the rate constant
-\code{k} (\code{k = 1 / tau} in reciprocal units of \code{time_channel}; i.e. \verb{sec^-1s}).
+The rate constant \code{k} is the reciprocal of \code{tau} (\code{k = 1 / tau}) in
+reciprocal units of \code{time_channel}; i.e. \verb{sec^-1s}).
+
 Common derived quantities include the mean response time \code{MRT = TD + tau}
 and the half-response time \code{HRT = TD + tau * log(2)}.
 }
@@ -55,7 +56,7 @@ x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
 data <- data.frame(t, x)
 
 model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
-model
+summary(model)
 
 y <- predict(model, data)
 

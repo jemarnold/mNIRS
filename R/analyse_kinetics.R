@@ -1,34 +1,13 @@
-## canonical method for each accepted alias, matched case- and
-## separator-insensitively (" ", "-", "_")
-method_aliases <- c(
-    response_time = "response_time",
-    half_response_time = "response_time",
-    recovery_time = "response_time",
-    half_recovery_time = "response_time",
-    half_time = "response_time",
-    hrt = "response_time",
-    peak_slope = "peak_slope",
-    slope = "peak_slope",
-    exp = "monoexponential",
-    exponential = "monoexponential",
-    mrt = "monoexponential",
-    tau = "monoexponential",
-    logistic = "sigmoidal",
-    gompertz = "sigmoidal",
-    xmid = "sigmoidal"
-)
-
-
 #' Analyse kinetics across mNIRS channels and intervals
 #'
 #' @description
-#' Fit parametric or non-parametric kinetics for each `nirs_channel` within an
-#' *"mnirs"* data frame, a list of data frames, or a grouped data frame.
+#' Model NIRS kinetics responses for each `nirs_channel` within an *"mnirs"*
+#' data frame, a list of data frames, or a grouped data frame.
 #'
 #' Note the `method`-specific arguments below.
 #'
-#' @param data A data frame of class *"mnirs"* containing time series data and
-#'   metadata, a list of data frames, or a grouped data frame (see *Details*).
+#' @param data A data frame, a list of data frames, or a grouped data frame of
+#'   class *"mnirs"* containing time series data and metadata (see *Details*).
 #' @param method A character string specifying the kinetics analysis method.
 #'   Additional arguments must be specified for each method. See *Details*.
 #'   \describe{
@@ -40,17 +19,17 @@ method_aliases <- c(
 #'      \item{`"monoexponential"`}{Monoexponential curve fit via
 #'      [stats::nls()]. Additional arguments: `use_TD`. See
 #'      [monoexponential()].}
-#'      \item{`"sigmoidal"`}{4-parameter sigmoidal curve fit via
+#'      \item{`"sigmoidal"`}{Logistic or Gompertz-family curve fit via
 #'      [stats::nls()]. Additional arguments: `shape`. See [logistic()].}
 #'   }
 #' @param start_time A numeric value in units of `time_channel` specifying the
-#'   time of response onset (effectively kinetics fit time = `0`). If `NULL`
+#'   time of response onset (effectively time = `0` of the response). If `NULL`
 #'   (*default*), retrieves `interval_times` from *"mnirs"* metadata, or falls
-#'   back to `0` (see *Details*).
+#'   back to `0` or the first positive time value (see *Details*).
 #' @param end_window A numeric value in units of `time_channel` specifying the
-#'   forward-looking window in which to look for the end of the kinetics fit.
+#'   window in which to look for the end of the kinetics fit. 
 #'   `end_window = Inf` (*default*) returns the global extreme from the full
-#'   range of `x` (see *Details*).
+#'   sample range (see *Details*).
 #' @param ... Additional arguments passed to the underlying method function.
 #'   See *Details*.
 #' @param fraction **response_time**: A numeric value in the range
@@ -63,8 +42,8 @@ method_aliases <- c(
 #'   time span around `idx` in which to perform the operation, according
 #'   to `align`. In units of `time_channel`.
 #' @param align **peak_slope**: Window alignment as *"centre"/"center"*
-#'   (the *default*), *"left"*, or *"right"*. Where *"left"* is *forward
-#'   looking*, and *"right"* is *backward looking* from the current
+#'   (the *default*), *"left"*, or *"right"*. Where *"left"* is forward
+#'   looking, and *"right"* is backward looking from the current
 #'   sample.
 #' @param partial **peak_slope**: Logical; default is `FALSE`, requires
 #'   local windows to have complete number of samples specified by
@@ -105,37 +84,37 @@ method_aliases <- c(
 #' Specified `nirs_channels` (or channels retrieved from *"mnirs"* metadata)
 #' will be analysed and results returned as a formatted table.
 #'
-#' ## Response onset (**start_time**) and the baseline window
+#' ## Response **start_time** and the baseline window
 #'
 #' `start_time` should be specified as the time point separating the
 #' pre-response baseline (`time_channel <= start_time`) from the start of the
 #' response fit window (`time_channel > start_time`). For intervals extracted
 #' with [extract_intervals()], `start_time` will retrieve `interval_times`
-#' from *"mnirs"* metadata. Otherwise `start_time` defaults to `0`.
+#' from *"mnirs"* metadata. Otherwise `start_time` defaults to `0` or the
+#' first positive time value.
 #'
 #' For *"response_time"*, the baseline window before `start_time` defines the
 #' mean starting amplitude `A` directly and anchors the start of the
 #' `response_time` parameter. For *"peak_slope"*, `start_time` anchors the
-#' response onset for the `peak_slope_time` parameter. For *"monoexponential"*
+#' start of the `peak_slope_time` parameter. For *"monoexponential"*
 #' and *"sigmoidal"*, the baseline window before `start_time` anchors the
-#' starting amplitude `A` and the onset of the time values `TD` in a
-#' 4-parameter monoexponential model and `xmid` in all sigmoidal models. (see
-#' respective *method* sections below).
+#' starting fitted amplitude `A` and the start of the `TD` and `MRT`, or
+#' `xmid` parameters. (see respective *method* sections below).
 #'
-#' ## Response direction and the end of the fitting window
+#' ## Response **direction** and the fit **end_window**
 #'
 #' By default, `direction` is detected automatically as either *"positive"*
 #' (upward) or *"negative"* (downward) response, and can be overwritten
 #' manually. `end_window` is a time span in units of `time_channel` and
 #' defines the end of the kinetics fitting window by locating the first peak
 #' or trough value (depending on direction) that has no greater/lesser values
-#' within the subsequent `end_window`. The fitting window extends to the end
-#' of `end_window` beyond the detected peak/trough.
+#' within the subsequent `end_window` time span. The curve fitting window
+#' extends to the end of `end_window` beyond the detected peak/trough.
 #'
-#' For *"monoexponential"* and *"sigmoidal"*, `direction` also constrains the
-#' sign of the fitted amplitude `B - A` (and the sigmoidal `slope`). A fit
-#' that cannot satisfy the requested direction returns `NA` coefficients with
-#' a warning.
+#' For *"monoexponential"* and *"sigmoidal"* methods, `direction` also
+#' constrains the sign of the fitted amplitude `B - A`, and the sigmoidal
+#' `slope`. A fit that cannot satisfy the requested direction returns `NA`
+#' coefficients with a warning.
 #'
 #' ## method = "response_time"
 #'
@@ -150,20 +129,19 @@ method_aliases <- c(
 #' `fraction = 0.632` approximates the time constant (`tau`; \eqn{\tau})
 #' parameter from a monoexponential function.
 #'
-#' The target response value is:
-#'
-#' `fitted = A + (B - A) * fraction`
+#' The target response value is: `fitted = A + (B - A) * fraction`
 #'
 #' Where `A` is the mean baseline value (`time_channel <= start_time`) and `B`
-#' is the first local extreme (peak or trough) value after `start_time`.
-#' `response_time` is the elapsed time from `start_time` to `response_value`;
-#' the first observed sample where the signal is equal to or greater/lesser
-#' than the target `fitted` value. See [response_time()] for the full algorithm
-#' and coefficients results.
+#' is the first local extreme (peak or trough) value with no greater extreme
+#' values within `end_window`. `response_value` is the first observed sample
+#' where the signal is equal to or greater/lesser than the target `fitted`
+#' value. `response_time` is the elapsed time from `start_time` to
+#' `response_value`. See [response_time()] for the full algorithm and
+#' coefficients.
 #'
 #' ## method = "peak_slope"
 #'
-#' Aliases: `method = c("peak slope", "slope")`.
+#' Aliases: `method = c("peak slope", "slope", "lm")`.
 #'
 #' A semi-parametric approach to estimate the maximum positive or negative
 #' local linear slope of a signal using rolling least-squares regression. The
@@ -177,7 +155,7 @@ method_aliases <- c(
 #'
 #' ## method = "monoexponential"
 #'
-#' Aliases: `method = c("monoexp", "exponential", "tau", "MRT")`.
+#' Aliases: `method = c("monoexp", "exponential", "exp", "tau", "MRT")`.
 #'
 #' A parametric approach fitting a self-starting monoexponential function to
 #' the response curve using [stats::nls()] with [SSmonoexponential()] for either
@@ -188,26 +166,25 @@ method_aliases <- c(
 #' - 3-parameter: `A + (B - A) * (1 - exp(-t / tau))`
 #' - 4-parameter: `ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))`
 #'
-#' `TD` is the *time delay* from the expected response start (defined by
-#' `start_time`) and the onset of the response curve. `tau` is the
-#' *time constant* of the response. The *rate constant* `k` is derived as the
-#' reciprocal (`k = 1 / tau`). The *mean response time* `MRT = TD + tau` and
-#' the *half-response time* `HRT = TD + tau * log(2)` can also be derived. See
-#' [monoexponential()] for the model family and [SSmonoexponential()] for self-start
-#' initialisation.
+#' `TD` is the *time delay* from `start_time` to the onset of the exponential
+#' response curve. `tau` is the *time constant* of the response. The 
+#' *rate constant* `k` is the reciprocal (`k = 1 / tau`). The 
+#' *mean response time* is the time sum `MRT = TD + tau`. See
+#' [monoexponential()] for the model family and [SSmonoexponential()] for
+#' self-start initialisation.
 #'
-#' Parameters (`A`, `B`, `tau`, `TD`) may be held constant with `fix`, e.g.
-#' `fix = list(A = 0)`. `TD` is fixable only when `use_TD = TRUE` for all
-#' channels; a fixed `TD` disables the 3-parameter fallback.
-#'
-#' Other arguments (`...`) passed to [stats::nls()] are `<NOT YET IMPLEMENTED>`.
+#' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`.
+#' This excludes them from the fit optimisation procedure, and effectively
+#' reduces the function to a lower-parameter model. `TD` can only be fixed when
+#' `use_TD = TRUE` and disables the 3-parameter fallback. It is recommended to
+#' specify `use_TD = FALSE` rather than fix `TD = 0`.
 #'
 #' ## method = "sigmoidal"
 #'
-#' Aliases: `method = c("logistic", "sigmoid", "gompertz", "xmid")`.
+#' Aliases: `method = c("logistic", "gompertz", "xmid")`.
 #'
 #' A parametric approach fitting a self-starting 4-parameter sigmoidal function
-#' to the response curve using [stats::nls()] in one of three shapes.
+#' to the response curve using [stats::nls()] in one of three shapes. 
 #'
 #' Model equations (all 4-parameter):
 #'
@@ -221,41 +198,40 @@ method_aliases <- c(
 #'   `k = slope * e / (B - A)`. Late-acceleration; inflection height fixed at
 #'   `A + (B - A) * (1 - 1/e)`.
 #'
-#' `xmid` is the time at the *inflection point*; the steepest moment of the
-#' response, relative to `start_time`. `slope` is the response rate `dx/dt` at
-#' the inflection. A *"symmetric"* shape is the default for an unbiased fit
-#' when no obvious asymmetry is expected. *"gompertz"* growth is appropriate
-#' for fast-onset, slow-tail responses, and *"gompertz_left"* for slow-onset,
+#' `xmid` is the time from `start_time` to the *inflection point*; the steepest
+#' moment of the response. `slope` is the response rate `dx/dt` at the
+#' inflection.
+#' 
+#' A *"symmetric"* shape is the default for an unbiased fit when no
+#' obvious asymmetry is expected. *"gompertz"* growth is appropriate
+#' for fast-onset, slow-tail responses. *"gompertz_left"* for slow-onset,
 #' fast-tail responses. See [logistic()], [gompertz()], and [gompertz_left()]
 #' for the model families and [SSlogistic()], [SSgompertz()], and
 #' [SSgompertz_left()] for self-start initialisations.
 #'
-#' Parameters (`A`, `B`, `xmid`, `slope`) may be held constant with `fix`,
-#' e.g. `fix = list(A = 0)`.
+#' Parameters may be held constant with `fix`, e.g. `fix = list(A = 0)`.
 #'
-#' Other arguments (`...`) passed to [stats::nls()] are `<NOT YET IMPLEMENTED>`.
-#'
-#' @returns A formatted table of printed results, with individual elements
-#'   accessible as a structured list of class *"mnirs_kinetics"* containing:
+#' @returns A formatted table of results, with individual elements accessible
+#'   as a structured list of class *"mnirs_kinetics"* containing:
 #'
 #'   \item{`method`}{The method used, e.g. `"response_time"`.}
 #'   \item{`model`}{A named list of model objects (per interval, per
 #'       `nirs_channel`). For `"peak_slope"`, each element is an
-#'       [lm][stats::lm] object; for `"monoexponential"`, an
-#'       [nls][stats::nls] object; for `"response_time"`, `NULL`. `NULL`
+#'       [lm][stats::lm] object; for `"monoexponential"` and `"sigmoidal"`,
+#'       an [nls][stats::nls] object; for `"response_time"`, `NULL`. `NULL`
 #'       for channels where fitting failed. When a `direction`-bounded
 #'       refit was required, the stored model is parameterised with
 #'       amplitude `D = B - A` in place of `B`.}
 #'   \item{`coefficients`}{A [tibble][tibble::tibble-package] of coefficients
-#'       with one row per `nirs_channel` per interval, containing columns
-#'       `interval`, `nirs_channels`, and the method-specific parameters.}
+#'       with one row per `nirs_channel` per interval, containing 
+#'       method-specific parameters.}
 #'   \item{`data`}{A list of the original input data frames augmented with a
-#'       `*_fitted` column of fitted values for each `nirs_channel`.}
+#'       `*_fitted` column of fitted values for each processed `nirs_channel`.}
 #'   \item{`interval_times`}{A data frame with one row per interval and
 #'       numeric column `start_times` -- the resolved response onset used for
 #'       fitting (the supplied `start_time`, else the [extract_intervals()]
-#'       metadata, else the first time value) -- and `end_times` when any
-#'       interval carries an end time from the metadata.}
+#'       metadata, else 0 or the first positive time value) -- and `end_times`
+#'       when any interval carries an end time from the metadata.}
 #'   \item{`diagnostics`}{A data frame of model diagnostics (`n_obs`, `r2`,
 #'       `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, `bic`) with one
 #'       row per `nirs_channel` per interval.}
@@ -268,7 +244,7 @@ method_aliases <- c(
 #'
 #' @examples
 #' result <- read_mnirs(
-#'     example_mnirs("train.red"),
+#'     file_path = example_mnirs("train.red"),
 #'     nirs_channels = c(
 #'         smo2_left = "SmO2 unfiltered",
 #'         smo2_right = "SmO2 unfiltered"
@@ -301,6 +277,9 @@ method_aliases <- c(
 #'
 #' ## along with diagnostics and other returned objects
 #' result$diagnostics
+#' 
+#' ## plot results
+#' plot(result)
 #'
 #' @export
 analyse_kinetics <- function(

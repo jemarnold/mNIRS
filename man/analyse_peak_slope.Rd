@@ -40,9 +40,9 @@ used.
 }}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
-time of response onset (effectively kinetics fit time = \code{0}). If \code{NULL}
+time of response onset (effectively time = \code{0} of the response). If \code{NULL}
 (\emph{default}), retrieves \code{interval_times} from \emph{"mnirs"} metadata, or falls
-back to \code{0} (see \emph{Details}).}
+back to \code{0} or the first positive time value (see \emph{Details}).}
 
 \item{width}{An integer defining the local window in number of samples
 around \code{idx} in which to perform the operation, according to \code{align}.}
@@ -55,14 +55,14 @@ in which to perform the operation, according to \code{align}. In units of
 \emph{"left"}, or \emph{"right"}. Where \emph{"left"} is \emph{forward looking}, and \emph{"right"}
 is \emph{backward looking} from the current sample.}
 
-\item{direction}{A character string specifying the response direction to
-detect -- \code{"auto"} (\emph{default}), \code{"positive"}, or \code{"negative"}. See
+\item{direction}{A character string specifying the response direction
+\code{"positive"}, or \code{"negative"}, or detect with \code{"auto"} (\emph{default}). See
 \emph{Details}.}
 
 \item{end_window}{A numeric value in units of \code{time_channel} specifying the
-forward-looking window in which to look for the end of the kinetics fit.
+window in which to look for the end of the kinetics fit.
 \code{end_window = Inf} (\emph{default}) returns the global extreme from the full
-range of \code{x} (see \emph{Details}).}
+sample range (see \emph{Details}).}
 
 \item{partial}{Logical; default is \code{FALSE}, only returns values where a full
 window of valid (non-\code{NA}) samples are available. If \code{TRUE}, ignores \code{NA}

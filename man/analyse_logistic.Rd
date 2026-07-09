@@ -48,18 +48,18 @@ and reported at their fixed values. Applied globally across
 \code{nirs_channels}.}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
-time of response onset (effectively kinetics fit time = \code{0}). If \code{NULL}
+time of response onset (effectively time = \code{0} of the response). If \code{NULL}
 (\emph{default}), retrieves \code{interval_times} from \emph{"mnirs"} metadata, or falls
-back to \code{0} (see \emph{Details}).}
+back to \code{0} or the first positive time value (see \emph{Details}).}
 
-\item{direction}{A character string specifying the response direction to
-detect -- \code{"auto"} (\emph{default}), \code{"positive"}, or \code{"negative"}. See
+\item{direction}{A character string specifying the response direction
+\code{"positive"}, or \code{"negative"}, or detect with \code{"auto"} (\emph{default}). See
 \emph{Details}.}
 
 \item{end_window}{A numeric value in units of \code{time_channel} specifying the
-forward-looking window in which to look for the end of the kinetics fit.
+window in which to look for the end of the kinetics fit.
 \code{end_window = Inf} (\emph{default}) returns the global extreme from the full
-range of \code{x} (see \emph{Details}).}
+sample range (see \emph{Details}).}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
@@ -90,10 +90,9 @@ recording the resolved arguments used.
 \description{
 Internal channel-level dispatch for
 \code{analyse_kinetics(method = "sigmoidal")}. Fits a 4-parameter sigmoidal
-curve to each \code{nirs_channel} within a single
-\emph{"mnirs"} data frame in one of three asymmetry shapes (\code{"symmetric"},
-\code{"gompertz"}, \code{"gompertz_left"}). See \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing
-documentation.
+curve to each \code{nirs_channel} within a single \emph{"mnirs"} data frame with
+one of three shapes: \code{"symmetric"}, \code{"gompertz"}, or \code{"gompertz_left"}.
+See \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing documentation.
 }
 \seealso{
 \code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=logistic]{logistic()}}, \code{\link[=SSlogistic]{SSlogistic()}},

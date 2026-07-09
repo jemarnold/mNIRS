@@ -1,3 +1,24 @@
+## canonical method for each accepted alias, matched case- and
+## separator-insensitively (" ", "-", "_")
+method_aliases <- c(
+    response_time = "response_time",
+    half_response_time = "response_time",
+    recovery_time = "response_time",
+    half_recovery_time = "response_time",
+    half_time = "response_time",
+    hrt = "response_time",
+    peak_slope = "peak_slope",
+    slope = "peak_slope",
+    lm = "peak_slope",
+    exp = "monoexponential",
+    exponential = "monoexponential",
+    mrt = "monoexponential",
+    tau = "monoexponential",
+    logistic = "sigmoidal",
+    gompertz = "sigmoidal",
+    xmid = "sigmoidal"
+) 
+
 #' Detect the direction of a response signal
 #'
 #' Resolves whether a signal is predominantly increasing (`"positive"`) or
@@ -9,7 +30,7 @@
 #'   direction when the net slope of `x` is zero or `NA`. The absolute
 #'   maximum and minimum of `fallback` are compared; if `abs(max) >= abs(min)`,
 #'   `"positive"` is returned.
-#' @param direction A character string specifying the kinetics direction to
+#' @param direction A character string specifying the response direction to
 #'   detect when `"auto"` (*default*). When `"positive"` or `"negative"`
 #'   returns unchanged.
 #' @inheritParams replace_invalid
@@ -56,8 +77,8 @@ detect_direction <- function(
 #'   specifying the forward-looking window used to check for subsequent
 #'   greater/lesser values than the candidate extreme. `end_window = Inf`
 #'   (*default*) returns the global extreme from the full range of `x`.
-#' @param direction A character string specifying the response direction to
-#'   detect -- `"auto"` (*default*), `"positive"`, or `"negative"`. See
+#' @param direction A character string specifying the response direction
+#'   `"positive"`, or `"negative"`, or detect with `"auto"` (*default*). See
 #'   *Details*.
 #' @inheritParams replace_invalid
 #'
@@ -107,8 +128,7 @@ find_kinetics_idx <- function(
     if (!(args$bypass_checks %||% FALSE)) {
         validate_x_t(x, t, allow_na = TRUE, env = env)
         validate_numeric(
-            end_window, 1, c(0, Inf), msg1 = "one-element positive",
-            env = env
+            end_window, 1, c(0, Inf), msg1 = "one-element positive", env = env
         )
     }
 

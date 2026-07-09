@@ -7,27 +7,25 @@
 #'   variable.
 #' @param B A numeric parameter for the ending asymptote of the response
 #'   variable.
-#' @param xmid A numeric parameter for the `t` value at the inflection
+#' @param xmid A numeric parameter for the time value at the inflection
 #'   (steepest) point of the curve, in units of the predictor variable `t`.
 #' @param slope A numeric parameter for the slope `dx/dt` of the response
-#'   variable at the inflection point `xmid`.
+#'   variable at the inflection `xmid`.
 #' @param asym A numeric parameter for the asymmetry index of the curve,
-#'   equal to the fraction of the response where the inflection point `xmid`
-#'   occurs, bounded in `c(0, 1)` for `(y(xmid) - A) / (B - A)`. `asym = 0.5`
+#'   equal to the fraction of the response where the inflection `xmid` occurs,
+#'   bounded in `c(0, 1)` for `(y(xmid) - A) / (B - A)`. `asym = 0.5`
 #'   is symmetric and equivalent to the 4-parameter form. If `NULL`
 #'   (*default*), a symmetric 4-parameter model is used.
 #'
 #' @details
-#' ## Implementation
-#'
 #' The 4-parameter symmetric form is fit by [analyse_kinetics()] when
 #' `method = "sigmoidal"` and `shape = "symmetric"` (*default*) via the
 #' self-starting wrapper [SSlogistic()].
 #'
 #' The 5-parameter Richards form is exported for advanced use directly with
-#' [stats::nls()] but is not used by [analyse_kinetics()]; for asymmetric
-#' shapes prefer [gompertz()] / [gompertz_left()], which are more
-#' numerically stable.
+#' [stats::nls()] but is not used by [analyse_kinetics()] due to convergence
+#' instability. For asymmetric responses, prefer [gompertz()] / 
+#' [gompertz_left()], which are more stable.
 #'
 #' ## Model equations
 #'
@@ -40,18 +38,18 @@
 #' 5-parameter (asymmetric) model re-parameterised so `asym` is the
 #'   inflection fraction. Internally:
 #'
-#'   `v = -log(2) / log(asym)`
-#'   `k = 2 * slope * v / ((B - A) * asym)`
-#'   `y = A + (B - A) / (1 + exp(-k * (t - xmid)))^(1 / v)`
+#'   * `y = A + (B - A) / (1 + exp(-k * (t - xmid)))^(1 / v)`
+#'   * `k = 2 * slope * v / ((B - A) * asym)`
+#'   * `v = -log(2) / log(asym)`
 #'
 #' Inflection is at `t = xmid` with `dx/dt = slope` and
-#'   `y(xmid) = A + (B - A) * asym` for any `asym` in `(0, 1)`. At
-#'   `asym = 0.5 -> v = 1` and the model collapses to the 4-parameter form.
-#'   `asym -> 0` gives an early-acceleration curve (inflection near `A`),
-#'   `asym -> 1` gives a late-acceleration curve (inflection near `B`).
-#'
-#' `asym = 0.368` (`1/e`) approximates a right-inflection Gompertz curve.
-#'   `asym = 0.632` (`1 - 1/e`) approximates a left-inflection Gompertz curve.
+#'   `y(xmid) = A + (B - A) * asym` for any `asym` in `(0, 1)`. 
+#' 
+#'   * `asym = 0.5 -> v = 1` the model collapses to the 4-parameter form.
+#'   * `asym -> 0` gives an early-acceleration curve (inflection near `A`),
+#'   * `asym -> 1` gives a late-acceleration curve (inflection near `B`).
+#'   * `asym = 0.368` (`1/e`) approximates a right-inflection Gompertz curve.
+#'   * `asym = 0.632` (`1 - 1/e`) approximates a left-inflection Gompertz curve.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -67,7 +65,7 @@
 #' data <- data.frame(x, t)
 #'
 #' model <- nls(x ~ SSlogistic(t, A, B, xmid, slope, asym), data = data)
-#' model
+#' summary(model)
 #'
 #' y <- predict(model, data)
 #'
@@ -100,7 +98,7 @@ logistic <- function(t, A, B, xmid, slope, asym = NULL) {
 
 #' Gompertz growth function
 #'
-#' Calculate a 4-parameter Gompertz (asymmetric sigmoidal) curve.
+#' Calculate 4-parameter Gompertz (asymmetric sigmoidal) curves.
 #'
 #' @inheritParams logistic
 #'
@@ -120,28 +118,28 @@ logistic <- function(t, A, B, xmid, slope, asym = NULL) {
 #'
 #' ## Model equations
 #'
-#' Both forms are re-parameterised so that `xmid` is the inflection time
+#' Both forms are re-parameterised so that `xmid` is the time at inflection
 #'   and `slope` is the response rate `dx/dt` at the inflection point.
 #'
 #' Gompertz (right-Gompertz; early acceleration, inflection near `A`):
 #'
-#'   `k = slope * e / (B - A)`
-#'   `y = A + (B - A) * exp(-exp(-k * (t - xmid)))`
+#'   * `k = slope * e / (B - A)`
+#'   * `y = A + (B - A) * exp(-exp(-k * (t - xmid)))`
 #'
 #' Left-Gompertz (late acceleration, inflection near `B`):
 #'
-#'   `k = slope * e / (B - A)`
-#'   `y = A + (B - A) * (1 - exp(-exp(k * (t - xmid))))`
+#'   * `k = slope * e / (B - A)`
+#'   * `y = A + (B - A) * (1 - exp(-exp(k * (t - xmid))))`
 #'
-#' For both forms, `y(xmid) = A + (B - A) / e` or
+#' For both forms, `y(xmid) = A + (B - A) / e` (right) or
 #'   `y(xmid) = A + (B - A) * (1 - 1/e)` (left), corresponding to
 #'   inflection-height fractions of `1/e` and `1 - 1/e`, respectively.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
 #'
-#' @seealso [analyse_kinetics()], [SSgompertz()],
-#'   [SSgompertz_left()], [logistic()]
+#' @seealso [analyse_kinetics()], [SSgompertz()], [SSgompertz_left()], 
+#'   [logistic()]
 #'
 #' @examples
 #' ## create a Gompertz curve with random noise
@@ -152,7 +150,7 @@ logistic <- function(t, A, B, xmid, slope, asym = NULL) {
 #' data <- data.frame(t, x)
 #'
 #' model <- nls(x ~ SSgompertz(t, A, B, xmid, slope), data = data)
-#' model
+#' summary(model)
 #'
 #' y <- predict(model, data)
 #'
@@ -396,12 +394,12 @@ init_inflection <- function(x, t, A_init, B_init) {
 #'
 #' The 4-parameter form is used by [analyse_kinetics()] when
 #'   `method = "sigmoidal"` and `shape = "symmetric"`. The 5-parameter
-#'   asymmetric form is retained as an advanced escape hatch for direct
-#'   [stats::nls()] use only; `analyse_kinetics()` instead dispatches to
-#'   [SSgompertz()] / [SSgompertz_left()] for asymmetric shapes,
-#'   which are more numerically stable on noisy real-world data.
+#'   asymmetric form is retained for advanced/experimental use only.
 #'   [stats::nls()] reads the free parameters from the formula right-hand
 #'   side, so omitting `asym` incurs no degrees-of-freedom penalty.
+#'
+#' `analyse_kinetics()` instead dispatches to [SSgompertz()] /
+#'   [SSgompertz_left()] for asymmetric shapes, which are more stable.
 #'
 #' ## Fixing parameters
 #'
@@ -424,16 +422,20 @@ init_inflection <- function(x, t, A_init, B_init) {
 #'     rnorm(length(t), 0, 2)
 #' data <- data.frame(t, x)
 #'
-#' ## 5-parameter fit
-#' model5 <- nls(x ~ SSlogistic(t, A, B, xmid, slope, asym), data = data)
-#' model5
-#'
-#' ## 4-parameter fit on the same data
+#' ## 4-parameter fit
 #' model4 <- nls(x ~ SSlogistic(t, A, B, xmid, slope), data = data)
-#' model4
+#' summary(model4)
 #'
-#' y5 <- predict(model5, data)
+#' ## 5-parameter fit on the same data
+#' model5 <- nls(x ~ SSlogistic(t, A, B, xmid, slope, asym), data = data)
+#' summary(model5)
+#'
+#' ## fix the baseline A at a known value
+#' model_fixed <- nls(x ~ SSlogistic(t, A = 10, B, xmid, slope), data = data)
+#' summary(model_fixed)
+#'
 #' y4 <- predict(model4, data)
+#' y5 <- predict(model5, data)
 #'
 #' \donttest{
 #'     if (requireNamespace("ggplot2", quietly = TRUE)) {
@@ -448,10 +450,7 @@ init_inflection <- function(x, t, A_init, B_init) {
 #' @export
 SSlogistic <- selfStart(
     model = logistic,
-    initial = init_fixed(
-        logistic_init,
-        c("A", "B", "xmid", "slope", "asym")
-    ),
+    initial = init_fixed(logistic_init, c("A", "B", "xmid", "slope", "asym")),
     parameters = c("A", "B", "xmid", "slope", "asym")
 )
 
@@ -460,8 +459,7 @@ SSlogistic <- selfStart(
 #'
 #' Creates initial coefficient estimates for `selfStart` wrappers around
 #' [gompertz()] and [gompertz_left()], for use with [stats::nls()]. Both
-#' wrappers expose the same 4-parameter `(A, B, xmid, slope)` interface for
-#' cross-shape coefficient comparability.
+#' wrappers use the same 4-parameter `(A, B, xmid, slope)` interface.
 #'
 #' @usage
 #' SSgompertz(t, A, B, xmid, slope)
@@ -495,15 +493,20 @@ SSlogistic <- selfStart(
 #' data <- data.frame(t, x)
 #'
 #' model <- nls(x ~ SSgompertz(t, A, B, xmid, slope), data = data)
-#' model
+#' summary(model)
+#' 
+#' ## fix the baseline A at a known value
+#' model_fixed <- nls(x ~ SSgompertz(t, A = 10, B, xmid, slope), data = data)
+#' summary(model_fixed)
 #'
-#' ## left-Gompertz on a different realisation
+#' ## left-Gompertz
 #' set.seed(16)
 #' x2 <- gompertz_left(t, A = 10, B = 100, xmid = 30, slope = 4) +
 #'     rnorm(length(t), 0, 2)
 #' data2 <- data.frame(t, x = x2)
+#' 
 #' model_left <- nls(x ~ SSgompertz_left(t, A, B, xmid, slope), data = data2)
-#' model_left
+#' summary(model_left)
 #'
 #' @export
 SSgompertz <- selfStart(
@@ -543,10 +546,9 @@ shape_dispatch <- list(
 #'
 #' Internal channel-level dispatch for
 #' `analyse_kinetics(method = "sigmoidal")`. Fits a 4-parameter sigmoidal
-#' curve to each `nirs_channel` within a single
-#' *"mnirs"* data frame in one of three asymmetry shapes (`"symmetric"`,
-#' `"gompertz"`, `"gompertz_left"`). See [analyse_kinetics()] for user-facing
-#' documentation.
+#' curve to each `nirs_channel` within a single *"mnirs"* data frame with
+#' one of three shapes: `"symmetric"`, `"gompertz"`, or `"gompertz_left"`.
+#' See [analyse_kinetics()] for user-facing documentation.
 #'
 #' @param shape Character; the 4-parameter sigmoidal shape to fit. One of
 #'   `"symmetric"` (*default*; calls [SSlogistic()]), `"gompertz"`

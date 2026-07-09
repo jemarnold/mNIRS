@@ -20,11 +20,11 @@ variable.}
 \item{B}{A numeric parameter for the ending asymptote of the response
 variable.}
 
-\item{xmid}{A numeric parameter for the \code{t} value at the inflection
+\item{xmid}{A numeric parameter for the time value at the inflection
 (steepest) point of the curve, in units of the predictor variable \code{t}.}
 
 \item{slope}{A numeric parameter for the slope \code{dx/dt} of the response
-variable at the inflection point \code{xmid}.}
+variable at the inflection \code{xmid}.}
 }
 \value{
 A numeric vector of predicted values the same length as the
@@ -33,8 +33,7 @@ predictor variable \code{t}.
 \description{
 Creates initial coefficient estimates for \code{selfStart} wrappers around
 \code{\link[=gompertz]{gompertz()}} and \code{\link[=gompertz_left]{gompertz_left()}}, for use with \code{\link[stats:nls]{stats::nls()}}. Both
-wrappers expose the same 4-parameter \verb{(A, B, xmid, slope)} interface for
-cross-shape coefficient comparability.
+wrappers use the same 4-parameter \verb{(A, B, xmid, slope)} interface.
 }
 \details{
 Overwrites \code{\link[stats:SSgompertz]{stats::SSgompertz()}}.
@@ -55,15 +54,20 @@ x <- gompertz(t, A = 10, B = 100, xmid = 30, slope = 4) +
 data <- data.frame(t, x)
 
 model <- nls(x ~ SSgompertz(t, A, B, xmid, slope), data = data)
-model
+summary(model)
 
-## left-Gompertz on a different realisation
+## fix the baseline A at a known value
+model_fixed <- nls(x ~ SSgompertz(t, A = 10, B, xmid, slope), data = data)
+summary(model_fixed)
+
+## left-Gompertz
 set.seed(16)
 x2 <- gompertz_left(t, A = 10, B = 100, xmid = 30, slope = 4) +
     rnorm(length(t), 0, 2)
 data2 <- data.frame(t, x = x2)
+
 model_left <- nls(x ~ SSgompertz_left(t, A, B, xmid, slope), data = data2)
-model_left
+summary(model_left)
 
 }
 \seealso{

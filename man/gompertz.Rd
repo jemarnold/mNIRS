@@ -18,18 +18,18 @@ variable.}
 \item{B}{A numeric parameter for the ending asymptote of the response
 variable.}
 
-\item{xmid}{A numeric parameter for the \code{t} value at the inflection
+\item{xmid}{A numeric parameter for the time value at the inflection
 (steepest) point of the curve, in units of the predictor variable \code{t}.}
 
 \item{slope}{A numeric parameter for the slope \code{dx/dt} of the response
-variable at the inflection point \code{xmid}.}
+variable at the inflection \code{xmid}.}
 }
 \value{
 A numeric vector of predicted values the same length as the
 predictor variable \code{t}.
 }
 \description{
-Calculate a 4-parameter Gompertz (asymmetric sigmoidal) curve.
+Calculate 4-parameter Gompertz (asymmetric sigmoidal) curves.
 }
 \details{
 The \code{\link[=gompertz]{gompertz()}} curve is asymmetric, with the inflection point \code{xmid} closer
@@ -47,20 +47,22 @@ via the self-starting wrappers \code{\link[=SSgompertz]{SSgompertz()}} and \code
 
 \subsection{Model equations}{
 
-Both forms are re-parameterised so that \code{xmid} is the inflection time
+Both forms are re-parameterised so that \code{xmid} is the time at inflection
 and \code{slope} is the response rate \code{dx/dt} at the inflection point.
 
 Gompertz (right-Gompertz; early acceleration, inflection near \code{A}):
-
-\code{k = slope * e / (B - A)}
-\code{y = A + (B - A) * exp(-exp(-k * (t - xmid)))}
+\itemize{
+\item \code{k = slope * e / (B - A)}
+\item \code{y = A + (B - A) * exp(-exp(-k * (t - xmid)))}
+}
 
 Left-Gompertz (late acceleration, inflection near \code{B}):
+\itemize{
+\item \code{k = slope * e / (B - A)}
+\item \code{y = A + (B - A) * (1 - exp(-exp(k * (t - xmid))))}
+}
 
-\code{k = slope * e / (B - A)}
-\code{y = A + (B - A) * (1 - exp(-exp(k * (t - xmid))))}
-
-For both forms, \code{y(xmid) = A + (B - A) / e} or
+For both forms, \code{y(xmid) = A + (B - A) / e} (right) or
 \code{y(xmid) = A + (B - A) * (1 - 1/e)} (left), corresponding to
 inflection-height fractions of \code{1/e} and \code{1 - 1/e}, respectively.
 }
@@ -74,7 +76,7 @@ x <- gompertz(t, A = 10, B = 100, xmid = 30, slope = 4) +
 data <- data.frame(t, x)
 
 model <- nls(x ~ SSgompertz(t, A, B, xmid, slope), data = data)
-model
+summary(model)
 
 y <- predict(model, data)
 
@@ -89,6 +91,6 @@ y <- predict(model, data)
 
 }
 \seealso{
-\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=SSgompertz]{SSgompertz()}},
-\code{\link[=SSgompertz_left]{SSgompertz_left()}}, \code{\link[=logistic]{logistic()}}
+\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=SSgompertz]{SSgompertz()}}, \code{\link[=SSgompertz_left]{SSgompertz_left()}},
+\code{\link[=logistic]{logistic()}}
 }

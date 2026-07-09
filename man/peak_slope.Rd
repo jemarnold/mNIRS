@@ -34,8 +34,8 @@ in which to perform the operation, according to \code{align}. In units of
 \emph{"left"}, or \emph{"right"}. Where \emph{"left"} is \emph{forward looking}, and \emph{"right"}
 is \emph{backward looking} from the current sample.}
 
-\item{direction}{A character string specifying the response direction to
-detect -- \code{"auto"} (\emph{default}), \code{"positive"}, or \code{"negative"}. See
+\item{direction}{A character string specifying the response direction
+\code{"positive"}, or \code{"negative"}, or detect with \code{"auto"} (\emph{default}). See
 \emph{Details}.}
 
 \item{partial}{Logical; default is \code{FALSE}, only returns values where a full

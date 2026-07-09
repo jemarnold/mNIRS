@@ -1,14 +1,12 @@
 #' Monoexponential function
 #'
-#' Calculate a 3- or 4-parameter monoexponential curve. This model family is
-#' fit by [analyse_kinetics()] when `method = "monoexponential"`, and by
-#' [stats::nls()] via the self-starting wrapper [SSmonoexponential()].
+#' Calculate a 3- or 4-parameter monoexponential curve.
 #'
 #' @param t A numeric vector of the predictor variable (time).
-#' @param A A numeric parameter for the starting (baseline) value of the
-#'   response variable.
-#' @param B A numeric parameter for the ending (asymptote) value of the
-#'   response variable.
+#' @param A A numeric parameter for the starting baseline of the response
+#'   variable.
+#' @param B A numeric parameter for the ending asymptote of the response
+#'   variable.
 #' @param tau A numeric parameter for the time constant `tau` (\eqn{\tau})
 #'   of the exponential curve, in units of the predictor variable `t`.
 #' @param TD A numeric parameter for the time delay before the onset of
@@ -16,16 +14,20 @@
 #'   (*default*), a 3-parameter model without time delay is used.
 #'
 #' @details
+#' This model family is
+#' fit by [analyse_kinetics()] when `method = "monoexponential"`, and by
+#' [stats::nls()] via the self-starting wrapper [SSmonoexponential()].
+#' 
 #' ## Model equations
 #'
-#' 3-parameter model:
-#'   `A + (B - A) * (1 - exp(-t / tau))`
+#' 3-parameter model: `A + (B - A) * (1 - exp(-t / tau))`
 #'
 #' 4-parameter model:
 #'   `ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))`
 #'
-#' `tau` is the time constant, equal to the reciprocal of the rate constant
-#' `k` (`k = 1 / tau` in reciprocal units of `time_channel`; i.e. `sec^-1s`).
+#' The rate constant `k` is the reciprocal of `tau` (`k = 1 / tau`) in
+#' reciprocal units of `time_channel`; i.e. `sec^-1s`).
+#' 
 #' Common derived quantities include the mean response time `MRT = TD + tau`
 #' and the half-response time `HRT = TD + tau * log(2)`.
 #'
@@ -44,7 +46,7 @@
 #' data <- data.frame(t, x)
 #'
 #' model <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
-#' model
+#' summary(model)
 #'
 #' y <- predict(model, data)
 #'
@@ -175,9 +177,9 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #' ## Fixing parameters
 #'
 #' Any parameter may be held constant by writing a value in place of its
-#'   name in the formula, e.g. `x ~ SSmonoexponential(t, A = 0, B, tau)` fixes the
-#'   baseline at `A = 0`. Fixed parameters are excluded from estimation and
-#'   are not returned by [stats::coef()].
+#'   name in the formula, e.g. `x ~ SSmonoexponential(t, A = 0, B, tau)` fixes
+#'   the baseline at `A = 0`. Fixed parameters are excluded from estimation
+#'   and are not returned by [stats::coef()].
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -195,15 +197,15 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #'
 #' ## 4-parameter fit
 #' model4 <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
-#' model4
+#' summary(model4)
 #'
 #' ## 3-parameter fit on the same data
 #' model3 <- nls(x ~ SSmonoexponential(t, A, B, tau), data = data)
-#' model3
+#' summary(model3)
 #'
 #' ## fix the baseline A at a known value
 #' model_fixed <- nls(x ~ SSmonoexponential(t, A = 10, B, tau, TD), data = data)
-#' coef(model_fixed)
+#' summary(model_fixed)
 #'
 #' y4 <- predict(model4, data)
 #' y3 <- predict(model3, data)
@@ -305,9 +307,7 @@ analyse_monoexponential <- function(
     ## every channel fits the 4-parameter model
     use_TD_all <- all(vapply(per_channel, \(.a) .a$use_TD, logical(1)))
     fix <- validate_fix(
-        fix,
-        c("A", "B", "tau", if (use_TD_all) "TD"),
-        env = env
+        fix, c("A", "B", "tau", if (use_TD_all) "TD"), env = env
     )
 
     ## NA scaffold (method columns only) for convergence failure

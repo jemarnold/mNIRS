@@ -15,15 +15,15 @@ variable.}
 \item{B}{A numeric parameter for the ending asymptote of the response
 variable.}
 
-\item{xmid}{A numeric parameter for the \code{t} value at the inflection
+\item{xmid}{A numeric parameter for the time value at the inflection
 (steepest) point of the curve, in units of the predictor variable \code{t}.}
 
 \item{slope}{A numeric parameter for the slope \code{dx/dt} of the response
-variable at the inflection point \code{xmid}.}
+variable at the inflection \code{xmid}.}
 
 \item{asym}{A numeric parameter for the asymmetry index of the curve,
-equal to the fraction of the response where the inflection point \code{xmid}
-occurs, bounded in \code{c(0, 1)} for \code{(y(xmid) - A) / (B - A)}. \code{asym = 0.5}
+equal to the fraction of the response where the inflection \code{xmid} occurs,
+bounded in \code{c(0, 1)} for \code{(y(xmid) - A) / (B - A)}. \code{asym = 0.5}
 is symmetric and equivalent to the 4-parameter form. If \code{NULL}
 (\emph{default}), a symmetric 4-parameter model is used.}
 }
@@ -45,12 +45,12 @@ symmetric form (A, B, xmid, slope) and the 5-parameter asymmetric form
 
 The 4-parameter form is used by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when
 \code{method = "sigmoidal"} and \code{shape = "symmetric"}. The 5-parameter
-asymmetric form is retained as an advanced escape hatch for direct
-\code{\link[stats:nls]{stats::nls()}} use only; \code{analyse_kinetics()} instead dispatches to
-\code{\link[=SSgompertz]{SSgompertz()}} / \code{\link[=SSgompertz_left]{SSgompertz_left()}} for asymmetric shapes,
-which are more numerically stable on noisy real-world data.
+asymmetric form is retained for advanced/experimental use only.
 \code{\link[stats:nls]{stats::nls()}} reads the free parameters from the formula right-hand
 side, so omitting \code{asym} incurs no degrees-of-freedom penalty.
+
+\code{analyse_kinetics()} instead dispatches to \code{\link[=SSgompertz]{SSgompertz()}} /
+\code{\link[=SSgompertz_left]{SSgompertz_left()}} for asymmetric shapes, which are more stable.
 \subsection{Fixing parameters}{
 
 Any parameter may be held constant by writing a value in place of its
@@ -67,16 +67,20 @@ x <- logistic(t, A = 10, B = 100, xmid = 30, slope = 4, asym = 0.3) +
     rnorm(length(t), 0, 2)
 data <- data.frame(t, x)
 
-## 5-parameter fit
-model5 <- nls(x ~ SSlogistic(t, A, B, xmid, slope, asym), data = data)
-model5
-
-## 4-parameter fit on the same data
+## 4-parameter fit
 model4 <- nls(x ~ SSlogistic(t, A, B, xmid, slope), data = data)
-model4
+summary(model4)
 
-y5 <- predict(model5, data)
+## 5-parameter fit on the same data
+model5 <- nls(x ~ SSlogistic(t, A, B, xmid, slope, asym), data = data)
+summary(model5)
+
+## fix the baseline A at a known value
+model_fixed <- nls(x ~ SSlogistic(t, A = 10, B, xmid, slope), data = data)
+summary(model_fixed)
+
 y4 <- predict(model4, data)
+y5 <- predict(model5, data)
 
 \donttest{
     if (requireNamespace("ggplot2", quietly = TRUE)) {

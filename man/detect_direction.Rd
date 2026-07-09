@@ -22,7 +22,7 @@ direction when the net slope of \code{x} is zero or \code{NA}. The absolute
 maximum and minimum of \code{fallback} are compared; if \code{abs(max) >= abs(min)},
 \code{"positive"} is returned.}
 
-\item{direction}{A character string specifying the kinetics direction to
+\item{direction}{A character string specifying the response direction to
 detect when \code{"auto"} (\emph{default}). When \code{"positive"} or \code{"negative"}
 returns unchanged.}
 }

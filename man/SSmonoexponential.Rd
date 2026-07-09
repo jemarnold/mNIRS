@@ -9,11 +9,11 @@ SSmonoexponential(t, A, B, tau, TD)
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
 
-\item{A}{A numeric parameter for the starting (baseline) value of the
-response variable.}
+\item{A}{A numeric parameter for the starting baseline of the response
+variable.}
 
-\item{B}{A numeric parameter for the ending (asymptote) value of the
-response variable.}
+\item{B}{A numeric parameter for the ending asymptote of the response
+variable.}
 
 \item{tau}{A numeric parameter for the time constant \code{tau} (\eqn{\tau})
 of the exponential curve, in units of the predictor variable \code{t}.}
@@ -44,9 +44,9 @@ reads the free parameters from the formula right-hand side, so omitting
 \subsection{Fixing parameters}{
 
 Any parameter may be held constant by writing a value in place of its
-name in the formula, e.g. \code{x ~ SSmonoexponential(t, A = 0, B, tau)} fixes the
-baseline at \code{A = 0}. Fixed parameters are excluded from estimation and
-are not returned by \code{\link[stats:coef]{stats::coef()}}.
+name in the formula, e.g. \code{x ~ SSmonoexponential(t, A = 0, B, tau)} fixes
+the baseline at \code{A = 0}. Fixed parameters are excluded from estimation
+and are not returned by \code{\link[stats:coef]{stats::coef()}}.
 }
 }
 \examples{
@@ -59,15 +59,15 @@ data <- data.frame(t, x)
 
 ## 4-parameter fit
 model4 <- nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = data)
-model4
+summary(model4)
 
 ## 3-parameter fit on the same data
 model3 <- nls(x ~ SSmonoexponential(t, A, B, tau), data = data)
-model3
+summary(model3)
 
 ## fix the baseline A at a known value
 model_fixed <- nls(x ~ SSmonoexponential(t, A = 10, B, tau, TD), data = data)
-coef(model_fixed)
+summary(model_fixed)
 
 y4 <- predict(model4, data)
 y3 <- predict(model3, data)

@@ -200,6 +200,8 @@ test_that("filter_moving_average with insufficient width returns NA with warning
 
 ## filter_butterworth() =========================================
 test_that("filter_butterworth validates inputs correctly", {
+    skip_if_not_installed("signal")
+    
     expect_error(
         filter_butterworth(x = "not_numeric", order = 1, W = 0.1),
         "x.*numeric"
@@ -237,6 +239,8 @@ test_that("filter_butterworth validates inputs correctly", {
 })
 
 test_that("filter_butterworth returns correct output structure", {
+    skip_if_not_installed("signal")
+
     x <- rnorm(100)
     result <- filter_butterworth(x, order = 2, W = 0.1)
 
@@ -246,6 +250,8 @@ test_that("filter_butterworth returns correct output structure", {
 })
 
 test_that("filter_butterworth handles different edge options", {
+    skip_if_not_installed("signal")
+
     set.seed(42)
     x <- sin(2 * pi * 1:50 / 10) + rnorm(50, 0, 0.5)
 
@@ -264,6 +270,8 @@ test_that("filter_butterworth handles different edge options", {
 })
 
 test_that("filter_butterworth handles NA values", {
+    skip_if_not_installed("signal")
+
     x_with_na <- c(1:5, NA, 7:10)
 
     # NA propagates through filtering
@@ -289,6 +297,8 @@ test_that("filter_butterworth handles NA values", {
 })
 
 test_that("filter_butterworth handles different filter types", {
+    skip_if_not_installed("signal")
+
     set.seed(123)
     x <- rnorm(100)
 
@@ -314,6 +324,8 @@ test_that("filter_butterworth handles different filter types", {
 })
 
 test_that("filter_butterworth handles edge cases", {
+    skip_if_not_installed("signal")
+
     # Very short vector
     x_short <- c(1, 2, 3)
     result <- filter_butterworth(x_short, order = 1, W = 0.5)
@@ -331,6 +343,8 @@ test_that("filter_butterworth handles edge cases", {
 })
 
 test_that("filter_butterworth smooths noisy signal", {
+    skip_if_not_installed("signal")
+
     set.seed(999)
     sin_wave <- sin(2 * pi * 1:100 / 20)
     x <- seq_along(sin_wave)
@@ -358,6 +372,8 @@ test_that("filter_butterworth works visually", {
 
 
 test_that("filter_butter() is deprecated and delegates to filter_butterworth()", {
+    skip_if_not_installed("signal")
+
     x <- sin(2 * pi * seq_len(50) / 20)
 
     lifecycle::expect_deprecated(
@@ -540,6 +556,8 @@ test_that("smooth_spline validates spar parameter", {
 
 ## Butterworth tests ==============================================
 test_that("butterworth low-pass filter works", {
+    skip_if_not_installed("signal")
+
     result <- filter_mnirs(
         moxy_data,
         method = "butterworth",
@@ -558,7 +576,9 @@ test_that("butterworth low-pass filter works", {
 })
 
 test_that("butterworth accepts fc instead of W", {
-    sr <- attr(moxy_data, "sample_rate")
+    skip_if_not_installed("signal")
+
+    sample_rate <- attr(moxy_data, "sample_rate")
 
     result_W <- filter_mnirs(
         moxy_data,
@@ -574,7 +594,7 @@ test_that("butterworth accepts fc instead of W", {
         method = "butterworth",
         type = "low",
         order = 2,
-        fc = 0.1 * sr * 0.5,
+        fc = 0.1 * sample_rate * 0.5,
         verbose = FALSE
     )
 
@@ -582,6 +602,8 @@ test_that("butterworth accepts fc instead of W", {
 })
 
 test_that("butterworth prefers W when both W and fc specified", {
+    skip_if_not_installed("signal")
+
     expect_message(
         filter_mnirs(
             moxy_data,
@@ -679,6 +701,8 @@ test_that("butterworth handles different filter types", {
 })
 
 test_that("butterworth validates W length for stop/pass filters", {
+    skip_if_not_installed("signal")
+
     expect_error(
         filter_mnirs(
             moxy_data,
@@ -705,6 +729,8 @@ test_that("butterworth validates W length for stop/pass filters", {
 })
 
 test_that("butterworth handles NAs with na.rm = TRUE", {
+    skip_if_not_installed("signal")
+
     moxy_data <- read_mnirs(
         file_path = example_mnirs("moxy_ramp.xlsx"),
         nirs_channels = c(smo2_left = "SmO2 Live", smo2_right = "SmO2 Live(2)"),
@@ -836,6 +862,8 @@ test_that("filter_mnirs preserves and updates metadata", {
 })
 
 test_that("butterworth updates sample_rate in metadata", {
+    skip_if_not_installed("signal")
+
     result <- filter_mnirs(
         moxy_data,
         method = "butterworth",
@@ -852,6 +880,8 @@ test_that("butterworth updates sample_rate in metadata", {
 
 ## verbose output tests ==============================================
 test_that("verbose output works", {
+    skip_if_not_installed("signal")
+
     expect_message(
         filter_mnirs(moxy_data, method = "smooth_spline", verbose = TRUE),
         "spar ="
@@ -899,6 +929,8 @@ test_that("filter_mnirs works with pipe", {
 })
 
 test_that("multiple filtering operations can be chained", {
+    skip_if_not_installed("signal")
+
     result <- moxy_data |>
         filter_mnirs(
             method = "butterworth",

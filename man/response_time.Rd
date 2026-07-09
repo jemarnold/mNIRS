@@ -28,8 +28,8 @@ baseline window. Defaults to \code{0}.}
 fractional response amplitude to detect. Defaults to \code{0.5} (50\% response,
 i.e. half-response time).}
 
-\item{direction}{A character string specifying the response direction to
-detect -- \code{"auto"} (\emph{default}), \code{"positive"}, or \code{"negative"}. See
+\item{direction}{A character string specifying the response direction
+\code{"positive"}, or \code{"negative"}, or detect with \code{"auto"} (\emph{default}). See
 \emph{Details}.}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})

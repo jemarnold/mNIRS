@@ -38,7 +38,7 @@ warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{interval_name}{Character; the interval name recorded in the \code{interval}
-column of the returned coefficients.}
+column of the returned coefficients, \code{diagnostics}, and \code{channel_args}.}
 
 \item{extra_args}{Named list of additional arguments recorded in the
 \code{channel_args} result attribute.}

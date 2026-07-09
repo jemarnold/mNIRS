@@ -19,7 +19,6 @@ A named list with: \code{coefficients}, \code{model}, \code{data},
 Shared helper for \verb{analyse_kinetics.*} methods. Takes a list of
 per-interval (per-data frame) kinetics results data frames (each carrying
 \code{"fitted_data"}, \code{"channel_args"}, and \code{"diagnostics"} attributes) and the
-original \code{data_list}. Interval names are read from the \code{interval} column
-that each result data frame already carries.
+original \code{data_list}. Interval names are taken from \code{names(data_list)}.
 }
 \keyword{internal}
