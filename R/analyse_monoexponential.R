@@ -249,8 +249,8 @@ SSmonoexponential <- selfStart(
 #' @inheritParams analyse_kinetics
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
-#'   `nirs_channels`, `A`, `B`, `tau`, `k`, `TD`, `MRT`, `HRT`, `tau_fitted`,
-#'   `MRT_fitted`, `HRT_fitted`. Per-channel metadata are attached as
+#'   `nirs_channels`, `A`, `B`, `tau`, `k`, `TD`, `MRT`, `HRT`, `MRT_fitted`,
+#'   `HRT_fitted`. Per-channel metadata are attached as
 #'   attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
 #'     where fitting failed.
@@ -319,7 +319,6 @@ analyse_monoexponential <- function(
         TD = NA_real_,
         MRT = NA_real_,
         HRT = NA_real_,
-        tau_fitted = NA_real_,
         MRT_fitted = NA_real_,
         HRT_fitted = NA_real_
     )
@@ -415,9 +414,10 @@ analyse_monoexponential <- function(
         MRT_val <- sum(TD_arg, coefs[["tau"]])
         HRT_val <- sum(TD_arg, coefs[["tau"]] * log(2))
 
-        ## predict response at tau, MRT, and HRT using the fitted model
+        ## predict response at tau, MRT, and HRT using the fitted model;
+        ## tau shifted by TD_arg so all time points share the reported frame
         fitted_params <- monoexponential(
-            t = c(coefs[["tau"]], MRT_val, HRT_val),
+            t = c(MRT_val, HRT_val),
             A = coefs[["A"]],
             B = coefs[["B"]],
             tau = coefs[["tau"]],
@@ -433,9 +433,8 @@ analyse_monoexponential <- function(
                 TD         = TD_val,
                 MRT        = MRT_val,
                 HRT        = HRT_val,
-                tau_fitted = fitted_params[[1L]],
-                MRT_fitted = fitted_params[[2L]],
-                HRT_fitted = fitted_params[[3L]]
+                MRT_fitted = fitted_params[[1L]],
+                HRT_fitted = fitted_params[[2L]],
             ),
             model = model,
             fitted_data = data.frame(

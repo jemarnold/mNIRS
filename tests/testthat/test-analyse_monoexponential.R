@@ -338,7 +338,7 @@ test_that("analyse_monoexponential() returns correct structure", {
     expect_named(result, c(
         "interval", "nirs_channels", "time_channel",
         "A", "B", "tau", "k", "TD", "MRT", "HRT",
-        "tau_fitted", "MRT_fitted", "HRT_fitted"
+        "MRT_fitted", "HRT_fitted"
     ))
     expect_equal(nrow(result), 1L)
 

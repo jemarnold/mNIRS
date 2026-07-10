@@ -367,7 +367,7 @@ analyse_kinetics(data, nirs_channels = c(hhb, smo2), method = "peak_slope",
 |---|---|
 | `"response_time"` | `A` baseline mean, `B` extreme, `response_time` (elapsed from `start_time`), `response_value` (observed at response), `fitted` (target `A + (B-A)*fraction`), `idx` (response row) |
 | `"peak_slope"` | `slope` (units `x/t`), `intercept`, `fitted` (predicted value at peak), `peak_slope_time` (elapsed from `start_time`), `idx` (window-centre row) |
-| `"monoexponential"` | `A` baseline, `B` asymptote, `tau` time constant, `k` rate constant (`1/tau`), `TD` time delay, `MRT` mean response time (`TD+tau`), `HRT` half-response time (`TD+tau·ln2`), `tau_fitted`/`MRT_fitted`/`HRT_fitted` (predicted value at each) |
+| `"monoexponential"` | `A` baseline, `B` asymptote, `tau` time constant, `k` rate constant (`1/tau`), `TD` time delay, `MRT` mean response time (`TD+tau`), `HRT` half-response time (`TD+tau·ln2`), `MRT_fitted`/`HRT_fitted` (predicted value at each) |
 | `"sigmoidal"` | `A` start asymptote, `B` end asymptote, `xmid` inflection time, `slope` (`dx/dt` at `xmid`), `xmid_fitted` (predicted value at `xmid`) |
 
 **Diagnostics:** `n_obs`, `r2`, `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, `bic`.
