@@ -5,6 +5,7 @@
 \alias{analyse_kinetics.response_time}
 \alias{analyse_kinetics.peak_slope}
 \alias{analyse_kinetics.monoexponential}
+\alias{analyse_kinetics.biexponential}
 \alias{analyse_kinetics.sigmoidal}
 \alias{analyze_kinetics}
 \title{Analyse kinetics across mNIRS channels and intervals}
@@ -13,7 +14,8 @@ analyse_kinetics(
   data,
   nirs_channels = NULL,
   time_channel = NULL,
-  method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
+  method = c("response_time", "peak_slope", "monoexponential", "biexponential",
+    "sigmoidal"),
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -34,7 +36,8 @@ analyze_kinetics(
   data,
   nirs_channels = NULL,
   time_channel = NULL,
-  method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
+  method = c("response_time", "peak_slope", "monoexponential", "biexponential",
+    "sigmoidal"),
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -71,6 +74,8 @@ arguments: \code{width} or \code{span}, \code{align}, \code{partial}, \code{na.r
 \item{\code{"monoexponential"}}{Monoexponential curve fit via
 \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_TD}. See
 \code{\link[=monoexponential]{monoexponential()}}.}
+\item{\code{"biexponential"}}{Biexponential (fast + slow component) curve
+fit via \code{\link[stats:nls]{stats::nls()}}. See \code{\link[=biexponential]{biexponential()}}.}
 \item{\code{"sigmoidal"}}{Logistic or Gompertz-family curve fit via
 \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{shape}. See \code{\link[=logistic]{logistic()}}.}
 }}
@@ -134,8 +139,8 @@ to fit. One of \code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic
 \code{"gompertz"} (early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or
 \code{"gompertz_left"} (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
 
-\item{fix}{\strong{monoexponential, sigmoidal}: An \emph{optional} named list of
-model parameters to hold constant during fitting, e.g.
+\item{fix}{\strong{monoexponential, biexponential, sigmoidal}: An \emph{optional}
+named list of model parameters to hold constant during fitting, e.g.
 \code{fix = list(A = 0)} fixes the starting amplitude at \code{0}. Fixed
 parameters are excluded from estimation and reported at their fixed
 values. Applied globally across \code{nirs_channels}. See \emph{Details}.}
@@ -292,6 +297,31 @@ reduces the function to a lower-parameter model. \code{TD} can only be fixed whe
 specify \code{use_TD = FALSE} rather than fix \code{TD = 0}.
 }
 
+\subsection{method = "biexponential"}{
+
+Aliases: \code{method = c("biexp", "double exponential")}.
+
+A parametric approach fitting a self-starting 5-parameter biexponential
+function to the response curve using \code{\link[stats:nls]{stats::nls()}} with
+\code{\link[=SSbiexponential]{SSbiexponential()}}. The response shares one overall amplitude \code{B - A}
+split between a \emph{fast} (\code{tau1}) and a \emph{slow} (\code{tau2}) exponential
+component.
+
+Model equation:
+
+\code{A + (B - A) * (prop * (1 - exp(-t / tau1)) + (1 - prop) * (1 - exp(-t / tau2)))}
+
+\code{tau1} and \code{tau2} are the fast and slow \emph{time constants}; \code{prop} is the
+\emph{amplitude fraction} carried by the fast component (the slow component
+carries \code{1 - prop}). The exchangeable time constants are ordered
+\code{tau1 <= tau2} for a reproducible parameterisation. The amplitude-weighted
+\emph{mean response time} is \code{MRT = prop * tau1 + (1 - prop) * tau2}. See
+\code{\link[=biexponential]{biexponential()}} for the model family and \code{\link[=SSbiexponential]{SSbiexponential()}} for
+self-start initialisation.
+
+Any parameter may be held constant with \code{fix}, e.g. \code{fix = list(A = 0)}.
+}
+
 \subsection{method = "sigmoidal"}{
 
 Aliases: \code{method = c("logistic", "gompertz", "xmid")}.
@@ -368,5 +398,6 @@ plot(result)
 }
 \seealso{
 \code{\link[=extract_intervals]{extract_intervals()}}, \code{\link[=response_time]{response_time()}}, \code{\link[=peak_slope]{peak_slope()}},
-\code{\link[=monoexponential]{monoexponential()}}, \code{\link[=logistic]{logistic()}}, \code{\link[=gompertz]{gompertz()}}, \code{\link[=gompertz_left]{gompertz_left()}}
+\code{\link[=monoexponential]{monoexponential()}}, \code{\link[=biexponential]{biexponential()}}, \code{\link[=logistic]{logistic()}}, \code{\link[=gompertz]{gompertz()}},
+\code{\link[=gompertz_left]{gompertz_left()}}
 }

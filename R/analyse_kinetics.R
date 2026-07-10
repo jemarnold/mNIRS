@@ -19,6 +19,8 @@
 #'      \item{`"monoexponential"`}{Monoexponential curve fit via
 #'      [stats::nls()]. Additional arguments: `use_TD`. See
 #'      [monoexponential()].}
+#'      \item{`"biexponential"`}{Biexponential (fast + slow component) curve
+#'      fit via [stats::nls()]. See [biexponential()].}
 #'      \item{`"sigmoidal"`}{Logistic or Gompertz-family curve fit via
 #'      [stats::nls()]. Additional arguments: `shape`. See [logistic()].}
 #'   }
@@ -62,8 +64,8 @@
 #'   to fit. One of `"symmetric"` (*default*; calls [SSlogistic()]),
 #'   `"gompertz"` (early-inflection; calls [SSgompertz()]), or
 #'   `"gompertz_left"` (late-inflection; calls [SSgompertz_left()]).
-#' @param fix **monoexponential, sigmoidal**: An *optional* named list of
-#'   model parameters to hold constant during fitting, e.g.
+#' @param fix **monoexponential, biexponential, sigmoidal**: An *optional*
+#'   named list of model parameters to hold constant during fitting, e.g.
 #'   `fix = list(A = 0)` fixes the starting amplitude at `0`. Fixed
 #'   parameters are excluded from estimation and reported at their fixed
 #'   values. Applied globally across `nirs_channels`. See *Details*.
@@ -179,6 +181,31 @@
 #' `use_TD = TRUE` and disables the 3-parameter fallback. It is recommended to
 #' specify `use_TD = FALSE` rather than fix `TD = 0`.
 #'
+#' ## method = "biexponential"
+#'
+#' Aliases: `method = c("biexp", "double exponential")`.
+#'
+#' A parametric approach fitting a self-starting 5-parameter biexponential
+#' function to the response curve using [stats::nls()] with
+#' [SSbiexponential()]. The response shares one overall amplitude `B - A`
+#' split between a *fast* (`tau1`) and a *slow* (`tau2`) exponential
+#' component.
+#'
+#' Model equation:
+#'
+#' `A + (B - A) * (prop * (1 - exp(-t / tau1)) +
+#'   (1 - prop) * (1 - exp(-t / tau2)))`
+#'
+#' `tau1` and `tau2` are the fast and slow *time constants*; `prop` is the
+#' *amplitude fraction* carried by the fast component (the slow component
+#' carries `1 - prop`). The exchangeable time constants are ordered
+#' `tau1 <= tau2` for a reproducible parameterisation. The amplitude-weighted
+#' *mean response time* is `MRT = prop * tau1 + (1 - prop) * tau2`. See
+#' [biexponential()] for the model family and [SSbiexponential()] for
+#' self-start initialisation.
+#'
+#' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`.
+#'
 #' ## method = "sigmoidal"
 #'
 #' Aliases: `method = c("logistic", "gompertz", "xmid")`.
@@ -240,7 +267,8 @@
 #'   \item{`call`}{The matched call.}
 #'
 #' @seealso [extract_intervals()], [response_time()], [peak_slope()],
-#'   [monoexponential()], [logistic()], [gompertz()], [gompertz_left()]
+#'   [monoexponential()], [biexponential()], [logistic()], [gompertz()],
+#'   [gompertz_left()]
 #'
 #' @examples
 #' result <- read_mnirs(
@@ -286,7 +314,10 @@ analyse_kinetics <- function(
     data,
     nirs_channels = NULL,
     time_channel = NULL,
-    method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
+    method = c(
+        "response_time", "peak_slope", "monoexponential", "biexponential",
+        "sigmoidal"
+    ),
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
@@ -426,6 +457,41 @@ analyse_kinetics.monoexponential <- function(
 #' @rdname analyse_kinetics
 #' @usage NULL
 #' @export
+analyse_kinetics.biexponential <- function(
+    data,
+    nirs_channels = NULL,
+    time_channel = NULL,
+    method,
+    start_time = NULL,
+    direction = c("auto", "positive", "negative"),
+    end_window = Inf,
+    verbose = TRUE,
+    ...,
+    fix = NULL
+) {
+    ## TODO: pass additional stats::nls() args
+    ## resolve global verbose option when caller omits the argument
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
+    }
+    worker_args <- unlist(kinetics_dispatch[c("common", "biexponential")])
+    return(analyse_kinetics_intervals(
+        data        = data,
+        worker      = analyse_biexponential,
+        method      = "biexponential",
+        worker_args = mget(worker_args),
+        nirs_quo    = enquo(nirs_channels),
+        time_quo    = enquo(time_channel),
+        verbose     = verbose,
+        call        = match.call(),
+        env         = sys.call(-1)
+    ))
+}
+
+
+#' @rdname analyse_kinetics
+#' @usage NULL
+#' @export
 analyse_kinetics.sigmoidal <- function(
     data,
     nirs_channels = NULL,
@@ -465,7 +531,10 @@ analyze_kinetics <- function(
     data,
     nirs_channels = NULL,
     time_channel = NULL,
-    method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
+    method = c(
+        "response_time", "peak_slope", "monoexponential", "biexponential",
+        "sigmoidal"
+    ),
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,

@@ -14,6 +14,9 @@ method_aliases <- c(
     exponential = "monoexponential",
     mrt = "monoexponential",
     tau = "monoexponential",
+    biexponential = "biexponential",
+    biexp = "biexponential",
+    double_exponential = "biexponential",
     logistic = "sigmoidal",
     gompertz = "sigmoidal",
     xmid = "sigmoidal"
@@ -381,6 +384,7 @@ kinetics_dispatch <- list(
     response_time = c("fraction"),
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
     monoexponential = c("use_TD", "fix"),
+    biexponential = c("fix"),
     sigmoidal = c("shape", "fix")
 )
 
@@ -556,7 +560,7 @@ analyse_kinetics_channels <- function(
     ## warn when time coefficients are negative (response before start_time)
     if (verbose) {
         check_cols <- intersect(
-            c("TD", "tau", "response_time", "peak_slope_time"),
+            c("TD", "tau", "tau1", "tau2", "response_time", "peak_slope_time"),
             names(result)
         )
 

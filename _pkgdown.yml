@@ -65,6 +65,7 @@ reference:
   - matches("response_time")
   - matches("slope")
   - matches("monoexp")
+  - matches("biexp")
   - matches("sigmoidal")
   - matches("logistic")
   - matches("gompertz")
