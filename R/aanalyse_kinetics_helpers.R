@@ -384,7 +384,7 @@ kinetics_dispatch <- list(
     response_time = c("fraction"),
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
     monoexponential = c("use_TD", "fix"),
-    biexponential = c("fix"),
+    biexponential = c("use_TD", "fix"),
     sigmoidal = c("shape", "fix")
 )
 

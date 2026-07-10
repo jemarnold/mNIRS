@@ -8,6 +8,7 @@ analyse_biexponential(
   data,
   nirs_channels = NULL,
   time_channel = NULL,
+  use_TD = TRUE,
   fix = NULL,
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
@@ -35,11 +36,18 @@ Must match a column name in \code{data} exactly.
 used.
 }}
 
-\item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B}, \code{tau1},
-\code{tau2}, \code{prop}) to hold constant during fitting, e.g.
+\item{use_TD}{Logical; default is \code{TRUE} to attempt to fit a
+6-parameter \code{\link[=SSbiexponential]{SSbiexponential()}} model (A, B1, tau1, B2, tau2, TD) with a
+time delay. If the 6-parameter fit fails, or if \code{use_TD = FALSE}, attempts
+to fit a reduced 5-parameter \code{\link[=SSbiexponential]{SSbiexponential()}} model
+(A, B1, tau1, B2, tau2).}
+
+\item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B1}, \code{tau1},
+\code{B2}, \code{tau2}, \code{TD}) to hold constant during fitting, e.g.
 \code{fix = list(A = 0)}. Fixed parameters are excluded from estimation
 and reported at their fixed values. Applied globally across
-\code{nirs_channels}.}
+\code{nirs_channels}. \code{TD} is fixable only when \code{use_TD = TRUE} for all
+channels; a fixed \code{TD} disables the 5-parameter fallback.}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
 time of response onset (effectively time = \code{0} of the response). If \code{NULL}
@@ -68,8 +76,8 @@ than the validator.}
 }
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns
-\code{nirs_channels}, \code{A}, \code{B}, \code{tau1}, \code{tau2}, \code{prop}, \code{MRT}, \code{tau1_fitted},
-\code{tau2_fitted}, \code{MRT_fitted}. Per-channel metadata are attached as
+\code{nirs_channels}, \code{A}, \code{B1}, \code{tau1}, \code{B2}, \code{tau2}, \code{TD}, \code{plateau},
+\code{nadir_time}, \code{nadir_value}. Per-channel metadata are attached as
 attributes:
 \itemize{
 \item \code{"model"}: an \link[stats:nls]{nls} model object, or \code{NULL} for channels
@@ -84,8 +92,8 @@ recording the resolved arguments used.
 }
 \description{
 Internal channel-level dispatch for
-\code{analyse_kinetics(method = "biexponential")}. Fits a 5-parameter
-biexponential curve to each \code{nirs_channel} within a single \emph{"mnirs"} data
+\code{analyse_kinetics(method = "biexponential")}. Fits a biexponential
+nadir-recovery curve to each \code{nirs_channel} within a single \emph{"mnirs"} data
 frame. See \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing documentation.
 }
 \seealso{

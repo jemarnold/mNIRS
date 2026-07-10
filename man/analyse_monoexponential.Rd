@@ -75,8 +75,8 @@ than the validator.}
 }
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns
-\code{nirs_channels}, \code{A}, \code{B}, \code{tau}, \code{k}, \code{TD}, \code{MRT}, \code{HRT}, \code{tau_fitted},
-\code{MRT_fitted}, \code{HRT_fitted}. Per-channel metadata are attached as
+\code{nirs_channels}, \code{A}, \code{B}, \code{tau}, \code{k}, \code{TD}, \code{MRT}, \code{HRT}, \code{MRT_fitted},
+\code{HRT_fitted}. Per-channel metadata are attached as
 attributes:
 \itemize{
 \item \code{"model"}: an \link[stats:nls]{nls} model object, or \code{NULL} for channels

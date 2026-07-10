@@ -55,11 +55,12 @@
 #'   any `NA`s to the returned vector. If `TRUE`, ignores `NA`s and
 #'   processes available valid samples within the local window. May
 #'   return errors or warnings. (see *Details*).
-#' @param use_TD **monoexponential**: Logical; default is `TRUE`
-#'   to attempt to fit a 4-parameter [SSmonoexponential()] model (A, B, tau,
-#'   TD) with a time delay. If the 4-parameter fit fails, or if
-#'   `use_TD = FALSE`, attempts to fit a reduced 3-parameter
-#'   [SSmonoexponential()] model (A, B, tau).
+#' @param use_TD **monoexponential, biexponential**: Logical; default is
+#'   `TRUE` to attempt to fit a model with a time-delay parameter `TD`. For
+#'   **monoexponential** this is the 4-parameter [SSmonoexponential()] model
+#'   (A, B, tau, TD); for **biexponential** the 6-parameter
+#'   [SSbiexponential()] model (A, B1, tau1, B2, tau2, TD). If the fit fails,
+#'   or if `use_TD = FALSE`, attempts the reduced model without `TD`.
 #' @param shape **sigmoidal**: Character; the 4-parameter sigmoidal shape
 #'   to fit. One of `"symmetric"` (*default*; calls [SSlogistic()]),
 #'   `"gompertz"` (early-inflection; calls [SSgompertz()]), or
@@ -185,24 +186,22 @@
 #'
 #' Aliases: `method = c("biexp", "double exponential")`.
 #'
-#' A parametric approach fitting a self-starting 5-parameter biexponential
+#' A parametric approach fitting a self-starting biexponential nadir-recovery
 #' function to the response curve using [stats::nls()] with
-#' [SSbiexponential()]. The response shares one overall amplitude `B - A`
-#' split between a *fast* (`tau1`) and a *slow* (`tau2`) exponential
-#' component.
+#' [SSbiexponential()]. A *fast* component (`B1`, `tau1`) drives the initial
+#' drop to a rounded nadir; a *slow* component (`B2`, `tau2`) recovers toward
+#' a stable plateau.
 #'
 #' Model equation:
 #'
-#' `A + (B - A) * (prop * (1 - exp(-t / tau1)) +
-#'   (1 - prop) * (1 - exp(-t / tau2)))`
+#' `A - B1 * (1 - exp(-t / tau1)) + B2 * (1 - exp(-t / tau2))`
 #'
-#' `tau1` and `tau2` are the fast and slow *time constants*; `prop` is the
-#' *amplitude fraction* carried by the fast component (the slow component
-#' carries `1 - prop`). The exchangeable time constants are ordered
-#' `tau1 <= tau2` for a reproducible parameterisation. The amplitude-weighted
-#' *mean response time* is `MRT = prop * tau1 + (1 - prop) * tau2`. See
-#' [biexponential()] for the model family and [SSbiexponential()] for
-#' self-start initialisation.
+#' `A` is the starting value, `B1`/`tau1` the fast drop amplitude and time
+#' constant, and `B2`/`tau2` the slow recovery amplitude and time constant
+#' (typically `tau2 >> tau1`). The response *plateau* as `t` approaches
+#' infinity is `A - B1 + B2`. Set `use_TD = TRUE` (*default*) to add an
+#' optional time-delay parameter `TD`. See [biexponential()] for the model
+#' family and [SSbiexponential()] for self-start initialisation.
 #'
 #' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`.
 #'
@@ -462,6 +461,7 @@ analyse_kinetics.biexponential <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     method,
+    use_TD = TRUE,
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,

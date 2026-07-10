@@ -434,7 +434,7 @@ analyse_monoexponential <- function(
                 MRT        = MRT_val,
                 HRT        = HRT_val,
                 MRT_fitted = fitted_params[[1L]],
-                HRT_fitted = fitted_params[[2L]],
+                HRT_fitted = fitted_params[[2L]]
             ),
             model = model,
             fitted_data = data.frame(

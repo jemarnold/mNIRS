@@ -4,26 +4,29 @@
 \alias{SSbiexponential}
 \title{Self-starting biexponential model}
 \usage{
-SSbiexponential(t, A, B, tau1, tau2, prop)
+SSbiexponential(t, A, B1, tau1, B2, tau2, TD)
 }
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
 
-\item{A}{A numeric parameter for the starting baseline of the response
-variable.}
+\item{A}{A numeric parameter for the starting value of the response
+variable (the \code{t = 0} intercept).}
 
-\item{B}{A numeric parameter for the ending asymptote of the response
-variable.}
+\item{B1}{A numeric parameter for the amplitude of the \emph{fast} component;
+the depth of the initial drop to the nadir.}
 
 \item{tau1}{A numeric parameter for the \emph{fast} time constant (\eqn{\tau_1}),
-in units of the predictor variable \code{t}.}
+in units of the predictor variable \code{t}. Dominates the initial steep fall.}
+
+\item{B2}{A numeric parameter for the amplitude of the \emph{slow} component;
+the size of the recovery from the nadir toward the plateau.}
 
 \item{tau2}{A numeric parameter for the \emph{slow} time constant (\eqn{\tau_2}),
-in units of the predictor variable \code{t}. By convention \code{tau1 <= tau2}.}
+in units of the predictor variable \code{t}. Typically \verb{tau2 >> tau1}.}
 
-\item{prop}{A numeric parameter in \verb{[0, 1]} for the \emph{amplitude fraction}
-carried by the fast component \code{tau1}; the slow component \code{tau2} carries
-the remaining \code{1 - prop}.}
+\item{TD}{A numeric parameter for the time delay before the onset of the
+response, in units of the predictor variable \code{t}. If \code{NULL} (\emph{default}),
+a 5-parameter model without time delay is used.}
 }
 \value{
 A numeric vector of predicted values the same length as the
@@ -31,36 +34,41 @@ predictor variable \code{t}.
 }
 \description{
 Creates initial coefficient estimates for a \code{selfStart} wrapper around
-\code{\link[=biexponential]{biexponential()}}, for use with \code{\link[stats:nls]{stats::nls()}}. Fits the 5-parameter form
-(A, B, tau1, tau2, prop).
+\code{\link[=biexponential]{biexponential()}}, for use with \code{\link[stats:nls]{stats::nls()}}. Supports both the
+5-parameter form (A, B1, tau1, B2, tau2) and the 6-parameter form
+(A, B1, tau1, B2, tau2, TD); arity is inferred from the formula passed
+to \code{\link[stats:nls]{stats::nls()}}.
 }
 \details{
-Model: \code{x ~ SSbiexponential(t, A, B, tau1, tau2, prop)}
+5-parameter model: \code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2)}
 
-The fast/slow time constants \code{tau1} and \code{tau2} are exchangeable, so
-\code{\link[=analyse_kinetics]{analyse_kinetics()}} orders the fitted values \code{tau1 <= tau2} (swapping
-\code{prop} accordingly) for a reproducible parameterisation.
+6-parameter model: \code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, TD)}
+
+The 5-parameter form is recommended for small samples or when no obvious
+time delay is expected, as it converges more reliably. \code{\link[stats:nls]{stats::nls()}}
+reads the free parameters from the formula right-hand side, so omitting
+\code{TD} incurs no degrees-of-freedom penalty.
 \subsection{Fixing parameters}{
 
 Any parameter may be held constant by writing a value in place of its
-name in the formula, e.g. \code{x ~ SSbiexponential(t, A = 0, B, tau1, tau2, prop)} fixes the baseline at \code{A = 0}. Fixed parameters are excluded from
+name in the formula, e.g. \code{x ~ SSbiexponential(t, A = 0, B1, tau1, B2, tau2)} fixes the baseline at \code{A = 0}. Fixed parameters are excluded from
 estimation and are not returned by \code{\link[stats:coef]{stats::coef()}}.
 }
 }
 \examples{
-## create a biexponential curve with random noise
+## create a nadir-recovery biexponential curve with random noise
 set.seed(1)
 t <- 0:120
-x <- biexponential(t, A = 50, B = 80, tau1 = 5, tau2 = 40, prop = 0.6) +
+x <- biexponential(t, A = 70, B1 = 25, tau1 = 5, B2 = 15, tau2 = 40) +
     rnorm(length(t), 0, 0.8)
 data <- data.frame(t, x)
 
-model <- nls(x ~ SSbiexponential(t, A, B, tau1, tau2, prop), data = data)
+model <- nls(x ~ SSbiexponential(t, A, B1, tau1, B2, tau2), data = data)
 summary(model)
 
 ## fix the baseline A at a known value
 model_fixed <- nls(
-    x ~ SSbiexponential(t, A = 50, B, tau1, tau2, prop), data = data
+    x ~ SSbiexponential(t, A = 70, B1, tau1, B2, tau2), data = data
 )
 summary(model_fixed)
 

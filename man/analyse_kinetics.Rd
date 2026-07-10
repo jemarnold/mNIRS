@@ -128,11 +128,12 @@ any \code{NA}s to the returned vector. If \code{TRUE}, ignores \code{NA}s and
 processes available valid samples within the local window. May
 return errors or warnings. (see \emph{Details}).}
 
-\item{use_TD}{\strong{monoexponential}: Logical; default is \code{TRUE}
-to attempt to fit a 4-parameter \code{\link[=SSmonoexponential]{SSmonoexponential()}} model (A, B, tau,
-TD) with a time delay. If the 4-parameter fit fails, or if
-\code{use_TD = FALSE}, attempts to fit a reduced 3-parameter
-\code{\link[=SSmonoexponential]{SSmonoexponential()}} model (A, B, tau).}
+\item{use_TD}{\strong{monoexponential, biexponential}: Logical; default is
+\code{TRUE} to attempt to fit a model with a time-delay parameter \code{TD}. For
+\strong{monoexponential} this is the 4-parameter \code{\link[=SSmonoexponential]{SSmonoexponential()}} model
+(A, B, tau, TD); for \strong{biexponential} the 6-parameter
+\code{\link[=SSbiexponential]{SSbiexponential()}} model (A, B1, tau1, B2, tau2, TD). If the fit fails,
+or if \code{use_TD = FALSE}, attempts the reduced model without \code{TD}.}
 
 \item{shape}{\strong{sigmoidal}: Character; the 4-parameter sigmoidal shape
 to fit. One of \code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic]{SSlogistic()}}),
@@ -301,23 +302,22 @@ specify \code{use_TD = FALSE} rather than fix \code{TD = 0}.
 
 Aliases: \code{method = c("biexp", "double exponential")}.
 
-A parametric approach fitting a self-starting 5-parameter biexponential
+A parametric approach fitting a self-starting biexponential nadir-recovery
 function to the response curve using \code{\link[stats:nls]{stats::nls()}} with
-\code{\link[=SSbiexponential]{SSbiexponential()}}. The response shares one overall amplitude \code{B - A}
-split between a \emph{fast} (\code{tau1}) and a \emph{slow} (\code{tau2}) exponential
-component.
+\code{\link[=SSbiexponential]{SSbiexponential()}}. A \emph{fast} component (\code{B1}, \code{tau1}) drives the initial
+drop to a rounded nadir; a \emph{slow} component (\code{B2}, \code{tau2}) recovers toward
+a stable plateau.
 
 Model equation:
 
-\code{A + (B - A) * (prop * (1 - exp(-t / tau1)) + (1 - prop) * (1 - exp(-t / tau2)))}
+\code{A - B1 * (1 - exp(-t / tau1)) + B2 * (1 - exp(-t / tau2))}
 
-\code{tau1} and \code{tau2} are the fast and slow \emph{time constants}; \code{prop} is the
-\emph{amplitude fraction} carried by the fast component (the slow component
-carries \code{1 - prop}). The exchangeable time constants are ordered
-\code{tau1 <= tau2} for a reproducible parameterisation. The amplitude-weighted
-\emph{mean response time} is \code{MRT = prop * tau1 + (1 - prop) * tau2}. See
-\code{\link[=biexponential]{biexponential()}} for the model family and \code{\link[=SSbiexponential]{SSbiexponential()}} for
-self-start initialisation.
+\code{A} is the starting value, \code{B1}/\code{tau1} the fast drop amplitude and time
+constant, and \code{B2}/\code{tau2} the slow recovery amplitude and time constant
+(typically \verb{tau2 >> tau1}). The response \emph{plateau} as \code{t} approaches
+infinity is \code{A - B1 + B2}. Set \code{use_TD = TRUE} (\emph{default}) to add an
+optional time-delay parameter \code{TD}. See \code{\link[=biexponential]{biexponential()}} for the model
+family and \code{\link[=SSbiexponential]{SSbiexponential()}} for self-start initialisation.
 
 Any parameter may be held constant with \code{fix}, e.g. \code{fix = list(A = 0)}.
 }
