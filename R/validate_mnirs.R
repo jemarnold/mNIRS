@@ -132,8 +132,8 @@ validate_numeric <- function(
 
     ## subset once for range/integer checks
     needs_subset <- !is.null(range) || integer
-    if (needs_subset && !allow_na) {
-        x_valid <- if (n_valid < length(x)) x[valid] else x
+    if (needs_subset) {
+        x_valid <- x[!is.na(x)]
     }
 
     ## range check
@@ -628,15 +628,14 @@ validate_fix <- function(fix, params, env = rlang::caller_env()) {
 
 #' wrap findInterval: informative 'time_channel' error message
 #' @keywords internal
-findInt_mnirs <- function(..., env = rlang::caller_env()) {
-    withCallingHandlers(findInterval(...), error = \(e) {
+findInt_mnirs <- function(x, vec, ..., env = rlang::caller_env()) {
+    if (anyNA(vec) || is.unsorted(vec)) {
         cli_abort(c(
-            "x" = "Duplicate or irregular {.arg time_channel} samples \\
-            detected.",
-            "i" = "{.arg time_channel} must be sorted without repeating, \\
-            decreasing, or {.val {NA}}s."
+            "x" = "Irregular {.arg time_channel} samples detected.",
+            "i" = "{.arg time_channel} must be sorted without {.val {NA}}s."
         ), call = env)
-    })
+    }
+    return(findInterval(x, vec, ...))
 }
 
 

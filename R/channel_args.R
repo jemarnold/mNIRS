@@ -141,20 +141,20 @@ resolve_channel_args <- function(
 #' vectors. String shortcuts expand against `nirs_channels`: `"ensemble"`
 #' places all channels in one group (preserving relative scaling) and
 #' `"distinct"` places each channel in its own group. Custom `list()`
-#' groupings may use bare symbols or character names; channels omitted
+#' groupings may use bare symbols or character names. Groups must be
+#' non-empty and their resulting names must be unique. Channels omitted
 #' from a custom grouping are processed independently, matching
 #' `group_intervals` behaviour in [extract_intervals()].
 #'
 #' @param nirs_channels Character vector of resolved channel names.
 #' @param group_channels A quosure from `rlang::enquo()`, a character
-#'   string (`"ensemble"` or `"distinct"`), or a `list()` of channel-name
-#'   vectors. Lists may be named; unnamed groups are keyed by their first
-#'   member.
+#'   string (`"ensemble"` or `"distinct"`), or a `list()` of (optionally named) 
+#'   channel-name vectors.
 #' @param data A data frame for parsing bare-symbol group members.
 #' @param env Environment for symbol evaluation.
 #'
-#' @returns A named list of character vectors covering all
-#'   `nirs_channels`, each channel appearing in exactly one group.
+#' @returns A uniquely named list of non-empty character vectors covering
+#'   all `nirs_channels`, each channel appearing in exactly one group.
 #'
 #' @keywords internal
 validate_group_channels <- function(
@@ -196,10 +196,25 @@ validate_group_channels <- function(
         ), call = env)
     }
 
+    ## empty groups cannot produce a channel mapping or derived name
+    empty <- lengths(group_channels) == 0L
+    if (any(empty)) {
+        group_labels <- names(group_channels) %||%
+            rep("", length(group_channels))
+        unnamed <- !nzchar(group_labels)
+        group_labels[unnamed] <- paste("position", which(unnamed))
+        empty_groups <- group_labels[empty]
+        cli_abort(c(
+            "x" = "{.arg group_channels}: empty group{?s} \\
+            {.field {empty_groups}}.",
+            "i" = "Each group must contain at least one channel."
+        ), call = env)
+    }
+
     ## group members must be known channels
     members <- unlist(group_channels, use.names = FALSE)
     unknown <- setdiff(members, nirs_channels)
-    if (!is.character(members) || length(unknown) > 0L) {
+    if (length(unknown) > 0L) {
         cli_abort(c(
             "x" = "{.arg group_channels}: channel{?s} {.field {unknown}} \\
             not recognised.",
@@ -229,6 +244,16 @@ validate_group_channels <- function(
     names <- names(group_channels) %||% rep("", length(group_channels))
     unnamed <- !nzchar(names)
     names[unnamed] <- vapply(group_channels[unnamed], `[[`, "", 1L)
+
+    ## group names are argument lookup keys and must be unambiguous
+    if (anyDuplicated(names) > 0L) {
+        dupes <- unique(names[duplicated(names)])
+        cli_abort(c(
+            "x" = "{.arg group_channels}: duplicated group name{?s} \\
+            {.field {dupes}}.",
+            "i" = "Group names must be unique."
+        ), call = env)
+    }
 
     return(setNames(group_channels, names))
 }

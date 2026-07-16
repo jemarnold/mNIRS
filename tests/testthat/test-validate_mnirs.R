@@ -77,6 +77,30 @@ test_that("validate_numeric handles NA, NaN, Inf", {
     expect_silent(validate_numeric(c(1, NA, 3), elements = 2))
 })
 
+test_that("validate_numeric allows NA with range and integer checks", {
+    expect_silent(validate_numeric(
+        c(1, NA),
+        elements = 2,
+        range = c(0, 2),
+        allow_na = TRUE
+    ))
+    expect_silent(validate_numeric(
+        c(1L, NA_integer_),
+        elements = 2,
+        integer = TRUE,
+        allow_na = TRUE
+    ))
+
+    expect_error(
+        validate_numeric(c(3, NA), range = c(0, 2), allow_na = TRUE),
+        "numeric"
+    )
+    expect_error(
+        validate_numeric(c(1.5, NA), integer = TRUE, allow_na = TRUE),
+        "integer"
+    )
+})
+
 test_that("validate_numeric handles NULL", {
     expect_silent(validate_numeric(NULL))
 })
@@ -232,7 +256,6 @@ test_that("parse_channel_name returns NULL on logical channel", {
     expect_true(is.list(list_null))
     expect_null(unlist(list_null))
 })
-
 
 
 ## validate_nirs_channels() ========================================
@@ -403,7 +426,6 @@ test_that("validate_event_channel() error conditions", {
     data$lap <- rep(NA_integer_, nrow(data))
     expect_error(validate_event_channel("lap", data), "must contain valid")
 })
-
 
 
 ## within() ===============================================================
@@ -773,6 +795,8 @@ test_that("validate_start_time() errors when start_time exceeds time range", {
 test_that("findInt_mnirs provides informative error", {
     expect_error(findInt_mnirs(1, c(3, 1, 2)), "time_channel.*sorted")
     expect_error(findInt_mnirs(1, c(1, NA, 2)), "time_channel.*sorted")
+    ## duplicates permitted
+    expect_equal(findInt_mnirs(1, c(1, 2, 2, 3)), 1)
     ## valid input passes through to findInterval()
     expect_equal(findInt_mnirs(2.5, 1:5), findInterval(2.5, 1:5))
 })

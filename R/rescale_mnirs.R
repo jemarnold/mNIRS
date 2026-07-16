@@ -22,7 +22,8 @@
 #'      the relative scaling between channels.}
 #'      \item{`list(c("A", "B"), c("C", "D"))`}{Operate on channels `A` & `B`
 #'      in one group, and `C` & `D` in another group. Groups can be named
-#'      (e.g. `list(smo2 = c("A", "B"))`).}
+#'      (e.g. `list(smo2 = c("A", "B"))`). Each group must be non-empty
+#'      and resulting group names must be unique.}
 #'   }
 #' @param range A numeric vector in the form `c(min, max)`, indicating the
 #'   range of output values to which `nirs_channels` will be rescaled.

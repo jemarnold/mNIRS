@@ -301,13 +301,61 @@ test_that("validate_group_channels aborts on invalid groups", {
     )
 })
 
+test_that("validate_group_channels rejects duplicate group names", {
+    channels <- c("smo2", "o2hb")
+
+    expect_error(
+        validate_group_channels(channels, list(g = "smo2", g = "o2hb")),
+        "duplicated group name.*g"
+    )
+    ## explicit name collides with key generated for omitted channel
+    expect_error(
+        validate_group_channels(channels, list(o2hb = "smo2")),
+        "duplicated group name.*o2hb"
+    )
+})
+
+test_that("validate_group_channels rejects empty groups", {
+    channels <- c("smo2", "o2hb")
+
+    expect_error(
+        validate_group_channels(channels, list(g = character())),
+        "empty group.*g"
+    )
+    ## unnamed empty groups are reported by position
+    expect_error(
+        validate_group_channels(channels, list(character())),
+        "empty group.*position 1"
+    )
+})
+
+test_that("validate_group_channels treats an empty list as no grouping", {
+    channels <- c("smo2", "o2hb")
+
+    ## no groups given: every channel is processed independently
+    expect_equal(
+        validate_group_channels(channels, list()),
+        list(smo2 = "smo2", o2hb = "o2hb")
+    )
+})
+
 test_that("validate_group_channels reports errors from the caller's `env`", {
     channels <- c("smo2", "o2hb")
 
-    ## the abort is attributed to the user-facing function via `env`
-    caller <- function() {
-        validate_group_channels(channels, list(c("smo2", "typo")))
+    ## aborts are attributed to the user-facing function via `env`
+    caller <- function(groups) {
+        validate_group_channels(channels, groups)
     }
-    err <- expect_error(caller(), "typo.*not recognised")
-    expect_equal(rlang::call_name(conditionCall(err)), "caller")
+    unknown <- expect_error(
+        caller(list(c("smo2", "typo"))),
+        "typo.*not recognised"
+    )
+    empty <- expect_error(caller(list(g = character())), "empty group")
+    duplicated <- expect_error(
+        caller(list(g = "smo2", g = "o2hb")),
+        "duplicated group name"
+    )
+    expect_equal(rlang::call_name(conditionCall(unknown)), "caller")
+    expect_equal(rlang::call_name(conditionCall(empty)), "caller")
+    expect_equal(rlang::call_name(conditionCall(duplicated)), "caller")
 })
