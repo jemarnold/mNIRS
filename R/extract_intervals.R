@@ -23,8 +23,10 @@
 #'   values for ensemble-averaging. If `NULL`, will be estimated from
 #'   `time_channel` (see *Details*).
 #'
-#' @param group_intervals Either a character string or a `list()` of integer
-#'   vectors specifying how to group intervals (see *Details*).
+#' @param group_intervals Either a character string or a non-empty `list()` of
+#'   non-empty integer-valued numeric vectors specifying how to group intervals
+#'   (see *Details*). Custom indices must be between `1` and the number of
+#'   detected intervals.
 #'   \describe{
 #'     \item{`"distinct"`}{The default. Extract each interval as an independent
 #'     data frame.}
@@ -320,6 +322,7 @@ extract_intervals <- function(
     ## resolve interval boundary times ==========================
     interval_list <- resolve_interval(start, end, t_vec, event_vec)
     n_events <- length(interval_list$start_time)
+    validate_interval_groups(group_intervals, n_events, env)
 
     ## recycle params to match number of intervals
     group_channels <- recycle_param(

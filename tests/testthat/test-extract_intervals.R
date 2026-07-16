@@ -1219,6 +1219,41 @@ test_that("apply_interval_groups handles custom grouping", {
     )
 })
 
+test_that("extract_intervals rejects invalid group_intervals indices", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+    extract_groups <- \(groups) {
+        extract_intervals(
+            data,
+            start = by_time(2, 5, 8),
+            span = c(-0.5, 0.5),
+            group_intervals = groups,
+            verbose = FALSE
+        )
+    }
+
+    integer_error <- "group_intervals.*position 1.*missing integer indices"
+    range_error <- "Indices must be between.*1.*3"
+
+    expect_error(extract_groups(list()), "group_intervals.*at least one group")
+    expect_error(extract_groups(list("1")), integer_error)
+    expect_error(extract_groups(list(TRUE)), integer_error)
+    expect_error(extract_groups(list(NA_integer_)), integer_error)
+    expect_error(extract_groups(list(Inf)), integer_error)
+    expect_error(extract_groups(list(1.5)), integer_error)
+    expect_error(extract_groups(list(matrix(1:2))), integer_error)
+    expect_error(extract_groups(list(0L)), range_error)
+    expect_error(extract_groups(list(-1L)), range_error)
+    expect_error(extract_groups(list(4L)), range_error)
+    expect_error(
+        extract_groups(list(valid = 1L, invalid = 4L)),
+        "out-of-range.*invalid"
+    )
+    expect_error(
+        extract_groups(list(integer())),
+        "group_intervals.*empty group.*position 1"
+    )
+})
+
 test_that("apply_interval_groups returns single interval as distinct regardless", {
     interval1 <- create_mock_interval(time_start = 0, n = 11, event_time = 0)
     df_list <- list(interval_1 = interval1)

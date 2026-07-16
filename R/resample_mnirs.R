@@ -57,7 +57,7 @@
 #' - For `method = "none"`, existing rows are matched to the nearest original
 #'   values of `time_channel` without interpolation or filling, meaning newly
 #'   created samples and any `NA`s in the original data are returned as `NA`.
-#' - When down-sampling, numeric columns use time-weighted averaging.
+#' - When down-sampling, numeric columns use linear interpolation averaging.
 #'   Non-numeric columns use the first valid value in each output bin.
 #'
 #' @returns A [tibble][tibble::tibble-package] of class `"mnirs"`. Metadata are

@@ -381,6 +381,68 @@ recycle_to_length <- function(
 }
 
 
+## reject malformed group indices before they reach vector subscripting
+validate_interval_groups <- function(
+    group_intervals,
+    n_intervals,
+    env = rlang::caller_env()
+) {
+    if (length(group_intervals) == 0L) {
+        cli_abort(c(
+            "x" = "{.arg group_intervals} must contain at least one group."
+        ), call = env)
+    }
+
+    spec <- group_intervals[[1L]][1L]
+    if (length(group_intervals) == 1L &&
+            isTRUE(spec %in% c("distinct", "ensemble"))) {
+        return(invisible())
+    }
+
+    group_labels <- names(group_intervals) %||%
+        character(length(group_intervals))
+    unnamed <- is.na(group_labels) | !nzchar(group_labels)
+    group_labels[unnamed] <- paste("position", which(unnamed))
+
+    empty <- lengths(group_intervals) == 0L
+    if (any(empty)) {
+        cli_abort(c(
+            "x" = "{.arg group_intervals}: empty group{?s} \\
+            {.field {group_labels[empty]}}.",
+            "i" = "Each group must contain at least one interval index."
+        ), call = env)
+    }
+
+    ## is_integerish(finite = TRUE) rejects non-numeric, NA, Inf, & fractions
+    valid <- vapply(
+        group_intervals,
+        \(.g) rlang::is_integerish(.g, finite = TRUE) && is.null(dim(.g)),
+        logical(1)
+    )
+    if (!all(valid)) {
+        cli_abort(c(
+            "x" = "{.arg group_intervals}: group{?s} \\
+            {.field {group_labels[!valid]}} contains missing integer indices."
+        ), call = env)
+    }
+
+    oob <- lapply(group_intervals, \(.g) .g[.g < 1L | .g > n_intervals])
+    out_of_range <- lengths(oob) > 0L
+    if (any(out_of_range)) {
+        invalid <- unique(unlist(oob, use.names = FALSE))
+        cli_abort(c(
+            "x" = "{.arg group_intervals} contains out-of-range interval \\
+            indices in group{qty(sum(out_of_range))}{?s} \\
+            {.field {group_labels[out_of_range]}}: {.field {invalid}}.",
+            "i" = "Indices must be between {.val 1} and \\
+            {.val {n_intervals}}."
+        ), call = env)
+    }
+
+    return(invisible())
+}
+
+
 #' Recycle parameter to match number of events
 #'
 #' Recycle an argument vector to a list or repeat the last list item to match
