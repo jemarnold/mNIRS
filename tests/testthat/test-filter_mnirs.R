@@ -520,6 +520,47 @@ test_that("smooth_spline handles NAs", {
     )
 })
 
+test_that("smooth_spline handles channel-specific NAs independently", {
+    data <- data.frame(
+        time = 0:7,
+        ch1 = c(NA, 1, 4, 9, 16, 25, 36, 49),
+        ch2 = c(0, 1, 4, 9, 16, NA, 36, 49)
+    )
+
+    combined <- filter_mnirs(
+        data,
+        nirs_channels = c("ch1", "ch2"),
+        time_channel = "time",
+        method = "smooth_spline",
+        spar = 0.5,
+        na.rm = TRUE,
+        verbose = FALSE
+    )
+    ch1 <- filter_mnirs(
+        data,
+        nirs_channels = "ch1",
+        time_channel = "time",
+        method = "smooth_spline",
+        spar = 0.5,
+        na.rm = TRUE,
+        verbose = FALSE
+    )
+    ch2 <- filter_mnirs(
+        data,
+        nirs_channels = "ch2",
+        time_channel = "time",
+        method = "smooth_spline",
+        spar = 0.5,
+        na.rm = TRUE,
+        verbose = FALSE
+    )
+
+    expect_equal(combined$ch1, ch1$ch1)
+    expect_equal(combined$ch2, ch2$ch2)
+    expect_equal(which(is.na(combined$ch1)), 1L)
+    expect_equal(which(is.na(combined$ch2)), 6L)
+})
+
 test_that("smooth_spline errors with irregular samples", {
     moxy_data <- read_mnirs(
         file_path = example_mnirs("moxy_ramp.xlsx"),

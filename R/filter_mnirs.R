@@ -276,12 +276,13 @@ filter_mnirs.smooth_spline <- function(
             spar, 1, c(0, Inf), FALSE, msg1 = "one-element positive", env = env
         )
         x <- data[[.x]]
+        t <- t_vec
         ## handle NAs
         handle_na <- na.rm && anyNA(x)
         if (handle_na) {
             na_info <- preserve_na(x)
             x <- na_info$x_valid
-            t_vec <- t_vec[!na_info$na_idx]
+            t <- t[!na_info$na_idx]
         } else if (anyNA(x)) {
             cli_abort(c(
                 "x" = "{.arg nirs_channels} = {.field {.x}} contains internal \\
@@ -290,7 +291,7 @@ filter_mnirs.smooth_spline <- function(
             ), call = env)
         }
 
-        spline_model <- stats::smooth.spline(x = t_vec, y = x, spar = spar)
+        spline_model <- stats::smooth.spline(x = t, y = x, spar = spar)
 
         if (is.null(spar) && verbose) {
             cli_inform(c(
