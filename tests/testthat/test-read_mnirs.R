@@ -1228,8 +1228,11 @@ test_that("extract_start_timestamp() detects ISO 8601 timestamp", {
         stringsAsFactors = FALSE
     )
     result <- extract_start_timestamp(data)
-    expect_type(result, "character")
-    expect_match(result, "2025-03-01T08:30:00")
+    expect_s3_class(result, "POSIXct")
+    expect_equal(
+        result,
+        as.POSIXct("2025-03-01T08:30:00", format = "%Y-%m-%dT%H:%M:%OS")
+    )
 })
 
 test_that("extract_start_timestamp() detects yyyy-mm-dd HH:MM:SS format", {
@@ -1239,8 +1242,8 @@ test_that("extract_start_timestamp() detects yyyy-mm-dd HH:MM:SS format", {
         stringsAsFactors = FALSE
     )
     result <- extract_start_timestamp(data)
-    expect_type(result, "character")
-    expect_match(result, "2025-06-15 14:22:10")
+    expect_s3_class(result, "POSIXct")
+    expect_equal(result, as.POSIXct("2025-06-15 14:22:10"))
 })
 
 test_that("extract_start_timestamp() returns earliest timestamp when multiple present", {
@@ -1250,25 +1253,38 @@ test_that("extract_start_timestamp() returns earliest timestamp when multiple pr
         stringsAsFactors = FALSE
     )
     result <- extract_start_timestamp(data)
-    expect_match(result, "2025-01-01 09:00:00")
+    expect_equal(result, as.POSIXct("2025-01-01 09:00:00"))
+})
+
+test_that("extract_start_timestamp() compares mixed formats chronologically", {
+    data <- data.frame(
+        V1 = c("2025-01-01 00:00:00", "31/12/2024 23:00:00")
+    )
+
+    expect_equal(
+        extract_start_timestamp(data),
+        as.POSIXct("31/12/2024 23:00:00", format = "%d/%m/%Y %H:%M:%OS")
+    )
 })
 
 test_that("extract_start_timestamp() ignores NA and empty strings", {
     data <- data.frame(
         V1 = c(NA, ""),
-        V2 = c("2025-05-10T07:00:00", NA),
+        V2 = c("2025-05-10T07:00:00", "invalid:time"),
         stringsAsFactors = FALSE
     )
     result <- extract_start_timestamp(data)
-    expect_type(result, "character")
-    expect_match(result, "2025-05-10T07:00:00")
+    expect_s3_class(result, "POSIXct")
+    expect_equal(
+        result,
+        as.POSIXct("2025-05-10T07:00:00", format = "%Y-%m-%dT%H:%M:%OS")
+    )
 })
 
 test_that("extract_start_timestamp() works with real example file header", {
     file_header <- read_file(example_mnirs("moxy_ramp.xlsx"))[1:20, ]
     result <- extract_start_timestamp(file_header)
-    expect_false(is.null(result))
-    expect_type(result, "character")
+    expect_s3_class(result, "POSIXct")
 })
 
 
@@ -1410,6 +1426,79 @@ test_that("parse_time_channel() returns start_timestamp from POSIXct time_channe
     expect_equal(result$start_timestamp, t0, ignore_attr = TRUE)
 })
 
+test_that("parse_time_channel() start_timestamp is first sample when non-monotonic", {
+    t0 <- as.POSIXct("2025-01-01 10:00:00")
+    data <- data.frame(time = t0 + c(5, 0, 10), value = c(1, 2, 3))
+
+    result <- parse_time_channel(data, "time", add_timestamp = TRUE)
+
+    ## start_timestamp + time must reconstruct the original timestamps
+    expect_equal(result$start_timestamp, t0 + 5, ignore_attr = TRUE)
+    expect_equal(
+        as.numeric(result$data$timestamp),
+        as.numeric(t0 + c(5, 0, 10))
+    )
+})
+
+test_that("parse_time_channel() does not force header for dated time series", {
+    t0 <- as.POSIXct("2025-03-15 08:00:00")
+    data <- data.frame(time = t0 + 0:2)
+
+    result <- parse_time_channel(
+        data,
+        "time",
+        start_timestamp = stop("header timestamp was forced")
+    )
+
+    expect_equal(result$start_timestamp, t0, ignore_attr = TRUE)
+})
+
+test_that("parse_time_channel() dated time series takes priority over header", {
+    t0 <- as.POSIXct("2025-03-15 08:00:00")
+    data <- data.frame(time = format(t0 + 0:2, "%Y-%m-%d %H:%M:%S"))
+    header_start <- as.POSIXct("2024-01-01 00:00:00")
+
+    result <- parse_time_channel(
+        data,
+        "time",
+        start_timestamp = header_start,
+        add_timestamp = TRUE
+    )
+
+    expect_equal(result$start_timestamp, t0)
+    expect_equal(result$data$timestamp, t0 + 0:2, ignore_attr = TRUE)
+})
+
+test_that("parse_time_channel() header anchors time-only series", {
+    data <- data.frame(time = c("10:00:00", "10:00:01"))
+    header_start <- as.POSIXct("2025-03-15 10:00:00")
+
+    result <- parse_time_channel(
+        data,
+        "time",
+        start_timestamp = header_start,
+        add_timestamp = TRUE
+    )
+
+    expect_equal(result$start_timestamp, header_start)
+    expect_equal(result$data$timestamp, header_start + 0:1)
+})
+
+test_that("parse_time_channel() header anchors fractional-day series", {
+    data <- data.frame(time = c(0.5, 0.5 + 1 / 86400))
+    header_start <- as.POSIXct("2025-03-15 12:00:00")
+
+    result <- parse_time_channel(
+        data,
+        "time",
+        start_timestamp = header_start,
+        add_timestamp = TRUE
+    )
+
+    expect_equal(result$start_timestamp, header_start)
+    expect_equal(result$data$timestamp, header_start + 0:1, tolerance = 1e-6)
+})
+
 test_that("parse_time_channel() add_timestamp=TRUE adds POSIXct column after time_channel", {
     t0 <- as.POSIXct("2025-01-01 10:00:00")
     data <- data.frame(
@@ -1438,7 +1527,7 @@ test_that("parse_time_channel() add_timestamp=TRUE with start_timestamp reconstr
         time = c(0, 1, 2),
         value = c(1, 2, 3)
     )
-    start_ts <- "2025-06-01T09:00:00"
+    start_ts <- as.POSIXct("2025-06-01 09:00:00")
 
     result <- parse_time_channel(
         data,
@@ -1450,12 +1539,10 @@ test_that("parse_time_channel() add_timestamp=TRUE with start_timestamp reconstr
     expect_true("timestamp" %in% names(result$data))
     expect_s3_class(result$data$timestamp, "POSIXct")
 
-    expected_t0 <- as.POSIXct(start_ts, format = "%Y-%m-%dT%H:%M:%OS")
     expect_equal(
         as.numeric(result$data$timestamp),
-        as.numeric(expected_t0 + c(0, 1, 2))
+        as.numeric(start_ts + c(0, 1, 2))
     )
-    ## start_timestamp is passed through unchanged
     expect_equal(result$start_timestamp, start_ts)
 })
 
@@ -1477,9 +1564,9 @@ test_that("parse_time_channel() add_timestamp=TRUE with no timestamps skips colu
     expect_null(result$start_timestamp)
 })
 
-test_that("parse_time_channel() works on fractional unix time", {
+test_that("parse_time_channel() works on fraction-of-day", {
     ## Moxy.csv saved as excel will coerce date-time
-    ## to numeric fractional Unix time.
+    ## to numeric fraction-of-day
     file_path <- test_path("testdata/moxy-occlusion.xlsx")
     skip_if_not(file.exists(file_path), "testdata not available")
 
@@ -1504,6 +1591,23 @@ test_that("parse_time_channel() works on fractional unix time", {
     expect_equal(format(result$start_timestamp, "%Z"), format(Sys.time(), "%Z"))
     expect_equal(format(result$start_timestamp, "%H:%M:%OS"), "13:52:59")
 })
+
+test_that("parse_time_channel() leaves small numeric time unconverted", {
+    ## short 0-1 s series, flat, and negative time are not fraction-of-day
+    ## TODO unlikely edge case not covered, YAGNI
+    # small <- parse_time_channel(data.frame(time = c(0, 0.5, 1)), "time")
+    # expect_equal(small$data$time, c(0, 0.5, 1))
+    # expect_null(small$start_timestamp)
+
+    flat <- parse_time_channel(data.frame(time = c(0, 0, 0)), "time")
+    expect_equal(flat$data$time, c(0, 0, 0))
+    expect_null(flat$start_timestamp)
+
+    negative <- parse_time_channel(data.frame(time = c(-2, -1, 0)), "time")
+    expect_equal(negative$data$time, c(-2, -1, 0))
+    expect_null(negative$start_timestamp)
+})
+
 
 test_that("parse_time_channel() returns local time zonel", {
     perfpro <- test_path("testdata/perfpro-mre.xlsx")
@@ -1766,6 +1870,38 @@ test_that("detect_irregular_samples uses correct time_channel name", {
 })
 
 ## read_mnirs() =======================================================
+test_that("read_mnirs preserves dated time series timestamps", {
+    file_path <- tempfile(fileext = ".csv")
+    on.exit(unlink(file_path))
+    writeLines(
+        c(
+            "recorded_at,SmO2",
+            "2025-03-15 08:00:00,55",
+            "2025-03-15 08:00:01,56"
+        ),
+        file_path
+    )
+    expected <- as.POSIXct(c(
+        "2025-03-15 08:00:00",
+        "2025-03-15 08:00:01"
+    ))
+
+    result <- read_mnirs(
+        file_path,
+        nirs_channels = "SmO2",
+        time_channel = "recorded_at",
+        add_timestamp = TRUE,
+        verbose = FALSE
+    )
+
+    expect_s3_class(attr(result, "start_timestamp"), "POSIXct")
+    expect_equal(
+        attr(result, "start_timestamp"), min(expected), ignore_attr = TRUE
+    )
+    expect_equal(result$timestamp, expected)
+    expect_equal(result$recorded_at, c(0, 1))
+})
+
 ## read_mnirs() auto-detection =========================================
 test_that("read_mnirs auto-detects Moxy channels when nirs_channels = NULL", {
     file_path <- example_mnirs("moxy_ramp")
@@ -2112,6 +2248,7 @@ test_that("read_mnirs external train.red mre works", {
 
     expect_equal(attr(df, "nirs_device"), "Train.Red")
     expect_equal(attr(df, "sample_rate"), 10)
+    expect_s3_class(attr(df, "start_timestamp"), "POSIXct")
 })
 
 test_that("read_mnirs coerces integerish event_channel to integer", {
@@ -2539,4 +2676,3 @@ test_that("create_mnirs_data preserves grouping", {
     df_ungrp <- create_mnirs_data(df, nirs_channels = "B")
     expect_false(dplyr::is_grouped_df(df_ungrp))
 })
-

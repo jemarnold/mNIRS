@@ -248,6 +248,9 @@ read_data_table <- function(
 
 
 #' Datetime format strings for POSIXct parsing
+#'
+#' Time-only format must stay first: `parse_time_channel()` splits on
+#' `dttm_opts[1L]` vs `dttm_opts[-1L]` to detect an absolute date-time series.
 #' @keywords internal
 dttm_opts <- c(
     "%H:%M:%OS",
@@ -268,20 +271,17 @@ extract_start_timestamp <- function(file_header) {
     ## all dttm_opts contain %H:%M, so candidates must contain ":"
     header_values <- header_values[grepl(":", header_values, fixed = TRUE)]
 
-    ## search for POSIXct values, return the earliest time value
-    ## vulnerable to invalid timestamps
-    parsed <- which(
-        !is.na(vapply(header_values, \(.x) {
-        as.POSIXct(.x, tryFormats = dttm_opts, optional = TRUE)
-    }, numeric(1L)))
-    )
+    ## parse candidates separately because header formats may differ
+    parsed <- vapply(header_values, \(.x) {
+        as.numeric(as.POSIXct(.x, tryFormats = dttm_opts, optional = TRUE))
+    }, numeric(1L))
+    parsed <- parsed[!is.na(parsed)]
 
     if (length(parsed) == 0L) {
         return(NULL)
     }
 
-    ## return the earliest character string timestamp, assuming start time
-    return(min(header_values[parsed]))
+    return(as.POSIXct(min(parsed)))
 }
 
 
@@ -544,25 +544,38 @@ parse_time_channel <- function(
     zero_time = FALSE
 ) {
     t_vec <- data[[time_channel]]
+    dated <- inherits(t_vec, "POSIXct")
 
     ## character time -> numeric (sample index / seconds) where numeric-like,
     ## otherwise parse date-time formats to POSIXct
     if (is.character(t_vec)) {
         num <- suppressWarnings(as.numeric(t_vec))
-        t_vec <- if (any(!is.na(num))) {
-            num
+        if (any(!is.na(num))) {
+            t_vec <- num
         } else {
-            as.POSIXct(t_vec, tryFormats = dttm_opts, optional = TRUE)
+            ## absolute date-time formats take priority; a time-only series
+            ## is relative and must be anchored by a header timestamp
+            dated_vec <- as.POSIXct(
+                t_vec,
+                tryFormats = dttm_opts[-1L],
+                optional = TRUE
+            )
+            dated <- any(!is.na(dated_vec))
+            t_vec <- if (dated) {
+                dated_vec
+            } else {
+                as.POSIXct(t_vec, tryFormats = dttm_opts[1L], optional = TRUE)
+            }
         }
     }
 
-    ## fractional unix time to POSIXct coerced to local time zone
-    if (is.numeric(t_vec) && all(t_vec <= 1, na.rm = TRUE)) {
-        t_vec <- as.POSIXct(
+    ## fraction-of-day time to POSIXct coerced to local time zone
+    if (is.numeric(t_vec) && all(t_vec >= 0 & t_vec <= 1, na.rm = TRUE)) {
+        midnight <- as.POSIXct(
             as.character(as.POSIXct(Sys.Date(), "UTC")),
             tz = Sys.timezone()
-        ) +
-            t_vec * 86400
+        )
+        t_vec <- midnight + t_vec * 86400
     }
 
     ## recalculate numeric time to start from zero
@@ -579,36 +592,25 @@ parse_time_channel <- function(
 
     data[[time_channel]] <- t_vec
 
-    ## add_timestamp preserves or adds POSIXct/dttm column
-    if (add_timestamp) {
-        ## add "timestamp" col after `time_channel` position
+    ## a dated series anchors itself; `!dated` short-circuits so the lazy
+    ## header argument is never forced. Otherwise a header timestamp anchors
+    ## the relative series, else fall back to the parsed series.
+    ## first sample, not earliest, so `start_timestamp + time` matches the
+    ## zeroed `time_channel` when samples are out of order
+    if (!dated && !is.null(start_timestamp)) {
+        timestamp <- start_timestamp + t_vec
+    } else {
+        timestamp <- timestamp_vec
+        start_timestamp <- timestamp_vec[1L]
+    }
+
+    ## insert timestamp column directly behind `time_channel`
+    if (add_timestamp && !is.null(timestamp)) {
         col_names <- names(data)
         time_idx <- match(time_channel, col_names)
         data_names <- append(col_names, "timestamp", time_idx)
-        data$timestamp <- NA_real_
+        data$timestamp <- timestamp
         data <- data[data_names]
-
-        ## if neither header start_timestamp or timestamp_vec exist
-        ## then return NULL and don't append column
-        if (!is.null(start_timestamp)) {
-            start_time <- as.POSIXct(
-                start_timestamp,
-                tryFormats = dttm_opts,
-                optional = TRUE
-            )
-            data$timestamp <- start_time + t_vec
-        } else if (!is.null(timestamp_vec)) {
-            data$timestamp <- timestamp_vec
-        } else {
-            ## column removed if no timestamp detected
-            data$timestamp <- NULL
-        }
-    }
-
-    ## extract earliest POSIXct value as start_timestamp metadata
-    ## if not already passed from file header
-    if (is.null(start_timestamp) && !is.null(timestamp_vec)) {
-        start_timestamp <- min(timestamp_vec, na.rm = TRUE)
     }
 
     return(list(data = data, start_timestamp = start_timestamp))

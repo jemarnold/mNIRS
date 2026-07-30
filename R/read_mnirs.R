@@ -160,9 +160,6 @@ read_mnirs <- function(
     data <- table_list$data_table
     file_header <- table_list$file_header
 
-    ## extract start time from file header
-    start_timestamp <- extract_start_timestamp(file_header)
-
     ## attempt to detect `time_channel` automatically
     time_channel <- detect_time_channel(
         data,
@@ -197,20 +194,16 @@ read_mnirs <- function(
         verbose
     )
     ## convert POSIXct to numeric and/or recalc time from zero
-    ## return list(data, start_timestamp) — start_timestamp from time_channel POSIXct
+    ## defer header parsing unless the time channel lacks an absolute timestamp
     time_list <- parse_time_channel(
         data,
         time_renamed,
-        start_timestamp,
+        extract_start_timestamp(file_header),
         add_timestamp,
         zero_time
     )
     data <- time_list$data
-
-    ## extract start_timestamp from data if not already found in header
-    if (is.null(start_timestamp)) {
-        start_timestamp <- time_list$start_timestamp
-    }
+    start_timestamp <- time_list$start_timestamp
 
     ## validate and estimate sample rate
     ## will write new "time" column if Oxysoft export rate detected

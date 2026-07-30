@@ -447,7 +447,7 @@ test_that("seq_range respects direction argument", {
 })
 
 test_that("seq_range infers direction from sign of by", {
-    #TODO should it respect ordered x?
+    # TODO should it respect ordered x?
     ## descending input, ascending output
     expect_equal(seq_range(c(5, 1)), 1:5)
     ## negative `by` alone -> descending
