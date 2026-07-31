@@ -1,18 +1,22 @@
 #' Read raw data frame from file path
+#' @inheritParams validate_mnirs
 #' @keywords internal
-read_file <- function(file_path) {
+read_file <- function(file_path, env = rlang::caller_env()) {
     ## validation: check file exists
     if (!file.exists(file_path)) {
         cli_abort(c(
             "x" = "File not found. Check that file exists.",
             "i" = "{.arg file_path} = {.path {file_path}}"
-        ))
+        ), call = env)
     }
 
     ## import data_raw from either excel or csv
     if (grepl("\\.(csv|tsv|txt)$", file_path, ignore.case = TRUE)) {
         ## sample lines for separator and column count detection
-        lines <- readLines(file_path, warn = FALSE)
+        ## strip whitespace inside quoted fields and around line edges
+        lines <- trimws(
+            gsub('\\s*"\\s*', '"', readLines(file_path, warn = FALSE))
+        )
         nrows <- length(lines)
 
         ## detect separator: comma vs tab from first 10 lines
@@ -51,9 +55,9 @@ read_file <- function(file_path) {
                         "i" = "Check file is not in use by another \\
                         application.",
                         "i" = "{e$message}"
-                    ))
+                    ), call = env)
                 } else {
-                    cli_abort(e$message)
+                    cli_abort(e$message, call = env)
                 }
             }
         )
@@ -62,8 +66,8 @@ read_file <- function(file_path) {
         cli_abort(c(
             "x" = "Unsupported file type.",
             "i" = "{.arg file_path} = {.path {file_path}}",
-            "i" = "Only {.var .csv}, {.var .txt}, and {.var .xls(x)} supported."
-        ))
+            "i" = "Currently only {.var .csv}, {.var .txt}, and {.var .xls(x)} supported."
+        ), call = env)
     }
 
     return(data.frame(data_raw))
@@ -107,34 +111,24 @@ device_patterns <- list(
 #' Detect mnirs device from file metadata
 #' @keywords internal
 detect_mnirs_device <- function(data) {
-    ## find the first row in `string` where all `patterns` match
-    find_row <- function(string, patterns, fixed = TRUE) {
-        Find(\(.i) {
-            all(vapply(patterns, \(.x) {
-                    grepl(.x, string[.i], fixed = fixed)
-                }, logical(1L)))
-        }, seq_along(string))
-    }
-
     ## collapse each row to a single string for pattern matching
-    data_strings <- apply(data, 1L, paste, collapse = " ")
+    data_strings <- do.call(paste, c(data, list(sep = " ")))
 
-    ## find first row of `data_strings` which matches any of `device_patterns`
-    matched_row <- Find(\(.i) {
-        any(vapply(device_patterns, \(.d) {
-            !is.null(find_row(data_strings[.i], .d$pattern, .d$fixed))
-        }, logical(1L)))
-    }, seq_along(data_strings))
+    ## first row index where all of a device's patterns match; NA if none
+    first_rows <- vapply(device_patterns, \(.d) {
+        hits <- Reduce(`&`, lapply(
+            .d$pattern, grepl, x = data_strings, fixed = .d$fixed
+        ))
+        which(hits)[1L]
+    }, integer(1L))
 
-    if (is.null(matched_row)) {
+    if (all(is.na(first_rows))) {
         return(list(nirs_device = NULL, header_row = 1L))
     }
 
-    ## return the first device name which matches the row of `data_strings`
-    device_name <- Find(\(.nm) {
-        .d <- device_patterns[[.nm]]
-        !is.null(find_row(data_strings[matched_row], .d$pattern, .d$fixed))
-    }, names(device_patterns))
+    ## earliest matching row; ties resolved by device order via which.min
+    matched_row <- min(first_rows, na.rm = TRUE)
+    device_name <- names(first_rows)[which.min(first_rows)]
 
     ## require "oxysoft" match for Artinis pattern
     if (identical(device_name, "Artinis")) {
@@ -149,6 +143,7 @@ detect_mnirs_device <- function(data) {
 
 
 #' Detect known channels for a device
+#' @inheritParams validate_mnirs
 #' @keywords internal
 detect_device_channels <- function(
     data,
@@ -157,7 +152,8 @@ detect_device_channels <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     keep_all = FALSE,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     ## user-specified channels always take priority
     if (!is.null(nirs_channels)) {
@@ -188,7 +184,7 @@ detect_device_channels <- function(
         cli_abort(c(
             "x" = "{.arg nirs_channels} cannot be determined automatically.",
             "i" = "Define {.arg nirs_channels} explicitly."
-        ))
+        ), call = env)
     }
 
     ## check for NULL
@@ -205,9 +201,9 @@ detect_device_channels <- function(
     if (verbose) {
         cli_inform(c(
             "!" = "{.val {nirs_device}} file format detected. \\
-            {.arg nirs_channels} set to {.val {ch_list$nirs_channels}}.",
+            {.arg nirs_channels} set to {.field {ch_list$nirs_channels}}.",
             "i" = "Override by specifying {.arg nirs_channels} explicitly."
-        ))
+        ), call = env)
     }
 
     return(ch_list)
@@ -215,11 +211,13 @@ detect_device_channels <- function(
 
 
 #' Read data table from raw data
+#' @inheritParams validate_mnirs
 #' @keywords internal
 read_data_table <- function(
     data,
     header_row = 1L,
-    nirs_channels = NULL
+    nirs_channels = NULL,
+    env = rlang::caller_env()
 ) {
     nrows <- nrow(data)
     ## find the first row where ALL nirs_channels match
@@ -234,7 +232,7 @@ read_data_table <- function(
         cli_abort(c(
             "x" = "Channel names not detected.",
             "i" = "Column names are case sensitive and must match exactly."
-        ))
+        ), call = env)
     }
 
     ## extract the data_table, and name by header row
@@ -250,8 +248,11 @@ read_data_table <- function(
 
 
 #' Datetime format strings for POSIXct parsing
+#'
+#' Time-only format must stay first: `parse_time_channel()` splits on
+#' `dttm_opts[1L]` vs `dttm_opts[-1L]` to detect an absolute date-time series.
 #' @keywords internal
-datetime_formats <- c(
+dttm_opts <- c(
     "%H:%M:%OS",
     "%Y-%m-%dT%H:%M:%OS",
     "%Y-%m-%dT%H:%M:%OS%z",
@@ -267,29 +268,32 @@ datetime_formats <- c(
 extract_start_timestamp <- function(file_header) {
     header_values <- unlist(file_header, use.names = FALSE)
     header_values <- header_values[!is_empty(header_values)]
+    ## all dttm_opts contain %H:%M, so candidates must contain ":"
+    header_values <- header_values[grepl(":", header_values, fixed = TRUE)]
 
-    ## search for POSIXct values, return the earliest time value
-    ## vulnerable to invalid timestamps
-    parsed <- which(!is.na(vapply(header_values, \(.x) {
-        as.POSIXct(.x, tryFormats = datetime_formats, optional = TRUE)
-    }, numeric(1L))))
+    ## parse candidates separately because header formats may differ
+    parsed <- vapply(header_values, \(.x) {
+        as.numeric(as.POSIXct(.x, tryFormats = dttm_opts, optional = TRUE))
+    }, numeric(1L))
+    parsed <- parsed[!is.na(parsed)]
 
     if (length(parsed) == 0L) {
         return(NULL)
     }
 
-    ## return the earliest character string timestamp, assuming start time
-    return(min(header_values[parsed]))
+    return(as.POSIXct(min(parsed)))
 }
 
 
 #' Detect time_channel from header row
+#' @inheritParams validate_mnirs
 #' @keywords internal
 detect_time_channel <- function(
     data,
     time_channel = NULL,
     nirs_device = NULL,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     if (!is.null(time_channel)) {
         return(time_channel)
@@ -301,7 +305,7 @@ detect_time_channel <- function(
         if (verbose) {
             cli_inform(c(
                 "!" = "Oxysoft {.val sample} column detected."
-            ))
+            ), call = env)
         }
         return(c(sample = "1"))
     }
@@ -331,8 +335,8 @@ detect_time_channel <- function(
         if (verbose) {
             cli_inform(c(
                 "!" = "Detected {.arg time_channel} = \\
-                {col_blue(col_names[time_idx])}."
-            ))
+                {.field {col_names[time_idx]}}."
+            ), call = env)
         }
         return(col_names[time_idx])
     }
@@ -340,7 +344,7 @@ detect_time_channel <- function(
     cli_abort(c(
         "x" = "{.arg time_channel} not detected.",
         "i" = "Define {.arg time_channel} explicitly."
-    ))
+    ), call = env)
 }
 
 
@@ -377,6 +381,7 @@ name_channels <- function(x) {
 
 
 #' Select data table columns and rename from channels, handling duplicates
+#' @inheritParams validate_mnirs
 #' @keywords internal
 select_rename_data <- function(
     data,
@@ -384,7 +389,8 @@ select_rename_data <- function(
     time_channel,
     event_channel = NULL,
     keep_all = FALSE,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     ## ensure all channel inputs are named (name = original_col_name)
     ch_list <- list(
@@ -416,7 +422,7 @@ select_rename_data <- function(
         cli_abort(c(
             "x" = "Channel names not detected.",
             "i" = "Column names are case sensitive and must match exactly."
-        ))
+        ), call = env)
     }
 
     ## keep all columns or only specified channels
@@ -443,9 +449,9 @@ select_rename_data <- function(
         new <- user_vec[renamed]
         cli_warn(c(
             "!" = "Duplicate channel names detected.",
-            "i" = "Renamed: {.val {paste(old, new, sep = ' = ')}}",
+            "i" = "Renamed: {.field {paste(old, new, sep = ' = ')}}",
             "i" = "Unique channel names can be defined explicitly."
-        ))
+        ), call = warn_call(env))
     }
 
     return(list(
@@ -457,59 +463,74 @@ select_rename_data <- function(
 }
 
 
-#' Standardise comma decimals to periods in character columns
-#' @keywords internal
-convert_type <- function(
-    data,
-    time_channel,
-    event_channel = NULL,
-    verbose = TRUE
-) {
-    colnames <- names(data)
-    ## convert decimal "," to "."
-    char_cols <- setdiff(
-        colnames[vapply(data, is.character, logical(1L))],
-        time_channel
-    )
-    for (col in char_cols) {
-        data.table::set(
-            data, j = col, value = gsub(",", ".", data[[col]], fixed = TRUE)
-        )
-    }
-
-    ## convert column types
-    data <- utils::type.convert(
-        data, na.strings = c("NA", ""), dec = ".", as.is = TRUE
-    )
-
-    ## coerce integer columns to numeric (except event_channel)
-    int_cols <- setdiff(
-        colnames[vapply(data, is.integer, logical(1L))],
-        event_channel
-    )
-    data[int_cols] <- lapply(data[int_cols], as.numeric)
-
-    ## standardise Inf/NaN/empty to NA
-    data[] <- lapply(data, \(.x) {
-        if (is.character(.x)) {
-            .x[.x %in% c("", "NA")] <- NA_character_
-        } else if (is.integer(.x)) {
-            .x[!is.finite(.x)] <- NA_integer_
-        } else if (is.numeric(.x)) {
-            .x[!is.finite(.x)] <- NA_real_
-        }
-        .x
-    })
-
-    return(data)
-}
-
-
 #' Remove Empty Rows and Columns
 #' @keywords internal
 remove_empty_rows_cols <- function(data) {
     data <- data[rowSums(!is_empty(data)) > 0, , drop = FALSE]
     return(data[, colSums(!is_empty(data)) > 0, drop = FALSE])
+}
+
+
+#' Coerce column types by role: nirs numeric, event integer, others detected
+#' @inheritParams validate_mnirs
+#' @keywords internal
+convert_type <- function(
+    data,
+    nirs_channels = NULL,
+    time_channel,
+    event_channel = NULL,
+    verbose = TRUE,
+    env = rlang::caller_env()
+) {
+    ## convert decimal "," to "."
+    is_char <- vapply(data, is.character, logical(1L))
+    char_cols <- setdiff(names(data)[is_char], time_channel)
+    data[char_cols] <- lapply(
+        data[char_cols], gsub, pattern = ",", replacement = ".", fixed = TRUE
+    )
+
+    ## coerce by role, then standardise NA once:
+    ## - time_channel left unchanged for parse_time_channel
+    ## - nirs_channels  -> numeric
+    ## - event_channel  -> integer or character
+    ## - other columns  -> integer to numeric, otherwise unopinionated
+    data[] <- Map(\(.x, .nm) {
+        if (.nm %in% event_channel) {
+            .x <- utils::type.convert(
+                .x, na.strings = c("NA", ""), as.is = TRUE
+            )
+        } else if (.nm %in% nirs_channels) {
+            .x <- suppressWarnings(as.numeric(.x))
+        } else if (!.nm %in% time_channel) {
+            .x <- utils::type.convert(
+                .x, na.strings = c("NA", ""), as.is = TRUE
+            )
+            if (is.integer(.x)) {
+                .x <- as.numeric(.x)
+            }
+        }
+        ## standardise empty/NaN/Inf to NA by resulting type
+        if (is.character(.x)) {
+            .x[.x %in% c("", "NA")] <- NA_character_
+        } else {
+            .x[!is.finite(.x)] <- NA
+        }
+        .x
+    }, data, names(data))
+
+    ## warn per channel when nirs values are all coerced to NA
+    if (verbose) {
+        nirs_cols <- intersect(nirs_channels, names(data))
+        all_na <- vapply(data[nirs_cols], \(.x) all(is.na(.x)), logical(1L))
+        lapply(nirs_cols[all_na], \(.nm) {
+            cli_warn(c(
+                "!" = "Channel {.field {(.nm)}} values coerced to {.val {NA}}.",
+                "i" = "Check the source data contents should be numeric values."
+            ), call = warn_call(env))
+        })
+    }
+
+    return(data)
 }
 
 
@@ -522,65 +543,74 @@ parse_time_channel <- function(
     add_timestamp = FALSE,
     zero_time = FALSE
 ) {
-    time_vec <- data[[time_channel]]
+    t_vec <- data[[time_channel]]
+    dated <- inherits(t_vec, "POSIXct")
 
-    ## fractional unix time to POSIXct coerced to local time zone
-    if (is.numeric(time_vec) && all(time_vec <= 1, na.rm = TRUE)) {
-        time_vec <- as.POSIXct(
+    ## character time -> numeric (sample index / seconds) where numeric-like,
+    ## otherwise parse date-time formats to POSIXct
+    if (is.character(t_vec)) {
+        num <- suppressWarnings(as.numeric(t_vec))
+        if (any(!is.na(num))) {
+            t_vec <- num
+        } else {
+            ## absolute date-time formats take priority; a time-only series
+            ## is relative and must be anchored by a header timestamp
+            dated_vec <- as.POSIXct(
+                t_vec,
+                tryFormats = dttm_opts[-1L],
+                optional = TRUE
+            )
+            dated <- any(!is.na(dated_vec))
+            t_vec <- if (dated) {
+                dated_vec
+            } else {
+                as.POSIXct(t_vec, tryFormats = dttm_opts[1L], optional = TRUE)
+            }
+        }
+    }
+
+    ## fraction-of-day time to POSIXct coerced to local time zone
+    if (is.numeric(t_vec) && all(t_vec >= 0 & t_vec <= 1, na.rm = TRUE)) {
+        midnight <- as.POSIXct(
             as.character(as.POSIXct(Sys.Date(), "UTC")),
             tz = Sys.timezone()
-        ) + time_vec * 86400
+        )
+        t_vec <- midnight + t_vec * 86400
     }
 
     ## recalculate numeric time to start from zero
-    if (zero_time && is.numeric(time_vec)) {
-        time_vec <- time_vec - time_vec[1L]
-    }
-
-    ## character time to POSIXct
-    if (is.character(time_vec)) {
-        time_vec <- as.POSIXct(
-            time_vec, tryFormats = datetime_formats, optional = TRUE
-        )
+    if (zero_time && is.numeric(t_vec)) {
+        t_vec <- t_vec - t_vec[1L]
     }
 
     ## preserve POSIXct timestamp and convert to numeric seconds
     timestamp_vec <- NULL
-    if (inherits(time_vec, "POSIXct")) {
-        timestamp_vec <- time_vec
-        time_vec <- as.numeric(difftime(time_vec, time_vec[1L], units = "secs"))
+    if (inherits(t_vec, "POSIXct")) {
+        timestamp_vec <- t_vec
+        t_vec <- as.numeric(difftime(t_vec, t_vec[1L], units = "secs"))
     }
 
-    data[[time_channel]] <- time_vec
+    data[[time_channel]] <- t_vec
 
-    ## add_timestamp preserves or adds POSIXct/dttm column
-    if (add_timestamp) {
-        ## add "timestamp" col after `time_channel` position
+    ## a dated series anchors itself; `!dated` short-circuits so the lazy
+    ## header argument is never forced. Otherwise a header timestamp anchors
+    ## the relative series, else fall back to the parsed series.
+    ## first sample, not earliest, so `start_timestamp + time` matches the
+    ## zeroed `time_channel` when samples are out of order
+    if (!dated && !is.null(start_timestamp)) {
+        timestamp <- start_timestamp + t_vec
+    } else {
+        timestamp <- timestamp_vec
+        start_timestamp <- timestamp_vec[1L]
+    }
+
+    ## insert timestamp column directly behind `time_channel`
+    if (add_timestamp && !is.null(timestamp)) {
         col_names <- names(data)
         time_idx <- match(time_channel, col_names)
         data_names <- append(col_names, "timestamp", time_idx)
-        data$timestamp <- NA_real_
+        data$timestamp <- timestamp
         data <- data[data_names]
-
-        ## if neither header start_timestamp or timestamp_vec exist
-        ## then return NULL and don't append column
-        if (!is.null(start_timestamp)) {
-            start_time <- as.POSIXct(
-                start_timestamp, tryFormats = datetime_formats, optional = TRUE
-            )
-            data$timestamp <- start_time + time_vec
-        } else if (!is.null(timestamp_vec)) {
-            data$timestamp <- timestamp_vec
-        } else {
-            ## column removed if no timestamp detected
-            data$timestamp <- NULL
-        }
-    }
-
-    ## extract earliest POSIXct value as start_timestamp metadata
-    ## if not already passed from file header
-    if (is.null(start_timestamp) && !is.null(timestamp_vec)) {
-        start_timestamp <- min(timestamp_vec, na.rm = TRUE)
     }
 
     return(list(data = data, start_timestamp = start_timestamp))
@@ -588,6 +618,7 @@ parse_time_channel <- function(
 
 
 #' Validate and Estimate Sample Rate
+#' @inheritParams validate_mnirs
 #' @keywords internal
 parse_sample_rate <- function(
     data,
@@ -595,7 +626,8 @@ parse_sample_rate <- function(
     time_channel,
     sample_rate = NULL,
     nirs_device = NULL,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     ## if Oxysoft, sample_rate will be detected = 1
     ## extract and overwrite with exported sample_rate
@@ -605,20 +637,20 @@ parse_sample_rate <- function(
         sample_rate <- as.numeric(file_header[pos[1L], pos[2L] + 1L])
 
         col_names <- names(data)
-        time_vec <- data[[time_channel]] / sample_rate
         time_idx <- match(time_channel, col_names)
         data_names <- append(col_names, "time", time_idx)
         data_names <- rename_duplicates(data_names)
+        t_vec <- data[[time_channel]] / sample_rate
         time_channel <- setdiff(data_names, col_names)
-        data[[time_channel]] <- time_vec
+        data[[time_channel]] <- t_vec
         data <- data[data_names]
 
         if (verbose) {
             cli_inform(c(
                 "!" = "Oxysoft {.arg sample_rate} = {.val {sample_rate}} Hz.",
-                "i" = "{.arg time_channel} = {.val {time_channel}} added to \\
+                "i" = "{.arg time_channel} = {.field {time_channel}} added to \\
                 the data frame, in {.cls seconds}."
-            ))
+            ), call = env)
         }
     }
 
@@ -627,7 +659,7 @@ parse_sample_rate <- function(
     ## will estimate from time_channel (time_channel)
     ## will error on unable to estimate sample_rate
     sample_rate <- validate_sample_rate(
-        data, time_channel, sample_rate, verbose
+        data, time_channel, sample_rate, verbose, env = env
     )
 
     return(list(
@@ -639,11 +671,13 @@ parse_sample_rate <- function(
 
 
 #' Report warnings for unbalanced time_channel samples
+#' @inheritParams validate_mnirs
 #' @keywords internal
 detect_irregular_samples <- function(
     x,
     time_channel,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     if (!verbose) {
         return(invisible())
@@ -664,18 +698,18 @@ detect_irregular_samples <- function(
 
     info_msg <- if (n_total > 5L) {
         ## more than 5: print the first three plus remaining count
-        "{.arg {time_channel}} = {.val {irregular_vec[seq_len(3L)]}} \\
+        "{.field {time_channel}} = {.val {irregular_vec[seq_len(3L)]}} \\
         and {n_total - 3L} more."
     } else {
         ## 5 or fewer: print all
-        "{.arg {time_channel}} = {.val {irregular_vec}}."
+        "{.field {time_channel}} = {.val {irregular_vec}}."
     }
 
     cli_warn(c(
         "!" = "Duplicate or irregular {.arg time_channel} samples detected.",
         "i" = info_msg,
         "i" = "Re-sample with {.fn mnirs::resample_mnirs}."
-    ))
+    ), call = warn_call(env))
 
     return(invisible())
 }

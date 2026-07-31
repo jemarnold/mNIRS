@@ -5,7 +5,7 @@
 #' metadata.
 #'
 #' @param file_path Path of the data file to import. Supported file extensions
-#'   are `".xlsx"`, `".xls"`, and `".csv"`.
+#'   include `".xlsx"`, `".xls"`, `".csv"`, and `".txt"`.
 #'
 #' @param nirs_channels A character vector of one or more column names
 #'   containing mNIRS signals to import. Names must match the file header
@@ -160,18 +160,23 @@ read_mnirs <- function(
     data <- table_list$data_table
     file_header <- table_list$file_header
 
-    ## extract start time from file header
-    start_timestamp <- extract_start_timestamp(file_header)
-
     ## attempt to detect `time_channel` automatically
     time_channel <- detect_time_channel(
-        data, time_channel, nirs_device, verbose
+        data,
+        time_channel,
+        nirs_device,
+        verbose
     )
 
     ## rename from channel names, make duplicates unique, keep columns
     ## return list(data_renamed, nirs_renamed, time_renamed, event_renamed)
     renamed_list <- select_rename_data(
-        data, nirs_channels, time_channel, event_channel, keep_all, verbose
+        data,
+        nirs_channels,
+        time_channel,
+        event_channel,
+        keep_all,
+        verbose
     )
     data <- renamed_list$data
     nirs_renamed <- renamed_list$nirs_channel
@@ -181,24 +186,35 @@ read_mnirs <- function(
     ## remove empty (NA) columns and rows
     data <- remove_empty_rows_cols(data)
     ## convert char decimal "," to "." and convert column types
-    data <- convert_type(data, time_renamed, event_renamed, verbose)
+    data <- convert_type(
+        data,
+        nirs_renamed,
+        time_renamed,
+        event_renamed,
+        verbose
+    )
     ## convert POSIXct to numeric and/or recalc time from zero
-    ## return list(data, start_timestamp) — start_timestamp from time_channel POSIXct
+    ## defer header parsing unless the time channel lacks an absolute timestamp
     time_list <- parse_time_channel(
-        data, time_renamed, start_timestamp, add_timestamp, zero_time
+        data,
+        time_renamed,
+        extract_start_timestamp(file_header),
+        add_timestamp,
+        zero_time
     )
     data <- time_list$data
-
-    ## extract start_timestamp from data if not already found in header
-    if (is.null(start_timestamp)) {
-        start_timestamp <- time_list$start_timestamp
-    }
+    start_timestamp <- time_list$start_timestamp
 
     ## validate and estimate sample rate
     ## will write new "time" column if Oxysoft export rate detected
     ## return list(data_sampled, time_renamed, sample_rate)
     sample_list <- parse_sample_rate(
-        data, file_header, time_renamed, sample_rate, nirs_device, verbose
+        data,
+        file_header,
+        time_renamed,
+        sample_rate,
+        nirs_device,
+        verbose
     )
     data <- sample_list$data
     time_renamed <- sample_list$time_channel
@@ -305,9 +321,12 @@ create_mnirs_data <- function(data, ...) {
 
     metadata <- utils::modifyList(attributes(data), incoming_metadata)
 
+    ## preserve grouping: `new_tibble()` resets class, so re-add `grouped_df`
+    grp <- if (inherits(data, "grouped_df")) "grouped_df"
+
     nirs_data <- tibble::new_tibble(
         data,
-        class = "mnirs",
+        class = c("mnirs", grp),
         nirs_device = metadata$nirs_device,
         nirs_channels = metadata$nirs_channels,
         time_channel = metadata$time_channel,

@@ -4,7 +4,14 @@
 \alias{as_plot_data}
 \title{Validate and bind a list of mnirs data frames for plotting}
 \usage{
-as_plot_data(x)
+as_plot_data(x, env = rlang::caller_env())
+}
+\arguments{
+\item{x}{A numeric vector.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 Validate and bind a list of mnirs data frames for plotting

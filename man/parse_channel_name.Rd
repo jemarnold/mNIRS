@@ -11,7 +11,8 @@ parse_channel_name(channel, data, env = rlang::caller_env())
 
 \item{data}{A data frame for tidyselect context.}
 
-\item{env}{Environment for symbol evaluation.}
+\item{env}{Environment for symbol evaluation (typically the quosure
+environment).}
 }
 \value{
 A character vector, list of character vectors, or \code{NULL}.

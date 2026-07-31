@@ -6,8 +6,9 @@
 \usage{
 shift_mnirs(
   data,
-  nirs_channels = list(),
+  nirs_channels = NULL,
   time_channel = NULL,
+  group_channels = c("ensemble", "distinct"),
   to = NULL,
   by = NULL,
   width = NULL,
@@ -17,8 +18,9 @@ shift_mnirs(
 )
 }
 \arguments{
-\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
-metadata.}
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data
+and metadata, a list of data frames, or a grouped data frame (see
+\emph{Details}).}
 
 \item{nirs_channels}{A character vector giving the names of mNIRS columns to
 operate on. Must match column names in \code{data} exactly.
@@ -34,6 +36,20 @@ Must match a column name in \code{data} exactly.
 used.
 }}
 
+\item{group_channels}{Either a character string or a \code{list()} of
+channel-name vectors specifying how to group \code{nirs_channels}
+(see \emph{Details}).
+\describe{
+\item{\code{"ensemble"}}{The \emph{default}. Operate on all channels together,
+preserving the relative scaling between channels.}
+\item{\code{"distinct"}}{Operate on each channel independently, losing
+the relative scaling between channels.}
+\item{\code{list(c("A", "B"), c("C", "D"))}}{Operate on channels \code{A} & \code{B}
+in one group, and \code{C} & \code{D} in another group. Groups can be named
+(e.g. \code{list(smo2 = c("A", "B"))}). Each group must be non-empty
+and resulting group names must be unique.}
+}}
+
 \item{to}{A numeric value in units of \code{nirs_channels} to which the data
 channels will be shifted, e.g. shift the minimum value to zero.}
 
@@ -41,8 +57,7 @@ channels will be shifted, e.g. shift the minimum value to zero.}
 channels will be shifted, e.g. shift all values up by 10 units.}
 
 \item{width}{An integer defining the local window in number of samples
-centred on \code{idx}, between
-\verb{[idx - floor(width/2), idx + floor(width/2)]}.}
+centred on \code{idx}, between \verb{[idx - floor(width/2), idx + floor(width/2)]}.}
 
 \item{span}{A numeric value defining the local window time span around
 \code{idx} in units of \code{time_channel} or \code{t}, between
@@ -64,7 +79,8 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 A \link[tibble:tibble-package]{tibble} of class \emph{"mnirs"} with metadata
-available with \code{attributes()}.
+available with \code{attributes()}. For list or grouped data frame input,
+returns a named list of \emph{"mnirs"} tibbles, one per interval.
 }
 \description{
 Move the range of data channels in a data frame up or down, while preserving
@@ -74,30 +90,81 @@ positive values, or shift the mean of the first time span in a recording
 to zero.
 }
 \details{
-\code{nirs_channels = list()} can be used to group data channels (column names)
-to preserve absolute or relative scaling.
+\code{group_channels} controls how data channels are grouped to preserve
+absolute or relative scaling (see \code{\link[=rescale_mnirs]{rescale_mnirs()}}).
 \itemize{
-\item Channels grouped together in a vector (e.g. \code{list(c("A", "B"))}) will be
-shifted to a common value, and the relative scaling within that group
-will be preserved.
-\item Channels in separate list vectors (e.g. \code{list("A", "B")}) will be
-shifted independently, and relative scaling between groups will be lost.
-\item A single vector of channel names (e.g. \code{c("A", "B")}) will group
-channels together.
-\item Channels (columns) in \code{data} not explicitly defined in \code{nirs_channels}
-will be passed through untouched to the output data frame.
+\item \code{group_channels = "ensemble"} (the \emph{default}) shifts all
+\code{nirs_channels} to a common value, preserving relative scaling
+between channels.
+\item \code{group_channels = "distinct"} shifts each channel independently,
+losing relative scaling between channels.
+\item A \code{list()} of channel-name vectors (e.g. \code{list(c("A", "B"), c("C", "D"))})
+shifts channels \code{A} & \code{B} together and \code{C} & \code{D} together, preserving
+relative scaling within, but not between groups. \code{nirs_channels}
+omitted from the list are rescaled independently.
+\item Channel groups can be named (e.g. \code{list(smo2 = c("A", "B"))}) and names
+used as keys for per-group arguments.
+}
+
+Only one of either \code{to} or \code{by} and one of either \code{width} or \code{span} should
+be defined for each \code{group_channels}. If both of either pairing are
+defined, \code{to} will be preferred over \code{by}, and \code{width} will be preferred
+over \code{span}.
+\itemize{
+\item Channels (columns) in \code{data} not in \code{nirs_channels} are passed
+through without processing to the output data frame.
 }
 
 \code{nirs_channels} and \code{time_channel} can be retrieved automatically from
 \code{data} of class \emph{"mnirs"} which has been processed with \code{{mnirs}},
-if not defined explicitly. This will default to returning all
-\code{nirs_channels} grouped together, and should be defined explicitly
-for other grouping arrangements.
-
-Only one of either \code{to} or \code{by} and one of either \code{width} or \code{span} should
-be defined. If both of either pairing are defined, \code{to} will be preferred
-over \code{by}, and \code{width} will be preferred over \code{span}.
+if not defined explicitly.
 }
+\section{Per-channel arguments}{
+
+
+Arguments apply globally to all \code{nirs_channels} by default. Relevant
+arguments can instead be supplied uniquely per-channel as a named \code{list()},
+with names matching either \code{nirs_channels} or list names in
+\code{group_channels}, e.g.:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{shift_mnirs(
+    data,
+    nirs_channels = c(A, B, C),
+    group_channels = list(smo2 = c(A, B), hhb = C),
+    to = list(100, C = 0),
+    width = list(smo2 = 3),
+    span = list(hhb = 5),
+    position = "first"
+)
+}\if{html}{\out{</div>}}
+\itemize{
+\item A non-list value applies to every channel (the \emph{default} behaviour).
+\item A \code{list()} named by \code{nirs_channels} or \code{group_channels} applies
+per-channel / per-group values.
+\item A single unnamed value in the list will be applied to unlisted channels
+(e.g. \code{span = list(3, hhb = 5)} gives \code{hhb} 5 and every other channel 3).
+If no unnamed fallback value in the list, channels not named in the list
+will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
+process \code{hhb}).
+\item \code{list()} names not matching \code{nirs_channels} or \code{group_channels} are
+warned about and ignored.
+}
+}
+
+\section{Data input formats}{
+
+
+\emph{{mnirs}} processing functions accept \code{data} in multiple formats:
+\itemize{
+\item A \strong{single \emph{"mnirs"} data frame} is processed and returned directly.
+\item A \strong{list of \emph{"mnirs"} data frames}: each interval is processed
+separately and returned as a named list.
+\item A \strong{grouped \emph{"mnirs"} data frame}, e.g. with \code{dplyr::group_by()}: the
+data frame is split by grouping levels and each group is processed as
+a separate interval, returned as a named list.
+}
+}
+
 \examples{
 ## read example data
 data <- read_mnirs(
@@ -107,8 +174,9 @@ data <- read_mnirs(
     time_channel = c(time = "hh:mm:ss"),
     verbose = FALSE
 ) |>
-    shift_mnirs(        ## un-grouped nirs channels to shift separately 
-        nirs_channels = list(smo2_left, smo2_right), 
+    shift_mnirs(        ## un-grouped nirs channels to shift separately
+        nirs_channels = c(smo2_left, smo2_right),
+        group_channels = "distinct",
         to = 0,         ## NIRS values will be shifted to zero
         span = 120,     ## shift the *first* 120 sec of data to zero
         position = "first"
@@ -121,6 +189,6 @@ data
         plot(data, time_labels = TRUE) +
             ggplot2::geom_hline(yintercept = 0, linetype = "dotted")
     }
-}  
+}
 
 }

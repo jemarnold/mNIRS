@@ -14,11 +14,15 @@ navbar:
     - news
     right:
     - search
+    - github
     - bluesky
     - twitter
-    - github
     - lightswitch
   components:
+    github:
+      icon: fa-github
+      href: https://github.com/jemarnold/mnirs
+      aria-label: GitHub
     bluesky:
       icon: fa-brands fa-bluesky
       href: https://bsky.app/profile/jemarnold.bsky.social
@@ -27,10 +31,6 @@ navbar:
       icon: fa-twitter
       href: https://twitter.com/jem_arnold
       aria-label: Twitter
-    github:
-      icon: fa-github
-      href: https://github.com/jemarnold/mnirs
-      aria-label: GitHub
 figures:
   bg: white
 reference:
@@ -41,27 +41,27 @@ reference:
   - read_mnirs
   - example_mnirs
   - create_mnirs_data
-- title: Pre-process data
+- title: Process data
   desc: |
-    Clean, filter, and process data.
+    Clean, filter, and transform data.
   contents:
-  - starts_with("replace")
   - resample_mnirs
-  - filter_mnirs
+  - starts_with("replace")
   - starts_with("filter")
   - shift_mnirs
   - rescale_mnirs
-- title: Interval detection
+- title: Detect intervals
   desc: |
     Detect and extract intervals for further analysis
   contents:
   - extract_intervals
-  - by_time
-- title: Printing & plotting
+  - starts_with("by_")
+- title: Print & plot
   desc: |
     Tools for printing functions and pretty plotting with `{ggplot2}`.
   contents:
-  - plot.mnirs
+  - starts_with("print")
+  - starts_with("plot")
   - theme_mnirs
   - starts_with("palette")
   - starts_with("scale")

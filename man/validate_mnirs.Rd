@@ -21,18 +21,13 @@ validate_numeric(
   integer = FALSE,
   allow_na = FALSE,
   msg1 = "",
-  msg2 = ""
-)
-
-validate_mnirs_data(data, ncol = 2L)
-
-validate_nirs_channels(
-  nirs_channels,
-  data,
-  verbose = FALSE,
-  as_list = FALSE,
+  msg2 = "",
   env = rlang::caller_env()
 )
+
+validate_mnirs_data(data, ncol = 2L, env = rlang::caller_env())
+
+validate_nirs_channels(nirs_channels, data, env = rlang::caller_env())
 
 validate_time_channel(time_channel, data, env = rlang::caller_env())
 
@@ -43,13 +38,25 @@ validate_event_channel(
   env = rlang::caller_env()
 )
 
-estimate_sample_rate(x)
+estimate_sample_rate(x, env = rlang::caller_env())
 
-validate_sample_rate(data, time_channel, sample_rate, verbose = TRUE)
+validate_sample_rate(
+  data,
+  time_channel,
+  sample_rate,
+  verbose = TRUE,
+  env = rlang::caller_env()
+)
 
-validate_width_span(width = NULL, span = NULL, verbose = TRUE, msg = "")
+validate_width_span(
+  width = NULL,
+  span = NULL,
+  verbose = TRUE,
+  msg = "",
+  env = rlang::caller_env()
+)
 
-validate_x_t(x, t, allow_na = FALSE)
+validate_x_t(x, t, allow_na = FALSE, env = rlang::caller_env())
 }
 \arguments{
 \item{x}{A numeric vector.}
@@ -73,6 +80,10 @@ of \code{NA} to the returned numeric/integer vector.}
 \item{msg1, msg2}{A character string appended to the \code{\link[cli:cli_abort]{cli::cli_abort()}}
 message when numeric validation fails.}
 
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
+
 \item{data}{A data frame of class \emph{"mnirs"} containing time series data and
 metadata.}
 
@@ -82,16 +93,6 @@ operate on. Must match column names in \code{data} exactly.
 \item If \code{NULL} (default), the \code{nirs_channels} metadata attribute of \code{data} is
 used.
 }}
-
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
-
-\item{as_list}{Logical. Default is \code{FALSE}. If \code{nirs_channels} is specified
-as a list, it will be coerced to a flat character vector and an
-information message is displayed (when \code{verbose = TRUE}). If \code{TRUE},
-\code{nirs_channels} is returned as-is, i.e. as a list for callers which
-require it.}
 
 \item{time_channel}{A character string naming the time or sample column.
 Must match a column name in \code{data} exactly.
@@ -116,6 +117,10 @@ present or detected in metadata. If \code{FALSE}, \code{event_channel} may be \c
 be used if detected, or the sample rate will be estimated from
 \code{time_channel}.
 }}
+
+\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
+warnings and information messages helpful for troubleshooting. Ad
+global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 Returns the validated object (e.g. a resolved \code{time_channel}

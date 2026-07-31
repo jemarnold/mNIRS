@@ -77,8 +77,41 @@ test_that("validate_numeric handles NA, NaN, Inf", {
     expect_silent(validate_numeric(c(1, NA, 3), elements = 2))
 })
 
+test_that("validate_numeric allows NA with range and integer checks", {
+    expect_silent(validate_numeric(
+        c(1, NA),
+        elements = 2,
+        range = c(0, 2),
+        allow_na = TRUE
+    ))
+    expect_silent(validate_numeric(
+        c(1L, NA_integer_),
+        elements = 2,
+        integer = TRUE,
+        allow_na = TRUE
+    ))
+
+    expect_error(
+        validate_numeric(c(3, NA), range = c(0, 2), allow_na = TRUE),
+        "numeric"
+    )
+    expect_error(
+        validate_numeric(c(1.5, NA), integer = TRUE, allow_na = TRUE),
+        "integer"
+    )
+})
+
 test_that("validate_numeric handles NULL", {
     expect_silent(validate_numeric(NULL))
+})
+
+test_that("validate_numeric reports errors from the caller's `env`", {
+    ## a named caller env attributes the abort to the user-facing function
+    caller <- function() {
+        validate_numeric("text", env = rlang::current_env())
+    }
+    err <- expect_error(caller(), "numeric")
+    expect_equal(rlang::call_name(conditionCall(err)), "caller")
 })
 
 ## validate_mnirs_data() ========================================
@@ -225,11 +258,10 @@ test_that("parse_channel_name returns NULL on logical channel", {
 })
 
 
-
 ## validate_nirs_channels() ========================================
 test_that("validate_nirs_channels() uses metadata when NULL", {
     data <- create_test_data()
-    result <- validate_nirs_channels(NULL, data, verbose = FALSE)
+    result <- validate_nirs_channels(NULL, data)
     expect_equal(result, c("nirs1", "nirs2"))
 })
 
@@ -239,7 +271,7 @@ test_that("validate_nirs_channels() uses explicit channels when provided", {
     expect_equal(result, "nirs1")
 })
 
-test_that("validate_nirs_channels() works with nirs_channels = list()", {
+test_that("validate_nirs_channels() accepts vectors and quosures", {
     data <- create_test_data()
     nirs_vec <- c("nirs1", "nirs2")
     result <- validate_nirs_channels(nirs_vec, data)
@@ -247,22 +279,6 @@ test_that("validate_nirs_channels() works with nirs_channels = list()", {
 
     result <- validate_nirs_channels(enquo(nirs_vec), data)
     expect_equal(result, nirs_vec)
-
-    attr(data, "nirs_channels") <- nirs_vec
-    expect_message(
-        result <- validate_nirs_channels(
-            NULL, data, verbose = TRUE, as_list = TRUE
-        ),
-        "`nirs_channels`.*grouped"
-    )
-    expect_equal(result, nirs_vec)
-
-    nirs_list <- list(c("nirs1", "nirs2"), "nirs3")
-    result <- validate_nirs_channels(nirs_list, data, as_list = TRUE)
-    expect_equal(result, nirs_list)
-
-    result <- validate_nirs_channels(enquo(nirs_list), data, as_list = TRUE)
-    expect_equal(result, nirs_list)
 })
 
 test_that("validate_nirs_channels() errors when not in metadata or provided", {
@@ -300,14 +316,11 @@ test_that("validate_nirs_channels() errors when < 2 valid values", {
     )
 })
 
-test_that("validate_nirs_channels() informs when list coerced to vector", {
+test_that("validate_nirs_channels() silently flattens list input", {
     data <- create_test_data()
     nirs_list <- list(c("nirs1", "nirs2"), "nirs3")
-    expect_message(
-        result <- validate_nirs_channels(
-            nirs_list, data, verbose = TRUE, as_list = FALSE
-        ),
-        "`nirs_channels`.*unlisted"
+    expect_no_message(
+        result <- validate_nirs_channels(nirs_list, data)
     )
     expect_equal(result, c("nirs1", "nirs2", "nirs3"))
 })
@@ -413,7 +426,6 @@ test_that("validate_event_channel() error conditions", {
     data$lap <- rep(NA_integer_, nrow(data))
     expect_error(validate_event_channel("lap", data), "must contain valid")
 })
-
 
 
 ## within() ===============================================================
@@ -713,10 +725,78 @@ test_that("validate_x_t() validates inputs", {
     expect_silent(validate_x_t(x = NA_real_, t = 1, allow_na = TRUE))
 })
 
+
+## validate_start_time() ==============================
+test_that("validate_start_time() uses explicit start_time when provided", {
+    data <- create_test_data()
+    attr(data, "interval_times") <- 3
+    expect_equal(validate_start_time(5, data, data[["time"]]), 5)
+})
+
+test_that("validate_start_time() falls back to interval_times attribute", {
+    data <- create_test_data()
+    attr(data, "interval_times") <- 3
+    expect_equal(validate_start_time(NULL, data, data[["time"]]), 3)
+})
+
+test_that("validate_start_time() falls back to zero when no start_time or attribute", {
+    data <- create_test_data()
+    expect_equal(validate_start_time(NULL, data, data[["time"]]), 0)
+})
+
+test_that("validate_start_time() falls back to first non-negative time", {
+    data <- create_test_data(time_max = 10, sample_rate = 1)
+    ## time = -2.5, -1.5, ..., 7.5: first non-negative value is 0.5
+    data[["time"]] <- data[["time"]] - 2.5
+    expect_equal(validate_start_time(NULL, data, data[["time"]]), 0.5)
+})
+
+test_that("validate_start_time() falls back to zero when all times negative", {
+    data <- create_test_data(time_max = 10, sample_rate = 1)
+    data[["time"]] <- data[["time"]] - 20
+    ## fallback 0 exceeds time range, so errors on range check, not on NA
+    expect_error(
+        validate_start_time(NULL, data, data[["time"]]),
+        "No observations.*before"
+    )
+})
+
+test_that("validate_start_time() rejects non-numeric or multi-element start_time", {
+    data <- create_test_data()
+    expect_error(validate_start_time("5", data, data[["time"]]), "numeric")
+    expect_error(validate_start_time(c(1, 2), data, data[["time"]]), "numeric")
+    expect_error(validate_start_time(NA, data, data[["time"]]), "numeric")
+})
+
+test_that("validate_start_time() warns and resets when no observations <= start_time", {
+    data <- create_test_data()
+    expect_warning(
+        result <- validate_start_time(-1, data, data[["time"]]),
+        "start_time.*before first valid.*time_channel"
+    )
+    expect_equal(result, data[["time"]][1L])
+
+    ## verbose = FALSE suppresses warning, still resets
+    expect_silent(
+        result <- validate_start_time(-1, data, data[["time"]], verbose = FALSE)
+    )
+    expect_equal(result, data[["time"]][1L])
+})
+
+test_that("validate_start_time() errors when start_time exceeds time range", {
+    data <- create_test_data(time_max = 10)
+    expect_error(
+        validate_start_time(100, data, data[["time"]]),
+        "No observations.*before"
+    )
+})
+
 ## findInt_mnirs() ==================================
 test_that("findInt_mnirs provides informative error", {
     expect_error(findInt_mnirs(1, c(3, 1, 2)), "time_channel.*sorted")
     expect_error(findInt_mnirs(1, c(1, NA, 2)), "time_channel.*sorted")
+    ## duplicates permitted
+    expect_equal(findInt_mnirs(1, c(1, 2, 2, 3)), 1)
     ## valid input passes through to findInterval()
     expect_equal(findInt_mnirs(2.5, 1:5), findInterval(2.5, 1:5))
 })

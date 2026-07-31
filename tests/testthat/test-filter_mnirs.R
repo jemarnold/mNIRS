@@ -1,46 +1,26 @@
-## filter_ma() ===========================================
-test_that("filter_ma() returns expected smoothed values", {
+## filter_moving_average() ===========================================
+test_that("filter_moving_average() returns expected smoothed values", {
     x <- c(1, 2, 3, 4, 5)
 
-    result <- filter_ma(x, width = 3, verbose = FALSE, na.rm = TRUE)
+    result <- filter_moving_average(x, width = 3, verbose = FALSE, na.rm = TRUE)
     expect_equal(result, c(NA, 2, 3, 4, NA))
-    result <- filter_ma(x, width = 3, verbose = FALSE, partial = TRUE)
-    expect_equal(result, c(1.5, 2, 3, 4, 4.5))
-
-    # Width-based with single width (floor(1/2) = 0, so just x itself)
-    result <- filter_ma(x, width = 1, verbose = FALSE)
-    expect_equal(result, x)
-    
-    ## filter_moving_average alias for filter_ma
-    result <- filter_moving_average(
-        x,
-        width = 3,
-        verbose = FALSE,
-        partial = FALSE
-    )
-    expect_equal(result, c(NA, 2, 3, 4, NA))
-    result <- filter_moving_average(
-        x,
-        width = 3,
-        verbose = FALSE,
-        partial = TRUE
-    )
+    result <- filter_moving_average(x, width = 3, verbose = FALSE, partial = TRUE)
     expect_equal(result, c(1.5, 2, 3, 4, 4.5))
 })
 
-test_that("filter_ma() handles custom time vectors", {
+test_that("filter_moving_average() handles custom time vectors", {
     x <- c(10, 20, 30, 40, 50, 60)
     t <- c(0, 1, 3, 6, 10, 11)
 
     # Span-based with time gaps
-    result <- filter_ma(x, t, span = 2, verbose = FALSE)
+    result <- filter_moving_average(x, t, span = 2, verbose = FALSE)
     expect_equal(result, c(15, 15, 30, 40, 55, 55))
 })
 
-test_that("filter_ma() handles NA values correctly", {
+test_that("filter_moving_average() handles NA values correctly", {
     x <- c(1, NA, 3, 4, 5)
 
-    result <- filter_ma(
+    result <- filter_moving_average(
         x,
         width = 3,
         partial = FALSE,
@@ -49,7 +29,7 @@ test_that("filter_ma() handles NA values correctly", {
     )
     expect_equal(result, c(rep(NA, 3), 4, NA))
 
-    result <- filter_ma(
+    result <- filter_moving_average(
         x,
         width = 3,
         partial = TRUE,
@@ -57,7 +37,7 @@ test_that("filter_ma() handles NA values correctly", {
     )
     expect_equal(result, c(1, 2, 3.5, 4, 4.5))
 
-    result <- filter_ma(
+    result <- filter_moving_average(
         x,
         width = 3,
         partial = FALSE, ## min 3 valid obs at edges
@@ -65,7 +45,7 @@ test_that("filter_ma() handles NA values correctly", {
     )
     expect_equal(result, c(NA, 2, 3.5, 4, NA))
 
-    result <- filter_ma(
+    result <- filter_moving_average(
         x,
         width = 3,
         partial = TRUE,
@@ -75,20 +55,20 @@ test_that("filter_ma() handles NA values correctly", {
     expect_equal(result, c(rep(NA, 3), 4, 4.5))
 
     x <- c(1, NA, NA, NA, NA, 6, 7, 8)
-    result <- filter_ma(x, width = 3, partial = TRUE, na.rm = TRUE)
+    result <- filter_moving_average(x, width = 3, partial = TRUE, na.rm = TRUE)
     expect_equal(result, c(1, 1, NA, NA, 6, 6.5, 7, 7.5))
 })
 
-test_that("filter_ma() validates x as numeric", {
+test_that("filter_moving_average() validates x as numeric", {
     expect_error(
-        filter_ma(c("a", "b", "c"), width = 3, verbose = FALSE),
+        filter_moving_average(c("a", "b", "c"), width = 3, verbose = FALSE),
         "x.*numeric"
     )
 })
 
-test_that("filter_ma() validates t as numeric", {
+test_that("filter_moving_average() validates t as numeric", {
     expect_error(
-        filter_ma(
+        filter_moving_average(
             1:5,
             t = letters[1:5],
             width = 3,
@@ -98,58 +78,58 @@ test_that("filter_ma() validates t as numeric", {
     )
 })
 
-test_that("filter_ma() validates x and t have same length", {
+test_that("filter_moving_average() validates x and t have same length", {
     expect_error(
-        filter_ma(1:5, t = 1:3, width = 3, verbose = FALSE),
+        filter_moving_average(1:5, t = 1:3, width = 3, verbose = FALSE),
         "equal length"
     )
 })
 
-test_that("filter_ma() validates width & span constraints", {
+test_that("filter_moving_average() validates width & span constraints", {
     x <- 1:10
 
     ## width or span required
     expect_error(
-        filter_ma(x, verbose = FALSE),
+        filter_moving_average(x, verbose = FALSE),
         "width.*or.*span.*must be defined"
     )
 
     # Width must be positive integer
     expect_error(
-        filter_ma(x, width = -1, verbose = FALSE),
+        filter_moving_average(x, width = -1, verbose = FALSE),
         "width.*integer"
     )
 
     ## width = 0
     expect_error(
-        filter_ma(x, width = 0, verbose = FALSE),
+        filter_moving_average(x, width = 0, verbose = FALSE),
         "width.*integer"
     )
     ## width > length(x)
     expect_true(all(
-        filter_ma(x, width = 21, partial = TRUE) == mean(x)
+        filter_moving_average(x, width = 21, partial = TRUE) == mean(x)
     ))
 
     # Span must be positive
     expect_error(
-        filter_ma(x, span = -1, verbose = FALSE),
+        filter_moving_average(x, span = -1, verbose = FALSE),
         "span.*numeric"
     )
 
     ## span = 0
-    expect_equal(filter_ma(x, span = 0, verbose = FALSE), x)
+    expect_equal(filter_moving_average(x, span = 0, verbose = FALSE), x)
     ## span = 0.5 takes nearest 1 sample
-    expect_equal(filter_ma(x, span = 0.5, verbose = FALSE), x)
+    expect_equal(filter_moving_average(x, span = 0.5, verbose = FALSE), x)
     ## span > length(x)
     expect_true(all(
-        filter_ma(x, span = 21, partial = TRUE) == mean(x)
+        filter_moving_average(x, span = 21, partial = TRUE) == mean(x)
     ))
 })
 
-test_that("filter_ma() warns when both width and span provided", {
+test_that("filter_moving_average() warns when both width and span provided", {
     ## should produce warning
     expect_message(
-        filter_ma(1:5, width = 3, span = 2),
+        filter_moving_average(1:5, width = 3, span = 2),
         "width.*span"
     )
 
@@ -159,99 +139,105 @@ test_that("filter_ma() warns when both width and span provided", {
 
     ## should not produce warning
     expect_silent(
-        result <- filter_ma(1:5, width = 3, span = 2)
+        result <- filter_moving_average(1:5, width = 3, span = 2)
     )
 })
 
-test_that("filter_ma() handles edge cases", {
+test_that("filter_moving_average() handles edge cases", {
     # Single value
     expect_equal(
-        filter_ma(5, width = 1, verbose = FALSE),
+        filter_moving_average(5, width = 1, verbose = FALSE),
         5,
         ignore_attr = TRUE
     )
 
     # Two values
     expect_equal(
-        filter_ma(c(1, 2), width = 1, verbose = FALSE),
+        filter_moving_average(c(1, 2), width = 1, verbose = FALSE),
         c(1, 2)
     )
 
     # All NA
     expect_error(
-        filter_ma(c(NA, NA, NA), width = 3, verbose = FALSE),
+        filter_moving_average(c(NA, NA, NA), width = 3, verbose = FALSE),
         "x.*numeric"
     )
 })
 
-test_that("filter_ma with insufficient width returns NA with warning", {
+test_that("filter_moving_average with insufficient width returns NA with warning", {
     t <- 1:10
     x <- c(1, NA, 3, NA, 5, NA, 7, NA, 9, NA)
 
-    expect_all_equal(filter_ma(x, t, width = 2), NA_real_) |>
+    expect_all_equal(filter_moving_average(x, t, width = 2), NA_real_) |>
         expect_warning("Set.*na.rm = TRUE")
 
     x <- c(NA, 1, NA)
     expect_error(
-        filter_ma(x, width = 3, na.rm = TRUE),
+        filter_moving_average(x, width = 3, na.rm = TRUE),
         "Insufficient.*samples"
     )
 })
 
-## filter_butter() =========================================
-test_that("filter_butter validates inputs correctly", {
+## filter_butterworth() =========================================
+test_that("filter_butterworth validates inputs correctly", {
+    skip_if_not_installed("signal")
+    
     expect_error(
-        filter_butter(x = "not_numeric", order = 1, W = 0.1),
+        filter_butterworth(x = "not_numeric", order = 1, W = 0.1),
         "x.*numeric"
     )
 
     expect_error(
-        filter_butter(x = 1:10, order = 0, W = 0.1),
+        filter_butterworth(x = 1:10, order = 0, W = 0.1),
         "n.*integer"
     )
 
     expect_error(
-        filter_butter(x = 1:10, order = -1, W = 0.1),
+        filter_butterworth(x = 1:10, order = -1, W = 0.1),
         "n.*integer"
     )
 
     expect_error(
-        filter_butter(x = 1:10, order = 1.5, W = 0.1),
+        filter_butterworth(x = 1:10, order = 1.5, W = 0.1),
         "n.*integer"
     )
 
     expect_error(
-        filter_butter(x = 1:10, order = 1, W = 1.5),
+        filter_butterworth(x = 1:10, order = 1, W = 1.5),
         "W.*numeric"
     )
 
     expect_error(
-        filter_butter(x = 1:10, order = 1, W = 0),
+        filter_butterworth(x = 1:10, order = 1, W = 0),
         "W.*numeric"
     )
 
     expect_error(
-        filter_butter(x = 1:10, order = 1, W = c(0.1, 0.3), type = "low"),
+        filter_butterworth(x = 1:10, order = 1, W = c(0.1, 0.3), type = "low"),
         "W.*numeric"
     )
 })
 
-test_that("filter_butter returns correct output structure", {
+test_that("filter_butterworth returns correct output structure", {
+    skip_if_not_installed("signal")
+
     x <- rnorm(100)
-    result <- filter_butter(x, order = 2, W = 0.1)
+    result <- filter_butterworth(x, order = 2, W = 0.1)
 
     expect_type(result, "double")
     expect_length(result, length(x))
     expect_false(anyNA(result))
 })
 
-test_that("filter_butter handles different edge options", {
+test_that("filter_butterworth handles different edge options", {
+    skip_if_not_installed("signal")
+
     set.seed(42)
     x <- sin(2 * pi * 1:50 / 10) + rnorm(50, 0, 0.5)
 
-    result_none <- filter_butter(x, order = 2, W = 0.1, edges = "none")
-    result_rev <- filter_butter(x, order = 2, W = 0.1, edges = "rev")
-    result_rep1 <- filter_butter(x, order = 2, W = 0.1, edges = "rep1")
+    result_none <- filter_butterworth(x, order = 2, W = 0.1, edges = "none")
+    result_rev <- filter_butterworth(x, order = 2, W = 0.1, edges = "rev")
+    result_rep1 <- filter_butterworth(x, order = 2, W = 0.1, edges = "rep1")
 
     expect_length(result_none, length(x))
     expect_length(result_rev, length(x))
@@ -263,39 +249,43 @@ test_that("filter_butter handles different edge options", {
     expect_false(identical(result_rev, result_rep1))
 })
 
-test_that("filter_butter handles NA values", {
+test_that("filter_butterworth handles NA values", {
+    skip_if_not_installed("signal")
+
     x_with_na <- c(1:5, NA, 7:10)
 
     # NA propagates through filtering
     expect_error(
-        filter_butter(x_with_na, order = 1, W = 0.1, na.rm = FALSE),
+        filter_butterworth(x_with_na, order = 1, W = 0.1, na.rm = FALSE),
         "x.*NA"
     )
 
-    result <- filter_butter(x_with_na, order = 1, W = 0.1, na.rm = TRUE)
+    result <- filter_butterworth(x_with_na, order = 1, W = 0.1, na.rm = TRUE)
     expect_true(is.na(result[6]))
 
     # All NA input
     expect_error(
-        filter_butter(rep(NA_real_, 5), order = 1, W = 0.1, na.rm = TRUE),
+        filter_butterworth(rep(NA_real_, 5), order = 1, W = 0.1, na.rm = TRUE),
         "x.*valid.*numeric"
     )
 
     # Leading/trailing NAs
     x_edge_na <- c(NA, NA, 3:8, NA, NA)
-    result_edge <- filter_butter(x_edge_na, order = 1, W = 0.1, na.rm = TRUE)
+    result_edge <- filter_butterworth(x_edge_na, order = 1, W = 0.1, na.rm = TRUE)
     expect_true(all(is.na(result_edge[c(1:2, 9:10)])))
     expect_length(result_edge, length(x_edge_na))
 })
 
-test_that("filter_butter handles different filter types", {
+test_that("filter_butterworth handles different filter types", {
+    skip_if_not_installed("signal")
+
     set.seed(123)
     x <- rnorm(100)
 
-    low <- filter_butter(x, order = 2, W = 0.1, type = "low")
-    high <- filter_butter(x, order = 2, W = 0.9, type = "high")
-    stop <- filter_butter(x, order = 2, W = c(0.3, 0.7), type = "stop")
-    pass <- filter_butter(x, order = 2, W = c(0.3, 0.7), type = "pass")
+    low <- filter_butterworth(x, order = 2, W = 0.1, type = "low")
+    high <- filter_butterworth(x, order = 2, W = 0.9, type = "high")
+    stop <- filter_butterworth(x, order = 2, W = c(0.3, 0.7), type = "stop")
+    pass <- filter_butterworth(x, order = 2, W = c(0.3, 0.7), type = "pass")
 
     expect_length(low, length(x))
     expect_length(high, length(x))
@@ -304,56 +294,84 @@ test_that("filter_butter handles different filter types", {
 
     ## wrong W elements
     expect_error(
-        filter_butter(x, order = 2, W = c(0.3, 0.7), type = "low"),
+        filter_butterworth(x, order = 2, W = c(0.3, 0.7), type = "low"),
         "W.*1-element.*numeric"
     )
     expect_error(
-        filter_butter(x, order = 2, W = 0.9, type = "pass"),
+        filter_butterworth(x, order = 2, W = 0.9, type = "pass"),
         "W.*2-element.*numeric"
     )
 })
 
-test_that("filter_butter handles edge cases", {
+test_that("filter_butterworth handles edge cases", {
+    skip_if_not_installed("signal")
+
     # Very short vector
     x_short <- c(1, 2, 3)
-    result <- filter_butter(x_short, order = 1, W = 0.5)
+    result <- filter_butterworth(x_short, order = 1, W = 0.5)
     expect_length(result, 3)
 
     # Single value
     x_single <- 5
-    result_single <- filter_butter(x_single, order = 1, W = 0.5)
+    result_single <- filter_butterworth(x_single, order = 1, W = 0.5)
     expect_length(result_single, 1)
 
     # Constant signal
     x_const <- rep(10, 50)
-    result_const <- filter_butter(x_const, order = 1, W = 0.5)
+    result_const <- filter_butterworth(x_const, order = 1, W = 0.5)
     expect_true(all(abs(result_const - 10) < 1e-10))
 })
 
-test_that("filter_butter smooths noisy signal", {
+test_that("filter_butterworth smooths noisy signal", {
+    skip_if_not_installed("signal")
+
     set.seed(999)
     sin_wave <- sin(2 * pi * 1:100 / 20)
     x <- seq_along(sin_wave)
     noisy <- sin_wave + rnorm(100, 0, 0.3)
-    filtered <- filter_butter(noisy, order = 2, W = 0.2)
+    filtered <- filter_butterworth(noisy, order = 2, W = 0.2)
 
     # Filtered signal should be smoother (lower variance)
     expect_lt(var(diff(filtered)), var(diff(noisy)))
 })
 
-test_that("filter_butter works visually", {
-    skip("visual check for filter_butter")
+test_that("filter_butterworth works visually", {
+    skip("visual check for filter_butterworth")
     set.seed(999)
     sin_wave <- sin(2 * pi * 1:100 / 20)
     x <- seq_along(sin_wave)
     noisy <- sin_wave + rnorm(100, 0, 0.3)
-    filtered <- filter_butter(noisy, order = 2, W = 0.2)
+    filtered <- filter_butterworth(noisy, order = 2, W = 0.2)
 
-    ggplot2::ggplot(tibble::tibble()) +
+    ggplot2::ggplot(tibble()) +
         ggplot2::aes(x = x) +
         ggplot2::geom_line(ggplot2::aes(y = sin_wave, colour = "sin")) +
         ggplot2::geom_line(ggplot2::aes(y = noisy, colour = "noisy")) +
         ggplot2::geom_line(ggplot2::aes(y = filtered, colour = "filtered"))
+})
+
+
+## alias functions ===================================================
+test_that("filter_ma & filter_butter alias parents and report own names", {
+    skip_if_not_installed("signal")
+    x <- c(1, 2, 3, 4, 5)
+
+    ## aliases return identical results to their parent functions
+    expect_identical(
+        filter_ma(x, width = 3, verbose = FALSE),
+        filter_moving_average(x, width = 3, verbose = FALSE)
+    )
+    expect_identical(
+        filter_butter(x, order = 2, W = 0.1),
+        filter_butterworth(x, order = 2, W = 0.1)
+    )
+
+    ## conditions attribute to the alias name as called, not the parent
+    err <- expect_error(filter_ma(x), "Window size undefined")
+    expect_equal(rlang::call_name(conditionCall(err)), "filter_ma")
+
+    err <- expect_error(filter_butter(x, order = 0, W = 0.1), "n.*integer")
+    expect_equal(rlang::call_name(conditionCall(err)), "filter_butter")
 })
 
 
@@ -416,6 +434,39 @@ test_that("filter_mnirs method aliases work", {
         filter_mnirs(moxy_data, method = "Smooth Spline", verbose = FALSE),
         result_spl
     )
+})
+
+test_that("filter_mnirs applies method per channel", {
+    result <- filter_mnirs(
+        moxy_data,
+        method = list(smo2_left = "ma", smo2_right = "spline"),
+        width = list(smo2_left = 5),
+        spar = list(smo2_right = 0.5),
+        verbose = FALSE
+    )
+    left <- filter_mnirs(
+        moxy_data,
+        nirs_channels = "smo2_left",
+        method = list("moving_average"), ## list to cover `if (is.list(method) && !any(nzchar(names(method) %||% "")))`
+        width = 5,
+        verbose = FALSE
+    )
+    right <- filter_mnirs(
+        moxy_data,
+        nirs_channels = "smo2_right",
+        method = "smooth_spline",
+        spar = 0.5,
+        verbose = FALSE
+    )
+
+    expect_equal(result$smo2_left, left$smo2_left)
+    expect_equal(result$smo2_right, right$smo2_right)
+    expect_s3_class(result, "mnirs")
+    expect_equal(
+        attr(result, "nirs_channels"),
+        attr(moxy_data, "nirs_channels")
+    )
+    expect_equal(attr(result, "time_channel"), attr(moxy_data, "time_channel"))
 })
 
 test_that("filter_mnirs validates method argument", {
@@ -489,6 +540,47 @@ test_that("smooth_spline handles NAs", {
     )
 })
 
+test_that("smooth_spline handles channel-specific NAs independently", {
+    data <- data.frame(
+        time = 0:7,
+        ch1 = c(NA, 1, 4, 9, 16, 25, 36, 49),
+        ch2 = c(0, 1, 4, 9, 16, NA, 36, 49)
+    )
+
+    combined <- filter_mnirs(
+        data,
+        nirs_channels = c("ch1", "ch2"),
+        time_channel = "time",
+        method = "smooth_spline",
+        spar = 0.5,
+        na.rm = TRUE,
+        verbose = FALSE
+    )
+    ch1 <- filter_mnirs(
+        data,
+        nirs_channels = "ch1",
+        time_channel = "time",
+        method = "smooth_spline",
+        spar = 0.5,
+        na.rm = TRUE,
+        verbose = FALSE
+    )
+    ch2 <- filter_mnirs(
+        data,
+        nirs_channels = "ch2",
+        time_channel = "time",
+        method = "smooth_spline",
+        spar = 0.5,
+        na.rm = TRUE,
+        verbose = FALSE
+    )
+
+    expect_equal(combined$ch1, ch1$ch1)
+    expect_equal(combined$ch2, ch2$ch2)
+    expect_equal(which(is.na(combined$ch1)), 1L)
+    expect_equal(which(is.na(combined$ch2)), 6L)
+})
+
 test_that("smooth_spline errors with irregular samples", {
     moxy_data <- read_mnirs(
         file_path = example_mnirs("moxy_ramp.xlsx"),
@@ -525,6 +617,8 @@ test_that("smooth_spline validates spar parameter", {
 
 ## Butterworth tests ==============================================
 test_that("butterworth low-pass filter works", {
+    skip_if_not_installed("signal")
+
     result <- filter_mnirs(
         moxy_data,
         method = "butterworth",
@@ -543,7 +637,9 @@ test_that("butterworth low-pass filter works", {
 })
 
 test_that("butterworth accepts fc instead of W", {
-    sr <- attr(moxy_data, "sample_rate")
+    skip_if_not_installed("signal")
+
+    sample_rate <- attr(moxy_data, "sample_rate")
 
     result_W <- filter_mnirs(
         moxy_data,
@@ -559,7 +655,7 @@ test_that("butterworth accepts fc instead of W", {
         method = "butterworth",
         type = "low",
         order = 2,
-        fc = 0.1 * sr * 0.5,
+        fc = 0.1 * sample_rate * 0.5,
         verbose = FALSE
     )
 
@@ -567,6 +663,8 @@ test_that("butterworth accepts fc instead of W", {
 })
 
 test_that("butterworth prefers W when both W and fc specified", {
+    skip_if_not_installed("signal")
+
     expect_message(
         filter_mnirs(
             moxy_data,
@@ -616,7 +714,7 @@ test_that("butterworth validates filter type", {
             W = 0.1,
             verbose = FALSE
         ),
-        "should be one of"
+        "must be one of"
     )
 })
 
@@ -664,6 +762,8 @@ test_that("butterworth handles different filter types", {
 })
 
 test_that("butterworth validates W length for stop/pass filters", {
+    skip_if_not_installed("signal")
+
     expect_error(
         filter_mnirs(
             moxy_data,
@@ -690,6 +790,8 @@ test_that("butterworth validates W length for stop/pass filters", {
 })
 
 test_that("butterworth handles NAs with na.rm = TRUE", {
+    skip_if_not_installed("signal")
+
     moxy_data <- read_mnirs(
         file_path = example_mnirs("moxy_ramp.xlsx"),
         nirs_channels = c(smo2_left = "SmO2 Live", smo2_right = "SmO2 Live(2)"),
@@ -821,6 +923,8 @@ test_that("filter_mnirs preserves and updates metadata", {
 })
 
 test_that("butterworth updates sample_rate in metadata", {
+    skip_if_not_installed("signal")
+
     result <- filter_mnirs(
         moxy_data,
         method = "butterworth",
@@ -837,6 +941,8 @@ test_that("butterworth updates sample_rate in metadata", {
 
 ## verbose output tests ==============================================
 test_that("verbose output works", {
+    skip_if_not_installed("signal")
+
     expect_message(
         filter_mnirs(moxy_data, method = "smooth_spline", verbose = TRUE),
         "spar ="
@@ -884,6 +990,8 @@ test_that("filter_mnirs works with pipe", {
 })
 
 test_that("multiple filtering operations can be chained", {
+    skip_if_not_installed("signal")
+
     result <- moxy_data |>
         filter_mnirs(
             method = "butterworth",
@@ -911,7 +1019,7 @@ test_that("filter_mnirs works visually on Moxy data", {
         dplyr::mutate(
             dplyr::across(
                 smo2,
-                \(.x) filter_butter(.x, 2, 0.05),
+                \(.x) filter_butterworth(.x, 2, 0.05),
                 .names = "{.col}_filtfilt"
             )
         )
@@ -947,4 +1055,58 @@ test_that("filter_mnirs works visually on Moxy data", {
             data = data_filt,
             ggplot2::aes(y = smo2, colour = "filt_mnirs")
         )
+})
+
+
+## multi-interval input ================================================
+test_that("filter_mnirs processes a named list of data frames", {
+    make_df <- \(val) {
+        create_mnirs_data(
+            data.frame(time = 1:5, ch1 = rep(val, 5)),
+            nirs_channels = "ch1",
+            time_channel = "time"
+        )
+    }
+    data_list <- list(a = make_df(50), b = make_df(60))
+
+    result <- filter_mnirs(
+        data_list,
+        method = "moving_average",
+        width = 3,
+        verbose = FALSE
+    )
+
+    expect_type(result, "list")
+    expect_named(result, c("a", "b"))
+    expect_s3_class(result$a, "mnirs")
+    ## constant input returns constant means; partial edge windows are NA
+    expect_equal(result$a$ch1, c(NA, 50, 50, 50, NA))
+    expect_equal(result$b$ch1, c(NA, 60, 60, 60, NA))
+})
+
+test_that("filter_mnirs processes grouped data frames", {
+    skip_if_not_installed("dplyr")
+
+    df <- create_mnirs_data(
+        data.frame(
+            time = rep(1:5, 2),
+            ch1 = rep(c(50, 60), each = 5),
+            group = rep(c("A", "B"), each = 5)
+        ),
+        nirs_channels = "ch1",
+        time_channel = "time"
+    )
+    grouped_df <- dplyr::group_by(df, group)
+
+    result <- filter_mnirs(
+        grouped_df,
+        method = "moving_average",
+        width = 3,
+        verbose = FALSE
+    )
+
+    expect_named(result, c("A", "B"))
+    expect_s3_class(result$A, "mnirs")
+    expect_equal(result$A$ch1, c(NA, 50, 50, 50, NA))
+    expect_equal(result$B$ch1, c(NA, 60, 60, 60, NA))
 })

@@ -6,10 +6,16 @@
 \usage{
 find_interval_time(
   interval,
-  time_vec,
+  t_vec,
   event_vec = NULL,
-  position = c("first", "last")
+  position = c("first", "last"),
+  env = rlang::caller_env()
 )
+}
+\arguments{
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 resolve a single mnirs_interval object to time values

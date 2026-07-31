@@ -2,9 +2,6 @@
 % Please edit documentation in R/filter_mnirs.R
 \name{filter_mnirs}
 \alias{filter_mnirs}
-\alias{filter_mnirs.smooth_spline}
-\alias{filter_mnirs.butterworth}
-\alias{filter_mnirs.moving_average}
 \title{Filter a data frame}
 \usage{
 filter_mnirs(
@@ -14,12 +11,23 @@ filter_mnirs(
   method = c("smooth_spline", "butterworth", "moving_average"),
   na.rm = FALSE,
   verbose = TRUE,
-  ...
+  ...,
+  spar = NULL,
+  order = 2L,
+  W = NULL,
+  fc = NULL,
+  sample_rate = NULL,
+  type = c("low", "high", "stop", "pass"),
+  edges = c("rev", "rep1", "none"),
+  width = NULL,
+  span = NULL,
+  partial = FALSE
 )
 }
 \arguments{
-\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
-metadata.}
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data
+and metadata, a list of data frames, or a grouped data frame (see
+\emph{Details}).}
 
 \item{nirs_channels}{A character vector giving the names of mNIRS columns to
 operate on. Must match column names in \code{data} exactly.
@@ -35,12 +43,17 @@ Must match a column name in \code{data} exactly.
 used.
 }}
 
-\item{method}{A character string indicating how to filter the data (see
-\emph{Details}).
+\item{method}{A character string indicating how to filter the data.
+Additional arguments must be specified for each method. See \emph{Details}.
 \describe{
-\item{\code{"smooth_spline"}}{Fits a cubic smoothing spline.}
-\item{\code{"butterworth"}}{Uses a centred Butterworth digital filter.}
-\item{\code{"moving_average"}}{Uses a centred moving average filter.}
+\item{\code{"smooth_spline"}}{Fits a cubic smoothing spline. Additional
+arguments: \code{spar}.}
+\item{\code{"butterworth"}}{Uses a centred Butterworth digital filter.
+Additional arguments: \code{order}, \code{W} or \code{fc}, \code{sample_rate}, \code{type},
+\code{edges}. See \code{\link[=filter_butterworth]{filter_butterworth()}}.}
+\item{\code{"moving_average"}}{Uses a centred moving average filter.
+Additional arguments: \code{width} or \code{span}, \code{partial}. See
+\code{\link[=filter_moving_average]{filter_moving_average()}}.}
 }}
 
 \item{na.rm}{Logical; default is \code{FALSE}, propagates any \code{NA}s to the
@@ -52,12 +65,53 @@ samples within the local window. May return errors or warnings. (see
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
-\item{...}{Additional method-specific arguments must be specified
+\item{...}{Additional arguments passed to the underlying method function.
+See \emph{Details}.}
+
+\item{spar}{\strong{smooth_spline}: A numeric smoothing parameter passed to
+\code{\link[stats:smooth.spline]{stats::smooth.spline()}}. If \code{NULL} (\emph{default}), automatically
+determined via penalised log likelihood.}
+
+\item{order}{\strong{butterworth}: An integer defining the filter order
+(\emph{default} \code{order = 2}).}
+
+\item{W}{\strong{butterworth}: A one- or two-element numeric vector within
+\verb{[0, 1]} defining the filter cutoff frequency(ies) as a fraction of
+the Nyquist frequency (see \emph{Details}). One of either \code{W} or \code{fc} must be
+specified.}
+
+\item{fc}{\strong{butterworth}: A one- or two-element numeric vector defining
+the filter absolute cutoff frequency in Hz. Used with \code{sample_rate} to
+compute \code{W}. One of either \code{W} or \code{fc} must be specified.}
+
+\item{sample_rate}{\strong{butterworth}: A numeric sample rate in Hz. Will
+be taken from metadata or estimated from \code{time_channel} if not
+defined.}
+
+\item{type}{\strong{butterworth}: A character string specifying filter type,
+one of: \code{c("low", "high", "stop", "pass")} (\code{"low"} is the
+\emph{default}).}
+
+\item{edges}{\strong{butterworth}: A character string specifying the edge
+padding, one of: \code{c("rev", "rep1", "none")} (\code{"rev"} is the
+\emph{default}). See \code{\link[=filter_butterworth]{filter_butterworth()}}.}
+
+\item{width}{\strong{moving_average}: An integer number of samples within
+the local window. One of either \code{width} or \code{span} must be specified.}
+
+\item{span}{\strong{moving_average}: A numeric time duration in units of
+\code{time_channel} within the local window. One of either \code{width} or
+\code{span} must be specified.}
+
+\item{partial}{\strong{moving_average}: Logical; default is \code{FALSE}, only
+returns values where a full window of valid (non-\code{NA}) samples are
+available. If \code{TRUE}, ignores \code{NA} and processes available valid samples
 (see \emph{Details}).}
 }
 \value{
 A \link[tibble:tibble-package]{tibble} of class \emph{"mnirs"} with metadata
-available with \code{attributes()}.
+available with \code{attributes()}. For list or grouped data frame input,
+returns a named list of \emph{"mnirs"} tibbles, one per interval.
 }
 \description{
 Apply digital filtering/smoothing to numeric vector data within a data frame
@@ -67,6 +121,8 @@ using either:
 \item A Butterworth digital filter.
 \item A simple moving average.
 }
+
+Note the \code{method}-specific arguments below.
 }
 \details{
 \subsection{method = "smooth_spline"}{
@@ -79,14 +135,6 @@ which can be left as \code{NULL} and automatically determined via penalised
 log likelihood. This usually works well for responses occurring on the
 order of minutes or longer. \code{spar} can be specified typically, but not
 necessarily, in the range \verb{spar = [0, 1]}.
-
-Additional arguments (\code{...}) accepted when \code{method = "smooth_spline"}:
-
-\describe{
-\item{\code{spar}}{A numeric smoothing parameter passed to
-\code{\link[stats:smooth.spline]{stats::smooth.spline()}}. If \code{NULL} (\emph{default}), automatically
-determined via penalised log likelihood.}
-}
 }
 
 \subsection{method = "butterworth"}{
@@ -125,23 +173,6 @@ in Hz. Where \code{W = fc / (sample_rate / 2)}.
 
 Only one of either \code{W} or \code{fc} should be defined. If both are
 defined, \code{W} will be preferred over \code{fc}.
-
-Additional arguments (\code{...}) accepted when \code{method = "butterworth"}:
-
-\describe{
-\item{\code{order}}{An integer for the filter order (\emph{default} \code{2}).}
-\item{\code{W}}{A numeric fractional cutoff frequency within \verb{[0, 1]}. One
-of either \code{W} or \code{fc} must be specified.}
-\item{\code{fc}}{A numeric absolute cutoff frequency in Hz. Used with
-\code{sample_rate} to compute \code{W}.}
-\item{\code{sample_rate}}{A numeric sample rate in Hz. Will be taken from
-metadata or estimated from \code{time_channel} if not defined.}
-\item{\code{type}}{A character string specifying filter type, one of:
-\code{c("low", "high", "stop", "pass")} (\code{"low"} is the default).}
-\item{\code{edges}}{A character string specifying the edge padding, one of:
-\code{c("rev", "rep1", "none")} (\code{"rev"} is the default).
-See \code{\link[=filter_butter]{filter_butter()}}.}
-}
 }
 
 \subsection{method = "moving_average"}{
@@ -153,18 +184,6 @@ window, defined by either \code{width} as the number of samples around
 \code{idx} between \verb{[idx - floor(width/2), idx + floor(width/2)]}. Or by
 \code{span} as the timespan in units of \code{time_channel} between
 \verb{[t - span/2, t + span/2]}.
-
-Additional arguments (\code{...}) accepted when \code{method = "moving_average"}:
-
-\describe{
-\item{\code{width} or \code{span}}{Either an integer number of samples, or a
-numeric time duration in units of \code{time_channel} within the local
-window. One of either \code{width} or \code{span} must be specified.}
-\item{\code{partial}}{Logical; \code{FALSE} by default, only returns values
-where a full window of valid (non-\code{NA}) samples are available.
-If \code{TRUE}, ignores \code{NA} and allows calculation over partial windows
-at the edges of the data.}
-}
 }
 
 \subsection{Missing values}{
@@ -179,6 +198,48 @@ each local window are either propagated to the returned vector when
 \code{na.rm = TRUE}.
 }
 }
+\section{Data input formats}{
+
+
+\emph{{mnirs}} processing functions accept \code{data} in multiple formats:
+\itemize{
+\item A \strong{single \emph{"mnirs"} data frame} is processed and returned directly.
+\item A \strong{list of \emph{"mnirs"} data frames}: each interval is processed
+separately and returned as a named list.
+\item A \strong{grouped \emph{"mnirs"} data frame}, e.g. with \code{dplyr::group_by()}: the
+data frame is split by grouping levels and each group is processed as
+a separate interval, returned as a named list.
+}
+}
+
+\section{Per-channel arguments}{
+
+
+Arguments apply globally to all \code{nirs_channels} by default. Relevant
+arguments can instead be supplied uniquely per-channel as a named \code{list()},
+with names matching \code{nirs_channels}, e.g.:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{replace_mnirs(
+    data,
+    nirs_channels = c(hhb, smo2),
+    invalid_values = list(hhb = -1, smo2 = c(0, 100)),
+    invalid_above = list(hhb = 10),
+    span = list(3, hhb = 5)
+)
+}\if{html}{\out{</div>}}
+\itemize{
+\item A non-list value applies to every channel (the \emph{default} behaviour).
+\item A \code{list()} named by \code{nirs_channels} applies per-channel values.
+\item A single unnamed value in the list will be applied to unlisted channels
+(e.g. \code{span = list(3, hhb = 5)} gives \code{hhb} 5 and every other channel 3).
+If no unnamed fallback value in the list, channels not named in the list
+will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
+process \code{hhb}).
+\item \code{list()} names not matching \code{nirs_channels} are warned about and
+ignored.
+}
+}
+
 \examples{
 ## read example data and clean for outliers
 data <- read_mnirs(

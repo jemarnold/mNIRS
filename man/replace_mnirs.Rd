@@ -56,8 +56,9 @@ replace_missing(
 )
 }
 \arguments{
-\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
-metadata.}
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data
+and metadata, a list of data frames, or a grouped data frame (see
+\emph{Details}).}
 
 \item{nirs_channels}{A character vector giving the names of mNIRS columns to
 operate on. Must match column names in \code{data} exactly.
@@ -93,8 +94,7 @@ are more conservative.
 }}
 
 \item{width}{An integer defining the local window in number of samples
-centred on \code{idx}, between
-\verb{[idx - floor(width/2), idx + floor(width/2)]}.}
+centred on \code{idx}, between \verb{[idx - floor(width/2), idx + floor(width/2)]}.}
 
 \item{span}{A numeric value defining the local window time span around
 \code{idx} in units of \code{time_channel} or \code{t}, between
@@ -126,8 +126,10 @@ Default is \code{seq_along(x)}.}
 \item{...}{Additional arguments.}
 }
 \value{
-\code{replace_mnirs()} return a \link[tibble:tibble-package]{tibble} of
-class \code{"mnirs"} with metadata available via \code{attributes()}.
+\code{replace_mnirs()} returns a \link[tibble:tibble-package]{tibble} of
+class \code{"mnirs"} with metadata available via \code{attributes()}. For list or
+grouped data frame input, returns a named list of \emph{"mnirs"} tibbles, one
+per interval.
 
 \code{replace_invalid()} returns a numeric vector the same length as
 \code{x} with invalid values replaced.
@@ -141,8 +143,8 @@ class \code{"mnirs"} with metadata available via \code{attributes()}.
 \description{
 Detect and replace local outliers, specified invalid values, and missing
 \code{NA} values across \code{nirs_channels} within an \emph{"mnirs"} data frame.
-\code{replace_mnirs()} operates on a data frame, extending the vectorised
-functions:.
+\code{replace_mnirs()} operates on a data frame, a list of data frames, or a
+grouped data frame, extending the vectorised functions.
 
 \code{replace_invalid()} detects specified invalid values or range cutoffs in a
 numeric vector and replace them with the local median value or \code{NA}.
@@ -234,6 +236,48 @@ valid sample on either side is used (equivalent to
 \code{replace_missing(x, width = 1)}).
 }
 }
+\section{Per-channel arguments}{
+
+
+Arguments apply globally to all \code{nirs_channels} by default. Relevant
+arguments can instead be supplied uniquely per-channel as a named \code{list()},
+with names matching \code{nirs_channels}, e.g.:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{replace_mnirs(
+    data,
+    nirs_channels = c(hhb, smo2),
+    invalid_values = list(hhb = -1, smo2 = c(0, 100)),
+    invalid_above = list(hhb = 10),
+    span = list(3, hhb = 5)
+)
+}\if{html}{\out{</div>}}
+\itemize{
+\item A non-list value applies to every channel (the \emph{default} behaviour).
+\item A \code{list()} named by \code{nirs_channels} applies per-channel values.
+\item A single unnamed value in the list will be applied to unlisted channels
+(e.g. \code{span = list(3, hhb = 5)} gives \code{hhb} 5 and every other channel 3).
+If no unnamed fallback value in the list, channels not named in the list
+will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
+process \code{hhb}).
+\item \code{list()} names not matching \code{nirs_channels} are warned about and
+ignored.
+}
+}
+
+\section{Data input formats}{
+
+
+\emph{{mnirs}} processing functions accept \code{data} in multiple formats:
+\itemize{
+\item A \strong{single \emph{"mnirs"} data frame} is processed and returned directly.
+\item A \strong{list of \emph{"mnirs"} data frames}: each interval is processed
+separately and returned as a named list.
+\item A \strong{grouped \emph{"mnirs"} data frame}, e.g. with \code{dplyr::group_by()}: the
+data frame is split by grouping levels and each group is processed as
+a separate interval, returned as a named list.
+}
+}
+
 \examples{
 ## vectorised operations
 x <- c(1, 999, 3, 4, 999, 6)

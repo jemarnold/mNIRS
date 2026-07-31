@@ -2,35 +2,44 @@
 % Please edit documentation in R/rescale_mnirs.R
 \name{rescale_mnirs}
 \alias{rescale_mnirs}
-\title{Re-scale data range}
+\title{Rescale data range}
 \usage{
 rescale_mnirs(
   data,
-  nirs_channels = list(),
+  nirs_channels = NULL,
+  group_channels = c("ensemble", "distinct"),
   range,
   verbose = TRUE
 )
 }
 \arguments{
-\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
-metadata.}
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data
+and metadata, a list of data frames, or a grouped data frame (see
+\emph{Details}).}
 
-\item{nirs_channels}{A \code{list()} of character vectors indicating grouping
-structure of mNIRS channel names to operate on (see \emph{Details}). Must
-match column names in \code{data} exactly. Retrieved from metadata if not
-defined explicitly.
+\item{nirs_channels}{A character vector giving the names of mNIRS columns to
+operate on. Must match column names in \code{data} exactly.
+\itemize{
+\item If \code{NULL} (default), the \code{nirs_channels} metadata attribute of \code{data} is
+used.
+}}
+
+\item{group_channels}{Either a character string or a \code{list()} of
+channel-name vectors specifying how to group \code{nirs_channels}
+(see \emph{Details}).
 \describe{
-\item{\code{list("A", "B", "C")}}{Will operate on each channel independently,
-losing the relative scaling between channels.}
-\item{\code{list(c("A", "B", "C"))}}{Will operate on all channels together,
+\item{\code{"ensemble"}}{The \emph{default}. Operate on all channels together,
 preserving the relative scaling between channels.}
-\item{\code{list(c("A", "B"), c("C", "D"))}}{Will operate on channels \code{A}
-& \code{B} in one group, and \code{C} & \code{D} in another group, preserving
-relative scaling within, but not between groups.}
+\item{\code{"distinct"}}{Operate on each channel independently, losing
+the relative scaling between channels.}
+\item{\code{list(c("A", "B"), c("C", "D"))}}{Operate on channels \code{A} & \code{B}
+in one group, and \code{C} & \code{D} in another group. Groups can be named
+(e.g. \code{list(smo2 = c("A", "B"))}). Each group must be non-empty
+and resulting group names must be unique.}
 }}
 
 \item{range}{A numeric vector in the form \code{c(min, max)}, indicating the
-range of output values to which data channels will be re-scaled.}
+range of output values to which \code{nirs_channels} will be rescaled.}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
@@ -38,32 +47,82 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 A \link[tibble:tibble-package]{tibble} of class \emph{"mnirs"} with metadata
-available with \code{attributes()}.
+available with \code{attributes()}. For list or grouped data frame input,
+returns a named list of \emph{"mnirs"} tibbles, one per interval.
 }
 \description{
 Expand or reduce the range (min and max values) of data channels to a new
-amplitude/dynamic range, e.g. re-scale the range of NIRS data to \code{c(0, 100)}.
+amplitude/dynamic range, e.g. rescale the range of NIRS data to \code{c(0, 100)}.
 }
 \details{
-\code{nirs_channels = list()} can be used to group data channels (column names)
-to preserve absolute or relative scaling.
+\code{group_channels} controls how data channels are grouped to preserve
+absolute or relative scaling.
 \itemize{
-\item Channels grouped together in a vector (e.g. \code{list(c("A", "B"))}) will be
-re-scaled to a common range, and the relative scaling within that group
-will be preserved.
-\item Channels in separate list vectors (e.g. \code{list("A", "B")}) will be
-re-scaled independently, and relative scaling between groups will be lost.
-\item A single vector of channel names (e.g. \code{c("A", "B")}) will group
-channels together.
-\item Channels (columns) in \code{data} not explicitly defined in \code{nirs_channels}
-will be passed through untouched to the output data frame.
+\item \code{group_channels = "ensemble"} (the \emph{default}) rescales all
+\code{nirs_channels} to a common range, preserving relative scaling
+between channels.
+\item \code{group_channels = "distinct"} rescales each channel independently,
+losing relative scaling between channels.
+\item A \code{list()} of channel-name vectors (e.g. \code{list(c("A", "B"), c("C", "D"))})
+rescales channels \code{A} & \code{B} together and \code{C} & \code{D} together, preserving
+relative scaling within, but not between groups. \code{nirs_channels}
+omitted from the list are rescaled independently.
+\item Channel groups can be named (e.g. \code{list(smo2 = c("A", "B"))}) and names
+used as keys for per-group \code{range} argument.
+\item Channels (columns) in \code{data} not in \code{nirs_channels} are passed
+through without processing to the output data frame.
 }
 
 \code{nirs_channels} can be retrieved automatically from \code{data} of class
 \emph{"mnirs"} which has been processed with \code{{mnirs}}, if not defined
-explicitly. This will default to returning all \code{nirs_channels} grouped
-together, and should be defined explicitly for other grouping arrangements.
+explicitly.
 }
+\section{Data input formats}{
+
+
+\emph{{mnirs}} processing functions accept \code{data} in multiple formats:
+\itemize{
+\item A \strong{single \emph{"mnirs"} data frame} is processed and returned directly.
+\item A \strong{list of \emph{"mnirs"} data frames}: each interval is processed
+separately and returned as a named list.
+\item A \strong{grouped \emph{"mnirs"} data frame}, e.g. with \code{dplyr::group_by()}: the
+data frame is split by grouping levels and each group is processed as
+a separate interval, returned as a named list.
+}
+}
+
+\section{Per-channel arguments}{
+
+
+Arguments apply globally to all \code{nirs_channels} by default. Relevant
+arguments can instead be supplied uniquely per-channel as a named \code{list()},
+with names matching either \code{nirs_channels} or list names in
+\code{group_channels}, e.g.:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{shift_mnirs(
+    data,
+    nirs_channels = c(A, B, C),
+    group_channels = list(smo2 = c(A, B), hhb = C),
+    to = list(100, C = 0),
+    width = list(smo2 = 3),
+    span = list(hhb = 5),
+    position = "first"
+)
+}\if{html}{\out{</div>}}
+\itemize{
+\item A non-list value applies to every channel (the \emph{default} behaviour).
+\item A \code{list()} named by \code{nirs_channels} or \code{group_channels} applies
+per-channel / per-group values.
+\item A single unnamed value in the list will be applied to unlisted channels
+(e.g. \code{span = list(3, hhb = 5)} gives \code{hhb} 5 and every other channel 3).
+If no unnamed fallback value in the list, channels not named in the list
+will be returned un-processed (e.g. \code{span = list(hhb = 5)} will only
+process \code{hhb}).
+\item \code{list()} names not matching \code{nirs_channels} or \code{group_channels} are
+warned about and ignored.
+}
+}
+
 \examples{
 ## read example data
 data <- read_mnirs(
@@ -73,9 +132,10 @@ data <- read_mnirs(
     time_channel = c(time = "hh:mm:ss"),
     verbose = FALSE
 ) |>
-    rescale_mnirs(        ## un-grouped nirs channels to rescale separately 
-        nirs_channels = list(smo2_left, smo2_right), 
-        range = c(0, 100) ## rescale to a 0-100\% functional exercise range
+    rescale_mnirs(        ## un-grouped nirs channels to rescale separately
+        nirs_channels = c(smo2_left, smo2_right),
+        group_channels = "distinct",
+        range = c(0, 100)  ## rescale to a 0-100\% functional exercise range
     )
 
 data

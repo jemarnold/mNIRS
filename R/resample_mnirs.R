@@ -22,7 +22,10 @@
 #'     columns will fall back to `"locf"` behaviour.}
 #'   }
 #'
+#' @inheritParams map_mnirs_intervals
 #' @inheritParams validate_mnirs
+#'
+#' @inheritSection map_mnirs_intervals Data input formats
 #'
 #' @details
 #' This function uses [replace_missing()] (based on [stats::approx()]) to
@@ -54,11 +57,13 @@
 #' - For `method = "none"`, existing rows are matched to the nearest original
 #'   values of `time_channel` without interpolation or filling, meaning newly
 #'   created samples and any `NA`s in the original data are returned as `NA`.
-#' - When down-sampling, numeric columns use time-weighted averaging.
+#' - When down-sampling, numeric columns use linear interpolation averaging.
 #'   Non-numeric columns use the first valid value in each output bin.
 #'
 #' @returns A [tibble][tibble::tibble-package] of class `"mnirs"`. Metadata are
-#'   stored as attributes and can be accessed with `attributes(data)`.
+#'   stored as attributes and can be accessed with `attributes(data)`. For
+#'   list or grouped data frame input, returns a named list of *"mnirs"*
+#'   tibbles, one per interval.
 #'
 #' @examples
 #' ## read example data
@@ -91,6 +96,11 @@ resample_mnirs <- function(
     method = c("none", "linear", "locf"),
     verbose = TRUE
 ) {
+    ## list or grouped input → normalise to named list, recurse per interval
+    if (inherits(data, "grouped_df") || !is.data.frame(data)) {
+        return(map_mnirs_intervals(data, match.call(), parent.frame()))
+    }
+
     ## validation ====================================
     validate_mnirs_data(data)
     metadata <- attributes(data)

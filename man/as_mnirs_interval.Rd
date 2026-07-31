@@ -4,12 +4,16 @@
 \alias{as_mnirs_interval}
 \title{coerce raw values to mnirs_interval objects}
 \usage{
-as_mnirs_interval(x, arg = "start")
+as_mnirs_interval(x, arg = "start", env = rlang::caller_env())
 }
 \arguments{
 \item{x}{A raw value or mnirs_interval object.}
 
 \item{arg}{Name of the argument for error messages.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 coerce raw values to mnirs_interval objects

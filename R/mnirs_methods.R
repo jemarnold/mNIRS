@@ -21,7 +21,7 @@
 #'         span = c(-60, 120),
 #'         verbose = FALSE
 #'     )
-#' 
+#'
 #' print(x)
 #'
 #' @export

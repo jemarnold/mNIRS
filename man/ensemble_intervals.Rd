@@ -4,9 +4,26 @@
 \alias{ensemble_intervals}
 \title{Ensemble average multiple intervals}
 \usage{
-ensemble_intervals(df_list, nirs_channels, metadata, verbose = TRUE)
+ensemble_intervals(
+  df_list,
+  group_channels,
+  metadata,
+  verbose = TRUE,
+  env = rlang::caller_env()
+)
+}
+\arguments{
+\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
+warnings and information messages helpful for troubleshooting. Ad
+global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
-Ensemble average multiple intervals
+\code{group_channels} is a character vector applied to every interval, or a
+list of per-interval channel vectors; channels excluded from an interval
+do not contribute to that channel's ensemble-mean.
 }
 \keyword{internal}

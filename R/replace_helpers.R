@@ -34,13 +34,15 @@
 #'   `[t - span/2, t + span/2]`.
 #'
 #' @rdname compute_helpers
+#' @inheritParams validate_mnirs
 #' @keywords internal
 compute_local_windows <- function(
     t,
     idx = seq_along(t),
     width = NULL,
     span = NULL,
-    align = c("centre", "left", "right")
+    align = c("centre", "left", "right"),
+    env = rlang::caller_env()
 ) {
     align <- sub("^center$", "centre", align)
     align <- match.arg(align)
@@ -58,21 +60,51 @@ compute_local_windows <- function(
         start_idx <- pmax.int(1L, idx + offsets[1L])
         end_idx <- pmin.int(n, idx + offsets[2L])
     } else {
-        # fmt: skip
         offsets <- switch(
             align,
             centre = c(-0.5, 0.5),
             left = c(0, 1),
             right = c(-1, 0)
-        ) * span
+        ) *
+            span
         start_idx <- findInt_mnirs(
-            t[idx] + offsets[1L], t, left.open = TRUE
-        ) + 1L
-        end_idx <- findInt_mnirs(t[idx] + offsets[2L], t)
+            t[idx] + offsets[1L],
+            t,
+            left.open = TRUE,
+            env = env
+        ) +
+            1L
+        end_idx <- findInt_mnirs(t[idx] + offsets[2L], t, env = env)
     }
 
     ## inclusive of x[i] for detect outliers
     return(Map(`:`, start_idx, end_idx))
+}
+
+
+#' @description
+#' `median_nona()`: Fast median for numeric vectors. Strips `NA`s and
+#' replicates `median.default` arithmetic without S3 dispatch.
+#'
+#' @returns
+#' `median_nona()`: A numeric value.
+#'
+#' @rdname compute_helpers
+#' @keywords internal
+median_nona <- function(w) {
+    if (anyNA(w)) {
+        w <- w[!is.na(w)]
+    }
+    n <- length(w)
+    if (n == 0L) {
+        return(NA_real_)
+    }
+    half <- (n + 1L) %/% 2L
+    if (n %% 2L == 1L) {
+        sort.int(w, partial = half)[half]
+    } else {
+        mean(sort.int(w, partial = half + 0L:1L)[half + 0L:1L])
+    }
 }
 
 
@@ -98,35 +130,92 @@ compute_local_fun <- function(x, window_idx, fn, ...) {
 
 
 #' @description
-#' `compute_outliers()`: Computes a vector of local medians and logicals 
-#' indicating outliers of `x` within a list of rolling sample windows 
-#' `window_idx`.
+#' `col_medians_padded()`: Column medians of an `NA`-padded numeric matrix
+#' via a single radix sort. `NA`s sort last per column; medians indexed
+#' from per-column valid counts. Matches `median(w, na.rm = TRUE)`.
+#'
+#' @param m A numeric matrix with one column per rolling window, padded
+#'   with `NA` where windows extend beyond the data.
 #'
 #' @returns
-#' `compute_outliers()`: A `list()` with vectors the same length as `x` for 
+#' `col_medians_padded()`: A numeric vector of length `ncol(m)`.
+#'
+#' @rdname compute_helpers
+#' @keywords internal
+col_medians_padded <- function(m) {
+    w <- nrow(m)
+    nv <- w - colSums(is.na(m))
+    ## sort all windows at once: by column, then value, NAs last
+    o <- order(col(m), m, na.last = TRUE, method = "radix")
+    ms <- matrix(m[o], nrow = w)
+    half <- pmax((nv + 1L) %/% 2L, 1L) ## guard nv == 0
+    cols <- seq_len(ncol(m))
+    lo <- ms[cbind(half, cols)]
+    hi <- ms[cbind(half + (nv %% 2L == 0L), cols)] ## even nv: mean of pair
+    med <- (lo + hi) / 2
+    med[nv == 0L] <- NA_real_
+    return(med)
+}
+
+
+#' @description
+#' `compute_outliers()`: Computes a vector of local medians and logicals
+#' indicating outliers of `x` within rolling windows defined by `width`
+#' or `span`.
+#'
+#' @returns
+#' `compute_outliers()`: A `list()` with vectors the same length as `x` for
 #' with numeric local medians and logical identifying where `is_outlier`.
 #'
 #' @rdname compute_helpers
 #' @keywords internal
 compute_outliers <- function(
     x,
-    window_idx,
-    outlier_cutoff
+    t,
+    outlier_cutoff,
+    width = NULL,
+    span = NULL,
+    env = rlang::caller_env()
 ) {
     n <- length(x)
     L <- 1.4826 ## 1 / qnorm(0.75): MAD at the 75% percentile of |Z|
     # MAD = median(|x - median(x)|) within each window
     ## median of absolute local residuals from the local median
-    local_stats <- vapply(seq_len(n), \(.i) {
-        w <- x[window_idx[[.i]]]
-        local_median <- median(w, na.rm = TRUE)
-        local_mad <- median(abs(w - local_median), na.rm = TRUE)
+    if (!is.null(width)) {
+        ## width: fixed-size windows, vectorised over an NA-padded matrix.
+        ## padding out-of-range cells with NA is equivalent to the clamped
+        ## partial edge windows because medians ignore NA.
+        ## same offsets as compute_local_windows(align = "centre")
+        offsets <- (-floor((width - 1L) / 2L)):(floor(width / 2L))
+        idx <- outer(offsets, seq_len(n), `+`)
+        oob <- idx < 1L | idx > n
+        idx[oob] <- 1L
+        m <- matrix(x[idx], nrow = width)
+        m[oob] <- NA_real_
 
-        c(local_median, local_mad)
-    }, numeric(2))
+        local_medians <- col_medians_padded(m)
+        local_mad <- col_medians_padded(
+            abs(m - rep(local_medians, each = width))
+        )
+    } else {
+        ## span: variable-size windows, per-window loop
+        window_idx <- compute_local_windows(
+            t,
+            width = NULL,
+            span = span,
+            env = env
+        )
+        local_stats <- vapply(seq_len(n), \(.i) {
+            w <- x[window_idx[[.i]]]
+            local_median <- median_nona(w)
+            local_mad <- median_nona(abs(w - local_median))
 
-    local_medians <- local_stats[1L, ]
-    local_mad <- local_stats[2L, ]
+            c(local_median, local_mad)
+        }, numeric(2))
+
+        local_medians <- local_stats[1L, ]
+        local_mad <- local_stats[2L, ]
+    }
 
     ## robust variance threshold based on minimum sample difference
     abs_diffs <- abs(diff(x[!is.na(x)]))
@@ -138,7 +227,7 @@ compute_outliers <- function(
         abs_dev > (L * outlier_cutoff * local_mad)
     ## NAs from is_outlier check should return FALSE
     is_outlier[is.na(is_outlier)] <- FALSE
-    
+
     ## return list of vectors w/ local logicals and medians
     return(list(
         local_medians = local_medians,
@@ -164,7 +253,8 @@ compute_valid_neighbours <- function(
     t = seq_along(x),
     width = NULL,
     span = NULL,
-    verbose = TRUE
+    verbose = TRUE,
+    env = rlang::caller_env()
 ) {
     na_idx <- which(is.na(x))
     valid_idx <- which(!is.na(x))
@@ -195,9 +285,9 @@ compute_valid_neighbours <- function(
     ## falls back to naerest bracketing pair when no valid samples within `span`
     window_idx <- lapply(seq_len(n_na), \(.i) {
         lo <- findInt_mnirs(
-            t_na[.i] - half_span, t_valid, left.open = TRUE
+            t_na[.i] - half_span, t_valid, left.open = TRUE, env = env
         ) + 1L
-        hi <- findInt_mnirs(t_na[.i] + half_span, t_valid)
+        hi <- findInt_mnirs(t_na[.i] + half_span, t_valid, env = env)
         if (lo > hi) {
             pos <- findInterval(na_idx[.i], valid_idx)
             return(unique(valid_idx[c(pos, min(n_valid, pos + 1L))]))

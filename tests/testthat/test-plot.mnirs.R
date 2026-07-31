@@ -208,12 +208,14 @@ test_that("format_hmmss handles fractional seconds", {
 
 ## as_plot_data() =============================================
 # Helper to create mock mNIRS object
-mock_mnirs <- function() {
-    df <- data.frame(
-        time = 1:10,
-        HHb = c(1:6, NA, NA, 9:10),
-        O2Hb = c(rep(2, 3), NA, NA, rep(2, 5))
+mock_mnirs <- function(time = 1:10) {
+    df <- tibble(
+        time = time,
+        HHb = seq_along(time),
+        O2Hb = rep(2, length(time))
     )
+    df$HHb[7:8] <- NA
+    df$O2Hb[4:5] <- NA
     structure(
         df,
         class = c("mnirs", "data.frame"),
@@ -320,6 +322,12 @@ test_that("time_labels controls x-axis name and formatting", {
 
     # With time_labels = TRUE
     p2 <- plot(x, time_labels = TRUE)
+    expect_equal(p2$labels$x, "time (mm:ss)")
+    expect_false(ggplot2::is_waiver(p2$scales$get_scales("x")$labels))
+
+    # With time_labels = TRUE & time >= 3600 (1 hr)
+    x <- mock_mnirs(time = 1:3600)
+    p2 <- plot(x, time_labels = TRUE)
     expect_equal(p2$labels$x, "time (h:mm:ss)")
     expect_false(ggplot2::is_waiver(p2$scales$get_scales("x")$labels))
 })
@@ -402,6 +410,22 @@ test_that("plot.mnirs works with extract_intervals and faceting", {
 
     # Build plot to ensure no errors during rendering
     expect_no_error(ggplot2::ggplot_build(p_facet))
+})
+
+test_that("plot.mnirs converts character interval to appearance-order factor", {
+    x <- mock_mnirs()
+
+    ## appearance order differs from alphabetical (interval_10 < interval_2)
+    x$interval <- rep(c("interval_2", "interval_10"), each = 5)
+
+    p <- plot(x)
+    expect_s3_class(p$data$interval, "factor")
+    expect_equal(levels(p$data$interval), c("interval_2", "interval_10"))
+
+    ## existing factor levels pass through unchanged
+    x$interval <- factor(x$interval, levels = c("interval_10", "interval_2"))
+    p2 <- plot(x)
+    expect_equal(levels(p2$data$interval), c("interval_10", "interval_2"))
 })
 
 test_that("plot.mnirs uses waiver() for breaks when scales is unavailable", {

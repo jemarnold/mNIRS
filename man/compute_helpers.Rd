@@ -2,7 +2,9 @@
 % Please edit documentation in R/replace_helpers.R
 \name{compute_local_windows}
 \alias{compute_local_windows}
+\alias{median_nona}
 \alias{compute_local_fun}
+\alias{col_medians_padded}
 \alias{compute_outliers}
 \alias{compute_valid_neighbours}
 \title{Computes rolling local values}
@@ -12,19 +14,32 @@ compute_local_windows(
   idx = seq_along(t),
   width = NULL,
   span = NULL,
-  align = c("centre", "left", "right")
+  align = c("centre", "left", "right"),
+  env = rlang::caller_env()
 )
+
+median_nona(w)
 
 compute_local_fun(x, window_idx, fn, ...)
 
-compute_outliers(x, window_idx, outlier_cutoff)
+col_medians_padded(m)
+
+compute_outliers(
+  x,
+  t,
+  outlier_cutoff,
+  width = NULL,
+  span = NULL,
+  env = rlang::caller_env()
+)
 
 compute_valid_neighbours(
   x,
   t = seq_along(x),
   width = NULL,
   span = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  env = rlang::caller_env()
 )
 }
 \arguments{
@@ -46,6 +61,10 @@ in which to perform the operation, according to \code{align}. In units of
 \emph{"left"}, or \emph{"right"}. Where \emph{"left"} is \emph{forward looking}, and \emph{"right"}
 is \emph{backward looking} from the current sample.}
 
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
+
 \item{x}{A numeric vector of the response variable.}
 
 \item{window_idx}{A list the same or shorter length as \code{x} with numeric
@@ -54,6 +73,9 @@ vectors for the sample indices of local rolling windows.}
 \item{fn}{A function to pass through for local rolling calculation.}
 
 \item{...}{Additional arguments.}
+
+\item{m}{A numeric matrix with one column per rolling window, padded
+with \code{NA} where windows extend beyond the data.}
 
 \item{outlier_cutoff}{A numeric value for the local outlier threshold, as
 the number of standard deviations from the local median.
@@ -75,7 +97,11 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 shorter length as \code{t} with numeric vectors of sample indices of length
 \code{width} samples or \code{span} units of time \code{t}.
 
+\code{median_nona()}: A numeric value.
+
 \code{compute_local_fun()}: A numeric vector the same length as \code{x}.
+
+\code{col_medians_padded()}: A numeric vector of length \code{ncol(m)}.
 
 \code{compute_outliers()}: A \code{list()} with vectors the same length as \code{x} for
 with numeric local medians and logical identifying where \code{is_outlier}.
@@ -89,12 +115,19 @@ side of the invalid \code{NA}s.
 \code{compute_local_windows()}: Compute a list of rolling window indices along a
 time variable \code{t}.
 
+\code{median_nona()}: Fast median for numeric vectors. Strips \code{NA}s and
+replicates \code{median.default} arithmetic without S3 dispatch.
+
 \code{compute_local_fun()}: Compute a rolling function along \code{x} from a list of
 rolling sample windows.
 
+\code{col_medians_padded()}: Column medians of an \code{NA}-padded numeric matrix
+via a single radix sort. \code{NA}s sort last per column; medians indexed
+from per-column valid counts. Matches \code{median(w, na.rm = TRUE)}.
+
 \code{compute_outliers()}: Computes a vector of local medians and logicals
-indicating outliers of \code{x} within a list of rolling sample windows
-\code{window_idx}.
+indicating outliers of \code{x} within rolling windows defined by \code{width}
+or \code{span}.
 
 \code{compute_valid_neighbours()}: Compute a list of rolling window indices along
 \code{x} to either side of \code{NA}s.

@@ -15,7 +15,7 @@ panel per element.}
 \code{ggplot2::geom_points()}. Otherwise displays \code{ggplot2::geom_lines()}.}
 
 \item{time_labels}{Logical. Default is \code{FALSE}. If \code{TRUE} displays x-axis
-time values formatted as \emph{"hh:mm:ss"} using \code{\link[=format_hmmss]{format_hmmss()}}. Otherwise,
+time values formatted as \emph{"h:mm:ss"} using \code{\link[=format_hmmss]{format_hmmss()}}. Otherwise,
 x-axis values are displayed as numeric.}
 
 \item{na.omit}{Logical. Default is \code{FALSE}. If \code{TRUE} omits missing (\code{NA})
@@ -48,7 +48,7 @@ data <- read_mnirs(
     verbose = FALSE
 )
 
-## plot time labels as "hh:mm:ss"
+## plot time labels as "h:mm:ss"
 plot(data, time_labels = TRUE)
 
 data_list <- extract_intervals(

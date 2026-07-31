@@ -617,7 +617,7 @@ test_that("detect_time_channel finds time column by name", {
         "Time"
     )
 
-    df <- tibble::tibble("hh:mm:ss" = 1:5, value = 6:10)
+    df <- tibble("hh:mm:ss" = 1:5, value = 6:10)
     expect_equal(
         detect_time_channel(df, verbose = FALSE),
         "hh:mm:ss"
@@ -856,12 +856,12 @@ test_that("select_rename_data() includes event channel", {
     expect_equal(result$event_channel, "Event")
 })
 
-test_that("select_rename_data() handles duplicate channel names", {
-    skip('currently returns "Channel names not detected error"')
-
+test_that("select_rename_data() handles un-renamed duplicate channels", {
     data <- data.frame(
         O2Hb = c("10"),
+        O2Hb = c("10"),
         Time = c("0.1"),
+        check.names = FALSE,
         stringsAsFactors = FALSE
     )
 
@@ -872,13 +872,13 @@ test_that("select_rename_data() handles duplicate channel names", {
             time_channel = "Time",
             verbose = TRUE
         ),
-        "Duplicated channel names"
+        "Duplicate channel names"
     )
 
     expect_equal(result$nirs_channel, c("O2Hb", "O2Hb_1"))
 })
 
-test_that("select_rename_data() handles duplicate data columns", {
+test_that("select_rename_data() handles renamed duplicate data columns", {
     data <- data.frame(
         O2Hb = c("10"),
         O2Hb = c("20"),
@@ -1008,22 +1008,20 @@ test_that("select_rename_data() prioritises custom names over data", {
 })
 
 ## convert_type() ================================================
-test_that("convert_type() coerces integer columns apart from event_channel", {
-    data <- data.frame(
+test_that("convert_type() applies unopinionated typing to data columns", {
+    data <- tibble(
         time = c(1, 2, 3),
-        lap = c(1.0, NA_real_, 2.0),
-        B = c(10, 20, 30),
-        x = c(10.5, 11.0, 11.5),
-        stringsAsFactors = FALSE
+        lap = c(1.0, NA_real_, 2.0),  ## event -> integer laps
+        B = c(10, 20, 30),            ## whole numbers -> double
+        x = c(10.5, 11.0, 11.5),      ## fractional -> double
     )
 
-    result <- convert_type(data, "time", event_channel = "lap")
+    result <- convert_type(data, time_channel = "time", event_channel = "lap")
 
-    expect_type(result$time, "double")
-    expect_type(result$B, "double")
+    expect_type(result$time, "double")   ## time left unchanged
     expect_type(result$lap, "integer")
     expect_equal(result$lap, c(1L, NA_integer_, 2L))
-    ## other columns unaffected
+    expect_type(result$B, "double")     ## unopinionated: whole -> duble
     expect_type(result$x, "double")
 })
 
@@ -1036,7 +1034,7 @@ test_that("convert_type() standardises empty and 'NA' strings to NA", {
         stringsAsFactors = FALSE
     )
 
-    result <- convert_type(data, "time")
+    result <- convert_type(data, time_channel = "time")
 
     expect_equal(result$A, c("a", NA_character_, "b"))
     expect_equal(result$B, c("x", NA_character_, "y"))
@@ -1049,22 +1047,21 @@ test_that("convert_type() standardises Inf/NaN to NA in numeric cols", {
         stringsAsFactors = FALSE
     )
 
-    result <- convert_type(data, "time")
+    result <- convert_type(data, time_channel = "time")
 
     expect_type(result$A, "double")
     expect_equal(result$A, c(1.5, NA_real_, NA_real_, NA_real_))
 })
 
 test_that("convert_type() standardises non-finite integers to NA", {
-    ## event_channel kept as integer; other int cols coerced to numeric
-    data <- data.frame(
+    ## event and whole-number cols resolve to integer via type.convert
+    data <- tibble(
         time = c("1", "2", "3"),
         lap = c("1", NA, "2"),
         B = c("10", "20", "30"),
-        stringsAsFactors = FALSE
     )
 
-    result <- convert_type(data, "time", event_channel = "lap")
+    result <- convert_type(data, time_channel = "time", event_channel = "lap")
 
     expect_type(result$lap, "integer")
     expect_equal(result$lap, c(1L, NA_integer_, 2L))
@@ -1078,9 +1075,65 @@ test_that("convert_type() preserves valid numeric values", {
         stringsAsFactors = FALSE
     )
 
-    result <- convert_type(data, "time")
+    result <- convert_type(data, time_channel = "time")
     expect_equal(result$A, c(0, 0))
 })
+
+test_that("convert_type() forces nirs_channels to numeric", {
+    data <- tibble(
+        time = c("1", "2", "3"),
+        smo2 = c("55", "< 0.5", "60"),  ## qualifier in a signal col
+        other = c("55", "< 0.5", "60"),  ## same values, not a signal
+        label = c("Start", "Lap", "Stop")
+    )
+
+    result <- convert_type(data, nirs_channels = "smo2", time_channel = "time")
+
+    ## specified `nirs_channels` coerced to numeric
+    expect_type(result$smo2, "double")
+    expect_equal(result$smo2, c(55, NA_real_, 60))
+    ## partly-numeric col type.converted without opinion
+    expect_type(result$other, "character")
+    expect_equal(result$other, data$other)
+    ## non-signal text col unaffected
+    expect_type(result$label, "character")
+    expect_equal(result$label, c("Start", "Lap", "Stop"))
+})
+
+test_that("convert_type() warns per nirs channel coerced to all NA", {
+    data <- tibble(
+        time = c("1", "2", "3"),
+        smo2 = c("a", "b", "c"),   ## non-numeric -> all NA
+        hhb = c("x", "y", "z"),    ## non-numeric -> all NA
+        o2hb = c("55", "z", "60"), ## partly numeric -> kept
+    )
+
+    expect_warning(
+        result <- convert_type(
+            data,
+            nirs_channels = c("smo2", "hhb", "o2hb"),
+            time_channel = "time"
+        ),
+        "smo2"
+    ) |> 
+        expect_warning("hhb")
+    expect_equal(result$smo2, rep(NA_real_, 3))
+    expect_equal(result$o2hb, c(55, NA_real_, 60))
+})
+
+test_that("convert_type() all-NA warning respects verbose = FALSE", {
+    data <- tibble(
+        time = c("1", "2"),
+        smo2 = c("a", "b"),
+    )
+
+    expect_no_warning(
+        convert_type(
+            data, nirs_channels = "smo2", time_channel = "time", verbose = FALSE
+        )
+    )
+})
+
 
 ## remove_empty_rows_cols() ===========================================
 test_that("remove_empty_rows_cols() removes empty rows & cols", {
@@ -1175,8 +1228,11 @@ test_that("extract_start_timestamp() detects ISO 8601 timestamp", {
         stringsAsFactors = FALSE
     )
     result <- extract_start_timestamp(data)
-    expect_type(result, "character")
-    expect_match(result, "2025-03-01T08:30:00")
+    expect_s3_class(result, "POSIXct")
+    expect_equal(
+        result,
+        as.POSIXct("2025-03-01T08:30:00", format = "%Y-%m-%dT%H:%M:%OS")
+    )
 })
 
 test_that("extract_start_timestamp() detects yyyy-mm-dd HH:MM:SS format", {
@@ -1186,8 +1242,8 @@ test_that("extract_start_timestamp() detects yyyy-mm-dd HH:MM:SS format", {
         stringsAsFactors = FALSE
     )
     result <- extract_start_timestamp(data)
-    expect_type(result, "character")
-    expect_match(result, "2025-06-15 14:22:10")
+    expect_s3_class(result, "POSIXct")
+    expect_equal(result, as.POSIXct("2025-06-15 14:22:10"))
 })
 
 test_that("extract_start_timestamp() returns earliest timestamp when multiple present", {
@@ -1197,25 +1253,38 @@ test_that("extract_start_timestamp() returns earliest timestamp when multiple pr
         stringsAsFactors = FALSE
     )
     result <- extract_start_timestamp(data)
-    expect_match(result, "2025-01-01 09:00:00")
+    expect_equal(result, as.POSIXct("2025-01-01 09:00:00"))
+})
+
+test_that("extract_start_timestamp() compares mixed formats chronologically", {
+    data <- data.frame(
+        V1 = c("2025-01-01 00:00:00", "31/12/2024 23:00:00")
+    )
+
+    expect_equal(
+        extract_start_timestamp(data),
+        as.POSIXct("31/12/2024 23:00:00", format = "%d/%m/%Y %H:%M:%OS")
+    )
 })
 
 test_that("extract_start_timestamp() ignores NA and empty strings", {
     data <- data.frame(
         V1 = c(NA, ""),
-        V2 = c("2025-05-10T07:00:00", NA),
+        V2 = c("2025-05-10T07:00:00", "invalid:time"),
         stringsAsFactors = FALSE
     )
     result <- extract_start_timestamp(data)
-    expect_type(result, "character")
-    expect_match(result, "2025-05-10T07:00:00")
+    expect_s3_class(result, "POSIXct")
+    expect_equal(
+        result,
+        as.POSIXct("2025-05-10T07:00:00", format = "%Y-%m-%dT%H:%M:%OS")
+    )
 })
 
 test_that("extract_start_timestamp() works with real example file header", {
     file_header <- read_file(example_mnirs("moxy_ramp.xlsx"))[1:20, ]
     result <- extract_start_timestamp(file_header)
-    expect_false(is.null(result))
-    expect_type(result, "character")
+    expect_s3_class(result, "POSIXct")
 })
 
 
@@ -1227,6 +1296,14 @@ test_that("parse_time_channel() returns a list with $data and $start_timestamp",
     expect_type(result, "list")
     expect_named(result, c("data", "start_timestamp"))
     expect_s3_class(result$data, "data.frame")
+})
+
+test_that("parse_time_channel() coerces numeric-string time to numeric", {
+    data <- data.frame(time = c("0", "1", "2"), stringsAsFactors = FALSE)
+    result <- parse_time_channel(data, "time")
+
+    expect_type(result$data$time, "double")
+    expect_equal(result$data$time, c(0, 1, 2))
 })
 
 test_that("parse_time_channel() preserves numeric time (zero_time = FALSE)", {
@@ -1349,6 +1426,79 @@ test_that("parse_time_channel() returns start_timestamp from POSIXct time_channe
     expect_equal(result$start_timestamp, t0, ignore_attr = TRUE)
 })
 
+test_that("parse_time_channel() start_timestamp is first sample when non-monotonic", {
+    t0 <- as.POSIXct("2025-01-01 10:00:00")
+    data <- data.frame(time = t0 + c(5, 0, 10), value = c(1, 2, 3))
+
+    result <- parse_time_channel(data, "time", add_timestamp = TRUE)
+
+    ## start_timestamp + time must reconstruct the original timestamps
+    expect_equal(result$start_timestamp, t0 + 5, ignore_attr = TRUE)
+    expect_equal(
+        as.numeric(result$data$timestamp),
+        as.numeric(t0 + c(5, 0, 10))
+    )
+})
+
+test_that("parse_time_channel() does not force header for dated time series", {
+    t0 <- as.POSIXct("2025-03-15 08:00:00")
+    data <- data.frame(time = t0 + 0:2)
+
+    result <- parse_time_channel(
+        data,
+        "time",
+        start_timestamp = stop("header timestamp was forced")
+    )
+
+    expect_equal(result$start_timestamp, t0, ignore_attr = TRUE)
+})
+
+test_that("parse_time_channel() dated time series takes priority over header", {
+    t0 <- as.POSIXct("2025-03-15 08:00:00")
+    data <- data.frame(time = format(t0 + 0:2, "%Y-%m-%d %H:%M:%S"))
+    header_start <- as.POSIXct("2024-01-01 00:00:00")
+
+    result <- parse_time_channel(
+        data,
+        "time",
+        start_timestamp = header_start,
+        add_timestamp = TRUE
+    )
+
+    expect_equal(result$start_timestamp, t0)
+    expect_equal(result$data$timestamp, t0 + 0:2, ignore_attr = TRUE)
+})
+
+test_that("parse_time_channel() header anchors time-only series", {
+    data <- data.frame(time = c("10:00:00", "10:00:01"))
+    header_start <- as.POSIXct("2025-03-15 10:00:00")
+
+    result <- parse_time_channel(
+        data,
+        "time",
+        start_timestamp = header_start,
+        add_timestamp = TRUE
+    )
+
+    expect_equal(result$start_timestamp, header_start)
+    expect_equal(result$data$timestamp, header_start + 0:1)
+})
+
+test_that("parse_time_channel() header anchors fractional-day series", {
+    data <- data.frame(time = c(0.5, 0.5 + 1 / 86400))
+    header_start <- as.POSIXct("2025-03-15 12:00:00")
+
+    result <- parse_time_channel(
+        data,
+        "time",
+        start_timestamp = header_start,
+        add_timestamp = TRUE
+    )
+
+    expect_equal(result$start_timestamp, header_start)
+    expect_equal(result$data$timestamp, header_start + 0:1, tolerance = 1e-6)
+})
+
 test_that("parse_time_channel() add_timestamp=TRUE adds POSIXct column after time_channel", {
     t0 <- as.POSIXct("2025-01-01 10:00:00")
     data <- data.frame(
@@ -1377,7 +1527,7 @@ test_that("parse_time_channel() add_timestamp=TRUE with start_timestamp reconstr
         time = c(0, 1, 2),
         value = c(1, 2, 3)
     )
-    start_ts <- "2025-06-01T09:00:00"
+    start_ts <- as.POSIXct("2025-06-01 09:00:00")
 
     result <- parse_time_channel(
         data,
@@ -1389,12 +1539,10 @@ test_that("parse_time_channel() add_timestamp=TRUE with start_timestamp reconstr
     expect_true("timestamp" %in% names(result$data))
     expect_s3_class(result$data$timestamp, "POSIXct")
 
-    expected_t0 <- as.POSIXct(start_ts, format = "%Y-%m-%dT%H:%M:%OS")
     expect_equal(
         as.numeric(result$data$timestamp),
-        as.numeric(expected_t0 + c(0, 1, 2))
+        as.numeric(start_ts + c(0, 1, 2))
     )
-    ## start_timestamp is passed through unchanged
     expect_equal(result$start_timestamp, start_ts)
 })
 
@@ -1416,9 +1564,9 @@ test_that("parse_time_channel() add_timestamp=TRUE with no timestamps skips colu
     expect_null(result$start_timestamp)
 })
 
-test_that("parse_time_channel() works on fractional unix time", {
+test_that("parse_time_channel() works on fraction-of-day", {
     ## Moxy.csv saved as excel will coerce date-time
-    ## to numeric fractional Unix time.
+    ## to numeric fraction-of-day
     file_path <- test_path("testdata/moxy-occlusion.xlsx")
     skip_if_not(file.exists(file_path), "testdata not available")
 
@@ -1506,7 +1654,9 @@ test_that("parse_time_channel() returns local time zonel", {
         event_renamed <- renamed_list$event_channel
 
         data <- remove_empty_rows_cols(data)
-        data <- convert_type(data, time_renamed, event_renamed, verbose = FALSE)
+        data <- convert_type(
+            data, nirs_renamed, time_renamed, event_renamed, verbose = FALSE
+        )
         time_list <- parse_time_channel(
             data,
             time_renamed,
@@ -1703,6 +1853,38 @@ test_that("detect_irregular_samples uses correct time_channel name", {
 })
 
 ## read_mnirs() =======================================================
+test_that("read_mnirs preserves dated time series timestamps", {
+    file_path <- tempfile(fileext = ".csv")
+    on.exit(unlink(file_path))
+    writeLines(
+        c(
+            "recorded_at,SmO2",
+            "2025-03-15 08:00:00,55",
+            "2025-03-15 08:00:01,56"
+        ),
+        file_path
+    )
+    expected <- as.POSIXct(c(
+        "2025-03-15 08:00:00",
+        "2025-03-15 08:00:01"
+    ))
+
+    result <- read_mnirs(
+        file_path,
+        nirs_channels = "SmO2",
+        time_channel = "recorded_at",
+        add_timestamp = TRUE,
+        verbose = FALSE
+    )
+
+    expect_s3_class(attr(result, "start_timestamp"), "POSIXct")
+    expect_equal(
+        attr(result, "start_timestamp"), min(expected), ignore_attr = TRUE
+    )
+    expect_equal(result$timestamp, expected)
+    expect_equal(result$recorded_at, c(0, 1))
+})
+
 ## read_mnirs() auto-detection =========================================
 test_that("read_mnirs auto-detects Moxy channels when nirs_channels = NULL", {
     file_path <- example_mnirs("moxy_ramp")
@@ -2049,6 +2231,7 @@ test_that("read_mnirs external train.red mre works", {
 
     expect_equal(attr(df, "nirs_device"), "Train.Red")
     expect_equal(attr(df, "sample_rate"), 10)
+    expect_s3_class(attr(df, "start_timestamp"), "POSIXct")
 })
 
 test_that("read_mnirs coerces integerish event_channel to integer", {
@@ -2316,7 +2499,7 @@ test_that("read_mnirs VO2master with ',' decimals returns numeric", {
     expect_all_true(vapply(df_raw, is.character, logical(1L)))
 
     ## should convert decimal "," to numeric
-    df <- convert_type(df_raw, time_channel)
+    df <- convert_type(df_raw, time_channel = time_channel)
     expect_all_true(vapply(df[, -c(1:2)], is.numeric, logical(1L)))
 
     ## integrated test
@@ -2456,4 +2639,23 @@ test_that("create_mnirs_data accepts NSE for *_channels", {
     df_list <- create_mnirs_data(df, meta)
     expect_equal(attr(df_list, "nirs_channels"), c("B", "C"))
     expect_equal(attr(df_list, "sample_rate"), 2)
+})
+
+test_that("create_mnirs_data preserves grouping", {
+    skip_if_not_installed("dplyr")
+    
+    df <- tibble(g = c("a", "a", "b"), A = 1:3, B = 4:6)
+    grouped <- dplyr::group_by(df, g)
+
+    df_grp <- create_mnirs_data(grouped, nirs_channels = "B", sample_rate = 1)
+
+    ## grouping survives and mnirs class is intact
+    expect_s3_class(df_grp, "mnirs")
+    expect_true(dplyr::is_grouped_df(df_grp))
+    expect_equal(dplyr::group_vars(df_grp), "g")
+    expect_equal(attr(df_grp, "nirs_channels"), "B")
+
+    ## ungrouped input stays ungrouped
+    df_ungrp <- create_mnirs_data(df, nirs_channels = "B")
+    expect_false(dplyr::is_grouped_df(df_ungrp))
 })

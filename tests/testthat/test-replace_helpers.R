@@ -214,8 +214,7 @@ test_that("compute_local_fun() handles single values", {
 test_that("compute_outliers returns list of logical and numeric vectors", {
     x <- c(1, 2, 3, 100, 5)
     t <- 1:5
-    window_idx <- compute_local_windows(t, width = 3, span = NULL)
-    result <- compute_outliers(x, window_idx, outlier_cutoff = 3)
+    result <- compute_outliers(x, t, outlier_cutoff = 3, width = 3)
 
     expect_type(result$local_medians, "double")
     expect_type(result$is_outlier, "logical")
@@ -228,12 +227,11 @@ test_that("compute_outliers returns list of logical and numeric vectors", {
 test_that("compute_outliers threshold sensitivity via outlier_cutoff", {
     x <- c(1, 2, 3, 10, 5)
     t <- 1:5
-    window_idx <- compute_local_windows(t, width = 3, span = NULL)
 
     # Strict threshold
-    strict <- compute_outliers(x, window_idx, outlier_cutoff = 1)
+    strict <- compute_outliers(x, t, outlier_cutoff = 1, width = 3)
     # Lenient threshold
-    lenient <- compute_outliers(x, window_idx, outlier_cutoff = 10)
+    lenient <- compute_outliers(x, t, outlier_cutoff = 10, width = 3)
 
     expect_true(sum(strict$is_outlier) > sum(lenient$is_outlier))
     expect_equal(strict$local_medians, lenient$local_medians)
@@ -242,8 +240,7 @@ test_that("compute_outliers threshold sensitivity via outlier_cutoff", {
 test_that("compute_outliers handles no outliers", {
     x <- 1:5
     t <- 1:5
-    window_idx <- compute_local_windows(t, width = 3, span = NULL)
-    result <- compute_outliers(x, window_idx, outlier_cutoff = 3)
+    result <- compute_outliers(x, t, outlier_cutoff = 3, width = 3)
 
     expect_true(all(!result$is_outlier))
 })
@@ -252,8 +249,7 @@ test_that("compute_outliers handles NA", {
     ## this shouldn't happen with handle_na, but just in case
     x <- c(1, 2, NA, 100, 5)
     t <- 1:5
-    window_idx <- compute_local_windows(t, width = 3, span = NULL)
-    result <- compute_outliers(x, window_idx, outlier_cutoff = 3)
+    result <- compute_outliers(x, t, outlier_cutoff = 3, width = 3)
 
     expect_true(all(!result$is_outlier))
 })

@@ -4,7 +4,13 @@
 \alias{recycle_param}
 \title{Recycle parameter to match number of events}
 \usage{
-recycle_param(param, n_events, event_groups, verbose = TRUE)
+recycle_param(
+  param,
+  n_events,
+  group_intervals,
+  verbose = TRUE,
+  env = rlang::caller_env()
+)
 }
 \description{
 Recycle an argument vector to a list or repeat the last list item to match

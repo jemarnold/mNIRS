@@ -4,7 +4,27 @@
 \alias{read_data_table}
 \title{Read data table from raw data}
 \usage{
-read_data_table(data, header_row = 1L, nirs_channels = NULL)
+read_data_table(
+  data,
+  header_row = 1L,
+  nirs_channels = NULL,
+  env = rlang::caller_env()
+)
+}
+\arguments{
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
+metadata.}
+
+\item{nirs_channels}{A character vector giving the names of mNIRS columns to
+operate on. Must match column names in \code{data} exactly.
+\itemize{
+\item If \code{NULL} (default), the \code{nirs_channels} metadata attribute of \code{data} is
+used.
+}}
+
+\item{env}{The calling environment or a defused call, used to report
+errors and warnings as coming from the user-facing function rather
+than the validator.}
 }
 \description{
 Read data table from raw data

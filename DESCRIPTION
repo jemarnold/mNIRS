@@ -1,17 +1,15 @@
 Package: mnirs
 Title: Muscle Near-Infrared Spectroscopy Processing and Analysis
-Version: 0.6.5
+Version: 0.7.0
 Authors@R: 
     person("Jem", "Arnold", , "jem.arnold@gmail.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0003-3908-9447"))
 Description: Read, process, and analyse data from muscle near-infrared
-    spectroscopy (mNIRS) devices. Import raw data from .csv or .xls(x)
-    files and return time-series data and metadata. Includes standardised
-    methods for cleaning, filtering, and pre-processing mNIRS data for
-    subsequent analysis. Also includes a custom plot theme and colour
-    palette. Intended for mNIRS researchers and practitioners in exercise
-    physiology, sports science, and clinical rehabilitation with minimal
-    coding experience required.
+    spectroscopy (mNIRS) devices. Import raw data from file and return
+    time-series data and metadata. Standardised methods for cleaning,
+    filtering, transforming, and analysing mNIRS data. Custom plot theme
+    and colour palette. Intended for mNIRS researchers and practitioners
+    in exercise physiology, sports science, and clinical practice.
 License: MIT + file LICENSE
 URL: https://jemarnold.github.io/mnirs/,
     https://github.com/jemarnold/mnirs
@@ -39,7 +37,7 @@ Suggests:
 VignetteBuilder: 
     quarto
 Config/Needs/website: quarto, tidyverse
+Config/roxygen2/version: 8.0.0
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-Config/roxygen2/version: 8.0.0

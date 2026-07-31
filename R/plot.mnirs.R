@@ -9,7 +9,7 @@
 #' @param points Logical. Default is `FALSE`. If `TRUE` displays
 #'   `ggplot2::geom_points()`. Otherwise displays `ggplot2::geom_lines()`.
 #' @param time_labels Logical. Default is `FALSE`. If `TRUE` displays x-axis
-#'   time values formatted as *"hh:mm:ss"* using [format_hmmss()]. Otherwise,
+#'   time values formatted as *"h:mm:ss"* using [format_hmmss()]. Otherwise,
 #'   x-axis values are displayed as numeric.
 #' @param na.omit Logical. Default is `FALSE`. If `TRUE` omits missing (`NA`)
 #'   and non-finite `c(Inf, -Inf, NaN)` from display.
@@ -20,7 +20,7 @@
 #' single data frame and displayed as faceted panels via
 #' [ggplot2::facet_wrap()].
 #'
-#' Accepts some arguments in `...`, such as `nrow`, `ncol`, and `scales` 
+#' Accepts some arguments in `...`, such as `nrow`, `ncol`, and `scales`
 #' passed to [ggplot2::facet_wrap()]. `n.breaks` overrides the default number
 #' of y-axis breaks. `breaks` overrides the x-axis breaks directly.
 #'
@@ -33,17 +33,17 @@
 #'     time_channel = c(time = "Timestamp (seconds passed)"),
 #'     verbose = FALSE
 #' )
-#' 
-#' ## plot time labels as "hh:mm:ss"
+#'
+#' ## plot time labels as "h:mm:ss"
 #' plot(data, time_labels = TRUE)
-#' 
+#'
 #' data_list <- extract_intervals(
 #'     data,
 #'     start = by_time(2452, 3168),
 #'     span = c(-60, 120),
 #'     verbose = FALSE
 #' )
-#' 
+#'
 #' ## plot a list of mnirs data frames as faceted panels
 #' plot(data_list, time_labels = TRUE)
 #'
@@ -69,7 +69,13 @@ plot.mnirs <- function(
 
     ## pre-compute conditionals
     x_name <- if (time_labels) {
-        paste(time_channel, "(h:mm:ss)")
+        ## match format_hmmss() output: "mm:ss" below one hour
+        units <- if (max(abs(x[[time_channel]]), na.rm = TRUE) < 3600) {
+            "(mm:ss)"
+        } else {
+            "(h:mm:ss)"
+        }
+        paste(time_channel, units)
     } else {
         ggplot2::waiver()
     }
@@ -91,6 +97,13 @@ plot.mnirs <- function(
         scales::breaks_pretty(n = args[["n.breaks"]] %||% 5)
     } else {
         ggplot2::waiver()
+    }
+
+    ## sort facets by appearance
+    if ("interval" %in% names(x) && !is.factor(x[["interval"]])) {
+        x[["interval"]] <- factor(x[["interval"]],
+            levels = unique(x[["interval"]])
+        )
     }
 
     ## build base plot with axis configuration
@@ -129,10 +142,12 @@ plot.mnirs <- function(
     ## facet when plotting multiple mnirs data frames
     if ("interval" %in% names(x)) {
         facet_args <- intersect(
-            names(args), names(formals(ggplot2::facet_wrap))
+            names(args),
+            names(formals(ggplot2::facet_wrap))
         )
         scales_arg <- args[["scales"]] %||% "free_x"
-        plot <- plot + do.call(
+        plot <- plot +
+            do.call(
             ggplot2::facet_wrap,
             c(
                 list(facets = ~interval, scales = scales_arg),
@@ -146,39 +161,40 @@ plot.mnirs <- function(
 
 
 #' Validate and bind a list of mnirs data frames for plotting
+#' @inheritParams validate_mnirs
 #' @keywords internal
-as_plot_data <- function(x) {
+as_plot_data <- function(x, env = rlang::caller_env()) {
     if (length(x) == 0L) {
         cli_abort(c(
             "x" = "{.fn plot.mnirs} must contain at least one \\
-            {col_blue('\"mnirs\"')} data frame."
-        ))
+            {.cls mnirs} data frame."
+        ), call = env)
     }
 
     if (any(!vapply(x, is.data.frame, logical(1)))) {
         cli_abort(c(
-            "x" = "{.fn plot.mnirs} must contain all {col_blue('\"mnirs\"')} \\
+            "x" = "{.fn plot.mnirs} must contain all {.cls mnirs} \\
             data frames."
-        ))
+        ), call = env)
     }
 
     ## validate time_channel is consistent across elements
     time_channels <- vapply(x, \(.df) {
         attr(.df, "time_channel") %||% NA_character_
     }, character(1))
-    
+
     if (anyNA(time_channels)) {
         cli_abort(c(
             "x" = "All elements of {.fn plot.mnirs} must have a \\
             {.field time_channel} attribute."
-        ))
+        ), call = env)
     }
     if (length(unique(time_channels)) > 1L) {
         cli_abort(c(
             "x" = "All elements of {.fn plot.mnirs} must share the same \\
             {.field time_channel}.",
             "i" = "Found: {.val {unique(time_channels)}}."
-        ))
+        ), call = env)
     }
 
     ## auto-name unnamed list elements
@@ -210,7 +226,8 @@ as_plot_data <- function(x) {
     }, x, names(x))
     plot_data <- do.call(rbind, unname(x))
     plot_data[["interval"]] <- factor(
-        plot_data[["interval"]], levels = unique(plot_data[["interval"]])
+        plot_data[["interval"]],
+        levels = unique(plot_data[["interval"]])
     )
     attr(plot_data, "nirs_channels") <- nirs_channels
     attr(plot_data, "time_channel") <- time_channels[[1L]]
@@ -337,20 +354,20 @@ theme_mnirs <- function(
 #'
 #' @export
 palette_mnirs <- function(...) {
-    # fmt: skip
-    colours <- c(                         ## NIRS location codes
-        `light blue`  = "#0080ff",      ## "VL"
-        `dark red`    = "#ba2630",      ## "FCR"
-        `light green` = "#5b8c52",      ## "BB" "#7dbf70" alt
-        `pink`        = "#ff80ff",      ## "VM"
-        `orange`      = "#ff7f00",      ## "SCM"
-        `dark blue`   = "#00468Bff",    ## "TA"
-        `light red`   = "#db5555",      ## "ECR"
-        `green`       = "#42B540FF",    ## "DL"
-        `purple`      = "#9f79ee",      ## "RF"
-        `brown`       = "#8b4726",      ## "PS"
-        `blue`        = "#0000ff",      ## "HHb"
-        `red`         = "#ED0000FF"     ## "O2Hb"
+    colours <- c(
+        ## NIRS location codes
+        `light blue` = "#0080ff", ## "VL"
+        `dark red` = "#ba2630", ## "FCR"
+        `light green` = "#5b8c52", ## "BB" "#7dbf70" alt
+        `pink` = "#ff80ff", ## "VM"
+        `orange` = "#ff7f00", ## "SCM"
+        `dark blue` = "#00468Bff", ## "TA"
+        `light red` = "#db5555", ## "ECR"
+        `green` = "#42B540FF", ## "DL"
+        `purple` = "#9f79ee", ## "RF"
+        `brown` = "#8b4726", ## "PS"
+        `blue` = "#0000ff", ## "HHb"
+        `red` = "#ED0000FF" ## "O2Hb"
     )
 
     dots <- list(...)

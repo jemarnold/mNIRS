@@ -1,6 +1,6 @@
 # Mock mnirs data with attributes
 create_mock_mnirs <- function(n = 100, sample_rate = 10) {
-    df <- tibble::tibble(
+    df <- tibble(
         time = seq(0, (n - 1) / sample_rate, length.out = n),
         smo2_left = sin(time * 0.5) * 10 + 50,
         smo2_right = cos(time * 0.5) * 10 + 50,
@@ -25,15 +25,15 @@ create_mock_interval <- function(
     event_time = 0,
     span = c(-1, 4)
 ) {
-    time_vec <- seq(
+    t_vec <- seq(
         time_start,
         time_start + (n - 1) / sample_rate,
         length.out = n
     )
-    df <- tibble::tibble(
-        time = time_vec,
-        smo2_left = sin(time_vec) * 5 + 50,
-        smo2_right = cos(time_vec) * 5 + 50
+    df <- tibble(
+        time = t_vec,
+        smo2_left = sin(t_vec) * 5 + 50,
+        smo2_right = cos(t_vec) * 5 + 50
     )
     structure(
         df,
@@ -184,33 +184,33 @@ test_that("recycle_span validates span", {
 
 ## find_interval_time() ====================================================
 test_that("find_interval_time resolves time values directly", {
-    time_vec <- seq(0.1, 10, by = 0.1)
+    t_vec <- seq(0.1, 10, by = 0.1)
 
-    result <- find_interval_time(by_time(2, 5, 8), time_vec)
+    result <- find_interval_time(by_time(2, 5, 8), t_vec)
     expect_equal(result, c(2, 5, 8))
 })
 
 test_that("find_interval_time resolves samples to times", {
-    time_vec <- seq(0.1, 10, by = 0.1)
+    t_vec <- seq(0.1, 10, by = 0.1)
 
     result <- find_interval_time(
-        by_sample(10, 30, 70), time_vec
+        by_sample(10, 30, 70), t_vec
     )
-    expect_equal(result, time_vec[c(10, 30, 70)])
+    expect_equal(result, t_vec[c(10, 30, 70)])
 })
 
 test_that("find_interval_time resolves labels to times", {
-    time_vec <- seq(0.1, 10, by = 0.1)
+    t_vec <- seq(0.1, 10, by = 0.1)
     event_vec <- c(
         "start", rep("", 4), "mid", rep("", 4), "end"
     )
 
     result <- find_interval_time(
         by_label("start", "mid"),
-        time_vec,
+        t_vec,
         event_vec
     )
-    expect_equal(result, time_vec[c(1, 6)])
+    expect_equal(result, t_vec[c(1, 6)])
 })
 
 test_that("find_interval_time errors when no labels match", {
@@ -219,7 +219,7 @@ test_that("find_interval_time errors when no labels match", {
     expect_error(
         find_interval_time(
             by_label("invalid"),
-            time_vec = NULL,
+            t_vec = NULL,
             event_vec
         ),
         "No events detected"
@@ -227,78 +227,78 @@ test_that("find_interval_time errors when no labels match", {
 })
 
 test_that("find_interval_time matches case-insensitively with ignore_case", {
-    time_vec <- seq(0.1, 1, by = 0.1)
+    t_vec <- seq(0.1, 1, by = 0.1)
     event_vec <- c("start", rep("", 4), "MID", rep("", 4))
 
     ## default case-sensitive — "START" must not match "start"
     expect_error(
-        find_interval_time(by_label("START"), time_vec, event_vec),
+        find_interval_time(by_label("START"), t_vec, event_vec),
         "No events detected"
     )
 
     ## ignore_case = TRUE matches both cases
     result <- find_interval_time(
         by_label("START", "mid", ignore_case = TRUE),
-        time_vec,
+        t_vec,
         event_vec
     )
-    expect_equal(result, time_vec[c(1, 6)])
+    expect_equal(result, t_vec[c(1, 6)])
 })
 
 test_that("find_interval_time treats labels as literal with fixed = TRUE", {
-    time_vec <- seq(0.1, 0.4, by = 0.1)
+    t_vec <- seq(0.1, 0.4, by = 0.1)
     event_vec <- c("lap.1", "lapX1", "lap.1", "lapX1")
 
     ## default regex — "lap.1" matches both "lap.1" and "lapX1"
     regex_result <- find_interval_time(
-        by_label("lap.1"), time_vec, event_vec
+        by_label("lap.1"), t_vec, event_vec
     )
-    expect_equal(regex_result, time_vec[1:4])
+    expect_equal(regex_result, t_vec[1:4])
 
     ## fixed = TRUE — "lap.1" matches only literal "lap.1"
     fixed_result <- find_interval_time(
-        by_label("lap.1", fixed = TRUE), time_vec, event_vec
+        by_label("lap.1", fixed = TRUE), t_vec, event_vec
     )
-    expect_equal(fixed_result, time_vec[c(1, 3)])
+    expect_equal(fixed_result, t_vec[c(1, 3)])
 })
 
 test_that("find_interval_time fixed = TRUE works with multiple labels", {
     ## grepl(fixed = TRUE) rejects "a|b" — verifies Reduce path
-    time_vec <- seq(0.1, 0.4, by = 0.1)
+    t_vec <- seq(0.1, 0.4, by = 0.1)
     event_vec <- c("lap.1", "lap.2", "lap.3", "lap.4")
 
     result <- find_interval_time(
         by_label("lap.1", "lap.3", fixed = TRUE),
-        time_vec,
+        t_vec,
         event_vec
     )
-    expect_equal(result, time_vec[c(1, 3)])
+    expect_equal(result, t_vec[c(1, 3)])
 })
 
 test_that("find_interval_time resolves laps with position = first", {
-    time_vec <- seq(0, 0.8, by = 0.1)
+    t_vec <- seq(0, 0.8, by = 0.1)
     event_vec <- c(1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L)
 
     result <- find_interval_time(
         by_lap(1, 3),
-        time_vec,
+        t_vec,
         event_vec,
         position = "first"
     )
-    expect_equal(result, time_vec[c(1, 7)])
+    expect_equal(result, t_vec[c(1, 7)])
 })
 
 test_that("find_interval_time resolves laps with position = last", {
-    time_vec <- seq(0, 0.8, by = 0.1)
+    t_vec <- seq(0, 0.8, by = 0.1)
     event_vec <- c(1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L)
 
     result <- find_interval_time(
         by_lap(1, 3),
-        time_vec,
+        t_vec,
         event_vec,
         position = "last"
     )
-    expect_equal(result, time_vec[c(3, 9)])
+    expect_equal(result, t_vec[c(3, 9)])
 })
 
 test_that("find_interval_time errors when lap not found", {
@@ -307,7 +307,7 @@ test_that("find_interval_time errors when lap not found", {
     expect_error(
         find_interval_time(
             by_lap(5),
-            time_vec = NULL,
+            t_vec = NULL,
             event_vec,
             position = "first"
         ),
@@ -317,12 +317,12 @@ test_that("find_interval_time errors when lap not found", {
 
 ## resolve_interval() ===============================================
 test_that("resolve_interval returns start-only times", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
 
     result <- resolve_interval(
         start = by_time(2, 5),
         end = NULL,
-        time_vec = time_vec
+        t_vec = t_vec
     )
 
     expect_true(result$has_start)
@@ -332,12 +332,12 @@ test_that("resolve_interval returns start-only times", {
 })
 
 test_that("resolve_interval returns paired start+end times", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
 
     result <- resolve_interval(
         start = by_time(2, 5),
         end = by_time(4, 8),
-        time_vec = time_vec
+        t_vec = t_vec
     )
 
     expect_true(result$has_start)
@@ -347,13 +347,13 @@ test_that("resolve_interval returns paired start+end times", {
 })
 
 test_that("resolve_interval warns and truncates unequal lengths", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
 
     expect_warning(
         result <- resolve_interval(
             start = by_time(2, 5, 8),
             end = by_time(4, 7),
-            time_vec = time_vec
+            t_vec = t_vec
         ),
         "Unequal lengths"
     )
@@ -365,17 +365,17 @@ test_that("resolve_interval warns and truncates unequal lengths", {
 
 test_that("resolve_interval resolves lap start-only to lap start", {
     event_vec <- c(1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L)
-    time_vec <- seq(0, 0.8, by = 0.1)
+    t_vec <- seq(0, 0.8, by = 0.1)
 
     result <- resolve_interval(
         start = by_lap(2),
         end = NULL,
-        time_vec = time_vec,
+        t_vec = t_vec,
         event_vec = event_vec
     )
 
     ## lap 2 starts row 4; time 0.3
-    expect_equal(result$start_time, time_vec[4])
+    expect_equal(result$start_time, t_vec[4])
     expect_null(result$end_time)
     expect_true(result$has_start)
     expect_false(result$has_end)
@@ -383,17 +383,17 @@ test_that("resolve_interval resolves lap start-only to lap start", {
 
 test_that("resolve_interval resolves lap end-only to lap end", {
     event_vec <- c(1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L)
-    time_vec <- seq(0, 0.8, by = 0.1)
+    t_vec <- seq(0, 0.8, by = 0.1)
 
     result <- resolve_interval(
         start = NULL,
         end = by_lap(3),
-        time_vec = time_vec,
+        t_vec = t_vec,
         event_vec = event_vec
     )
 
     ## lap 3 ends row 9; time 0.8
-    expect_equal(result$start_time, time_vec[9])
+    expect_equal(result$start_time, t_vec[9])
     expect_null(result$end_time)
     expect_false(result$has_start)
     expect_true(result$has_end)
@@ -401,17 +401,17 @@ test_that("resolve_interval resolves lap end-only to lap end", {
 
 test_that("resolve_interval lap single-boundary supports multiple laps", {
     event_vec <- c(1L, 1L, 2L, 2L, 3L, 3L)
-    time_vec <- seq(0, 0.5, by = 0.1)
+    t_vec <- seq(0, 0.5, by = 0.1)
 
     result <- resolve_interval(
         start = by_lap(1, 3),
         end = NULL,
-        time_vec = time_vec,
+        t_vec = t_vec,
         event_vec = event_vec
     )
 
     ## lap 1: row 1; lap 3: row 5
-    expect_equal(result$start_time, time_vec[c(1, 5)])
+    expect_equal(result$start_time, t_vec[c(1, 5)])
     expect_null(result$end_time)
     expect_true(result$has_start)
     expect_false(result$has_end)
@@ -498,7 +498,7 @@ test_that("recycle_param converts non-list to list", {
     result <- recycle_param(
         c(1, 2),
         n_events = 1,
-        event_groups = "distinct",
+        group_intervals = "distinct",
         verbose = FALSE
     )
 
@@ -511,7 +511,7 @@ test_that("recycle_param returns unchanged when lengths match", {
     result <- recycle_param(
         input,
         n_events = 3,
-        event_groups = "distinct",
+        group_intervals = "distinct",
         verbose = FALSE
     )
 
@@ -522,7 +522,7 @@ test_that("recycle_param recycles last element when param_length < n_events", {
     result <- recycle_param(
         list(c(-1, 1), c(-2, 2)),
         n_events = 4,
-        event_groups = "distinct",
+        group_intervals = "distinct",
         verbose = FALSE
     )
 
@@ -535,7 +535,7 @@ test_that("recycle_param truncates when param_length > n_events", {
     result <- recycle_param(
         list(c(-1, 1), c(-2, 2), c(-3, 3), c(-4, 4)),
         n_events = 2,
-        event_groups = "distinct",
+        group_intervals = "distinct",
         verbose = FALSE
     )
 
@@ -548,7 +548,7 @@ test_that("recycle_param flattens nested lists", {
     result <- recycle_param(
         list(list(c(-1, 1)), list(c(-2, 2))),
         n_events = 2,
-        event_groups = "distinct",
+        group_intervals = "distinct",
         verbose = FALSE
     )
 
@@ -561,7 +561,7 @@ test_that("recycle_param warns when recycling & truncating", {
         recycle_param(
             list(c(-1, 1), c(-2, 2)),
             n_events = 4,
-            event_groups = "distinct",
+            group_intervals = "distinct",
             verbose = TRUE
         ),
         regexp = "recycled.*unspecified"
@@ -571,7 +571,7 @@ test_that("recycle_param warns when recycling & truncating", {
         recycle_param(
             list(c(-1, 1), c(-2, 2), c(-3, 3)),
             n_events = 1,
-            event_groups = "distinct",
+            group_intervals = "distinct",
             verbose = TRUE
         ),
         regexp = "exceeds.*ignored"
@@ -584,7 +584,7 @@ test_that("recycle_param expands per group and reorders to event order", {
     result <- recycle_param(
         list(c(-0.3, 0.3), c(-0.5, 0.5)),
         n_events = 5,
-        event_groups = list(c(1, 3, 5), c(2, 4)),
+        group_intervals = list(c(1, 3, 5), c(2, 4)),
         verbose = FALSE
     )
 
@@ -601,7 +601,7 @@ test_that("recycle_param recycles params to match group count", {
     result <- recycle_param(
         list(c(-1, 1)),
         n_events = 4,
-        event_groups = list(c(1, 2), c(3), c(4)),
+        group_intervals = list(c(1, 2), c(3), c(4)),
         verbose = FALSE
     )
 
@@ -615,7 +615,7 @@ test_that("recycle_param recycles params to match group count", {
     result <- recycle_param(
         list(c(-0.3, 0.3), c(-0.5, 0.5)),
         n_events = 4,
-        event_groups = list(c(4, 3), c(2), c(1)),
+        group_intervals = list(c(4, 3), c(2), c(1)),
         verbose = FALSE
     )
 
@@ -631,7 +631,7 @@ test_that("recycle_param handles ungrouped events with custom grouping", {
     result <- recycle_param(
         param = list(c(-0.3, 0.3), c(-0.5, 0.5)),
         n_events = 5,
-        event_groups = list(c(1, 3), c(2, 4)),
+        group_intervals = list(c(1, 3), c(2, 4)),
         verbose = FALSE
     )
 
@@ -644,11 +644,11 @@ test_that("recycle_param handles ungrouped events with custom grouping", {
 })
 
 test_that("recycle_param truncates when more grouped events than actual events", {
-    ## event_groups specifies events 1-6 but only 4 actual events
+    ## group_intervals specifies events 1-6 but only 4 actual events
     result <- recycle_param(
         param = list(c(-0.3, 0.3), c(-0.5, 0.5)),
         n_events = 4,
-        event_groups = list(c(1, 3, 5), c(2, 4, 6)),
+        group_intervals = list(c(1, 3, 5), c(2, 4, 6)),
         verbose = FALSE
     )
 
@@ -664,7 +664,7 @@ test_that("recycle_param handles non-contiguous group indices", {
     result <- recycle_param(
         param = list(c(-0.3, 0.3), c(-0.5, 0.5)),
         n_events = 5,
-        event_groups = list(c(1, 4), c(2, 5)),
+        group_intervals = list(c(1, 4), c(2, 5)),
         verbose = FALSE
     )
 
@@ -682,7 +682,7 @@ test_that("recycle_param truncates excess params for custom grouping", {
         result <- recycle_param(
             list(c(-0.3, 0.3), c(-0.5, 0.5), c(-1, 1)),
             n_events = 4,
-            event_groups = list(c(1, 3), c(2, 4)),
+            group_intervals = list(c(1, 3), c(2, 4)),
             verbose = TRUE
         ),
         regexp = "exceeds"
@@ -700,7 +700,7 @@ test_that("recycle_param messages when recycling groups with verbose", {
         recycle_param(
             list(c(-1, 1), c(-2, 2), c(-3, 3)),
             n_events = 1,
-            event_groups = list(1),
+            group_intervals = list(1),
             verbose = TRUE
         ),
         regexp = "exceeds.*ignored"
@@ -710,7 +710,7 @@ test_that("recycle_param messages when recycling groups with verbose", {
         recycle_param(
             list(c(-0.3, 0.3), c(-0.5, 0.5)),
             n_events = 6,
-            event_groups = list(c(1, 2), c(3, 4), c(5, 6)),
+            group_intervals = list(c(1, 2), c(3, 4), c(5, 6)),
             verbose = TRUE
         ),
         regexp = "recycled.*unspecified"
@@ -721,7 +721,7 @@ test_that("recycle_param messages when recycling groups with verbose", {
         recycle_param(
             list(c(-0.3, 0.3)),
             n_events = 6,
-            event_groups = list(c(1, 2), c(3, 4), c(5, 6)),
+            group_intervals = list(c(1, 2), c(3, 4), c(5, 6)),
             verbose = TRUE
         )
     )
@@ -731,9 +731,9 @@ test_that("recycle_param messages when recycling groups with verbose", {
 ## apply_span() ============================================================
 test_that("apply_span creates correct interval specification", {
     ## floating point precision issues
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
     interval_list <- list(
-        start_time = time_vec[c(20, 50, 80)], ## c(1.9, 4.9, 7.9)
+        start_time = t_vec[c(20, 50, 80)], ## c(1.9, 4.9, 7.9)
         end_time = NULL,
         has_start = TRUE,
         has_end = FALSE
@@ -742,23 +742,23 @@ test_that("apply_span creates correct interval specification", {
 
     result <- apply_span(
         interval_list,
-        time_vec,
+        t_vec,
         span,
         verbose = FALSE
     )
 
     expect_s3_class(result, "data.frame")
     expect_equal(nrow(result), 3)
-    expect_equal(result$start_times, time_vec[c(20, 50, 80)] - 1)
-    expect_equal(result$end_times, time_vec[c(20, 50, 80)] + 1)
-    expect_equal(result$interval_times, as.list(time_vec[c(20, 50, 80)]))
+    expect_equal(result$start_times, t_vec[c(20, 50, 80)] - 1)
+    expect_equal(result$end_times, t_vec[c(20, 50, 80)] + 1)
+    expect_equal(result$interval_times, as.list(t_vec[c(20, 50, 80)]))
 })
 
 test_that("apply_span creates correct specification with start, end", {
     ## floating point precision issues
-    time_vec <- seq(0, 10, by = 0.1)
-    start_times <- time_vec[c(10, 40, 70)]
-    end_times <- time_vec[c(30, 60, 90)]
+    t_vec <- seq(0, 10, by = 0.1)
+    start_times <- t_vec[c(10, 40, 70)]
+    end_times <- t_vec[c(30, 60, 90)]
     interval_list <- list(
         start_time = start_times,
         end_time = end_times,
@@ -768,7 +768,7 @@ test_that("apply_span creates correct specification with start, end", {
 
     result <- apply_span(
         interval_list,
-        time_vec,
+        t_vec,
         span = list(c(0, 1), c(0, 1), c(0, 1)),
         verbose = FALSE
     )
@@ -779,7 +779,7 @@ test_that("apply_span creates correct specification with start, end", {
 })
 
 test_that("apply_span calculates correct start/end indices", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
     interval_list <- list(
         start_time = 5.0,
         end_time = NULL,
@@ -789,7 +789,7 @@ test_that("apply_span calculates correct start/end indices", {
 
     result <- apply_span(
         interval_list,
-        time_vec,
+        t_vec,
         span = list(c(-1, 2)),
         verbose = FALSE
     )
@@ -800,9 +800,9 @@ test_that("apply_span calculates correct start/end indices", {
 })
 
 test_that("apply_span clips partial out-of-bounds intervals", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
     interval_list <- list(
-        start_time = time_vec[6],
+        start_time = t_vec[6],
         end_time = NULL,
         has_start = TRUE,
         has_end = FALSE
@@ -810,7 +810,7 @@ test_that("apply_span clips partial out-of-bounds intervals", {
 
     result <- apply_span(
         interval_list,
-        time_vec,
+        t_vec,
         span = list(c(-2, 2)),
         verbose = FALSE
     )
@@ -821,7 +821,7 @@ test_that("apply_span clips partial out-of-bounds intervals", {
     expect_warning(
         result <- apply_span(
             interval_list,
-            time_vec,
+            t_vec,
             span = list(c(-2, 10)),
             verbose = TRUE
         ),
@@ -833,9 +833,9 @@ test_that("apply_span clips partial out-of-bounds intervals", {
 })
 
 test_that("apply_span errors for entirely out-of-bounds", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
     interval_list <- list(
-        start_time = time_vec[50],
+        start_time = t_vec[50],
         end_time = NULL,
         has_start = TRUE,
         has_end = FALSE
@@ -844,7 +844,7 @@ test_that("apply_span errors for entirely out-of-bounds", {
     expect_error(
         apply_span(
             interval_list,
-            time_vec,
+            t_vec,
             span = list(c(100, 200)),
             verbose = FALSE
         ),
@@ -853,7 +853,7 @@ test_that("apply_span errors for entirely out-of-bounds", {
 })
 
 test_that("apply_span applies span correctly with start+end", {
-    time_vec <- seq(0, 10, by = 0.1)
+    t_vec <- seq(0, 10, by = 0.1)
     interval_list <- list(
         start_time = 2.0,
         end_time = 6.0,
@@ -864,7 +864,7 @@ test_that("apply_span applies span correctly with start+end", {
     ## span[1] shifts start, span[2] shifts end
     result <- apply_span(
         interval_list,
-        time_vec,
+        t_vec,
         span = list(c(-1, 2)),
         verbose = FALSE
     )
@@ -878,21 +878,21 @@ test_that("apply_span applies span correctly with start+end", {
 ## extract_df_list() ==============================================
 test_that("extract_df_list returns correct number of intervals", {
     data <- create_mock_mnirs(n = 100, sample_rate = 10)
-    time_vec <- data$time
+    t_vec <- data$time
     
     interval_spec <- data.frame(
         span_before = c(-1, -1),
         span_after = c(2, 2),
-        start_times = time_vec[c(10, 50)],
-        end_times = time_vec[c(30, 70)]
+        start_times = t_vec[c(10, 50)],
+        end_times = t_vec[c(30, 70)]
     )
     interval_spec$interval_times <- list(1, 5) ## two start_times, no end_times
 
     result <- extract_df_list(
         data,
-        time_vec,
+        t_vec,
         interval_spec,
-        nirs_channels = list(
+        group_channels = list(
             c("smo2_left", "smo2_right"),
             c("smo2_left", "smo2_right")
         )
@@ -904,21 +904,21 @@ test_that("extract_df_list returns correct number of intervals", {
 
 test_that("extract_df_list extracts correct row ranges", {
     data <- create_mock_mnirs(n = 100, sample_rate = 10)
-    time_vec <- data$time
+    t_vec <- data$time
 
     interval_spec <- data.frame(
         span_before = -1,
         span_after = 1,
-        start_times = time_vec[20],
-        end_times = time_vec[40]
+        start_times = t_vec[20],
+        end_times = t_vec[40]
     )
     interval_spec$interval_times <- list(3) ## one start_times, no end_times
 
     result <- extract_df_list(
         data,
-        time_vec,
+        t_vec,
         interval_spec,
-        nirs_channels = list(c("smo2_left", "smo2_right"))
+        group_channels = list(c("smo2_left", "smo2_right"))
     )
 
     expect_equal(nrow(result[[1L]]), 21) # rows 20 to 40 inclusive
@@ -926,21 +926,21 @@ test_that("extract_df_list extracts correct row ranges", {
 
 test_that("extract_df_list preserves metadata attributes", {
     data <- create_mock_mnirs(n = 100, sample_rate = 10)
-    time_vec <- data$time
+    t_vec <- data$time
 
     interval_spec <- data.frame(
         span_before = -0.5,
         span_after = 1.5,
-        start_times = time_vec[10],
-        end_times = time_vec[30]
+        start_times = t_vec[10],
+        end_times = t_vec[30]
     )
     interval_spec$interval_times <- list(c(1.5, 3.0)) ## one start_times, one end_times
 
     result <- extract_df_list(
         data,
-        time_vec, 
+        t_vec, 
         interval_spec,
-        nirs_channels = list(c("smo2_left"))
+        group_channels = list(c("smo2_left"))
     )
 
     expect_equal(attr(result[[1L]], "interval_times"), c(1.5, 3.0))
@@ -951,13 +951,13 @@ test_that("extract_df_list preserves metadata attributes", {
 
 ## zero_offset_data() ===============================================
 test_that("zero_offset_data shifts time channel by event time", {
-    df <- tibble::tibble(time = c(5, 6, 7, 8, 9), value = 1:5)
+    df <- tibble(time = c(5, 6, 7, 8, 9), value = 1:5)
     result <- zero_offset_data(df, time_channel = "time", t0 = 7)
     expect_equal(result$time, c(-2, -1, 0, 1, 2))
     expect_equal(result$value, 1:5) # other columns unchanged
 
     ## negative event times
-    df <- tibble::tibble(time = c(-5, -4, -3, -2, -1), value = 1:5)
+    df <- tibble(time = c(-5, -4, -3, -2, -1), value = 1:5)
     result <- zero_offset_data(df, time_channel = "time", t0 = -3)
     expect_equal(result$time, c(-2, -1, 0, 1, 2))
 })
@@ -979,7 +979,7 @@ test_that("ensemble_intervals averages across intervals correctly", {
 
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = c("smo2_left", "smo2_right"),
+        group_channels = c("smo2_left", "smo2_right"),
         metadata = metadata,
         verbose = FALSE
     )
@@ -1000,7 +1000,7 @@ test_that("ensemble_intervals preserves metadata", {
 
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = c("smo2_left", "smo2_right"),
+        group_channels = c("smo2_left", "smo2_right"),
         metadata = metadata,
         verbose = FALSE
     )
@@ -1027,7 +1027,7 @@ test_that("ensemble_intervals warns on irregular samples with verbose", {
     expect_warning(
         ensemble_intervals(
             df_list = df_list,
-            nirs_channels = c("smo2_left", "smo2_right"),
+            group_channels = c("smo2_left", "smo2_right"),
             metadata = metadata,
             verbose = TRUE
         ),
@@ -1044,27 +1044,27 @@ test_that("ensemble_intervals returns the right number of dims", {
     )
     df_list <- list(interval_1 = interval1, interval_2 = interval2)
     metadata <- list(time_channel = "time", sample_rate = 10)
-    nirs_channels = c("smo2_left")
+    group_channels = c("smo2_left")
 
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = nirs_channels,
+        group_channels = group_channels,
         metadata = metadata,
         verbose = FALSE
     )
 
-    expect_equal(ncol(result), length(nirs_channels) + 1)
+    expect_equal(ncol(result), length(group_channels) + 1)
 
-    nirs_channels = c("smo2_left", "smo2_right")
+    group_channels = c("smo2_left", "smo2_right")
 
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = nirs_channels,
+        group_channels = group_channels,
         metadata = metadata,
         verbose = FALSE
     )
 
-    expect_equal(ncol(result), length(nirs_channels) + 1)
+    expect_equal(ncol(result), length(group_channels) + 1)
 })
 
 test_that("ensemble_intervals preserves all metadata attributes", {
@@ -1081,7 +1081,7 @@ test_that("ensemble_intervals preserves all metadata attributes", {
 
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = c("smo2_left", "smo2_right"),
+        group_channels = c("smo2_left", "smo2_right"),
         metadata = metadata,
         verbose = FALSE
     )
@@ -1105,7 +1105,7 @@ test_that("ensemble_intervals deduplicates nirs_channels attr", {
     ## duplicated channel name supplied; attr must be unique
     result <- ensemble_intervals(
         df_list = df_list,
-        nirs_channels = c("smo2_left", "smo2_left"),
+        group_channels = c("smo2_left", "smo2_left"),
         metadata = metadata,
         verbose = FALSE
     )
@@ -1114,21 +1114,21 @@ test_that("ensemble_intervals deduplicates nirs_channels attr", {
 })
 
 
-## group_intervals() ==================================================
-test_that("group_intervals returns distinct intervals unchanged", {
+## apply_interval_groups() ==================================================
+test_that("apply_interval_groups returns distinct intervals unchanged", {
     interval1 <- create_mock_interval(time_start = 0, n = 11, event_time = 0)
     interval2 <- create_mock_interval(time_start = 10, n = 11, event_time = 10)
     df_list <- list(interval_1 = interval1, interval_2 = interval2)
     metadata <- list(time_channel = "time", sample_rate = 10)
 
-    result <- group_intervals(
+    result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = list(
+        group_channels = list(
             c("smo2_left", "smo2_right"),
             c("smo2_left", "smo2_right")
         ),
         metadata = metadata,
-        event_groups = "distinct",
+        group_intervals = "distinct",
         zero_time = TRUE,
         verbose = FALSE
     )
@@ -1139,20 +1139,20 @@ test_that("group_intervals returns distinct intervals unchanged", {
     expect_equal(min(result[[1]]$time), 0)
 })
 
-test_that("group_intervals ensembles all intervals with 'ensemble'", {
+test_that("apply_interval_groups ensembles all intervals with 'ensemble'", {
     interval1 <- create_mock_interval(time_start = 0, n = 11, event_time = 0)
     interval2 <- create_mock_interval(time_start = 10, n = 11, event_time = 10)
     df_list <- list(interval_1 = interval1, interval_2 = interval2)
     metadata <- list(time_channel = "time", sample_rate = 10)
 
-    result <- group_intervals(
+    result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = list(
+        group_channels = list(
             c("smo2_left", "smo2_right"),
             c("smo2_left", "smo2_right")
         ),
         metadata = metadata,
-        event_groups = "ensemble",
+        group_intervals = "ensemble",
         zero_time = FALSE,
         verbose = FALSE
     )
@@ -1163,7 +1163,7 @@ test_that("group_intervals ensembles all intervals with 'ensemble'", {
     expect_equal(min(result[[1]]$time), 0)
 })
 
-test_that("group_intervals handles custom grouping", {
+test_that("apply_interval_groups handles custom grouping", {
     interval1 <- create_mock_interval(time_start = 0, n = 11, event_time = 0)
     interval2 <- create_mock_interval(time_start = 10, n = 11, event_time = 10)
     interval3 <- create_mock_interval(time_start = 20, n = 11, event_time = 20)
@@ -1176,11 +1176,11 @@ test_that("group_intervals handles custom grouping", {
     )
     metadata <- list(time_channel = "time", sample_rate = 10)
 
-    result <- group_intervals(
+    result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = rep(list(c("smo2_left", "smo2_right")), 4),
+        group_channels = rep(list(c("smo2_left", "smo2_right")), 4),
         metadata = metadata,
-        event_groups = list(c(1, 2), c(3, 4)),
+        group_intervals = list(c(1, 2), c(3, 4)),
         zero_time = TRUE,
         verbose = FALSE
     )
@@ -1190,11 +1190,11 @@ test_that("group_intervals handles custom grouping", {
 
     # Group only intervals 1, 2 & 3, leaving 4 ungrouped
     expect_message(
-        result <- group_intervals(
+        result <- apply_interval_groups(
             df_list = df_list,
-            nirs_channels = rep(list(c("smo2_left", "smo2_right")), 3),
+            group_channels = rep(list(c("smo2_left", "smo2_right")), 3),
             metadata = metadata,
-            event_groups = list(c(1, 2), 4),
+            group_intervals = list(c(1, 2), 4),
             zero_time = TRUE,
             verbose = TRUE
         ),
@@ -1206,11 +1206,11 @@ test_that("group_intervals handles custom grouping", {
 
     ## group the same interval multiple times throws warning
     expect_warning(
-        result <- group_intervals(
+        result <- apply_interval_groups(
             df_list = df_list,
-            nirs_channels = rep(list(c("smo2_left", "smo2_right")), 3),
+            group_channels = rep(list(c("smo2_left", "smo2_right")), 3),
             metadata = metadata,
-            event_groups = list(c(1, 2, 3), c(2, 4)),
+            group_intervals = list(c(1, 2, 3), c(2, 4)),
             zero_time = TRUE,
             verbose = TRUE
         ),
@@ -1218,16 +1218,51 @@ test_that("group_intervals handles custom grouping", {
     )
 })
 
-test_that("group_intervals returns single interval as distinct regardless", {
+test_that("extract_intervals rejects invalid group_intervals indices", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+    extract_groups <- \(groups) {
+        extract_intervals(
+            data,
+            start = by_time(2, 5, 8),
+            span = c(-0.5, 0.5),
+            group_intervals = groups,
+            verbose = FALSE
+        )
+    }
+
+    integer_error <- "group_intervals.*position 1.*missing integer indices"
+    range_error <- "Indices must be between.*1.*3"
+
+    expect_error(extract_groups(list()), "group_intervals.*at least one group")
+    expect_error(extract_groups(list("1")), integer_error)
+    expect_error(extract_groups(list(TRUE)), integer_error)
+    expect_error(extract_groups(list(NA_integer_)), integer_error)
+    expect_error(extract_groups(list(Inf)), integer_error)
+    expect_error(extract_groups(list(1.5)), integer_error)
+    expect_error(extract_groups(list(matrix(1:2))), integer_error)
+    expect_error(extract_groups(list(0L)), range_error)
+    expect_error(extract_groups(list(-1L)), range_error)
+    expect_error(extract_groups(list(4L)), range_error)
+    expect_error(
+        extract_groups(list(valid = 1L, invalid = 4L)),
+        "out-of-range.*invalid"
+    )
+    expect_error(
+        extract_groups(list(integer())),
+        "group_intervals.*empty group.*position 1"
+    )
+})
+
+test_that("apply_interval_groups returns single interval as distinct regardless", {
     interval1 <- create_mock_interval(time_start = 0, n = 11, event_time = 0)
     df_list <- list(interval_1 = interval1)
     metadata <- list(time_channel = "time", sample_rate = 10)
 
-    result <- group_intervals(
+    result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = list(c("smo2_left", "smo2_right")),
+        group_channels = list(c("smo2_left", "smo2_right")),
         metadata = metadata,
-        event_groups = "ensemble", # request ensemble but only 1 interval
+        group_intervals = "ensemble", # request ensemble but only 1 interval
         zero_time = FALSE,
         verbose = FALSE
     )
@@ -1235,7 +1270,7 @@ test_that("group_intervals returns single interval as distinct regardless", {
     expect_length(result, 1)
 })
 
-test_that("group_intervals (distinct) preserves all metadata on each interval", {
+test_that("apply_interval_groups (distinct) preserves all metadata on each interval", {
     interval1 <- create_mock_interval(time_start = 0, n = 11, event_time = 0)
     interval2 <- create_mock_interval(time_start = 10, n = 11, event_time = 10)
     df_list <- list(interval_1 = interval1, interval_2 = interval2)
@@ -1247,14 +1282,14 @@ test_that("group_intervals (distinct) preserves all metadata on each interval", 
         start_timestamp = as.POSIXct("2024-01-01")
     )
 
-    result <- group_intervals(
+    result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = list(
+        group_channels = list(
             c("smo2_left", "smo2_right"),
             c("smo2_left", "smo2_right")
         ),
         metadata = metadata,
-        event_groups = "distinct",
+        group_intervals = "distinct",
         zero_time = FALSE,
         verbose = FALSE
     )
@@ -1280,7 +1315,7 @@ test_that("group_intervals (distinct) preserves all metadata on each interval", 
 })
 
 
-test_that("group_intervals custom multi-interval groups preserve metadata", {
+test_that("apply_interval_groups custom multi-interval groups preserve metadata", {
     interval1 <- create_mock_interval(time_start = 0, n = 11, event_time = 0)
     interval2 <- create_mock_interval(time_start = 10, n = 11, event_time = 10)
     interval3 <- create_mock_interval(time_start = 20, n = 11, event_time = 20)
@@ -1298,11 +1333,11 @@ test_that("group_intervals custom multi-interval groups preserve metadata", {
         event_channel = "event"
     )
 
-    result <- group_intervals(
+    result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = rep(list(c("smo2_left", "smo2_right")), 4),
+        group_channels = rep(list(c("smo2_left", "smo2_right")), 4),
         metadata = metadata,
-        event_groups = list(c(1, 2), c(3, 4)),
+        group_intervals = list(c(1, 2), c(3, 4)),
         # zero_time = FALSE, ## ensemble auto zeroes
         verbose = FALSE
     )
@@ -1328,7 +1363,7 @@ test_that("group_intervals custom multi-interval groups preserve metadata", {
     )
 })
 
-test_that("group_intervals custom single-interval group retains original attrs", {
+test_that("apply_interval_groups custom single-interval group retains original attrs", {
     interval1 <- create_mock_interval(
         time_start = 0,
         n = 11,
@@ -1355,11 +1390,11 @@ test_that("group_intervals custom single-interval group retains original attrs",
     metadata <- list(time_channel = "time", sample_rate = 10)
 
     ## intervals 1+2 ensembled; interval 3 returned as lone group (raw)
-    result <- group_intervals(
+    result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = rep(list(c("smo2_left", "smo2_right")), 3),
+        group_channels = rep(list(c("smo2_left", "smo2_right")), 3),
         metadata = metadata,
-        event_groups = list(c(1, 2), 3),
+        group_intervals = list(c(1, 2), 3),
         zero_time = FALSE,
         verbose = FALSE
     )
@@ -1372,11 +1407,11 @@ test_that("group_intervals custom single-interval group retains original attrs",
     expect_equal(attr(lone, "interval_span"), c(-1, 4))
 
     ## with `zero_time = TRUE`
-    result <- group_intervals(
+    result <- apply_interval_groups(
         df_list = df_list,
-        nirs_channels = rep(list(c("smo2_left", "smo2_right")), 3),
+        group_channels = rep(list(c("smo2_left", "smo2_right")), 3),
         metadata = metadata,
-        event_groups = list(c(1, 2), 3),
+        group_intervals = list(c(1, 2), 3),
         zero_time = TRUE,
         verbose = FALSE
     )
@@ -1418,8 +1453,8 @@ test_that("extract_intervals returns list of tibbles", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = by_time(2, 5),
-        event_groups = "distinct",
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1437,9 +1472,9 @@ test_that("extract_intervals works with start and end", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = by_time(2, 5),
         end = by_time(4, 8),
-        event_groups = "distinct",
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1459,8 +1494,8 @@ test_that("extract_intervals works with by_sample", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = by_sample(21, 51),
-        event_groups = "distinct",
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1479,8 +1514,8 @@ test_that("extract_intervals works with by_label", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         start = by_label("marker"),
-        event_groups = "distinct",
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1499,8 +1534,8 @@ test_that("extract_intervals works with by_lap start only", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         start = by_lap(3),
-        event_groups = "distinct",
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1516,8 +1551,8 @@ test_that("extract_intervals works with by_lap start only", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         start = by_lap(3),
-        event_groups = "distinct",
         span = c(-0.5, 0.5),
         verbose = FALSE
     )
@@ -1534,8 +1569,8 @@ test_that("extract_intervals works with by_lap end only", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         end = by_lap(5),
-        event_groups = "distinct",
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1554,9 +1589,9 @@ test_that("extract_intervals works with by_lap start and end", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         start = by_lap(2),
         end = by_lap(4),
-        event_groups = "distinct",
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1576,9 +1611,9 @@ test_that("extract_intervals works with multiple by_lap pairs", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         start = by_lap(1, 5),
         end = by_lap(2, 7),
-        event_groups = "distinct",
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1620,8 +1655,8 @@ test_that("extract_intervals coerces raw numeric to by_time", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = 2,
-        event_groups = "distinct",
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1634,8 +1669,8 @@ test_that("extract_intervals coerces raw numeric to by_time", {
     obj <- 2
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = obj,
-        event_groups = "distinct",
         span = c(-0.5, 0.5),
         verbose = FALSE
     )
@@ -1652,8 +1687,8 @@ test_that("extract_intervals coerces raw character to by_label", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         start = "marker",
-        event_groups = "distinct",
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1670,9 +1705,9 @@ test_that("extract_intervals coerces raw integer to by_lap", {
     result <- extract_intervals(
         data = data,
         event_channel = "event",
+        group_intervals = "distinct",
         start = 2L,
         end = 4L,
-        event_groups = "distinct",
         span = c(0, 0),
         verbose = FALSE
     )
@@ -1689,9 +1724,9 @@ test_that("extract_intervals recycles positive span scalar", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = by_time(2),
         end = by_time(5),
-        event_groups = "distinct",
         span = 1,
         verbose = FALSE
     )
@@ -1706,9 +1741,9 @@ test_that("extract_intervals recycles negative span scalar", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = by_time(2),
         end = by_time(5),
-        event_groups = "distinct",
         span = -1,
         verbose = FALSE
     )
@@ -1723,8 +1758,8 @@ test_that("extract_intervals applies zero_time correctly", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = by_time(5),
-        event_groups = "distinct",
         span = c(-1, 1),
         zero_time = TRUE,
         verbose = FALSE
@@ -1739,8 +1774,8 @@ test_that("extract_intervals handles grouping", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "ensemble",
         start = by_time(2, 5, 8),
-        event_groups = "ensemble",
         span = c(-0.5, 0.5), ## single span recycled to all events
         verbose = FALSE
     )
@@ -1752,8 +1787,8 @@ test_that("extract_intervals handles grouping", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = list(c(1, 3), c(2, 4)),
         start = by_time(2, 4, 6, 8),
-        event_groups = list(c(1, 3), c(2, 4)),
         span = list(c(-0.3, 0.3), c(-0.5, 0.5)),
         verbose = FALSE
     )
@@ -1769,8 +1804,8 @@ test_that("extract_intervals handles different spans per event", {
 
     result <- extract_intervals(
         data = data,
+        group_intervals = "distinct",
         start = by_time(2, 5),
-        event_groups = "distinct",
         span = list(c(-0.5, 0.5), c(-1, 1)),
         verbose = FALSE
     )
@@ -1797,14 +1832,13 @@ test_that("extract_intervals errors & messages", {
     expect_warning(
         result <- extract_intervals(
             data = data,
+            group_intervals = "distinct",
             start = by_time(0.5),
-            event_groups = "distinct",
             span = c(-1, 1),
             verbose = TRUE
         ),
         regexp = "partially outside"
-    ) |>
-        expect_message("nirs_channels.*grouped together")
+    )
 
     expect_length(result, 1)
     ## start value bounded by time = zero
@@ -1818,8 +1852,8 @@ test_that("extract_intervals respects nirs_channels metadata", {
     result <- extract_intervals(
         data = data,
         nirs_channels = "smo2_left",
+        group_intervals = "distinct",
         start = by_time(1, 5),
-        event_groups = "distinct",
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1831,8 +1865,8 @@ test_that("extract_intervals respects nirs_channels metadata", {
         data = data,
         nirs_channels = "smo2_left",
         time_channel = "time",
+        group_intervals = "ensemble",
         start = by_time(1, 5),
-        event_groups = "ensemble",
         span = c(-1, 1),
         verbose = TRUE
     )
@@ -1841,76 +1875,90 @@ test_that("extract_intervals respects nirs_channels metadata", {
 })
 
 
-test_that("extract_intervals informs when nirs_channels is not a list()", {
+test_that("extract_intervals errors on deprecated nirs_channels = list()", {
     data <- create_mock_mnirs(n = 60, sample_rate = 10)
-    attr(data, "nirs_channels") <- NULL  ## remove metadata
 
-    ## fires: verbose=TRUE, ensemble, no metadata, non-list channels
-    expect_message(
-        extract_intervals(
-            data,
-            nirs_channels = "smo2_left",
-            time_channel = "time",
-            start = by_time(1, 4),
-            span = c(-0.5, 0.5),
-            event_groups = "ensemble",
-            verbose = TRUE
-        ),
-        "list\\(\\).*channel grouping"
-    )
-
-    ## silent: verbose=FALSE
-    expect_no_message(
-        extract_intervals(
-            data,
-            nirs_channels = "smo2_left",
-            time_channel = "time",
-            start = by_time(1, 4),
-            span = c(-0.5, 0.5),
-            event_groups = "ensemble",
-            verbose = FALSE
-        )
-    )
-
-    ## silent: nirs_channels already a list()
-    expect_no_message(
+    ## list-form nirs_channels replaced by group_channels
+    expect_error(
         extract_intervals(
             data,
             nirs_channels = list("smo2_left"),
             time_channel = "time",
+            group_intervals = "ensemble",
             start = by_time(1, 4),
             span = c(-0.5, 0.5),
-            event_groups = "ensemble",
-            verbose = TRUE
-        )
+            verbose = FALSE
+        ),
+        "group_channels"
+    )
+})
+
+test_that("extract_intervals group_channels selects channels per interval", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    ## channel excluded from interval 2 contributes no data to its
+    ## ensemble-mean; smo2_right must equal interval 1 values alone
+    result <- extract_intervals(
+        data = data,
+        group_intervals = "ensemble",
+        group_channels = list(c("smo2_left", "smo2_right"), "smo2_left"),
+        start = by_time(2, 5),
+        span = c(-0.5, 0.5),
+        verbose = FALSE
     )
 
-    ## silent: event_groups = "distinct"
-    expect_no_message(
+    interval1 <- extract_intervals(
+        data = data,
+        start = by_time(2),
+        span = c(-0.5, 0.5),
+        zero_time = TRUE,
+        verbose = FALSE
+    )[[1L]]
+
+    expect_named(result, "ensemble")
+    expect_named(result[[1L]], c("time", "smo2_left", "smo2_right"))
+    expect_equal(result$ensemble$smo2_right, interval1$smo2_right)
+    ## non-excluded channel still averages both intervals
+    expect_false(isTRUE(all.equal(
+        result$ensemble$smo2_left, interval1$smo2_left
+    )))
+
+    ## unknown channels error
+    expect_error(
         extract_intervals(
-            data,
-            nirs_channels = "smo2_left",
-            time_channel = "time",
-            start = by_time(1, 4),
+            data = data,
+            group_channels = "bogus",
+            start = by_time(2, 5),
             span = c(-0.5, 0.5),
-            event_groups = "distinct",
-            verbose = TRUE
-        )
+            verbose = FALSE
+        ),
+        "not recognised"
+    )
+})
+
+test_that("extract_intervals passes group_intervals names to output", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    result <- extract_intervals(
+        data = data,
+        group_intervals = list(low = c(1, 3), high = c(2, 4)),
+        start = by_time(2, 4, 6, 8),
+        span = c(-0.3, 0.3),
+        verbose = FALSE
     )
 
-    ## silent: data has nirs_channels metadata
-    attr(data, "nirs_channels") <- "smo2_left"
-    expect_no_message(
-        extract_intervals(
-            data,
-            nirs_channels = "smo2_left",
-            time_channel = "time",
-            start = by_time(1, 4),
-            span = c(-0.5, 0.5),
-            event_groups = "ensemble",
-            verbose = TRUE
-        )
+    expect_named(result, c("low", "high"))
+
+    ## partially named: unnamed groups fall back to interval ids
+    result <- extract_intervals(
+        data = data,
+        group_intervals = list(low = c(1, 3), c(2, 4)),
+        start = by_time(2, 4, 6, 8),
+        span = c(-0.3, 0.3),
+        verbose = FALSE
     )
+
+    expect_named(result, c("low", "interval_2_4"))
 })
 
 test_that("extract_intervals returns a list of class mnirs", {
@@ -1919,8 +1967,8 @@ test_that("extract_intervals returns a list of class mnirs", {
     result <- extract_intervals(
         data = data,
         nirs_channels = "smo2_left",
+        group_intervals = "distinct",
         start = by_time(1, 5),
-        event_groups = "distinct",
         span = c(-1, 1),
         verbose = FALSE
     )
@@ -1990,8 +2038,8 @@ test_that("extract_intervals works on train.red data", {
     result <- extract_intervals(
         data,
         nirs_channels = c("smo2_left", "smo2_right"),
+        group_intervals = "ensemble",
         start = by_time(2150, 3168),
-        event_groups = "ensemble",
         span = list(c(-30, 180)),
         zero_time = FALSE,
         verbose = FALSE
@@ -2017,8 +2065,8 @@ test_that("extract_intervals works on train.red data", {
     result <- extract_intervals(
         data,
         nirs_channels = c("smo2_left", "smo2_right"),
+        group_intervals = "distinct",
         start = by_time(2150, 3168),
-        event_groups = "distinct",
         span = list(c(-30, 180)),
         zero_time = FALSE,
         verbose = FALSE
@@ -2058,27 +2106,23 @@ test_that("extract_intervals benchmark", {
     ## fails if itr/sec regresses by >10%
     skip("benchmark baseline test")
 
-    data_list <- read_mnirs(
-        example_mnirs("train.red"),
-        nirs_channels = c(
-            smo2_left = "SmO2 unfiltered",
-            smo2_right = "SmO2 unfiltered"
-        ),
-        time_channel = c(time = "Timestamp (seconds passed)"),
-        zero_time = TRUE,
+    data <- read_mnirs(
+        file_path = example_mnirs("portamon"),
+        nirs_channels = c(thb = 2, hhb = 3, o2hb = 4),
+        time_channel = c(sample = 1),
+        event_channel = c(label = "col_6"),
         verbose = FALSE
-    ) |>
-        resample_mnirs(method = "linear", verbose = FALSE)
-
+    )
+    
     # for (i in seq_len(3)) {
     #     bm <- bench::mark(
     #         extract_intervals = extract_intervals(
-    #             data_list,
-    #             start = by_time(368, 1084),
-    #             event_groups = "distinct",
-    #             span = c(-20, 90),
-    #             zero_time = TRUE,
-    #             verbose = FALSE
+    #             data,
+    #             group_intervals = "distinct",
+    #             start = by_label("occlusion", ignore_case = TRUE),
+    #             span = c(1, 5),
+    #             zero_time = FALSE,
+    #             verbose = TRUE
     #         ),
     #         iterations = 50,
     #         check = FALSE
@@ -2087,22 +2131,122 @@ test_that("extract_intervals benchmark", {
     # }
 
     itr_per_sec <- bm$`itr/sec`
+    mem_alloc <- as.numeric(bm$mem_alloc)
 
-    ## baseline: update this value when optimising (seconds)
-    ## run test interactively to calibrate:
-    ##   itr_per_sec will be printed on first failure
-    baseline <- 330
-    threshold <- baseline * 1.10 ## 10% regression budget
+    ## baselines from documented example; update when optimising.
+    ## run test interactively to recalibrate on first failure.
+    itr_baseline <- 10.5          ## iterations per second (higher = better)
+    mem_baseline <- 4.18 * 1024^2 ## bytes (lower = better)
+
+    ## 10% regression budget
+    itr_floor <- itr_baseline * 0.90 ## min acceptable throughput
+    mem_ceiling <- mem_baseline * 1.10 ## max acceptable allocation
+
+    expect_gte(
+        itr_per_sec,
+        itr_floor,
+        label = sprintf(
+            "%.3f itr/sec below 90%% of baseline %.3f (floor %.3f)",
+            itr_per_sec,
+            itr_baseline,
+            itr_floor
+        )
+    )
 
     expect_lte(
-        itr_per_sec,
-        threshold,
+        mem_alloc,
+        mem_ceiling,
         label = sprintf(
-            "%.3f itr/sec exceeds %.0f%% of baseline %.3fs (limit %.3fs)",
-            itr_per_sec,
-            110,
-            baseline,
-            threshold
+            "%.2f MB exceeds 110%% of baseline %.2f MB (ceiling %.2f MB)",
+            mem_alloc / 1024^2,
+            mem_baseline / 1024^2,
+            mem_ceiling / 1024^2
         )
+    )
+})
+
+
+## list input dispatch =========================================
+test_that("extract_intervals flattens a list of data frames", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    result <- extract_intervals(
+        data = list(data, data),
+        group_intervals = "distinct",
+        start = by_time(2, 5),
+        span = c(-1, 1),
+        verbose = FALSE
+    )
+
+    ## single-layer list: 2 dfs x 2 intervals each
+    expect_s3_class(result, "mnirs")
+    expect_length(result, 4)
+    expect_true(all(vapply(result, tibble::is_tibble, logical(1))))
+    ## names follow `interval_<df>.<interval>`
+    expect_equal(
+        names(result),
+        c("interval_1.1", "interval_1.2", "interval_2.1", "interval_2.2")
+    )
+    ## interval data matches single-df output
+    expect_equal(result[[1]]$time[1], 2 - 1)
+    expect_equal(result[[3]]$time[1], 2 - 1)
+
+    ## single df input keeps unnested `interval_<n>` names
+    single <- extract_intervals(
+        data = data,
+        group_intervals = "distinct",
+        start = by_time(2, 5),
+        span = c(-1, 1),
+        verbose = FALSE
+    )
+    expect_equal(names(single), c("interval_1", "interval_2"))
+})
+
+test_that("extract_intervals names ensembles by input df across list inputs", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    result <- extract_intervals(
+        data = list(data, data),
+        nirs_channels = c(smo2_left, smo2_right),
+        group_intervals = "ensemble",
+        start = by_time(2, 5),
+        span = c(-1, 1),
+        verbose = FALSE
+    )
+
+    expect_s3_class(result, "mnirs")
+    expect_length(result, 2)
+    expect_equal(names(result), c("ensemble_1", "ensemble_2"))
+})
+
+test_that("extract_intervals errors on list with non-data-frame element", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    expect_error(
+        extract_intervals(
+            data = list(data, "not a df"),
+            start = by_time(2, 5),
+            span = c(-1, 1),
+            verbose = FALSE
+        ),
+        "must be a list of data frames"
+    )
+})
+
+
+## deprecation ==================================================
+test_that("extract_intervals errors on deprecated event_groups argument", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    ## event_groups was renamed to group_intervals
+    expect_error(
+        extract_intervals(
+            data = data,
+            start = by_time(2, 5),
+            event_groups = "distinct",
+            span = c(-1, 1),
+            verbose = FALSE
+        ),
+        "group_intervals"
     )
 })

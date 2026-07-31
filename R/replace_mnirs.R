@@ -2,8 +2,8 @@
 #'
 #' Detect and replace local outliers, specified invalid values, and missing
 #' `NA` values across `nirs_channels` within an *"mnirs"* data frame.
-#' `replace_mnirs()` operates on a data frame, extending the vectorised 
-#' functions:.
+#' `replace_mnirs()` operates on a data frame, a list of data frames, or a
+#' grouped data frame, extending the vectorised functions.
 #'
 #' @param invalid_values A numeric vector of invalid values to be replaced,
 #'   e.g. `invalid_values = c(0, 100, 102.3)`. Default `NULL` will not replace
@@ -23,8 +23,7 @@
 #'     `outlier_cutoff = 0` Tukey's median filter.
 #'
 #' @param width An integer defining the local window in number of samples
-#'   centred on `idx`, between
-#'   `[idx - floor(width/2), idx + floor(width/2)]`.
+#'   centred on `idx`, between `[idx - floor(width/2), idx + floor(width/2)]`.
 #'
 #' @param span A numeric value defining the local window time span around
 #'   `idx` in units of `time_channel` or `t`, between
@@ -44,7 +43,10 @@
 #'     \item{`"none"`}{Returns `NA`s without replacement.}
 #'   }
 #'
+#' @inheritParams map_mnirs_intervals
 #' @inheritParams validate_mnirs
+#'
+#' @inheritSection map_mnirs_intervals Data input formats
 #'
 #' @details
 #' ## Automatic channel detection
@@ -61,8 +63,36 @@
 #' of samples, or `span` as the time span in units of `time_channel`.
 #' A partial window is calculated at the edges of the data.
 #'
-#' @returns `replace_mnirs()` return a [tibble][tibble::tibble-package] of 
-#' class `"mnirs"` with metadata available via `attributes()`.
+#' @section Per-channel arguments:
+#'
+#' Arguments apply globally to all `nirs_channels` by default. Relevant
+#' arguments can instead be supplied uniquely per-channel as a named `list()`,
+#' with names matching `nirs_channels`, e.g.:
+#'
+#' ```r
+#' replace_mnirs(
+#'     data,
+#'     nirs_channels = c(hhb, smo2),
+#'     invalid_values = list(hhb = -1, smo2 = c(0, 100)),
+#'     invalid_above = list(hhb = 10),
+#'     span = list(3, hhb = 5)
+#' )
+#' ```
+#'
+#' - A non-list value applies to every channel (the *default* behaviour).
+#' - A `list()` named by `nirs_channels` applies per-channel values.
+#' - A single unnamed value in the list will be applied to unlisted channels
+#'   (e.g. `span = list(3, hhb = 5)` gives `hhb` 5 and every other channel 3).
+#'   If no unnamed fallback value in the list, channels not named in the list
+#'   will be returned un-processed (e.g. `span = list(hhb = 5)` will only
+#'   process `hhb`).
+#' - `list()` names not matching `nirs_channels` are warned about and
+#'   ignored.
+#'
+#' @returns `replace_mnirs()` returns a [tibble][tibble::tibble-package] of
+#' class `"mnirs"` with metadata available via `attributes()`. For list or
+#' grouped data frame input, returns a named list of *"mnirs"* tibbles, one
+#' per interval.
 #'
 #' @examples
 #' ## vectorised operations
@@ -133,15 +163,49 @@ replace_mnirs <- function(
     method = c("linear", "median", "locf", "none"),
     verbose = TRUE
 ) {
+    ## list or grouped input → normalise to named list, recurse per interval
+    if (inherits(data, "grouped_df") || !is.data.frame(data)) {
+        return(map_mnirs_intervals(data, match.call(), parent.frame()))
+    }
+
     ## validation ====================================
-    method <- match.arg(method)
-    check_conditions <- c(
-        !is.null(c(invalid_values, invalid_above, invalid_below)),
-        !is.null(outlier_cutoff),
-        method != "none"
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
+    }
+    validate_mnirs_data(data)
+    metadata <- attributes(data)
+    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data)
+    time_channel <- validate_time_channel(enquo(time_channel), data)
+    t_vec <- data[[time_channel]]
+
+    ## broadcast global args, applying any per-channel list() overrides
+    per_channel <- resolve_channel_args(
+        nirs_channels,
+        args = list(
+            invalid_values = invalid_values,
+            invalid_above = invalid_above,
+            invalid_below = invalid_below,
+            outlier_cutoff = outlier_cutoff,
+            width = width,
+            span = span,
+            method = method
+        ),
+        defaults = list(method = "linear"),
+        choices = list(method = c("linear", "median", "locf", "none")),
+        verbose = verbose
     )
+
+    ## per-channel replacement criteria: invalid, outliers, missing
+    check_list <- lapply(per_channel, \(.a) {
+        c(
+            !is.null(c(.a$invalid_values, .a$invalid_above, .a$invalid_below)),
+            !is.null(.a$outlier_cutoff),
+            .a$method != "none"
+        )
+    })
+
     ## do nothing condition
-    if (!any(check_conditions)) {
+    if (!any(unlist(check_list))) {
         cli_abort(c(
             "x" = "No replacement criteria specified",
             "i" = "At least one of {.arg invalid_values}, \\
@@ -149,56 +213,56 @@ replace_mnirs <- function(
             {.arg outlier_cutoff}, or {.arg method} must be specified."
         ))
     }
-    if (missing(verbose)) {
-        verbose <- getOption("mnirs.verbose", default = TRUE)
-    }
-
-    validate_mnirs_data(data)
-    metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, verbose)
-    time_channel <- validate_time_channel(enquo(time_channel), data)
-    time_vec <- data[[time_channel]]
-
-    if (check_conditions[2L] || method == "median") {
-        validate_width_span(width, span, verbose, "for `replace_mnirs()`.")
-    }
 
     ## remove invalid, outliers, and NA ==============================
-    data[nirs_channels] <- lapply(data[nirs_channels], \(.x) {
-        if (check_conditions[1L]) {
+    ## report conditions raised in the lambda from this function
+    env <- environment()
+    data[nirs_channels] <- Map(\(.nirs, .a, .check) {
+        .x <- data[[.nirs]]
+        ## verbose validator hints emitted once for the first channel
+        .v <- verbose && .nirs == nirs_channels[[1L]]
+        if (.check[2L] || .a$method == "median") {
+            validate_width_span(
+                .a$width, .a$span, .v, "for `replace_mnirs()`.", env = env
+            )
+        }
+        if (.check[1L]) {
             .x <- replace_invalid(
                 x = .x,
-                t = time_vec,
-                invalid_values = invalid_values,
-                invalid_above = invalid_above,
-                invalid_below = invalid_below,
+                t = t_vec,
+                invalid_values = .a$invalid_values,
+                invalid_above = .a$invalid_above,
+                invalid_below = .a$invalid_below,
                 method = "none",
-                bypass_checks = TRUE
+                bypass_checks = TRUE,
+                env = env
             )
         }
-        if (check_conditions[2L]) {
+        if (.check[2L]) {
             .x <- replace_outliers(
                 x = .x,
-                t = time_vec,
-                width = width,
-                span = span,
+                t = t_vec,
+                width = .a$width,
+                span = .a$span,
                 method = "none",
-                outlier_cutoff = outlier_cutoff,
-                bypass_checks = TRUE
+                outlier_cutoff = .a$outlier_cutoff,
+                bypass_checks = TRUE,
+                env = env
             )
         }
-        if (check_conditions[3L]) {
+        if (.check[3L]) {
             .x <- replace_missing(
                 x = .x,
-                t = time_vec,
-                width = width,
-                span = span,
-                method = method,
-                bypass_checks = TRUE
+                t = t_vec,
+                width = .a$width,
+                span = .a$span,
+                method = .a$method,
+                bypass_checks = TRUE,
+                env = env
             )
         }
         .x
-    })
+    }, nirs_channels, per_channel[nirs_channels], check_list[nirs_channels])
 
     ## Metadata =================================
     metadata$nirs_channels <- unique(nirs_channels)
@@ -210,24 +274,24 @@ replace_mnirs <- function(
 
 #' Replace invalid values
 #'
-#' `replace_invalid()` detects specified invalid values or range cutoffs in a 
+#' `replace_invalid()` detects specified invalid values or range cutoffs in a
 #' numeric vector and replace them with the local median value or `NA`.
 #'
 #' @param x A numeric vector of the response variable.
-#' @param t An *optional* numeric vector of the predictor variable (e.g. time). 
+#' @param t An *optional* numeric vector of the predictor variable (e.g. time).
 #'   Default is `seq_along(x)`.
 #' @inheritParams replace_mnirs
 #'
 #' @details
 #' ## Replace invalid values with with replace_invalid()
-#' 
+#'
 #' Specific `invalid_values` can be replaced, such as `c(0, 100, 102.3)`.
-#' Data ranges can be replaced with cutoff values specified by `invalid_above` 
-#' and `invalid_below`, where any values higher or lower than the specified 
-#' cutoff values (respectively) will be replaced, *inclusive* of the cutoff 
+#' Data ranges can be replaced with cutoff values specified by `invalid_above`
+#' and `invalid_below`, where any values higher or lower than the specified
+#' cutoff values (respectively) will be replaced, *inclusive* of the cutoff
 #' values themselves.
 #'
-#' @returns `replace_invalid()` returns a numeric vector the same length as 
+#' @returns `replace_invalid()` returns a numeric vector the same length as
 #' `x` with invalid values replaced.
 #'
 #' @rdname replace_mnirs
@@ -247,22 +311,25 @@ replace_invalid <- function(
 ) {
     ## validate ===============================================
     args <- list(...)
+    ## internal callers pass `env` through `...` to report conditions
+    ## as coming from the user-facing function
+    env <- args$env %||% environment()
     if (is.null(c(invalid_values, invalid_above, invalid_below))) {
         cli_abort(c(
             "x" = "No replacement criteria specified",
             "i" = "At least one of {.arg invalid_values}, \\
             {.arg invalid_above}, or {.arg invalid_below} must be specified."
-        ))
+        ), call = env)
     }
     if (!(args$bypass_checks %||% FALSE)) {
-        validate_x_t(x, t)
+        validate_x_t(x, t, env = env)
         if (missing(verbose)) {
             verbose <- getOption("mnirs.verbose", default = TRUE)
         }
     }
-    validate_numeric(invalid_values)
-    validate_numeric(invalid_above, 1, msg1 = "one-element")
-    validate_numeric(invalid_below, 1, msg1 = "one-element")
+    validate_numeric(invalid_values, env = env)
+    validate_numeric(invalid_above, 1, msg1 = "one-element", env = env)
+    validate_numeric(invalid_below, 1, msg1 = "one-element", env = env)
     method <- match.arg(method)
 
     ## process ========================================================
@@ -282,11 +349,19 @@ replace_invalid <- function(
 
     if (method == "median") {
         if (!(args$bypass_checks %||% FALSE)) {
-            validate_width_span(width, span, verbose, "for median replacement.")
+            validate_width_span(
+                width, span, verbose, "for median replacement.", env = env
+            )
         }
 
-        window_idx <- compute_local_windows(t, invalid_idx, width, span)
-        local_medians <- compute_local_fun(y, window_idx, median, na.rm = TRUE)
+        window_idx <- compute_local_windows(
+            t,
+            invalid_idx,
+            width,
+            span,
+            env = env
+        )
+        local_medians <- compute_local_fun(y, window_idx, median_nona)
         ## if method = "median"
         ## invalid_values removed to NA first,
         ## so returns local median excluding idx
@@ -334,7 +409,7 @@ replace_invalid <- function(
 #'   - `outlier_cutoff = 0` -- Tukey's median filter (every point
 #'     replaced by local median).
 #'
-#' @returns `replace_outliers()` returns a numeric vector the same length as 
+#' @returns `replace_outliers()` returns a numeric vector the same length as
 #' `x` with outliers replaced.
 #'
 #' @rdname replace_mnirs
@@ -352,21 +427,32 @@ replace_outliers <- function(
 ) {
     ## validate ===============================================
     args <- list(...)
+    ## internal callers pass `env` through `...` to report conditions
+    ## as coming from the user-facing function
+    env <- args$env %||% environment()
     if (!(args$bypass_checks %||% FALSE)) {
         if (missing(verbose)) {
             verbose <- getOption("mnirs.verbose", default = TRUE)
         }
-        validate_x_t(x, t)
-        validate_width_span(width, span, verbose, "for `replace_outliers()`.")
+        validate_x_t(x, t, env = env)
+        validate_width_span(
+            width, span, verbose, "for `replace_outliers()`.", env = env
+        )
     }
     validate_numeric(
-        outlier_cutoff, 1, c(0, Inf), msg1 = "one-element positive"
+        outlier_cutoff, 1, c(0, Inf), msg1 = "one-element positive", env = env
     )
     method <- match.arg(method)
 
     ## process =====================================================
-    window_idx <- compute_local_windows(t, width = width, span = span)
-    outlier_stats <- compute_outliers(x, window_idx, outlier_cutoff)
+    outlier_stats <- compute_outliers(
+        x,
+        t,
+        outlier_cutoff,
+        width,
+        span,
+        env = env
+    )
     local_medians <- outlier_stats$local_medians
     is_outlier <- outlier_stats$is_outlier
 
@@ -377,7 +463,7 @@ replace_outliers <- function(
     } else {
         NA_real_
     }
-    
+
     return(y)
 }
 
@@ -427,8 +513,11 @@ replace_missing <- function(
 ) {
     ## validate ===============================================
     args <- list(...)
+    ## internal callers pass `env` through `...` to report conditions
+    ## as coming from the user-facing function
+    env <- args$env %||% environment()
     if (!(args$bypass_checks %||% FALSE)) {
-        validate_x_t(x, t)
+        validate_x_t(x, t, env = env)
     }
     method <- match.arg(method)
     if (method == "locf") {
@@ -451,13 +540,15 @@ replace_missing <- function(
             if (missing(verbose)) {
                 verbose <- getOption("mnirs.verbose", default = TRUE)
             }
-            validate_width_span(width, span, verbose, "for median replacement.")
+            validate_width_span(
+                width, span, verbose, "for median replacement.", env = env
+            )
         }
         ## median of width or span VALID values to either side of sequential NAs
         y <- x
         na_idx <- which(is.na(x))
-        window_idx <- compute_valid_neighbours(x, t, width, span, verbose)
-        local_medians <- compute_local_fun(x, window_idx, median, na.rm = TRUE)
+        window_idx <- compute_valid_neighbours(x, t, width, span, verbose, env)
+        local_medians <- compute_local_fun(x, window_idx, median_nona)
         y[na_idx] <- local_medians
     }
 
