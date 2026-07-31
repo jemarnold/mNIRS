@@ -21,7 +21,8 @@ resample_mnirs(
 - data:
 
   A data frame of class *"mnirs"* containing time series data and
-  metadata.
+  metadata, a list of data frames, or a grouped data frame (see
+  *Details*).
 
 - time_channel:
 
@@ -80,7 +81,8 @@ resample_mnirs(
 
 A [tibble](https://tibble.tidyverse.org/reference/tibble-package.html)
 of class `"mnirs"`. Metadata are stored as attributes and can be
-accessed with `attributes(data)`.
+accessed with `attributes(data)`. For list or grouped data frame input,
+returns a named list of *"mnirs"* tibbles, one per interval.
 
 ## Details
 
@@ -119,8 +121,23 @@ are always filled by last-observation-carried-forward, regardless of
   meaning newly created samples and any `NA`s in the original data are
   returned as `NA`.
 
-- When down-sampling, numeric columns use time-weighted averaging.
-  Non-numeric columns use the first valid value in each output bin.
+- When down-sampling, numeric columns use linear interpolation
+  averaging. Non-numeric columns use the first valid value in each
+  output bin.
+
+## Data input formats
+
+*mnirs* processing functions accept `data` in multiple formats:
+
+- A **single *"mnirs"* data frame** is processed and returned directly.
+
+- A **list of *"mnirs"* data frames**: each interval is processed
+  separately and returned as a named list.
+
+- A **grouped *"mnirs"* data frame**, e.g. with
+  [`dplyr::group_by()`](https://dplyr.tidyverse.org/reference/group_by.html):
+  the data frame is split by grouping levels and each group is processed
+  as a separate interval, returned as a named list.
 
 ## Examples
 
@@ -135,7 +152,7 @@ data <- read_mnirs(
 #> ! Estimated `sample_rate` = 2 Hz.
 #> ℹ Define `sample_rate` explicitly to override.
 #> Warning: ! Duplicate or irregular `time_channel` samples detected.
-#> ℹ `time` = 211.59 and 1183.6.
+#> ℹ time = 211.59 and 1183.6.
 #> ℹ Re-sample with `mnirs::resample_mnirs()`.
 
 ## note warning about irregular sampling

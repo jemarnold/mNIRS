@@ -24,8 +24,8 @@ read_mnirs(
 
 - file_path:
 
-  Path of the data file to import. Supported file extensions are
-  `".xlsx"`, `".xls"`, and `".csv"`.
+  Path of the data file to import. Supported file extensions include
+  `".xlsx"`, `".xls"`, `".csv"`, and `".txt"`.
 
 - nirs_channels:
 
@@ -168,7 +168,7 @@ read_mnirs(
 #> ! Estimated `sample_rate` = 2 Hz.
 #> ℹ Define `sample_rate` explicitly to override.
 #> Warning: ! Duplicate or irregular `time_channel` samples detected.
-#> ℹ `time` = 211.59 and 1183.6.
+#> ℹ time = 211.59 and 1183.6.
 #> ℹ Re-sample with `mnirs::resample_mnirs()`.
 #> # A tibble: 2,202 × 3
 #>     time smo2_left smo2_right

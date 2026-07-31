@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mnirs</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -18,15 +18,15 @@
       <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mnirs-cheatsheet.pdf">mnirs-cheatsheet (PDF)</a></li>
-    <li><a class="dropdown-item" href="../articles/reading-mnirs-data.html">Reading and Cleaning Data with {mnirs}</a></li>
+    <li><a class="dropdown-item" href="../articles/reading-mnirs-data.html">Reading and Cleaning Data with mnirs</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/jemarnold/mnirs" aria-label="GitHub"><span class="fa fa-github"></span></a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://bsky.app/profile/jemarnold.bsky.social" aria-label="Bluesky"><span class="fa fa-brands fa-bluesky"></span></a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://twitter.com/jem_arnold" aria-label="Twitter"><span class="fa fa-twitter"></span></a></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/jemarnold/mnirs" aria-label="GitHub"><span class="fa fa-github"></span></a></li>
       </ul></div>
 
 
@@ -40,12 +40,189 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.0" id="mnirs-070">mnirs 0.7.0<a class="anchor" aria-label="anchor" href="#mnirs-070"></a></h2>
+<div class="section level3">
+<h3 id="highlights-0-7-0">Highlights<a class="anchor" aria-label="anchor" href="#highlights-0-7-0"></a></h3>
+<p>This minor version update includes mostly internal refactoring, but enough user-facing changes and a few breaking deprecations, so that it’s more than just a patch. This version lays the foundation for the incoming (hopefully soon) <em>mnirs</em> <code>analyse_kinetics</code> suite of functions.</p>
+</div>
+<div class="section level3">
+<h3 id="working-with-lists-and-grouped-data-frames-0-7-0">Working with lists and grouped data frames<a class="anchor" aria-label="anchor" href="#working-with-lists-and-grouped-data-frames-0-7-0"></a></h3>
+<ul><li><p>Core processing functions (<code><a href="../reference/resample_mnirs.html">resample_mnirs()</a></code>, <code><a href="../reference/replace_mnirs.html">replace_mnirs()</a></code>, <code><a href="../reference/filter_mnirs.html">filter_mnirs()</a></code>, <code><a href="../reference/shift_mnirs.html">shift_mnirs()</a></code>, and <code><a href="../reference/rescale_mnirs.html">rescale_mnirs()</a></code>) now accept as the <code>data</code> input either a single data frame, a list of data frames, or a grouped data frame (requires <a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a>). Single data frames are processed and returned directly, as previously. Listed and grouped data frames are each processed independently and returned as a named list.</p></li>
+<li><p><code><a href="../reference/extract_intervals.html">extract_intervals()</a></code> now also accepts a list of data frames or a grouped data frame and returns one flattened, named list of extracted intervals.</p></li>
+</ul><div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/replace_mnirs.html">replace_mnirs</a></span><span class="op">(</span></span>
+<span>    data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">df1</span>, <span class="va">df2</span><span class="op">)</span>,</span>
+<span>    outlier_cutoff <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>    span <span class="op">=</span> <span class="fl">5</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt; $interval_1</span></span>
+<span><span class="co">#&gt; # A tibble:</span></span>
+<span><span class="co">#&gt;     time  smo2    o2hb</span></span>
+<span><span class="co">#&gt;    &lt;dbl&gt; &lt;dbl&gt;   &lt;dbl&gt;</span></span>
+<span><span class="co">#&gt;  1   0    42.8 -0.0289</span></span>
+<span><span class="co">#&gt;  2   0.1  42.8 -0.0524</span></span>
+<span><span class="co">#&gt;  3   0.2  42.8 -0.0916</span></span>
+<span><span class="co">#&gt;  4   0.3  42.9 -0.138 </span></span>
+<span><span class="co">#&gt;  5   0.4  43.2 -0.205 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $interval_2</span></span>
+<span><span class="co">#&gt; # A tibble:</span></span>
+<span><span class="co">#&gt;     time  smo2  o2hb</span></span>
+<span><span class="co">#&gt;    &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;</span></span>
+<span><span class="co">#&gt;  1   9.9  51.7 -2.29</span></span>
+<span><span class="co">#&gt;  2  10    51.7 -2.32</span></span>
+<span><span class="co">#&gt;  3  10.1  51.8 -2.31</span></span>
+<span><span class="co">#&gt;  4  10.2  52.2 -2.22</span></span>
+<span><span class="co">#&gt;  5  10.3  52.4 -2.12</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="channel-grouping-and-processing-0-7-0">Channel grouping and processing<a class="anchor" aria-label="anchor" href="#channel-grouping-and-processing-0-7-0"></a></h3>
+<ul><li>
+<strong>BREAKING CHANGE</strong>: <code><a href="../reference/extract_intervals.html">extract_intervals()</a></code>, <code><a href="../reference/shift_mnirs.html">shift_mnirs()</a></code>, and <code><a href="../reference/rescale_mnirs.html">rescale_mnirs()</a></code> gain argument <code>group_channels</code>, which separates channel selection from channel grouping. <code>nirs_channels</code> selects channels; the new <code>group_channels</code> argument channels specifies <em>“distinct”</em>, <em>“ensemble”</em>, or custom channel groupp construction.</li>
+</ul><div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/shift_mnirs.html">shift_mnirs</a></span><span class="op">(</span></span>
+<span>    <span class="va">data</span>,</span>
+<span>    nirs_channels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">smo2</span>, <span class="va">o2hb</span><span class="op">)</span>,</span>
+<span>    group_channels <span class="op">=</span> <span class="st">"ensemble"</span>,</span>
+<span>    to <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>    span <span class="op">=</span> <span class="fl">5</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<ul><li>
+<code><a href="../reference/filter_mnirs.html">filter_mnirs()</a></code> and <code><a href="../reference/replace_mnirs.html">replace_mnirs()</a></code> now accept named lists for channel-specific processing arguments, in addition to a single global value as previously. <code><a href="../reference/rescale_mnirs.html">rescale_mnirs()</a></code> and <code><a href="../reference/shift_mnirs.html">shift_mnirs()</a></code> accept processing arguments specified by channel or group. This way each <code>nirs_channel</code> can be processed with unique parameters.</li>
+</ul><div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/filter_mnirs.html">filter_mnirs</a></span><span class="op">(</span></span>
+<span>    <span class="va">data</span>,</span>
+<span>    nirs_channels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">smo2</span>, <span class="va">o2hb</span><span class="op">)</span>,</span>
+<span>    method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>smo2 <span class="op">=</span> <span class="st">"moving_average"</span>, o2hb <span class="op">=</span> <span class="st">"butterworth"</span><span class="op">)</span>,</span>
+<span>    span <span class="op">=</span> <span class="fl">5</span>,     <span class="co">## only used by "moving_average" channels</span></span>
+<span>    order <span class="op">=</span> <span class="fl">2</span>,    <span class="co">## only used by "butterworth" channels (and below args)</span></span>
+<span>    W <span class="op">=</span> <span class="fl">0.02</span>,</span>
+<span>    type <span class="op">=</span> <span class="st">"low"</span>,</span>
+<span>    na.rm <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="function-and-argument-renaming-0-7-0">Function and argument renaming<a class="anchor" aria-label="anchor" href="#function-and-argument-renaming-0-7-0"></a></h3>
+<ul><li><p><code><a href="../reference/filter_butterworth.html">filter_butterworth()</a></code> and <code><a href="../reference/filter_moving_average.html">filter_moving_average()</a></code> are now the renamed canonical functions. <code><a href="../reference/filter_butterworth.html">filter_butter()</a></code> and <code><a href="../reference/filter_moving_average.html">filter_ma()</a></code> remain available as aliases.</p></li>
+<li><p><strong>BREAKING CHANGE</strong>: <code><a href="../reference/extract_intervals.html">extract_intervals()</a></code> new argument <code>group_intervals</code> replaces deprecated <code>event_groups</code>. This is where interval grouping is specified for <em>“distinct”</em> or <em>“ensemble”</em>-averaged, or custom group list construction.</p></li>
+</ul><div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">interval_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/extract_intervals.html">extract_intervals</a></span><span class="op">(</span></span>
+<span>    <span class="va">data</span>,</span>
+<span>    nirs_channels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">smo2_left</span>, <span class="va">smo2_right</span><span class="op">)</span>,</span>
+<span>    group_intervals <span class="op">=</span> <span class="st">"ensemble"</span>,</span>
+<span>    start <span class="op">=</span> <span class="fu"><a href="../reference/by_time.html">by_time</a></span><span class="op">(</span><span class="fl">368</span>, <span class="fl">1084</span><span class="op">)</span>,</span>
+<span>    span <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">20</span>, <span class="fl">90</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt; $ensemble</span></span>
+<span><span class="co">#&gt; # A tibble:</span></span>
+<span><span class="co">#&gt;     time smo2_left smo2_right</span></span>
+<span><span class="co">#&gt;    &lt;dbl&gt;     &lt;dbl&gt;      &lt;dbl&gt;</span></span>
+<span><span class="co">#&gt;  1 -20        56.3       59.2</span></span>
+<span><span class="co">#&gt;  2 -19.9      56.1       59.2</span></span>
+<span><span class="co">#&gt;  3 -19.8      56.1       59.2</span></span>
+<span><span class="co">#&gt;  4 -19.7      56.2       58.9</span></span>
+<span><span class="co">#&gt;  5 -19.6      56.4       58.9</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="performance-improvements--bug-fixes-0-7-0">Performance improvements &amp; bug fixes<a class="anchor" aria-label="anchor" href="#performance-improvements--bug-fixes-0-7-0"></a></h3>
+<div class="section level4">
+<h4 id="read_mnirs-0-7-0"><code>read_mnirs()</code><a class="anchor" aria-label="anchor" href="#read_mnirs-0-7-0"></a></h4>
+<ul><li>Improved reading of delimited files containing extra spaces around quoted values.</li>
+<li>Documented support for <code>.txt</code> files.</li>
+<li>Made automatic device and channel detection more efficient and improved related messages.</li>
+<li>
+<code>nirs_channel</code> now identified before type conversion, ensuring coercion to numeric.</li>
+<li>Added a warning when all values in <code>nirs_channels</code> become missing during numeric coercion.</li>
+<li>Improved handling of timestamp values; absolute date-times, time-only values, header timestamps, and POSIXct-type <code>time_channel</code> column.</li>
+<li>Refined <code>sample_rate</code> detection and warnings for irregular samples.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="create_mnirs_data-0-7-0"><code>create_mnirs_data()</code><a class="anchor" aria-label="anchor" href="#create_mnirs_data-0-7-0"></a></h4>
+<ul><li>Grouped data now remain grouped when <em>mnirs</em> metadata is added or refreshed.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="resample_mnirs-0-7-0"><code>resample_mnirs()</code><a class="anchor" aria-label="anchor" href="#resample_mnirs-0-7-0"></a></h4>
+<ul><li>
+<code>data</code> arg now accepts a list or grouped data frame and returns one processed data frame per data frame.</li>
+<li>Clarified documentation that downsampling numeric columns uses averages based on linear interpolation, rather than time-weighted averages.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="replace_mnirs-0-7-0"><code>replace_mnirs()</code><a class="anchor" aria-label="anchor" href="#replace_mnirs-0-7-0"></a></h4>
+<ul><li>
+<code>data</code> arg now accepts a list or grouped data frame and returns one processed data frame per data frame.</li>
+<li>Arguments can be specified per-<code>nirs_channels</code> as named lists.</li>
+<li>Improved performance via local-median calculations when values are missing.</li>
+<li>Made fixed-width outlier detection faster by calculating rolling medians across many windows together.</li>
+<li>Added clearer checks for invalid window settings and unsorted or missing time values.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="filter_mnirs-0-7-0"><code>filter_mnirs()</code><a class="anchor" aria-label="anchor" href="#filter_mnirs-0-7-0"></a></h4>
+<ul><li>
+<code>data</code> arg now accepts a list or grouped data frame and returns one processed data frame per data frame.</li>
+<li>Arguments can be specified per-<code>nirs_channels</code> as named lists.</li>
+<li>Filter settings such as <code>spar</code>, <code>W</code>, <code>fc</code>, <code>width</code>, and <code>span</code> are now explicit function arguments, making available options easier to discover.</li>
+<li>Simplified filter selection so each channel is sent directly to its chosen filter method.</li>
+<li>
+<code><a href="../reference/filter_butterworth.html">filter_butterworth()</a></code> and <code><a href="../reference/filter_moving_average.html">filter_moving_average()</a></code> are now the main worker functions; <code><a href="../reference/filter_butterworth.html">filter_butter()</a></code> and <code><a href="../reference/filter_moving_average.html">filter_ma()</a></code> remain available as aliases.</li>
+<li>Improved checks and messages for missing values, cutoff frequencies, window sizes, and unsupported settings.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="shift_mnirs-0-7-0"><code>shift_mnirs()</code><a class="anchor" aria-label="anchor" href="#shift_mnirs-0-7-0"></a></h4>
+<ul><li>
+<code>data</code> arg now accepts a list or grouped data frame and returns one processed data frame per data frame.</li>
+<li>Arguments can be specified per-<code>nirs_channels</code> as named lists, or per-named group via <code>group_channels</code> (see below).</li>
+<li>
+<strong>BREAKING CHANGE</strong>: Channel grouping through a list to process channels together is now supplied to <code>group_channels</code>. Supplying a list to <code>nirs_channels</code> is deprecated.</li>
+<li>
+<code>nirs_channels</code> now defaults to <code>NULL</code>, allowing channels to be taken from <em>mnirs</em> metadata as elsewhere in the package.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="rescale_mnirs-0-7-0"><code>rescale_mnirs()</code><a class="anchor" aria-label="anchor" href="#rescale_mnirs-0-7-0"></a></h4>
+<ul><li>
+<code>data</code> arg now accepts a list or grouped data frame and returns one processed data frame per data frame.</li>
+<li>Arguments can be specified per-<code>nirs_channels</code> as named lists, or per-named group via <code>group_channels</code> (see below).</li>
+<li>
+<strong>BREAKING CHANGE</strong>: Channel grouping through a list to process channels together is now supplied to <code>group_channels</code>. Supplying a list to <code>nirs_channels</code> is deprecated.</li>
+<li>
+<code>nirs_channels</code> now defaults to <code>NULL</code>, allowing channels to be taken from <em>mnirs</em> metadata as elsewhere in the package.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="extract_intervals-0-7-0"><code>extract_intervals()</code><a class="anchor" aria-label="anchor" href="#extract_intervals-0-7-0"></a></h4>
+<ul><li>
+<code>data</code> arg now accepts a list or grouped data frame and returns <em>one named list</em> with interval names that identify their source data frame and interval sequence number.</li>
+<li>Arguments can be specified per-<code>nirs_channels</code> as named lists.</li>
+<li>
+<strong>BREAKING CHANGE</strong>: Interval grouping for ensemble-averaging is now supplied to <code>group_intervals</code>, renamed from <code>event_groups</code>. <code>event_groups</code> is now deprecated.</li>
+<li>
+<strong>BREAKING CHANGE</strong>: Channel grouping through a list to process channels together is now supplied to <code>group_channels</code>. Supplying a list to <code>nirs_channels</code> is deprecated.</li>
+<li>Added checks for interval groups and their selected channels, with clearer errors for invalid group numbers, unknown channels, and invalid time boundaries.</li>
+<li>Updated ensemble averaging so each interval group can use its own per-channel argument selection.</li>
+<li>Improved naming, zero-time handling, and preservation of <em>mnirs</em> metadata in extracted intervals.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="plotmnirs-0-7-0"><code>plot.mnirs()</code><a class="anchor" aria-label="anchor" href="#plotmnirs-0-7-0"></a></h4>
+<ul><li>
+<code>data</code> arg accepts a list or grouped data frame and returns facetted plots per data frame (existing functionality since <em>mnirs 0.6.3</em>, documenting for clarity).</li>
+<li>Time (x-) axis now displays units <code>mm:ss</code> for data lasting less than one hour and <code>h:mm:ss</code> for longer data.</li>
+<li>Facets now follow the order of intervals in the input instead of being reordered alphabetically.</li>
+<li>Improved error messages for empty or invalid lists of data frames.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="internal-validation--shared-functions-0-7-0">Internal validation &amp; shared functions<a class="anchor" aria-label="anchor" href="#internal-validation--shared-functions-0-7-0"></a></h4>
+<ul><li>Improved errors and warnings package-wide so they point to the function called by the user rather than an internal checking function.</li>
+<li>Added <code>as_data_list.R</code> containing shared support for processing <code>data</code> argument from one data frame, a list of data frames, or a grouped data frame. Existing <em>mnirs</em> metadata is kept for each interval.</li>
+<li>Added <code>channel_args.R</code> containing shared support for setting processing options separately for each <code>nirs_channel</code> or per-group (for <code><a href="../reference/shift_mnirs.html">shift_mnirs()</a></code>, <code><a href="../reference/replace_mnirs.html">replace_mnirs()</a></code>, and <code><a href="../reference/extract_intervals.html">extract_intervals()</a></code>) as a list named by <code>nirs_channels</code>. One (vector) value can still be supplied to all channels by default.</li>
+<li>Added clear warnings for unknown channel names and errors for conflicting values within a group.</li>
+</ul></div>
+</div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.6.5" id="mnirs-065">mnirs 0.6.5<a class="anchor" aria-label="anchor" href="#mnirs-065"></a></h2><p class="text-muted">CRAN release: 2026-06-02</p>
 <div class="section level3">
 <h3 id="read_mnirs-0-6-5"><code>read_mnirs()</code><a class="anchor" aria-label="anchor" href="#read_mnirs-0-6-5"></a></h3>
 <ul><li><p><code><a href="../reference/read_mnirs.html">read_mnirs()</a></code> can now handle <code>c(".txt", ".tsv")</code> files via the same <code><a href="https://rdrr.io/pkg/data.table/man/fread.html" class="external-link">data.table::fread()</a></code> pathway as <code>".csv"</code>. There are occasionally still odd file formats where columns will not be properly detetcted, usually where files are designed to be human-readible not machine-readable.</p></li>
 <li><p><code>read_mnirs(nirs_channels = NULL)</code> now automatically returns <strong>all</strong> channels starting with “SmO2” (case insensitive), which is the most common NIRS channel name for wearable mNIRS devices. Previously, only the first detected nirs channel was returned.</p></li>
-</ul><div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+</ul><div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co">## read an mNIRS file with two "smo2" channels</span></span>
 <span><span class="va">df</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/read_mnirs.html">read_mnirs</a></span><span class="op">(</span>file_path <span class="op">=</span> <span class="fu"><a href="../reference/example_mnirs.html">example_mnirs</a></span><span class="op">(</span><span class="st">"moxy_ramp"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
@@ -76,13 +253,13 @@
 <div class="section level3">
 <h3 id="plotting-improvements-0-6-3">Plotting improvements<a class="anchor" aria-label="anchor" href="#plotting-improvements-0-6-3"></a></h3>
 <ul><li>Generic <code><a href="../reference/plot.mnirs.html">plot.mnirs()</a></code> ncan now be called on a list of <em>“mnirs”</em> data frames. Each data frame will be printed as a facet. This is primarily useful for printing a list of interval data frames exported from <code><a href="../reference/extract_intervals.html">extract_intervals()</a></code>:</li>
-</ul><div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+</ul><div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/read_mnirs.html">read_mnirs</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span> </span>
 <span>    <span class="fu"><a href="../reference/extract_intervals.html">extract_intervals</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span> </span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">## returns a plot with a facet for each interval</span></span></code></pre></div>
 <ul><li>To faciliate this, <code><a href="../reference/extract_intervals.html">extract_intervals()</a></code> now returns a list of data frames with <code>class = "mnirs"</code>. Otherwise, to manually plot a list of data frames, it will need to have <code>class(list) &lt;- c("mnirs", class(list))</code> edited manually.</li>
-</ul><div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+</ul><div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/read_mnirs.html">read_mnirs</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span> </span>
 <span>    <span class="fu"><a href="../reference/extract_intervals.html">extract_intervals</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span> </span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/class.html" class="external-link">class</a></span><span class="op">(</span><span class="op">)</span></span>
@@ -97,7 +274,7 @@
 <li><p>With previous behaviour, <code>start = by_lap()</code> would include the entire specified lap(s). But this resulted in less control over displaying only parts of a lap.</p></li>
 <li><p>Updated behaviour is now more consistent with <code>by_time</code>, <code>by_label</code>, and <code><a href="../reference/by_time.html">by_sample()</a></code> methods, which reference <code>start</code> and <code>end</code> from a single sample. This allows extraction of e.g. only the first 60-sec of lap:</p></li>
 </ul></li>
-</ul><div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+</ul><div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/read_mnirs.html">read_mnirs</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span> </span>
 <span>    <span class="fu"><a href="../reference/extract_intervals.html">extract_intervals</a></span><span class="op">(</span></span>
 <span>        start <span class="op">=</span> <span class="fu"><a href="../reference/by_time.html">by_lap</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">3</span><span class="op">)</span>,</span>
@@ -109,7 +286,7 @@
 <h3 id="updated-core-functions-0-6-3">Updated core functions<a class="anchor" aria-label="anchor" href="#updated-core-functions-0-6-3"></a></h3>
 <ul><li><p><code><a href="../reference/read_mnirs.html">read_mnirs()</a></code>: Fix detection issue with <em>“PerfPro”</em> file formats, and another small bug fix to improve timestamp parsing.</p></li>
 <li><p><code><a href="../reference/create_mnirs_data.html">create_mnirs_data()</a></code> now properly accepts tidy evaluation for <code>nirs_channels</code>, <code>time_channel</code>, and <code>event_channel</code>:</p></li>
-</ul><div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+</ul><div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/create_mnirs_data.html">create_mnirs_data</a></span><span class="op">(</span><span class="va">df</span>, nirs_channels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">o2hb</span>, <span class="va">hhb</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <ul><li>
 <p><code><a href="../reference/resample_mnirs.html">resample_mnirs()</a></code>:</p>
@@ -173,13 +350,13 @@
 <h4 id="updated-core-functions-0-6-0">Updated core functions<a class="anchor" aria-label="anchor" href="#updated-core-functions-0-6-0"></a></h4>
 <ul><li><p><code><a href="../reference/filter_mnirs.html">filter_mnirs()</a></code>: Method-specific arguments (e.g. <code>order</code> for <code>method = "butterworth"</code>, or <code>width</code> for <code>method = "moving_average"</code>) removed from the generic function call. Continue to be passed to the appropriate method via <code>...</code>. Documentation and info/warning/abort messages updated.</p></li>
 <li>
-<p><code><a href="../reference/filter_ma.html">filter_ma()</a></code> better separates effects of <code>partial</code> and <code>na.rm</code> args:</p>
+<p><code><a href="../reference/filter_moving_average.html">filter_ma()</a></code> better separates effects of <code>partial</code> and <code>na.rm</code> args:</p>
 <ul><li><p><code>partial = FALSE</code> by default returns NA at edges where insufficient number of samples are available compared to the specified <code>width</code> or <code>span</code>.</p></li>
 <li><p><code>partial = TRUE</code> calculates mean values at edges, as long as one valid non-<code>NA</code> sample is available.</p></li>
 <li>
 <p><code>na.rm = FALSE</code> by default behaves as expected with <code>mean(na.rm = FALSE)</code>, propagating any <code>NA</code>s in the local window to the calculated mean with a warning.</p>
 <ul><li>
-<strong>NOTE</strong> This differs from the behaviour of <code>na.rm = FALSE</code> in <code><a href="../reference/filter_butter.html">filter_butter()</a></code>, which errors if there are any internal <code>NA</code>s present. This has not been changed.</li>
+<strong>NOTE</strong> This differs from the behaviour of <code>na.rm = FALSE</code> in <code><a href="../reference/filter_butterworth.html">filter_butter()</a></code>, which errors if there are any internal <code>NA</code>s present. This has not been changed.</li>
 </ul></li>
 <li><p><code>na.rm = TRUE</code> ignores <code>NA</code>s and calculates local means as long as one valid sample is present.</p></li>
 </ul></li>
@@ -243,7 +420,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

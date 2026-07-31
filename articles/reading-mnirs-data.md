@@ -1,4 +1,4 @@
-# Reading and Cleaning Data with {mnirs}
+# Reading and Cleaning Data with mnirs
 
 ## Introduction
 
@@ -17,9 +17,9 @@ and applying information to the clients we work with.
 
 In this vignette we will demonstrate how to:
 
-- 📂 Read data files exported from commercial wearable NIRS devices, and
-  import NIRS channels into a standard data frame format with metadata,
-  ready for further processing.
+- 📂 Read files exported from wearable NIRS devices, and import NIRS
+  channels into a standard data frame format with metadata, ready for
+  further processing.
 
 - 📊 Plot and visualise data frames of class *`"mnirs"`*.
 
@@ -36,7 +36,7 @@ In this vignette we will demonstrate how to:
 - 📈️ Apply digital filtering to optimise signal-to-noise ratio for the
   responses observed in our data.
 
-- ⚖️ Shift and rescale across multiple NIRS channels, to normalise
+- ⚖️ Shift and rescale across multiple NIRS channels, to transform
   signal dynamic range while preserving absolute or relative scaling
   between muscle sites and NIRS channels.
 
@@ -69,8 +69,8 @@ library(mnirs)
 
 The first function called will often be
 [`read_mnirs()`](https://jemarnold.github.io/mnirs/reference/read_mnirs.md).
-This is used to read data from *.csv* or *.xls(x)* files exported from
-common wearable NIRS devices.
+This is used to read data files exported from mNIRS devices in
+*.xls(x)*, *.csv*, or *.txt* formats.
 
 Exported data files will often have multiple rows of file header
 metadata before the data table with NIRS recordings begins.
@@ -87,7 +87,8 @@ for more details.
 - `file_path`
 
   Specify the location of the data file, including file extension.
-  e.g. `"./my_file.xlsx"` or `"C:/myfolder/my_file.csv"`.
+  e.g. `"my_file.xlsx"`, `"C:/myfolder/my_file.csv"`, or
+  `here::here("data", "my_file.csv")`.
 
 > **Example data files**
 >
@@ -210,8 +211,8 @@ data_raw <- read_mnirs(
 )
 #> ! Estimated `sample_rate` = 2 Hz.
 #> ℹ Define `sample_rate` explicitly to override.
-#> Warning: ! Duplicate or irregular `time_channel` samples detected.
-#> ℹ `time` = 211.59 and 1183.6.
+#> Warning in read_mnirs(): ! Duplicate or irregular `time_channel` samples detected.
+#> ℹ time = 211.59 and 1183.6.
 #> ℹ Re-sample with `mnirs::resample_mnirs()`.
 
 ## Note the above info message that sample_rate was estimated correctly at 2 Hz ☝
@@ -241,15 +242,25 @@ data_raw
 documented as
 [`plot.mnirs()`](https://jemarnold.github.io/mnirs/reference/plot.mnirs.md)).
 This generic plot function uses *`ggplot2`* and will work on data frames
-generated or read by *`mnirs`* functions where the metadata contains
-`class = *"mnirs"*`.
+(or lists of data frames) processed by *`mnirs`* functions, where the
+metadata contains `class = *"mnirs"*`.
+
+> **Processing lists of *`mnirs`* data frames**
+>
+> As of `mnirs v0.7.0`, most processing functions will accept either a
+> single data frame, a list of data frames, or a grouped data frame
+> (requiring [dplyr](https://dplyr.tidyverse.org)), and returns a single
+> or list of data frames, respectively. This allows separate processing
+> of NIRS interval data, e.g. filtering and shifting NIRS channels
+> within discrete intervals, rather than on the global data frame.
 
 ### `plot.mnirs`
 
 - `data`
 
-  This function takes in a data frame of class *`mnirs`* and returns a
-  formatted *`ggplot2`* plot.
+  This function takes in a data frame or list of data frames of class
+  *`mnirs`* and returns a formatted *`ggplot2`* plot. Lists of *`mnirs`*
+  data frames are returned as plot facets.
 
 - `points`
 
@@ -341,10 +352,10 @@ will be left blank (`NA`) by default.
 
 - `data`
 
-  This function takes in a data frame, applies processing to all
-  channels specified explicitly or implicitly from *`mnirs`* metadata,
-  then returns the processed data frame. *`mnirs`* metadata will be
-  passed to and from this function.  
+  This function takes in a data frame or list of data frames, applies
+  processing to all channels specified explicitly or implicitly from
+  *`mnirs`* metadata, then returns the processed data frame (or list).
+  *`mnirs`* metadata will be passed to and from this function.  
     
   *`mnirs`* functions are also pipe-friendly for Base R 4.1+ (`|>`) or
   [magrittr](https://magrittr.tidyverse.org) (`%>%`) pipes to chain
@@ -446,12 +457,6 @@ details about the vector-specific functions see
 
 ### `replace_mnirs()`
 
-- `data`
-
-  This function takes in a data frame, resamples all data frame columns
-  to the new sample rate, then returns the processed data frame.
-  *`mnirs`* metadata will be passed to and from this function.
-
 - `nirs_channels`
 
   Specify which column names in `data` to process, i.e. the response
@@ -548,17 +553,6 @@ in another article coming soon.
 
 ### `filter_mnirs()`
 
-- `data`
-
-  This function takes in a data frame, applies processing to all
-  channels specified, then returns the processed data frame. *`mnirs`*
-  metadata will be passed to and from this function.
-
-- `nirs_channels`, `time_channel`, & `sample_rate`
-
-  If the data contain *`mnirs`* metadata, these will be detected
-  automatically, or they can be specified explicitly.
-
 - `na.rm`
 
   `FALSE` by default;
@@ -617,7 +611,7 @@ in another article coming soon.
 
 For filtering vector data and more details about Butterworth filter
 parameters, see
-[`filter_butter()`](https://jemarnold.github.io/mnirs/reference/filter_butter.md).
+[`filter_butterworth()`](https://jemarnold.github.io/mnirs/reference/filter_butterworth.md).
 
 #### Moving average
 
@@ -636,7 +630,7 @@ parameters, see
 
 For filtering vector data and more details about the moving average
 filter, see
-[`filter_ma()`](https://jemarnold.github.io/mnirs/reference/filter_ma.md).
+[`filter_moving_average()`](https://jemarnold.github.io/mnirs/reference/filter_moving_average.md).
 
 ### Apply the filter
 
@@ -698,28 +692,23 @@ other groups of channels.
 
 ### `shift_mnirs()`
 
-- `data`
+- `group_channels`
 
-  This function takes in a data frame, applies processing to all
-  channels specified, then returns the processed data frame. *`mnirs`*
-  metadata will be passed to and from this function.
-
-- `nirs_channels`
-
-  Unlike previous functions, `nirs_channels` should provided as a list
-  (e.g. `list(c(A, B), c(C))`). Each list item represents a group to be
-  shifted together to a common scale. Separate list items will be
-  shifted to separate scales. The relative scaling between channels will
-  be preserved within each group, but lost between groups.  
+  Controls how `nirs_channels` are grouped, to preserve absolute or
+  relative scaling. Either a character keyword or a
+  [`list()`](https://rdrr.io/r/base/list.html) of channel-name
+  vectors:  
     
-  `nirs_channels` should be specified explicitly to ensure the intended
-  grouping structure is returned. The default *`mnirs`* metadata will
-  group all NIRS channels together.
-
-- `time_channel`
-
-  If the data contain *`mnirs`* metadata, this channel will be detected
-  automatically, or it can be specified explicitly.
+  `"ensemble"` (the default) shifts all channels together to a common
+  value, preserving the relative scaling between channels.  
+    
+  `"distinct"` shifts each channel independently, losing the relative
+  scaling between channels.  
+    
+  A [`list()`](https://rdrr.io/r/base/list.html) of channel-name vectors
+  (e.g. `list(c(A, B), c(C))`) shifts channels `A` & `B` together and
+  `C` separately, preserving relative scaling within, but not between
+  groups.
 
 - `to` or `by`
 
@@ -763,8 +752,8 @@ protocol.
 ``` r
 
 data_shifted <- shift_mnirs(
-    data_filtered,     ## un-grouped nirs channels to shift separately 
-    nirs_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
+    data_filtered,
+    group_channels = list(smo2_left, smo2_right), ## 👈 channels shifted separately
     to = 0,            ## NIRS values will be shifted to zero
     span = 120,        ## shift the *first* 120 sec of data to zero
     position = "first"
@@ -801,23 +790,23 @@ were interested in asymmetries that could influence SmO₂ at rest.
 We may also want to rescale our data to a new dynamic range, changing
 the signal amplitude.
 
-- `data`
+- `group_channels`
 
-  This function takes in a data frame, applies processing to all
-  channels specified, then returns the processed data frame. *`mnirs`*
-  metadata will be passed to and from this function.
-
-- `nirs_channels`
-
-  Unlike previous functions, `nirs_channels` should provided as a list
-  (e.g. `list(c(A, B), c(C))`). Each list item represents a group to be
-  rescale together to a common range. Separate list items will be
-  rescaled to separate ranges. The relative scaling between channels
-  will be preserved within each group, but lost between groups.  
+  Controls how `nirs_channels` are grouped, to preserve absolute or
+  relative scaling. Either a character keyword or a
+  [`list()`](https://rdrr.io/r/base/list.html) of channel-name
+  vectors:  
     
-  `nirs_channels` should be specified explicitly to ensure the intended
-  grouping structure is returned. The default *`mnirs`* metadata will
-  group all NIRS channels together.
+  `"ensemble"` (the default) rescales all channels together to a common
+  range, preserving the relative scaling between channels.  
+    
+  `"distinct"` rescales each channel independently, losing the relative
+  scaling between channels.  
+    
+  A [`list()`](https://rdrr.io/r/base/list.html) of channel-name vectors
+  (e.g. `list(c(A, B), c(C))`) rescales channels `A` & `B` together and
+  `C` separately, preserving relative scaling within, but not between
+  groups.
 
 - `range`
 
@@ -828,8 +817,8 @@ the signal amplitude.
 ``` r
 
 data_rescaled <- rescale_mnirs(
-    data_filtered,    ## un-grouped nirs channels to rescale separately 
-    nirs_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
+    data_filtered,
+    group_channels = list(smo2_left, smo2_right), ## 👈 channels rescaled separately
     range = c(0, 100) ## rescale to a 0-100% functional exercise range
 )
 
@@ -863,7 +852,7 @@ and only discussed as representative for influence on interpretations).
 
 Most *`mnirs`* functions can be piped together using Base R 4.1+ (`|>`)
 or [magrittr](https://magrittr.tidyverse.org) (`%>%`). The entire
-pre-processing stage can easily be performed in a sequential pipe.
+processing workflow can easily be performed in a sequential pipe.
 
 To demonstrate this, we’ll read a different example file recorded with
 *Train.Red FYER* muscle oxygen sensor and pipe it through each
@@ -900,13 +889,13 @@ nirs_data <- read_mnirs(
         na.rm = TRUE
     ) |>
     shift_mnirs(
-        nirs_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
+        group_channels = list(smo2_left, smo2_right), ## 👈 channels grouped separately
         to = 0,
         span = 60,
         position = "first"
     ) |>
     rescale_mnirs(
-        nirs_channels = list(c(smo2_left, smo2_right)), ## 👈 channels grouped together
+        group_channels = list(c(smo2_left, smo2_right)), ## 👈 channels grouped together
         range = c(0, 100)
     )
 
@@ -943,13 +932,13 @@ for more details.
 
 - `data`
 
-  This function takes in a data frame, applies processing to all
-  channels specified, then returns a list of processed data frames.
+  This function takes in a single data frame, detects and extracts
+  specified intervals, and returns a list of processed data frames.
   *`mnirs`* metadata will be passed to and from this function.
 
 - `nirs_channels`
 
-  If returning a list of *“distinct”* intervals (see `event_groups`
+  If returning a list of *“distinct”* intervals (see `group_intervals`
   below), `nirs_channels` does not have to be specified, as no channels
   are processed.  
     
@@ -957,13 +946,8 @@ for more details.
   by providing a list of column names (e.g. `list(c(A, B), c(A))`),
   where each list item specifies the channels to be ensemble-averaged
   within the respective group (ensemble-groups are specified by
-  `event_groups` below), in the order in which they are returned. The
+  `group_intervals` below), in the order in which they are returned. The
   default *`mnirs`* metadata will ensemble-average all `nirs_channels`.
-
-- `time_channel`, `event_channel`, & `sample_rate`
-
-  If the data contain *`mnirs`* metadata, these will be detected
-  automatically, or they can be specified explicitly.
 
 - `start` & `end`
 
@@ -980,14 +964,14 @@ for more details.
   extract windows around events. Multiple values can be passed to
   extract multiple intervals.
 
-- `event_groups`
+- `group_intervals`
 
   Events can be extracted and returned as a list of `"distinct"`
   intervals, or `"ensemble"`-averaged into a single data frame. Custom
   grouping structure for ensemble-averaging can be specified by event
   number, in order of appearance within the original data.  
     
-  e.g. `event_groups = list(c(1, 2), c(3, 4))` would return a list of
+  e.g. `group_intervals = list(c(1, 2), c(3, 4))` would return a list of
   two intervals, each ensemble-averaged from the respective events, in
   sequential order from the original data.
 
@@ -1015,14 +999,14 @@ for more details.
 
 ``` r
 
-## return each interval independently with `event_groups = "distinct"`
+## return each interval independently with `group_intervals = "distinct"`
 distinct <- extract_intervals(
-    nirs_data,                  ## channels blank for "distinct" grouping
-    start = by_time(348, 1064), ## manually identified interval start times
-    end = by_time(458, 1174),   ## interval end time (start + 150 sec)
-    event_groups = "distinct",  ## return a list of data frames for each (2) event
-    span = c(0, 0),             ## no boundary modification
-    zero_time = FALSE           ## return original time values
+    nirs_data,                    ## channels blank for "distinct" grouping
+    group_intervals = "distinct", ## return a list of data frames for each (2) event
+    start = by_time(348, 1064),   ## manually identified interval start times
+    end = by_time(458, 1174),     ## interval end time (start + 150 sec)
+    span = c(0, 0),               ## no boundary modification
+    zero_time = FALSE             ## return original time values
 )
 
 plot(distinct, time_labels = TRUE)
@@ -1032,14 +1016,13 @@ plot(distinct, time_labels = TRUE)
 
 ``` r
 
-## ensemble average both intervals with `event_groups = "ensemble"`
+## ensemble average both intervals with `group_intervals = "ensemble"`
 ensemble <- extract_intervals(
-    nirs_data,                  ## channels recycled to all intervals by default
-    nirs_channels = c(smo2_left, smo2_right),
-    start = by_time(368, 1084), ## alternatively specify start times + span
-    event_groups = "ensemble",  ## ensemble-average across two intervals
-    span = c(-20, 90),          ## span recycled to all intervals by default
-    zero_time = TRUE            ## re-calculate common time to start from `0`
+    nirs_data,                    ## channels recycled to all intervals by default
+    group_intervals = "ensemble", ## ensemble-average across two intervals
+    start = by_time(368, 1084),   ## alternatively specify start times + span
+    span = c(-20, 90),            ## span recycled to all intervals by default
+    zero_time = TRUE              ## re-calculate common time to start from `0`
 )
 
 plot(ensemble, time_labels = TRUE) + 

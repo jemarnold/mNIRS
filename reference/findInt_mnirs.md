@@ -5,5 +5,5 @@ wrap findInterval: informative 'time_channel' error message
 ## Usage
 
 ``` r
-findInt_mnirs(...)
+findInt_mnirs(x, vec, ..., env = rlang::caller_env())
 ```

@@ -26,7 +26,7 @@ plot(x, points = FALSE, time_labels = FALSE, na.omit = FALSE, ...)
 - time_labels:
 
   Logical. Default is `FALSE`. If `TRUE` displays x-axis time values
-  formatted as *"hh:mm:ss"* using
+  formatted as *"h:mm:ss"* using
   [`format_hmmss()`](https://jemarnold.github.io/mnirs/reference/format_hmmss.md).
   Otherwise, x-axis values are displayed as numeric.
 
@@ -65,7 +65,7 @@ data <- read_mnirs(
     verbose = FALSE
 )
 
-## plot time labels as "hh:mm:ss"
+## plot time labels as "h:mm:ss"
 plot(data, time_labels = TRUE)
 
 

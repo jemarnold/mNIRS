@@ -19,9 +19,14 @@ Read raw data from exported files.
 
   Create an *mnirs* data frame with metadata
 
-## Pre-process data
+## Process data
 
-Clean, filter, and process data.
+Clean, filter, and transform data.
+
+- [`resample_mnirs()`](https://jemarnold.github.io/mnirs/reference/resample_mnirs.md)
+  :
+
+  Re-sample an *mnirs* data frame
 
 - [`replace_mnirs()`](https://jemarnold.github.io/mnirs/reference/replace_mnirs.md)
   [`replace_invalid()`](https://jemarnold.github.io/mnirs/reference/replace_mnirs.md)
@@ -31,28 +36,24 @@ Clean, filter, and process data.
 
   Replace outliers, invalid, and missing values in *mnirs* data
 
-- [`resample_mnirs()`](https://jemarnold.github.io/mnirs/reference/resample_mnirs.md)
-  :
-
-  Re-sample an *mnirs* data frame
+- [`filter_butterworth()`](https://jemarnold.github.io/mnirs/reference/filter_butterworth.md)
+  [`filter_butter()`](https://jemarnold.github.io/mnirs/reference/filter_butterworth.md)
+  : Apply a Butterworth digital filter
 
 - [`filter_mnirs()`](https://jemarnold.github.io/mnirs/reference/filter_mnirs.md)
   : Filter a data frame
 
-- [`filter_butter()`](https://jemarnold.github.io/mnirs/reference/filter_butter.md)
-  : Apply a Butterworth digital filter
-
-- [`filter_ma()`](https://jemarnold.github.io/mnirs/reference/filter_ma.md)
-  [`filter_moving_average()`](https://jemarnold.github.io/mnirs/reference/filter_ma.md)
+- [`filter_moving_average()`](https://jemarnold.github.io/mnirs/reference/filter_moving_average.md)
+  [`filter_ma()`](https://jemarnold.github.io/mnirs/reference/filter_moving_average.md)
   : Apply a moving average filter
 
 - [`shift_mnirs()`](https://jemarnold.github.io/mnirs/reference/shift_mnirs.md)
   : Shift data range
 
 - [`rescale_mnirs()`](https://jemarnold.github.io/mnirs/reference/rescale_mnirs.md)
-  : Re-scale data range
+  : Rescale data range
 
-## Interval detection
+## Detect intervals
 
 Detect and extract intervals for further analysis
 
@@ -67,10 +68,13 @@ Detect and extract intervals for further analysis
   [`by_sample()`](https://jemarnold.github.io/mnirs/reference/by_time.md)
   : Specify interval boundaries by time, label, lap, or sample
 
-## Printing & plotting
+## Print & plot
 
 Tools for printing functions and pretty plotting with
 [ggplot2](https://ggplot2.tidyverse.org).
+
+- [`print(`*`<mnirs>`*`)`](https://jemarnold.github.io/mnirs/reference/print.mnirs.md)
+  : Methods for mnirs objects
 
 - [`plot(`*`<mnirs>`*`)`](https://jemarnold.github.io/mnirs/reference/plot.mnirs.md)
   :
@@ -99,9 +103,6 @@ Tools for printing functions and pretty plotting with
 
 - [`format_hmmss()`](https://jemarnold.github.io/mnirs/reference/format_hmmss.md)
   : Format time span data as h:mm:ss
-
-- [`print(`*`<mnirs>`*`)`](https://jemarnold.github.io/mnirs/reference/print.mnirs.md)
-  : Methods for mnirs objects
 
 ## Files
 

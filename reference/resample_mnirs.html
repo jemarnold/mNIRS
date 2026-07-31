@@ -9,7 +9,7 @@ new samples via nearest-neighbour matching or interpolation.'><meta name="twitte
 
     <a class="navbar-brand me-2" href="../index.html">mnirs</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -20,15 +20,15 @@ new samples via nearest-neighbour matching or interpolation.'><meta name="twitte
       <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mnirs-cheatsheet.pdf">mnirs-cheatsheet (PDF)</a></li>
-    <li><a class="dropdown-item" href="../articles/reading-mnirs-data.html">Reading and Cleaning Data with {mnirs}</a></li>
+    <li><a class="dropdown-item" href="../articles/reading-mnirs-data.html">Reading and Cleaning Data with mnirs</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/jemarnold/mnirs" aria-label="GitHub"><span class="fa fa-github"></span></a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://bsky.app/profile/jemarnold.bsky.social" aria-label="Bluesky"><span class="fa fa-brands fa-bluesky"></span></a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://twitter.com/jem_arnold" aria-label="Twitter"><span class="fa fa-twitter"></span></a></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/jemarnold/mnirs" aria-label="GitHub"><span class="fa fa-github"></span></a></li>
       </ul></div>
 
 
@@ -64,8 +64,9 @@ new samples via nearest-neighbour matching or interpolation.</p>
 
 
 <dl><dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>A data frame of class <em>"mnirs"</em> containing time series data and
-metadata.</p></dd>
+<dd><p>A data frame of class <em>"mnirs"</em> containing time series data
+and metadata, a list of data frames, or a grouped data frame (see
+<em>Details</em>).</p></dd>
 
 
 <dt id="arg-time-channel">time_channel<a class="anchor" aria-label="anchor" href="#arg-time-channel"></a></dt>
@@ -119,7 +120,9 @@ global default can be set via <code>options(mnirs.verbose = FALSE)</code>.</p></
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <a href="https://tibble.tidyverse.org/reference/tibble-package.html" class="external-link">tibble</a> of class <code>"mnirs"</code>. Metadata are
-stored as attributes and can be accessed with <code>attributes(data)</code>.</p>
+stored as attributes and can be accessed with <code>attributes(data)</code>. For
+list or grouped data frame input, returns a named list of <em>"mnirs"</em>
+tibbles, one per interval.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -155,11 +158,23 @@ integer lap numbers) are always filled by last-observation-carried-forward,
 regardless of <code>method</code>:</p><ul><li><p>For <code>method = "none"</code>, existing rows are matched to the nearest original
 values of <code>time_channel</code> without interpolation or filling, meaning newly
 created samples and any <code>NA</code>s in the original data are returned as <code>NA</code>.</p></li>
-<li><p>When down-sampling, numeric columns use time-weighted averaging.
+<li><p>When down-sampling, numeric columns use linear interpolation averaging.
 Non-numeric columns use the first valid value in each output bin.</p></li>
 </ul></div>
 
     </div>
+    <div class="section level2">
+    <h2 id="data-input-formats">Data input formats<a class="anchor" aria-label="anchor" href="#data-input-formats"></a></h2>
+
+
+
+<p><em>mnirs</em> processing functions accept <code>data</code> in multiple formats:</p><ul><li><p>A <strong>single <em>"mnirs"</em> data frame</strong> is processed and returned directly.</p></li>
+<li><p>A <strong>list of <em>"mnirs"</em> data frames</strong>: each interval is processed
+separately and returned as a named list.</p></li>
+<li><p>A <strong>grouped <em>"mnirs"</em> data frame</strong>, e.g. with <code><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">dplyr::group_by()</a></code>: the
+data frame is split by grouping levels and each group is processed as
+a separate interval, returned as a named list.</p></li>
+</ul></div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
@@ -173,7 +188,7 @@ Non-numeric columns use the first valid value in each output bin.</p></li>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Estimated `sample_rate` = <span style="color: #0000BB;">2</span> Hz.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Define `sample_rate` explicitly to override.</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span><span style="color: #BBBB00;">!</span> Duplicate or irregular `time_channel` samples detected.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> `time` = <span style="color: #0000BB;">211.59</span> and <span style="color: #0000BB;">1183.6</span>.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">time</span> = <span style="color: #0000BB;">211.59</span> and <span style="color: #0000BB;">1183.6</span>.</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Re-sample with `mnirs::resample_mnirs()`.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co">## note warning about irregular sampling</span></span></span>
@@ -229,7 +244,7 @@ Non-numeric columns use the first valid value in each output bin.</p></li>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

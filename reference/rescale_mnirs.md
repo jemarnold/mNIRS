@@ -1,7 +1,7 @@
-# Re-scale data range
+# Rescale data range
 
 Expand or reduce the range (min and max values) of data channels to a
-new amplitude/dynamic range, e.g. re-scale the range of NIRS data to
+new amplitude/dynamic range, e.g. rescale the range of NIRS data to
 `c(0, 100)`.
 
 ## Usage
@@ -9,7 +9,8 @@ new amplitude/dynamic range, e.g. re-scale the range of NIRS data to
 ``` r
 rescale_mnirs(
   data,
-  nirs_channels = list(),
+  nirs_channels = NULL,
+  group_channels = c("ensemble", "distinct"),
   range,
   verbose = TRUE
 )
@@ -20,35 +21,44 @@ rescale_mnirs(
 - data:
 
   A data frame of class *"mnirs"* containing time series data and
-  metadata.
+  metadata, a list of data frames, or a grouped data frame (see
+  *Details*).
 
 - nirs_channels:
 
-  A [`list()`](https://rdrr.io/r/base/list.html) of character vectors
-  indicating grouping structure of mNIRS channel names to operate on
-  (see *Details*). Must match column names in `data` exactly. Retrieved
-  from metadata if not defined explicitly.
+  A character vector giving the names of mNIRS columns to operate on.
+  Must match column names in `data` exactly.
 
-  `list("A", "B", "C")`
+  - If `NULL` (default), the `nirs_channels` metadata attribute of
+    `data` is used.
 
-  :   Will operate on each channel independently, losing the relative
-      scaling between channels.
+- group_channels:
 
-  `list(c("A", "B", "C"))`
+  Either a character string or a
+  [`list()`](https://rdrr.io/r/base/list.html) of channel-name vectors
+  specifying how to group `nirs_channels` (see *Details*).
 
-  :   Will operate on all channels together, preserving the relative
-      scaling between channels.
+  `"ensemble"`
+
+  :   The *default*. Operate on all channels together, preserving the
+      relative scaling between channels.
+
+  `"distinct"`
+
+  :   Operate on each channel independently, losing the relative scaling
+      between channels.
 
   `list(c("A", "B"), c("C", "D"))`
 
-  :   Will operate on channels `A` & `B` in one group, and `C` & `D` in
-      another group, preserving relative scaling within, but not between
-      groups.
+  :   Operate on channels `A` & `B` in one group, and `C` & `D` in
+      another group. Groups can be named (e.g.
+      `list(smo2 = c("A", "B"))`). Each group must be non-empty and
+      resulting group names must be unique.
 
 - range:
 
   A numeric vector in the form `c(min, max)`, indicating the range of
-  output values to which data channels will be re-scaled.
+  output values to which `nirs_channels` will be rescaled.
 
 - verbose:
 
@@ -60,32 +70,83 @@ rescale_mnirs(
 
 A [tibble](https://tibble.tidyverse.org/reference/tibble-package.html)
 of class *"mnirs"* with metadata available with
-[`attributes()`](https://rdrr.io/r/base/attributes.html).
+[`attributes()`](https://rdrr.io/r/base/attributes.html). For list or
+grouped data frame input, returns a named list of *"mnirs"* tibbles, one
+per interval.
 
 ## Details
 
-`nirs_channels = list()` can be used to group data channels (column
-names) to preserve absolute or relative scaling.
+`group_channels` controls how data channels are grouped to preserve
+absolute or relative scaling.
 
-- Channels grouped together in a vector (e.g. `list(c("A", "B"))`) will
-  be re-scaled to a common range, and the relative scaling within that
-  group will be preserved.
+- `group_channels = "ensemble"` (the *default*) rescales all
+  `nirs_channels` to a common range, preserving relative scaling between
+  channels.
 
-- Channels in separate list vectors (e.g. `list("A", "B")`) will be
-  re-scaled independently, and relative scaling between groups will be
-  lost.
+- `group_channels = "distinct"` rescales each channel independently,
+  losing relative scaling between channels.
 
-- A single vector of channel names (e.g. `c("A", "B")`) will group
-  channels together.
+- A [`list()`](https://rdrr.io/r/base/list.html) of channel-name vectors
+  (e.g. `list(c("A", "B"), c("C", "D"))`) rescales channels `A` & `B`
+  together and `C` & `D` together, preserving relative scaling within,
+  but not between groups. `nirs_channels` omitted from the list are
+  rescaled independently.
 
-- Channels (columns) in `data` not explicitly defined in `nirs_channels`
-  will be passed through untouched to the output data frame.
+- Channel groups can be named (e.g. `list(smo2 = c("A", "B"))`) and
+  names used as keys for per-group `range` argument.
+
+- Channels (columns) in `data` not in `nirs_channels` are passed through
+  without processing to the output data frame.
 
 `nirs_channels` can be retrieved automatically from `data` of class
 *"mnirs"* which has been processed with `{mnirs}`, if not defined
-explicitly. This will default to returning all `nirs_channels` grouped
-together, and should be defined explicitly for other grouping
-arrangements.
+explicitly.
+
+## Data input formats
+
+*mnirs* processing functions accept `data` in multiple formats:
+
+- A **single *"mnirs"* data frame** is processed and returned directly.
+
+- A **list of *"mnirs"* data frames**: each interval is processed
+  separately and returned as a named list.
+
+- A **grouped *"mnirs"* data frame**, e.g. with
+  [`dplyr::group_by()`](https://dplyr.tidyverse.org/reference/group_by.html):
+  the data frame is split by grouping levels and each group is processed
+  as a separate interval, returned as a named list.
+
+## Per-channel arguments
+
+Arguments apply globally to all `nirs_channels` by default. Relevant
+arguments can instead be supplied uniquely per-channel as a named
+[`list()`](https://rdrr.io/r/base/list.html), with names matching either
+`nirs_channels` or list names in `group_channels`, e.g.:
+
+    shift_mnirs(
+        data,
+        nirs_channels = c(A, B, C),
+        group_channels = list(smo2 = c(A, B), hhb = C),
+        to = list(100, C = 0),
+        width = list(smo2 = 3),
+        span = list(hhb = 5),
+        position = "first"
+    )
+
+- A non-list value applies to every channel (the *default* behaviour).
+
+- A [`list()`](https://rdrr.io/r/base/list.html) named by
+  `nirs_channels` or `group_channels` applies per-channel / per-group
+  values.
+
+- A single unnamed value in the list will be applied to unlisted
+  channels (e.g. `span = list(3, hhb = 5)` gives `hhb` 5 and every other
+  channel 3). If no unnamed fallback value in the list, channels not
+  named in the list will be returned un-processed (e.g.
+  `span = list(hhb = 5)` will only process `hhb`).
+
+- [`list()`](https://rdrr.io/r/base/list.html) names not matching
+  `nirs_channels` or `group_channels` are warned about and ignored.
 
 ## Examples
 
@@ -98,9 +159,10 @@ data <- read_mnirs(
     time_channel = c(time = "hh:mm:ss"),
     verbose = FALSE
 ) |>
-    rescale_mnirs(        ## un-grouped nirs channels to rescale separately 
-        nirs_channels = list(smo2_left, smo2_right), 
-        range = c(0, 100) ## rescale to a 0-100% functional exercise range
+    rescale_mnirs(        ## un-grouped nirs channels to rescale separately
+        nirs_channels = c(smo2_left, smo2_right),
+        group_channels = "distinct",
+        range = c(0, 100)  ## rescale to a 0-100% functional exercise range
     )
 
 data

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mnirs</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -18,15 +18,15 @@
       <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mnirs-cheatsheet.pdf">mnirs-cheatsheet (PDF)</a></li>
-    <li><a class="dropdown-item" href="../articles/reading-mnirs-data.html">Reading and Cleaning Data with {mnirs}</a></li>
+    <li><a class="dropdown-item" href="../articles/reading-mnirs-data.html">Reading and Cleaning Data with mnirs</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/jemarnold/mnirs" aria-label="GitHub"><span class="fa fa-github"></span></a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://bsky.app/profile/jemarnold.bsky.social" aria-label="Bluesky"><span class="fa fa-brands fa-bluesky"></span></a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://twitter.com/jem_arnold" aria-label="Twitter"><span class="fa fa-twitter"></span></a></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/jemarnold/mnirs" aria-label="GitHub"><span class="fa fa-github"></span></a></li>
       </ul></div>
 
 
@@ -69,9 +69,9 @@
         </dt>
         <dd>Create an <em>mnirs</em> data frame with metadata</dd>
       </dl></div><div class="section level2">
-      <h2 id="pre-process-data">Pre-process data<a class="anchor" aria-label="anchor" href="#pre-process-data"></a></h2>
+      <h2 id="process-data">Process data<a class="anchor" aria-label="anchor" href="#process-data"></a></h2>
 
-      <div class="section-desc"><p>Clean, filter, and process data.</p></div>
+      <div class="section-desc"><p>Clean, filter, and transform data.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -80,6 +80,13 @@
 
       <dl><dt>
 
+          <code><a href="resample_mnirs.html">resample_mnirs()</a></code>
+
+        </dt>
+        <dd>Re-sample an <em>mnirs</em> data frame</dd>
+
+        <dt>
+
           <code><a href="replace_mnirs.html">replace_mnirs()</a></code> <code><a href="replace_mnirs.html">replace_invalid()</a></code> <code><a href="replace_mnirs.html">replace_outliers()</a></code> <code><a href="replace_mnirs.html">replace_missing()</a></code>
 
         </dt>
@@ -87,10 +94,10 @@
 
         <dt>
 
-          <code><a href="resample_mnirs.html">resample_mnirs()</a></code>
+          <code><a href="filter_butterworth.html">filter_butterworth()</a></code> <code><a href="filter_butterworth.html">filter_butter()</a></code>
 
         </dt>
-        <dd>Re-sample an <em>mnirs</em> data frame</dd>
+        <dd>Apply a Butterworth digital filter</dd>
 
         <dt>
 
@@ -101,14 +108,7 @@
 
         <dt>
 
-          <code><a href="filter_butter.html">filter_butter()</a></code>
-
-        </dt>
-        <dd>Apply a Butterworth digital filter</dd>
-
-        <dt>
-
-          <code><a href="filter_ma.html">filter_ma()</a></code> <code><a href="filter_ma.html">filter_moving_average()</a></code>
+          <code><a href="filter_moving_average.html">filter_moving_average()</a></code> <code><a href="filter_moving_average.html">filter_ma()</a></code>
 
         </dt>
         <dd>Apply a moving average filter</dd>
@@ -125,9 +125,9 @@
           <code><a href="rescale_mnirs.html">rescale_mnirs()</a></code>
 
         </dt>
-        <dd>Re-scale data range</dd>
+        <dd>Rescale data range</dd>
       </dl></div><div class="section level2">
-      <h2 id="interval-detection">Interval detection<a class="anchor" aria-label="anchor" href="#interval-detection"></a></h2>
+      <h2 id="detect-intervals">Detect intervals<a class="anchor" aria-label="anchor" href="#detect-intervals"></a></h2>
 
       <div class="section-desc"><p>Detect and extract intervals for further analysis</p></div>
 
@@ -150,7 +150,7 @@
         </dt>
         <dd>Specify interval boundaries by time, label, lap, or sample</dd>
       </dl></div><div class="section level2">
-      <h2 id="printing-plotting">Printing &amp; plotting<a class="anchor" aria-label="anchor" href="#printing-plotting"></a></h2>
+      <h2 id="print-plot">Print &amp; plot<a class="anchor" aria-label="anchor" href="#print-plot"></a></h2>
 
       <div class="section-desc"><p>Tools for printing functions and pretty plotting with <a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a>.</p></div>
 
@@ -160,6 +160,13 @@
 
 
       <dl><dt>
+
+          <code><a href="print.mnirs.html">print(<i>&lt;mnirs&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Methods for mnirs objects</dd>
+
+        <dt>
 
           <code><a href="plot.mnirs.html">plot(<i>&lt;mnirs&gt;</i>)</a></code>
 
@@ -200,13 +207,6 @@
 
         </dt>
         <dd>Format time span data as h:mm:ss</dd>
-
-        <dt>
-
-          <code><a href="print.mnirs.html">print(<i>&lt;mnirs&gt;</i>)</a></code>
-
-        </dt>
-        <dd>Methods for mnirs objects</dd>
       </dl></div><div class="section level2">
       <h2 id="files">Files<a class="anchor" aria-label="anchor" href="#files"></a></h2>
 
@@ -261,7 +261,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

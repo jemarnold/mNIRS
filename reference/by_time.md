@@ -89,8 +89,6 @@ data <- read_mnirs(
 
 ## start and end by time
 extract_intervals(data, start = by_time(66), end = by_time(357))
-#> ℹ `nirs_channels` = c("smo2_left", "smo2_right") grouped together from
-#>   metadata.
 #> $interval_1
 #> # A tibble: 4,150 × 4
 #>     time   lap smo2_left smo2_right
@@ -110,8 +108,6 @@ extract_intervals(data, start = by_time(66), end = by_time(357))
 
 ## start by lap
 extract_intervals(data, start = by_lap(2, 4), span = 0)
-#> ℹ `nirs_channels` = c("smo2_left", "smo2_right") grouped together from
-#>   metadata.
 #> $interval_1
 #> # A tibble: 1 × 4
 #>    time   lap smo2_left smo2_right
@@ -132,8 +128,6 @@ data <- create_mnirs_data(data, event_channel = "event")
 
 ## start by label, end by time
 extract_intervals(data, start = by_label("start"), end = by_time(1500))
-#> ℹ `nirs_channels` = c("smo2_left", "smo2_right") grouped together from
-#>   metadata.
 #> Warning: !  Interval 1 is partially outside data bounds.
 #> ℹ Returning available data only.
 #> $interval_1
@@ -155,8 +149,6 @@ extract_intervals(data, start = by_label("start"), end = by_time(1500))
 
 ## case-insensitive label match
 extract_intervals(data, start = by_label("START", ignore_case = TRUE))
-#> ℹ `nirs_channels` = c("smo2_left", "smo2_right") grouped together from
-#>   metadata.
 #> $interval_1
 #> # A tibble: 1,211 × 5
 #>     time   lap smo2_left smo2_right event
@@ -178,8 +170,6 @@ extract_intervals(data, start = by_label("START", ignore_case = TRUE))
 data$event[1000] <- "lap.1"
 data <- create_mnirs_data(data, event_channel = "event")
 extract_intervals(data, start = by_label("lap.1", fixed = TRUE))
-#> ℹ `nirs_channels` = c("smo2_left", "smo2_right") grouped together from
-#>   metadata.
 #> $interval_1
 #> # A tibble: 1,211 × 5
 #>     time   lap smo2_left smo2_right event
@@ -199,8 +189,6 @@ extract_intervals(data, start = by_label("lap.1", fixed = TRUE))
 
 ## multiple intervals by sample index
 extract_intervals(data, start = by_sample(1000, 1500))
-#> ℹ `nirs_channels` = c("smo2_left", "smo2_right") grouped together from
-#>   metadata.
 #> $interval_1
 #> # A tibble: 1,211 × 5
 #>     time   lap smo2_left smo2_right event

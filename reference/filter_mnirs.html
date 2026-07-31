@@ -5,13 +5,15 @@ A cubic smoothing spline.
 A Butterworth digital filter.
 A simple moving average.
 
-"><meta property="og:description" content="Apply digital filtering/smoothing to numeric vector data within a data frame
+
+Note the method-specific arguments below."><meta property="og:description" content="Apply digital filtering/smoothing to numeric vector data within a data frame
 using either:
 A cubic smoothing spline.
 A Butterworth digital filter.
 A simple moving average.
 
-"><meta name="twitter:card" content="summary"><meta name="twitter:creator" content="@jem_arnold"><meta name="twitter:site" content="@jem_arnold"></head><body>
+
+Note the method-specific arguments below."><meta name="twitter:card" content="summary"><meta name="twitter:creator" content="@jem_arnold"><meta name="twitter:site" content="@jem_arnold"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -19,7 +21,7 @@ A simple moving average.
 
     <a class="navbar-brand me-2" href="../index.html">mnirs</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -30,15 +32,15 @@ A simple moving average.
       <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mnirs-cheatsheet.pdf">mnirs-cheatsheet (PDF)</a></li>
-    <li><a class="dropdown-item" href="../articles/reading-mnirs-data.html">Reading and Cleaning Data with {mnirs}</a></li>
+    <li><a class="dropdown-item" href="../articles/reading-mnirs-data.html">Reading and Cleaning Data with mnirs</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/jemarnold/mnirs" aria-label="GitHub"><span class="fa fa-github"></span></a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://bsky.app/profile/jemarnold.bsky.social" aria-label="Bluesky"><span class="fa fa-brands fa-bluesky"></span></a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://twitter.com/jem_arnold" aria-label="Twitter"><span class="fa fa-twitter"></span></a></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/jemarnold/mnirs" aria-label="GitHub"><span class="fa fa-github"></span></a></li>
       </ul></div>
 
 
@@ -57,7 +59,8 @@ A simple moving average.
 using either:</p><ol><li><p>A cubic smoothing spline.</p></li>
 <li><p>A Butterworth digital filter.</p></li>
 <li><p>A simple moving average.</p></li>
-</ol></div>
+</ol><p>Note the <code>method</code>-specific arguments below.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
@@ -68,7 +71,17 @@ using either:</p><ol><li><p>A cubic smoothing spline.</p></li>
 <span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"smooth_spline"</span>, <span class="st">"butterworth"</span>, <span class="st">"moving_average"</span><span class="op">)</span>,</span>
 <span>  na.rm <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  <span class="va">...</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  spar <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  order <span class="op">=</span> <span class="fl">2L</span>,</span>
+<span>  W <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  fc <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  sample_rate <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"low"</span>, <span class="st">"high"</span>, <span class="st">"stop"</span>, <span class="st">"pass"</span><span class="op">)</span>,</span>
+<span>  edges <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"rev"</span>, <span class="st">"rep1"</span>, <span class="st">"none"</span><span class="op">)</span>,</span>
+<span>  width <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  span <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  partial <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -77,8 +90,9 @@ using either:</p><ol><li><p>A cubic smoothing spline.</p></li>
 
 
 <dl><dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>A data frame of class <em>"mnirs"</em> containing time series data and
-metadata.</p></dd>
+<dd><p>A data frame of class <em>"mnirs"</em> containing time series data
+and metadata, a list of data frames, or a grouped data frame (see
+<em>Details</em>).</p></dd>
 
 
 <dt id="arg-nirs-channels">nirs_channels<a class="anchor" aria-label="anchor" href="#arg-nirs-channels"></a></dt>
@@ -96,15 +110,20 @@ used.</p></li>
 
 
 <dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
-<dd><p>A character string indicating how to filter the data (see
-<em>Details</em>).</p><dl><dt><code>"smooth_spline"</code></dt>
-<dd><p>Fits a cubic smoothing spline.</p></dd>
+<dd><p>A character string indicating how to filter the data.
+Additional arguments must be specified for each method. See <em>Details</em>.</p><dl><dt><code>"smooth_spline"</code></dt>
+<dd><p>Fits a cubic smoothing spline. Additional
+arguments: <code>spar</code>.</p></dd>
 
 <dt><code>"butterworth"</code></dt>
-<dd><p>Uses a centred Butterworth digital filter.</p></dd>
+<dd><p>Uses a centred Butterworth digital filter.
+Additional arguments: <code>order</code>, <code>W</code> or <code>fc</code>, <code>sample_rate</code>, <code>type</code>,
+<code>edges</code>. See <code><a href="filter_butterworth.html">filter_butterworth()</a></code>.</p></dd>
 
 <dt><code>"moving_average"</code></dt>
-<dd><p>Uses a centred moving average filter.</p></dd>
+<dd><p>Uses a centred moving average filter.
+Additional arguments: <code>width</code> or <code>span</code>, <code>partial</code>. See
+<code><a href="filter_moving_average.html">filter_moving_average()</a></code>.</p></dd>
 
 
 </dl></dd>
@@ -124,14 +143,75 @@ global default can be set via <code>options(mnirs.verbose = FALSE)</code>.</p></
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional method-specific arguments must be specified
+<dd><p>Additional arguments passed to the underlying method function.
+See <em>Details</em>.</p></dd>
+
+
+<dt id="arg-spar">spar<a class="anchor" aria-label="anchor" href="#arg-spar"></a></dt>
+<dd><p><strong>smooth_spline</strong>: A numeric smoothing parameter passed to
+<code><a href="https://rdrr.io/r/stats/smooth.spline.html" class="external-link">stats::smooth.spline()</a></code>. If <code>NULL</code> (<em>default</em>), automatically
+determined via penalised log likelihood.</p></dd>
+
+
+<dt id="arg-order">order<a class="anchor" aria-label="anchor" href="#arg-order"></a></dt>
+<dd><p><strong>butterworth</strong>: An integer defining the filter order
+(<em>default</em> <code>order = 2</code>).</p></dd>
+
+
+<dt id="arg-w">W<a class="anchor" aria-label="anchor" href="#arg-w"></a></dt>
+<dd><p><strong>butterworth</strong>: A one- or two-element numeric vector within
+<code>[0, 1]</code> defining the filter cutoff frequency(ies) as a fraction of
+the Nyquist frequency (see <em>Details</em>). One of either <code>W</code> or <code>fc</code> must be
+specified.</p></dd>
+
+
+<dt id="arg-fc">fc<a class="anchor" aria-label="anchor" href="#arg-fc"></a></dt>
+<dd><p><strong>butterworth</strong>: A one- or two-element numeric vector defining
+the filter absolute cutoff frequency in Hz. Used with <code>sample_rate</code> to
+compute <code>W</code>. One of either <code>W</code> or <code>fc</code> must be specified.</p></dd>
+
+
+<dt id="arg-sample-rate">sample_rate<a class="anchor" aria-label="anchor" href="#arg-sample-rate"></a></dt>
+<dd><p><strong>butterworth</strong>: A numeric sample rate in Hz. Will
+be taken from metadata or estimated from <code>time_channel</code> if not
+defined.</p></dd>
+
+
+<dt id="arg-type">type<a class="anchor" aria-label="anchor" href="#arg-type"></a></dt>
+<dd><p><strong>butterworth</strong>: A character string specifying filter type,
+one of: <code>c("low", "high", "stop", "pass")</code> (<code>"low"</code> is the
+<em>default</em>).</p></dd>
+
+
+<dt id="arg-edges">edges<a class="anchor" aria-label="anchor" href="#arg-edges"></a></dt>
+<dd><p><strong>butterworth</strong>: A character string specifying the edge
+padding, one of: <code>c("rev", "rep1", "none")</code> (<code>"rev"</code> is the
+<em>default</em>). See <code><a href="filter_butterworth.html">filter_butterworth()</a></code>.</p></dd>
+
+
+<dt id="arg-width">width<a class="anchor" aria-label="anchor" href="#arg-width"></a></dt>
+<dd><p><strong>moving_average</strong>: An integer number of samples within
+the local window. One of either <code>width</code> or <code>span</code> must be specified.</p></dd>
+
+
+<dt id="arg-span">span<a class="anchor" aria-label="anchor" href="#arg-span"></a></dt>
+<dd><p><strong>moving_average</strong>: A numeric time duration in units of
+<code>time_channel</code> within the local window. One of either <code>width</code> or
+<code>span</code> must be specified.</p></dd>
+
+
+<dt id="arg-partial">partial<a class="anchor" aria-label="anchor" href="#arg-partial"></a></dt>
+<dd><p><strong>moving_average</strong>: Logical; default is <code>FALSE</code>, only
+returns values where a full window of valid (non-<code>NA</code>) samples are
+available. If <code>TRUE</code>, ignores <code>NA</code> and processes available valid samples
 (see <em>Details</em>).</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <a href="https://tibble.tidyverse.org/reference/tibble-package.html" class="external-link">tibble</a> of class <em>"mnirs"</em> with metadata
-available with <code><a href="https://rdrr.io/r/base/attributes.html" class="external-link">attributes()</a></code>.</p>
+available with <code><a href="https://rdrr.io/r/base/attributes.html" class="external-link">attributes()</a></code>. For list or grouped data frame input,
+returns a named list of <em>"mnirs"</em> tibbles, one per interval.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -147,14 +227,7 @@ which can be left as <code>NULL</code> and automatically determined via penalise
 log likelihood. This usually works well for responses occurring on the
 order of minutes or longer. <code>spar</code> can be specified typically, but not
 necessarily, in the range <code>spar = [0, 1]</code>.</p>
-<p>Additional arguments (<code>...</code>) accepted when <code>method = "smooth_spline"</code>:</p>
-<dl><dt><code>spar</code></dt>
-<dd><p>A numeric smoothing parameter passed to
-<code><a href="https://rdrr.io/r/stats/smooth.spline.html" class="external-link">stats::smooth.spline()</a></code>. If <code>NULL</code> (<em>default</em>), automatically
-determined via penalised log likelihood.</p></dd>
-
-
-</dl></div>
+</div>
 
 <div class="section">
 <h3 id="method-butterworth-">method = "butterworth"<a class="anchor" aria-label="anchor" href="#method-butterworth-"></a></h3>
@@ -188,33 +261,7 @@ directly in Hz, and <code>sample_rate</code> is the sample rate of the recorded 
 in Hz. Where <code>W = fc / (sample_rate / 2)</code>.</p>
 <p>Only one of either <code>W</code> or <code>fc</code> should be defined. If both are
 defined, <code>W</code> will be preferred over <code>fc</code>.</p>
-<p>Additional arguments (<code>...</code>) accepted when <code>method = "butterworth"</code>:</p>
-<dl><dt><code>order</code></dt>
-<dd><p>An integer for the filter order (<em>default</em> <code>2</code>).</p></dd>
-
-<dt><code>W</code></dt>
-<dd><p>A numeric fractional cutoff frequency within <code>[0, 1]</code>. One
-of either <code>W</code> or <code>fc</code> must be specified.</p></dd>
-
-<dt><code>fc</code></dt>
-<dd><p>A numeric absolute cutoff frequency in Hz. Used with
-<code>sample_rate</code> to compute <code>W</code>.</p></dd>
-
-<dt><code>sample_rate</code></dt>
-<dd><p>A numeric sample rate in Hz. Will be taken from
-metadata or estimated from <code>time_channel</code> if not defined.</p></dd>
-
-<dt><code>type</code></dt>
-<dd><p>A character string specifying filter type, one of:
-<code>c("low", "high", "stop", "pass")</code> (<code>"low"</code> is the default).</p></dd>
-
-<dt><code>edges</code></dt>
-<dd><p>A character string specifying the edge padding, one of:
-<code>c("rev", "rep1", "none")</code> (<code>"rev"</code> is the default).
-See <code><a href="filter_butter.html">filter_butter()</a></code>.</p></dd>
-
-
-</dl></div>
+</div>
 
 <div class="section">
 <h3 id="method-moving-average-">method = "moving_average"<a class="anchor" aria-label="anchor" href="#method-moving-average-"></a></h3>
@@ -226,20 +273,7 @@ window, defined by either <code>width</code> as the number of samples around
 <code>idx</code> between <code>[idx - floor(width/2), idx + floor(width/2)]</code>. Or by
 <code>span</code> as the timespan in units of <code>time_channel</code> between
 <code>[t - span/2, t + span/2]</code>.</p>
-<p>Additional arguments (<code>...</code>) accepted when <code>method = "moving_average"</code>:</p>
-<dl><dt><code>width</code> or <code>span</code></dt>
-<dd><p>Either an integer number of samples, or a
-numeric time duration in units of <code>time_channel</code> within the local
-window. One of either <code>width</code> or <code>span</code> must be specified.</p></dd>
-
-<dt><code>partial</code></dt>
-<dd><p>Logical; <code>FALSE</code> by default, only returns values
-where a full window of valid (non-<code>NA</code>) samples are available.
-If <code>TRUE</code>, ignores <code>NA</code> and allows calculation over partial windows
-at the edges of the data.</p></dd>
-
-
-</dl></div>
+</div>
 
 <div class="section">
 <h3 id="missing-values">Missing values<a class="anchor" aria-label="anchor" href="#missing-values"></a></h3>
@@ -255,6 +289,42 @@ each local window are either propagated to the returned vector when
 </div>
 
     </div>
+    <div class="section level2">
+    <h2 id="data-input-formats">Data input formats<a class="anchor" aria-label="anchor" href="#data-input-formats"></a></h2>
+
+
+
+<p><em>mnirs</em> processing functions accept <code>data</code> in multiple formats:</p><ul><li><p>A <strong>single <em>"mnirs"</em> data frame</strong> is processed and returned directly.</p></li>
+<li><p>A <strong>list of <em>"mnirs"</em> data frames</strong>: each interval is processed
+separately and returned as a named list.</p></li>
+<li><p>A <strong>grouped <em>"mnirs"</em> data frame</strong>, e.g. with <code><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">dplyr::group_by()</a></code>: the
+data frame is split by grouping levels and each group is processed as
+a separate interval, returned as a named list.</p></li>
+</ul></div>
+    <div class="section level2">
+    <h2 id="per-channel-arguments">Per-channel arguments<a class="anchor" aria-label="anchor" href="#per-channel-arguments"></a></h2>
+
+
+
+<p>Arguments apply globally to all <code>nirs_channels</code> by default. Relevant
+arguments can instead be supplied uniquely per-channel as a named <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code>,
+with names matching <code>nirs_channels</code>, e.g.:</p>
+<p></p><div class="sourceCode r"><pre><code><span><span class="fu"><a href="../reference/replace_mnirs.html">replace_mnirs</a></span><span class="op">(</span></span>
+<span>    <span class="va">data</span>,</span>
+<span>    nirs_channels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">hhb</span>, <span class="va">smo2</span><span class="op">)</span>,</span>
+<span>    invalid_values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>hhb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, smo2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">100</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    invalid_above <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>hhb <span class="op">=</span> <span class="fl">10</span><span class="op">)</span>,</span>
+<span>    span <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fl">3</span>, hhb <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre><p></p></div><ul><li><p>A non-list value applies to every channel (the <em>default</em> behaviour).</p></li>
+<li><p>A <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code> named by <code>nirs_channels</code> applies per-channel values.</p></li>
+<li><p>A single unnamed value in the list will be applied to unlisted channels
+(e.g. <code>span = list(3, hhb = 5)</code> gives <code>hhb</code> 5 and every other channel 3).
+If no unnamed fallback value in the list, channels not named in the list
+will be returned un-processed (e.g. <code>span = list(hhb = 5)</code> will only
+process <code>hhb</code>).</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code> names not matching <code>nirs_channels</code> are warned about and
+ignored.</p></li>
+</ul></div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
@@ -337,7 +407,7 @@ each local window are either propagated to the returned vector when
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

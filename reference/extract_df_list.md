@@ -5,5 +5,5 @@ Extract interval data by time range
 ## Usage
 
 ``` r
-extract_df_list(data, time_vec, interval_spec, nirs_channels)
+extract_df_list(data, t_vec, interval_spec, group_channels)
 ```

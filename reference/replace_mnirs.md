@@ -2,8 +2,8 @@
 
 Detect and replace local outliers, specified invalid values, and missing
 `NA` values across `nirs_channels` within an *"mnirs"* data frame.
-`replace_mnirs()` operates on a data frame, extending the vectorised
-functions:.
+`replace_mnirs()` operates on a data frame, a list of data frames, or a
+grouped data frame, extending the vectorised functions.
 
 `replace_invalid()` detects specified invalid values or range cutoffs in
 a numeric vector and replace them with the local median value or `NA`.
@@ -71,7 +71,8 @@ replace_missing(
 - data:
 
   A data frame of class *"mnirs"* containing time series data and
-  metadata.
+  metadata, a list of data frames, or a grouped data frame (see
+  *Details*).
 
 - nirs_channels:
 
@@ -172,10 +173,12 @@ replace_missing(
 
 ## Value
 
-`replace_mnirs()` return a
+`replace_mnirs()` returns a
 [tibble](https://tibble.tidyverse.org/reference/tibble-package.html) of
 class `"mnirs"` with metadata available via
-[`attributes()`](https://rdrr.io/r/base/attributes.html).
+[`attributes()`](https://rdrr.io/r/base/attributes.html). For list or
+grouped data frame input, returns a named list of *"mnirs"* tibbles, one
+per interval.
 
 `replace_invalid()` returns a numeric vector the same length as `x` with
 invalid values replaced.
@@ -261,6 +264,49 @@ If there are no valid values within `span` to one side of the `NA`, the
 median of the other side is used (i.e. for leading and trailing `NA`s).
 If there are no valid values within either side, the first valid sample
 on either side is used (equivalent to `replace_missing(x, width = 1)`).
+
+## Per-channel arguments
+
+Arguments apply globally to all `nirs_channels` by default. Relevant
+arguments can instead be supplied uniquely per-channel as a named
+[`list()`](https://rdrr.io/r/base/list.html), with names matching
+`nirs_channels`, e.g.:
+
+    replace_mnirs(
+        data,
+        nirs_channels = c(hhb, smo2),
+        invalid_values = list(hhb = -1, smo2 = c(0, 100)),
+        invalid_above = list(hhb = 10),
+        span = list(3, hhb = 5)
+    )
+
+- A non-list value applies to every channel (the *default* behaviour).
+
+- A [`list()`](https://rdrr.io/r/base/list.html) named by
+  `nirs_channels` applies per-channel values.
+
+- A single unnamed value in the list will be applied to unlisted
+  channels (e.g. `span = list(3, hhb = 5)` gives `hhb` 5 and every other
+  channel 3). If no unnamed fallback value in the list, channels not
+  named in the list will be returned un-processed (e.g.
+  `span = list(hhb = 5)` will only process `hhb`).
+
+- [`list()`](https://rdrr.io/r/base/list.html) names not matching
+  `nirs_channels` are warned about and ignored.
+
+## Data input formats
+
+*mnirs* processing functions accept `data` in multiple formats:
+
+- A **single *"mnirs"* data frame** is processed and returned directly.
+
+- A **list of *"mnirs"* data frames**: each interval is processed
+  separately and returned as a named list.
+
+- A **grouped *"mnirs"* data frame**, e.g. with
+  [`dplyr::group_by()`](https://dplyr.tidyverse.org/reference/group_by.html):
+  the data frame is split by grouping levels and each group is processed
+  as a separate interval, returned as a named list.
 
 ## Examples
 

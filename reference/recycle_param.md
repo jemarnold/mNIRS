@@ -6,5 +6,11 @@ match the number of events.
 ## Usage
 
 ``` r
-recycle_param(param, n_events, event_groups, verbose = TRUE)
+recycle_param(
+  param,
+  n_events,
+  group_intervals,
+  verbose = TRUE,
+  env = rlang::caller_env()
+)
 ```

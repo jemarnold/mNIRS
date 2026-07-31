@@ -22,7 +22,7 @@ parse_channel_name(channel, data, env = rlang::caller_env())
 
 - env:
 
-  Environment for symbol evaluation.
+  Environment for symbol evaluation (typically the quosure environment).
 
 ## Value
 

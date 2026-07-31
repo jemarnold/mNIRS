@@ -11,7 +11,7 @@ index.'><meta name="twitter:card" content="summary"><meta name="twitter:creator"
 
     <a class="navbar-brand me-2" href="../index.html">mnirs</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -22,15 +22,15 @@ index.'><meta name="twitter:card" content="summary"><meta name="twitter:creator"
       <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mnirs-cheatsheet.pdf">mnirs-cheatsheet (PDF)</a></li>
-    <li><a class="dropdown-item" href="../articles/reading-mnirs-data.html">Reading and Cleaning Data with {mnirs}</a></li>
+    <li><a class="dropdown-item" href="../articles/reading-mnirs-data.html">Reading and Cleaning Data with mnirs</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/jemarnold/mnirs" aria-label="GitHub"><span class="fa fa-github"></span></a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://bsky.app/profile/jemarnold.bsky.social" aria-label="Bluesky"><span class="fa fa-brands fa-bluesky"></span></a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://twitter.com/jem_arnold" aria-label="Twitter"><span class="fa fa-twitter"></span></a></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/jemarnold/mnirs" aria-label="GitHub"><span class="fa fa-github"></span></a></li>
       </ul></div>
 
 
@@ -58,12 +58,14 @@ index.</p>
 <span>  time_channel <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  event_channel <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  sample_rate <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  group_intervals <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"distinct"</span>, <span class="st">"ensemble"</span><span class="op">)</span>,</span>
+<span>  group_channels <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  start <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  end <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  span <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">60</span>, <span class="fl">60</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  event_groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"distinct"</span>, <span class="st">"ensemble"</span><span class="op">)</span>,</span>
 <span>  zero_time <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  event_groups <span class="op">=</span> <span class="fu">deprecated</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -73,16 +75,14 @@ index.</p>
 
 <dl><dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
 <dd><p>A data frame of class <em>"mnirs"</em> containing time series data and
-metadata.</p></dd>
+metadata, or a <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code> of such data frames.</p></dd>
 
 
 <dt id="arg-nirs-channels">nirs_channels<a class="anchor" aria-label="anchor" href="#arg-nirs-channels"></a></dt>
-<dd><p>A character vector or a <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code> of character vectors
-of mNIRS channel names to operate on within each interval (see <em>Details</em>).
-Names must match column names in <code>data</code> exactly.</p><ul><li><p>Must only be specified when <code>event_groups</code> contains <em>"ensemble"</em>-
-averaged intervals. If <code>event_groups = "distinct"</code> no channel processing
-occurs.</p></li>
-<li><p>If <code>NULL</code> (default), channels are retrieved from <em>"mnirs"</em> metadata.</p></li>
+<dd><p>A character vector of mNIRS channel names to operate
+on. Names must match column names in <code>data</code> exactly.</p><ul><li><p>If <code>NULL</code> (default), channels are retrieved from <em>"mnirs"</em> metadata.</p></li>
+<li><p><a href="https://lifecycle.r-lib.org/articles/stages.html#deprecated" class="external-link"><img src="figures/lifecycle-deprecated.svg" alt="[Deprecated]"></a> Passing a <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code> for per-group
+channel selection is deprecated; use <code>group_channels</code>.</p></li>
 </ul></dd>
 
 
@@ -105,6 +105,36 @@ lap numbers.</p><ul><li><p>Required when using <code><a href="by_time.html">by_l
 <dd><p>An <em>optional</em> numeric sample rate (Hz) used to bin time
 values for ensemble-averaging. If <code>NULL</code>, will be estimated from
 <code>time_channel</code> (see <em>Details</em>).</p></dd>
+
+
+<dt id="arg-group-intervals">group_intervals<a class="anchor" aria-label="anchor" href="#arg-group-intervals"></a></dt>
+<dd><p>Either a character string or a non-empty <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code> of
+non-empty integer-valued numeric vectors specifying how to group intervals
+(see <em>Details</em>). Custom indices must be between <code>1</code> and the number of
+detected intervals.</p><dl><dt><code>"distinct"</code></dt>
+<dd><p>The default. Extract each interval as an independent
+data frame.</p></dd>
+
+<dt><code>"ensemble"</code></dt>
+<dd><p>Ensemble-average each specified <code>nirs_channel</code> across
+all detected intervals, returning a single data frame.</p></dd>
+
+<dt><code>list(c(1, 2), c(3, 4))</code></dt>
+<dd><p>Ensemble-average each specified
+<code>nirs_channel</code> within each group and return one data frame per group.</p></dd>
+
+
+</dl></dd>
+
+
+<dt id="arg-group-channels">group_channels<a class="anchor" aria-label="anchor" href="#arg-group-channels"></a></dt>
+<dd><p>A character vector or a <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code> of character
+vectors selecting which <code>nirs_channels</code> are ensemble-averaged within
+each interval group (see <em>Details</em>).</p><ul><li><p>If <code>NULL</code> (default), all <code>nirs_channels</code> are used for every group.</p></li>
+<li><p>Only relevant when <code>group_intervals</code> contains <em>"ensemble"</em>-averaged
+intervals; with <code>group_intervals = "distinct"</code> no channel processing
+occurs.</p></li>
+</ul></dd>
 
 
 <dt id="arg-start">start<a class="anchor" aria-label="anchor" href="#arg-start"></a></dt>
@@ -135,24 +165,6 @@ of <code>time_channel</code>, or a <code><a href="https://rdrr.io/r/base/list.ht
 </ul></dd>
 
 
-<dt id="arg-event-groups">event_groups<a class="anchor" aria-label="anchor" href="#arg-event-groups"></a></dt>
-<dd><p>Either a character string or a <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code> of integer
-vectors specifying how to group intervals (see <em>Details</em>).</p><dl><dt><code>"distinct"</code></dt>
-<dd><p>The default. Extract each interval as an independent
-data frame.</p></dd>
-
-<dt><code>"ensemble"</code></dt>
-<dd><p>Ensemble-average each specified <code>nirs_channel</code> across
-all detected intervals, returning a single data frame.</p></dd>
-
-<dt><code>list(c(1, 2), c(3, 4))</code></dt>
-<dd><p>Ensemble-average each specified
-<code>nirs_channel</code> within each group and return one data frame per group.</p></dd>
-
-
-</dl></dd>
-
-
 <dt id="arg-zero-time">zero_time<a class="anchor" aria-label="anchor" href="#arg-zero-time"></a></dt>
 <dd><p>Logical. Default is <code>FALSE</code>. If <code>TRUE</code>, re-calculates
 numeric <code>time_channel</code> values to start from zero within each interval
@@ -164,11 +176,20 @@ data frame.</p></dd>
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via <code>options(mnirs.verbose = FALSE)</code>.</p></dd>
 
+
+<dt id="arg-event-groups">event_groups<a class="anchor" aria-label="anchor" href="#arg-event-groups"></a></dt>
+<dd><p><a href="https://lifecycle.r-lib.org/articles/stages.html#deprecated" class="external-link"><img src="figures/lifecycle-deprecated.svg" alt="[Deprecated]"></a> Renamed to
+<code>group_intervals</code> for naming consistency across the package.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A named <code><a href="https://rdrr.io/r/base/list.html" class="external-link">list()</a></code> of <a href="https://tibble.tidyverse.org/reference/tibble-package.html" class="external-link">tibbles</a> of class
-<em>"mnirs"</em>, each with metadata available via <code><a href="https://rdrr.io/r/base/attributes.html" class="external-link">attributes()</a></code>.</p>
+<em>"mnirs"</em>, each with metadata available via <code><a href="https://rdrr.io/r/base/attributes.html" class="external-link">attributes()</a></code>. When <code>data</code>
+is a list of data frames, results are flattened into a single-layer
+list with interval names indicating nested number of data frame and
+interval as <code>interval_&lt;df&gt;.&lt;interval&gt;</code>. Other interval names (e.g.
+<code>"ensemble"</code> or custom group names) are suffixed as <code>&lt;name&gt;_&lt;df&gt;</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -220,28 +241,27 @@ boundary window: <code>start = by_time(30), span = c(-5, 60)</code> returns
 </ul></div>
 
 <div class="section">
-<h3 id="per-interval-nirs-channels-for-ensemble-averaging">Per-interval nirs_channels for ensemble-averaging<a class="anchor" aria-label="anchor" href="#per-interval-nirs-channels-for-ensemble-averaging"></a></h3>
+<h3 id="per-group-channel-selection-with-group-channels">Per-group channel selection with group_channels<a class="anchor" aria-label="anchor" href="#per-group-channel-selection-with-group-channels"></a></h3>
 
 
-<p>When <code>event_groups = "ensemble"</code> or a list of numeric grouped intervals,
-<code>nirs_channels</code> can be specified as a list of column names to override
-ensemble-averaging across interval. For example, to exclude a channel
-in one interval:</p>
-<p></p><div class="sourceCode r"><pre><code><span><span class="va">nirs_channels</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<p>When <code>group_intervals = "ensemble"</code> or a list of numeric grouped intervals,
+<code>group_channels</code> can be specified as a list of column names to override
+which channels are ensemble-averaged within each group. For example, to
+exclude a channel from one interval:</p>
+<p></p><div class="sourceCode r"><pre><code><span><span class="va">group_channels</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">A</span>, <span class="va">B</span>, <span class="va">C</span><span class="op">)</span>,</span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">A</span>, <span class="va">C</span><span class="op">)</span> <span class="co">## channel "B" is excluded</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">A</span>, <span class="va">C</span><span class="op">)</span> <span class="co">## channel "B" data are excluded from the second interval</span></span>
 <span><span class="op">)</span></span></code></pre><p></p></div>
-<p>If all grouped intervals can include all <code>nirs_channels</code>, or if
-<code>event_groups = "distinct"</code>, a single <code>nirs_channels</code> character vector can
-be supplied and recycled to all groups, or left as <code>NULL</code> for channels to
-be taken from <em>"mnirs"</em> metadata.</p>
+<p>If all grouped intervals include all <code>nirs_channels</code>, <code>group_channels</code> can
+be left as <code>NULL</code> (the default) and all channels are ensemble-averaged
+within every group.</p>
 </div>
 
 <div class="section">
 <h3 id="grouping-intervals">Grouping intervals<a class="anchor" aria-label="anchor" href="#grouping-intervals"></a></h3>
 
 
-<p><code>event_groups</code> controls whether extracted intervals are returned as distinct
+<p><code>group_intervals</code> controls whether extracted intervals are returned as distinct
 data frames or ensemble-averaged.</p>
 <dl><dt><code>"distinct"</code></dt>
 <dd><p>The default. Extract each interval and return a
@@ -256,14 +276,14 @@ frame.</p></dd>
 <dd><p>Ensemble-average each specified
 <code>nirs_channel</code> within each group and return a list with one data frame
 for each group. Any intervals detected but not specified in
-<code>event_groups</code> are returned as distinct.</p></dd>
+<code>group_intervals</code> are returned as distinct.</p></dd>
 
 
-</dl><p><code>event_groups</code> lists can be named (e.g.
+</dl><p><code>group_intervals</code> lists can be named (e.g.
 <code>list(low = c(1, 2), high = c(3, 4))</code>) and will pass those names to the
 returned list of data frames.</p>
-<p>When <code>event_groups</code> is a list of numeric interval numbers, list items in
-<code>nirs_channels</code> and <code>span</code> are recycled to the number of groups. If lists
+<p>When <code>group_intervals</code> is a list of numeric interval numbers, list items in
+<code>group_channels</code> and <code>span</code> are recycled to the number of groups. If lists
 are only partially specified, the final item is recycled forward as needed.
 Extra items are ignored.</p>
 </div>
@@ -284,16 +304,16 @@ Extra items are ignored.</p>
 <span class="r-in"><span>    verbose <span class="op">=</span> <span class="cn">FALSE</span></span></span>
 <span class="r-in"><span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
 <span class="r-in"><span>    <span class="co">## avoid issues ensemble-averaging irregular samples</span></span></span>
-<span class="r-in"><span>    <span class="fu"><a href="resample_mnirs.html">resample_mnirs</a></span><span class="op">(</span>method <span class="op">=</span> <span class="st">"linear"</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span> </span></span>
+<span class="r-in"><span>    <span class="fu"><a href="resample_mnirs.html">resample_mnirs</a></span><span class="op">(</span>method <span class="op">=</span> <span class="st">"linear"</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co">## ensemble-average across multiple intervals</span></span></span>
 <span class="r-in"><span><span class="va">interval_list</span> <span class="op">&lt;-</span> <span class="fu">extract_intervals</span><span class="op">(</span></span></span>
-<span class="r-in"><span>    <span class="va">data</span>,                       <span class="co">## channels recycled to all intervals by default</span></span></span>
+<span class="r-in"><span>    <span class="va">data</span>,                         <span class="co">## channels recycled to all intervals by default</span></span></span>
 <span class="r-in"><span>    nirs_channels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">smo2_left</span>, <span class="va">smo2_right</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>    start <span class="op">=</span> <span class="fu"><a href="by_time.html">by_time</a></span><span class="op">(</span><span class="fl">368</span>, <span class="fl">1084</span><span class="op">)</span>, <span class="co">## manually identified interval start times</span></span></span>
-<span class="r-in"><span>    span <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">20</span>, <span class="fl">90</span><span class="op">)</span>,          <span class="co">## include the last 180-sec of each interval (recycled)</span></span></span>
-<span class="r-in"><span>    event_groups <span class="op">=</span> <span class="st">"ensemble"</span>,  <span class="co">## ensemble-average across two intervals</span></span></span>
-<span class="r-in"><span>    zero_time <span class="op">=</span> <span class="cn">TRUE</span>            <span class="co">## re-calculate common time to start from `0`</span></span></span>
+<span class="r-in"><span>    group_intervals <span class="op">=</span> <span class="st">"ensemble"</span>, <span class="co">## ensemble-average across two intervals</span></span></span>
+<span class="r-in"><span>    start <span class="op">=</span> <span class="fu"><a href="by_time.html">by_time</a></span><span class="op">(</span><span class="fl">368</span>, <span class="fl">1084</span><span class="op">)</span>,   <span class="co">## manually identified interval start times</span></span></span>
+<span class="r-in"><span>    span <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">20</span>, <span class="fl">90</span><span class="op">)</span>,            <span class="co">## include the last 180-sec of each interval (recycled)</span></span></span>
+<span class="r-in"><span>    zero_time <span class="op">=</span> <span class="cn">TRUE</span>              <span class="co">## re-calculate common time to start from `0`</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">interval_list</span><span class="op">[[</span><span class="fl">1L</span><span class="op">]</span><span class="op">]</span></span></span>
@@ -314,7 +334,7 @@ Extra items are ignored.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"ggplot2"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">interval_list</span><span class="op">[[</span><span class="fl">1L</span><span class="op">]</span><span class="op">]</span>, time_labels <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">interval_list</span>, time_labels <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>      <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_abline.html" class="external-link">geom_vline</a></span><span class="op">(</span>xintercept <span class="op">=</span> <span class="fl">0</span>, linetype <span class="op">=</span> <span class="st">"dotted"</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="op">}</span></span></span>
 <span class="r-plt img"><img src="extract_intervals-1.png" alt="" width="700" height="433"></span>
@@ -331,7 +351,7 @@ Extra items are ignored.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

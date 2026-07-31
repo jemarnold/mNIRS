@@ -14,18 +14,13 @@ validate_numeric(
   integer = FALSE,
   allow_na = FALSE,
   msg1 = "",
-  msg2 = ""
-)
-
-validate_mnirs_data(data, ncol = 2L)
-
-validate_nirs_channels(
-  nirs_channels,
-  data,
-  verbose = FALSE,
-  as_list = FALSE,
+  msg2 = "",
   env = rlang::caller_env()
 )
+
+validate_mnirs_data(data, ncol = 2L, env = rlang::caller_env())
+
+validate_nirs_channels(nirs_channels, data, env = rlang::caller_env())
 
 validate_time_channel(time_channel, data, env = rlang::caller_env())
 
@@ -36,13 +31,25 @@ validate_event_channel(
   env = rlang::caller_env()
 )
 
-estimate_sample_rate(x)
+estimate_sample_rate(x, env = rlang::caller_env())
 
-validate_sample_rate(data, time_channel, sample_rate, verbose = TRUE)
+validate_sample_rate(
+  data,
+  time_channel,
+  sample_rate,
+  verbose = TRUE,
+  env = rlang::caller_env()
+)
 
-validate_width_span(width = NULL, span = NULL, verbose = TRUE, msg = "")
+validate_width_span(
+  width = NULL,
+  span = NULL,
+  verbose = TRUE,
+  msg = "",
+  env = rlang::caller_env()
+)
 
-validate_x_t(x, t, allow_na = FALSE)
+validate_x_t(x, t, allow_na = FALSE, env = rlang::caller_env())
 ```
 
 ## Arguments
@@ -84,6 +91,12 @@ validate_x_t(x, t, allow_na = FALSE)
   [`cli::cli_abort()`](https://cli.r-lib.org/reference/cli_abort.html)
   message when numeric validation fails.
 
+- env:
+
+  The calling environment or a defused call, used to report errors and
+  warnings as coming from the user-facing function rather than the
+  validator.
+
 - data:
 
   A data frame of class *"mnirs"* containing time series data and
@@ -96,20 +109,6 @@ validate_x_t(x, t, allow_na = FALSE)
 
   - If `NULL` (default), the `nirs_channels` metadata attribute of
     `data` is used.
-
-- verbose:
-
-  Logical. Default is `TRUE`. Display or silence (if `FALSE`) warnings
-  and information messages helpful for troubleshooting. Ad global
-  default can be set via `options(mnirs.verbose = FALSE)`.
-
-- as_list:
-
-  Logical. Default is `FALSE`. If `nirs_channels` is specified as a
-  list, it will be coerced to a flat character vector and an information
-  message is displayed (when `verbose = TRUE`). If `TRUE`,
-  `nirs_channels` is returned as-is, i.e. as a list for callers which
-  require it.
 
 - time_channel:
 
@@ -139,6 +138,12 @@ validate_x_t(x, t, allow_na = FALSE)
   - If `NULL` (default), the `sample_rate` metadata attribute of `data`
     will be used if detected, or the sample rate will be estimated from
     `time_channel`.
+
+- verbose:
+
+  Logical. Default is `TRUE`. Display or silence (if `FALSE`) warnings
+  and information messages helpful for troubleshooting. Ad global
+  default can be set via `options(mnirs.verbose = FALSE)`.
 
 ## Value
 

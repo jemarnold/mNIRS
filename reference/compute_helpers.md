@@ -3,12 +3,19 @@
 `compute_local_windows()`: Compute a list of rolling window indices
 along a time variable `t`.
 
+`median_nona()`: Fast median for numeric vectors. Strips `NA`s and
+replicates `median.default` arithmetic without S3 dispatch.
+
 `compute_local_fun()`: Compute a rolling function along `x` from a list
 of rolling sample windows.
 
+`col_medians_padded()`: Column medians of an `NA`-padded numeric matrix
+via a single radix sort. `NA`s sort last per column; medians indexed
+from per-column valid counts. Matches `median(w, na.rm = TRUE)`.
+
 `compute_outliers()`: Computes a vector of local medians and logicals
-indicating outliers of `x` within a list of rolling sample windows
-`window_idx`.
+indicating outliers of `x` within rolling windows defined by `width` or
+`span`.
 
 `compute_valid_neighbours()`: Compute a list of rolling window indices
 along `x` to either side of `NA`s.
@@ -21,19 +28,32 @@ compute_local_windows(
   idx = seq_along(t),
   width = NULL,
   span = NULL,
-  align = c("centre", "left", "right")
+  align = c("centre", "left", "right"),
+  env = rlang::caller_env()
 )
+
+median_nona(w)
 
 compute_local_fun(x, window_idx, fn, ...)
 
-compute_outliers(x, window_idx, outlier_cutoff)
+col_medians_padded(m)
+
+compute_outliers(
+  x,
+  t,
+  outlier_cutoff,
+  width = NULL,
+  span = NULL,
+  env = rlang::caller_env()
+)
 
 compute_valid_neighbours(
   x,
   t = seq_along(x),
   width = NULL,
   span = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  env = rlang::caller_env()
 )
 ```
 
@@ -67,6 +87,12 @@ compute_valid_neighbours(
   *"right"*. Where *"left"* is *forward looking*, and *"right"* is
   *backward looking* from the current sample.
 
+- env:
+
+  The calling environment or a defused call, used to report errors and
+  warnings as coming from the user-facing function rather than the
+  validator.
+
 - x:
 
   A numeric vector of the response variable.
@@ -83,6 +109,11 @@ compute_valid_neighbours(
 - ...:
 
   Additional arguments.
+
+- m:
+
+  A numeric matrix with one column per rolling window, padded with `NA`
+  where windows extend beyond the data.
 
 - outlier_cutoff:
 
@@ -110,7 +141,11 @@ compute_valid_neighbours(
 or shorter length as `t` with numeric vectors of sample indices of
 length `width` samples or `span` units of time `t`.
 
+`median_nona()`: A numeric value.
+
 `compute_local_fun()`: A numeric vector the same length as `x`.
+
+`col_medians_padded()`: A numeric vector of length `ncol(m)`.
 
 `compute_outliers()`: A [`list()`](https://rdrr.io/r/base/list.html)
 with vectors the same length as `x` for with numeric local medians and
