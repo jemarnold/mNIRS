@@ -207,24 +207,78 @@ filter_mnirs <- function(
 
     ## validation ====================================
     validate_mnirs_data(data)
-    ## normalise method aliases before matching
-    method <- gsub(
+
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
+    }
+
+    ## normalise method aliases in place, preserving per-channel list names
+    method[] <- gsub(
         "^(ma|moving[ _-]average)$",
         "moving_average",
         method,
         ignore.case = TRUE
     )
-    method <- gsub(
+    method[] <- gsub(
         "^(spline|smooth[ _-]spline)$",
         "smooth_spline",
         method,
         ignore.case = TRUE
     )
-    method <- match.arg(method)
 
-    if (missing(verbose)) {
-        verbose <- getOption("mnirs.verbose", default = TRUE)
+    ## a fully unnamed list is a global value, not a per-channel map
+    if (is.list(method) && !any(nzchar(names(method) %||% ""))) {
+        method <- unlist(method)
     }
+
+    ## per-channel method: resolve against channels, recurse once per
+    ## unique method with its channel subset, then merge filtered columns
+    if (is.list(method)) {
+        env <- sys.call()
+        nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, env)
+        per_channel <- resolve_channel_args(
+            nirs_channels,
+            args = list(method = method),
+            defaults = list(method = "smooth_spline"),
+            choices = list(
+                method = c("smooth_spline", "butterworth", "moving_average")
+            ),
+            verbose = verbose,
+            env = env
+        )
+        methods <- vapply(per_channel[nirs_channels], `[[`, "", "method")
+
+        ## recurse in first-appearance method order; per-channel arg lists
+        ## in `...` pass through, each method extracts only its own args
+        groups <- split(nirs_channels, factor(methods, unique(methods)))
+        call <- match.call()
+        call$data <- data
+        call$verbose <- verbose
+        eval_env <- parent.frame()
+        results <- lapply(setNames(nm = names(groups)), \(.m) {
+            call$method <- .m
+            call$nirs_channels <- groups[[.m]]
+            eval(call, envir = eval_env)
+        })
+
+        ## merge filtered columns and restore full channel metadata
+        metadata <- attributes(data)
+        data[unlist(groups, use.names = FALSE)] <- do.call(
+            cbind, unname(Map(\(.r, .ch) .r[.ch], results, groups))
+        )
+        metadata$nirs_channels <- unique(nirs_channels)
+        metadata$time_channel <- attr(results[[1L]], "time_channel")
+        sample_rate <- Filter(
+            Negate(is.null),
+            lapply(results, attr, "sample_rate")
+        )
+        if (length(sample_rate) > 0L) {
+            metadata$sample_rate <- sample_rate[[1L]]
+        }
+        return(create_mnirs_data(data, metadata))
+    }
+
+    method <- match.arg(method)
 
     UseMethod(
         "filter_mnirs",

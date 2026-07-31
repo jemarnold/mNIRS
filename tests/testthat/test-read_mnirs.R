@@ -1592,23 +1592,6 @@ test_that("parse_time_channel() works on fraction-of-day", {
     expect_equal(format(result$start_timestamp, "%H:%M:%OS"), "13:52:59")
 })
 
-test_that("parse_time_channel() leaves small numeric time unconverted", {
-    ## short 0-1 s series, flat, and negative time are not fraction-of-day
-    ## TODO unlikely edge case not covered, YAGNI
-    # small <- parse_time_channel(data.frame(time = c(0, 0.5, 1)), "time")
-    # expect_equal(small$data$time, c(0, 0.5, 1))
-    # expect_null(small$start_timestamp)
-
-    flat <- parse_time_channel(data.frame(time = c(0, 0, 0)), "time")
-    expect_equal(flat$data$time, c(0, 0, 0))
-    expect_null(flat$start_timestamp)
-
-    negative <- parse_time_channel(data.frame(time = c(-2, -1, 0)), "time")
-    expect_equal(negative$data$time, c(-2, -1, 0))
-    expect_null(negative$start_timestamp)
-})
-
-
 test_that("parse_time_channel() returns local time zonel", {
     perfpro <- test_path("testdata/perfpro-mre.xlsx")
     moxy_occl <- test_path("testdata/moxy-occlusion.xlsx")

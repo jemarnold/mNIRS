@@ -449,6 +449,39 @@ test_that("filter_mnirs method aliases work", {
     )
 })
 
+test_that("filter_mnirs applies method per channel", {
+    result <- filter_mnirs(
+        moxy_data,
+        method = list(smo2_left = "ma", smo2_right = "spline"),
+        width = list(smo2_left = 5),
+        spar = list(smo2_right = 0.5),
+        verbose = FALSE
+    )
+    left <- filter_mnirs(
+        moxy_data,
+        nirs_channels = "smo2_left",
+        method = "moving_average",
+        width = 5,
+        verbose = FALSE
+    )
+    right <- filter_mnirs(
+        moxy_data,
+        nirs_channels = "smo2_right",
+        method = "smooth_spline",
+        spar = 0.5,
+        verbose = FALSE
+    )
+
+    expect_equal(result$smo2_left, left$smo2_left)
+    expect_equal(result$smo2_right, right$smo2_right)
+    expect_s3_class(result, "mnirs")
+    expect_equal(
+        attr(result, "nirs_channels"),
+        attr(moxy_data, "nirs_channels")
+    )
+    expect_equal(attr(result, "time_channel"), attr(moxy_data, "time_channel"))
+})
+
 test_that("filter_mnirs validates method argument", {
     expect_error(
         filter_mnirs(moxy_data, method = "invalid", verbose = FALSE),

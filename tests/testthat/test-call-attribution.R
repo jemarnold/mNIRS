@@ -50,6 +50,19 @@ test_that("filter_mnirs method errors attribute to the generic", {
         "type"
     )
     expect_equal(rlang::call_name(conditionCall(err)), "filter_mnirs")
+
+    ## per-channel `method` passes, leaving the error for `width`
+    err <- expect_error(
+        filter_mnirs(
+            data,
+            method = list(nirs1 = "moving_average", nirs2 = "smooth_spline"),
+            width = list(nirs1 = -1),
+            spar = list(nirs2 = 0.5),
+            verbose = FALSE
+        ),
+        "width"
+    )
+    expect_equal(rlang::call_name(conditionCall(err)), "filter_mnirs")
 })
 
 test_that("filter_moving_average called directly attributes to itself", {
