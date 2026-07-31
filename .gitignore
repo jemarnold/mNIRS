@@ -16,12 +16,9 @@ docs
 *mnirs-hex-v*.svg
 **/*.quarto_ipynb
 /.claude/
-^CLAUDE\.md$
 .vscode/
 tests/testthat/Rplots.pdf
 ~$*
 /tests/profiles
 /README_files
 README.html
-AGENTS.md
-SUSPECTED_BUGS.md

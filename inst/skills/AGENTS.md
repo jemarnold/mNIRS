@@ -1,513 +1,226 @@
-# `{mnirs}` Agent Reference
+# mnirs agent map
 
-**v0.7.0 | R | MIT** — workflow/dependency map for muscle near-infrared
-spectroscopy (mNIRS) processing & analysis package. 
-Website: https://jemarnold.github.io/mnirs/.
-See `README.md` + vignettes for examples.
+Reference for orchestrator/subagents. Package: muscle NIRS file
+import, time-series processing, interval extraction, kinetics analysis, plotting.
+Target release: 0.7.0. Current authority: source + tests > generated
+`man/`/`NAMESPACE` > README/vignettes.
 
-Read `.xls(x)`/`.csv`/`.txt`/`.tsv` exports → resample → clean → filter → (transform)
-→ extract intervals → analyse kinetics → plot.
+## Non-negotiable workflow
 
----
+- Read target `R/<stem>.R`, related `*_helpers.R`, matching
+  `tests/testthat/test-<stem>.R`, then roxygen source. Trace callers before edit.
+- Surgical diff. Preserve API, classes, attributes, conditions, call attribution,
+  grouping, tidy evaluation, and optional-dependency behaviour unless task changes it.
+- Root cause first. For bug fix: minimal failing test -> fix -> focused test -> wider
+  checks. Always obtain maintainer approval before editing tests; bug/feature request
+  alone does not authorise test changes.
+- Never edit `NAMESPACE`, `man/*.Rd`, or `README.md` directly. Sources:
+  roxygen in `R/*.R`; `README.Rmd`; `_pkgdown.yml`; Quarto `.qmd`.
+- User-facing conditions use `cli_abort()`, `cli_warn()`, `cli_inform()`; pass correct
+  `call`/`env`. Validation belongs in `R/validate_mnirs.R` or shared domain helper.
+- Style: base pipe `|>`; `\() ...` only single-line lambdas; explicit `return()`;
+  4-space indent; 80 columns (`air.toml`); lower-case `##` comments explain why.
+- Prefer vectorised/base/tidyverse code. No `for` loops or nested `if` growth.
+- Do not run devtools commands.
+- Do not inspect git history. Current tree only. Preserve unrelated dirty changes.
+- User-facing change: roxygen/docs + test + concise `NEWS.md` bullet when warranted.
+  New public topic also needs `_pkgdown.yml` reference coverage.
 
-## 1. `"mnirs"` — data frame/{tibble} subclass
+## Agent coordination
 
-Access metadata with `attributes(data)` or individually, eg: `attr(data, "nirs_channels")`.
+- Orchestrator owns scope, plan, integration, final diff, and unresolved decisions.
+- Delegate bounded inventories/static searches to subagents. Give exact files/question.
+- One writer per file. Subagents return evidence as `path` + symbol/test name, no prose
+  dump. Orchestrator verifies important claims in source before recording or editing.
+- Parallelise independent inspection; serialise overlapping edits. Never let subagents
+  alter tests without explicit maintainer authority.
 
-| Attribute | Type | Description |
-|---|---|---|
-| `nirs_device` | character(1) | device name (auto-detected) |
-| `nirs_channels` | character vector | NIRS signal column names |
-| `time_channel` | character(1) | time column name |
-| `event_channel` | character(1) | event/lap column name |
-| `sample_rate` | numeric(1) | Hz |
-| `start_timestamp` | POSIXct | absolute start datetime |
-| `interval_times` | list | `list(start, end)`; set by `extract_intervals()` |
-| `interval_span` | numeric(2) | span used in `extract_intervals()` |
+## Core model and invariants
 
-`verbose` read from `getOption("mnirs.verbose", TRUE)` or passed explicitly.
+`"mnirs"` = tibble/data-frame subclass made only via `create_mnirs_data()`.
+Canonical attributes (`mnirs_metadata`):
 
----
-
-## 2. Pipeline
-
-```
-read_mnirs()
-└─ plot()                              # visualise "mnirs" data at each step
-   └─ resample_mnirs()                 # regularise time grid
-      └─ replace_mnirs()               # clean invalid/outliers/NA
-         └─ filter_mnirs()             # smooth
-            ├─ shift_mnirs()           # optional: shift baseline
-            ├─ rescale_mnirs()         # optional: normalise range
-            ├─ correct_blood_volume()  # optional: blood-volume normalise
-            └─ extract_intervals()     # returns named list of "mnirs" dfs
-               └─ analyse_kinetics()   # compute response rate & time course
-                  └─ plot()            # plot "mnirs_kinetics": fit + markers
-```
-
-**Order:** diagram nesting = required sequence; failure modes + fixes in §5.
-`extract_intervals` → `analyse_kinetics` (or other list-wise fns) for
-multiple intervals.
-
-### Data input formats
-
-`resample_mnirs()`, `replace_mnirs()`, `filter_mnirs()`, `shift_mnirs()`,
-`rescale_mnirs()`, `extract_intervals()`, and `analyse_kinetics()` accept
-`data` as:
-
-- **single `"mnirs"` df** → processed, returned directly.
-- **list of `"mnirs"` dfs** (e.g. from `extract_intervals()`) →
-  each processed separately; returns a list.
-- **grouped df** (`dplyr::group_by()`, needs `{dplyr}`) → split per
-  group; returns a list of dfs.
-
-`extract_intervals()` on list input flattens results (§3.7).
-`plot.mnirs()` takes a list of dfs → faceted panels.
-
-### Per-channel arguments and grouping
-
-The same functions accept per-channel args as a named `list()`
-keyed by channel name:
-
-- `span = list(smo2 = 10)` — only `smo2` = 10; others fall back to default (`NULL`).
-- `span = list(hhb = 10, 5)` — one unnamed element is the fallback
-  (`hhb` = 10, others = 5).
-- Unrecognised names warned and ignored.
-
-`shift_mnirs()`/`rescale_mnirs()` group channels via `group_channels`;
-`extract_intervals()` groups intervals via `group_intervals` and per-group
-channels via `group_channels` (§3.5, §3.7).
-
----
-
-## 3. Function Reference
-
-Unless noted, `nirs_channels`, `time_channel`, `event_channel` default to `NULL` → retrieved from metadata. 
-Functions in §2's list accept list/grouped-df input and per-channel `list()` args.
-
-### 3.1 Read
-
-```r
-read_mnirs(
-    file_path,
-    nirs_channels = NULL,   # char vec; (required) rename: c(new = "old")
-    time_channel  = NULL,   # char(1); (required) rename: c(time = "Timestamp")
-    event_channel = NULL,   # char(1); optional; rename
-    sample_rate   = NULL,   # numeric(1) Hz; estimated if NULL
-    add_timestamp = FALSE,  # add POSIXct "timestamp" column
-    zero_time     = FALSE,  # rebase time[1] to 0
-    keep_all      = FALSE,  # keep all columns, else only specified channels
-    verbose       = TRUE
-)
-```
-
-- Auto-detects device, header row, channel names, time column when `NULL`.
-- Date-time `time_channel` → numeric, rebased to 0.
-- Warns on irregular sampling (non-monotonic, repeated, unequal).
-
-```r
-example_mnirs(file = NULL)
-## files: "moxy_ramp", "moxy_intervals", "train.red", "artinis",
-##        "portamon", others in inst/extdata
-
-create_mnirs_data(data, ...)  # low-level constructor; wraps df as "mnirs"
-## ... = named metadata (nirs_channels, time_channel, sample_rate, ...)
-```
-
----
-
-### 3.2 Resample
-
-```r
-resample_mnirs(
-    data, time_channel  = NULL,
-    sample_rate   = NULL,         # source Hz; estimated if NULL
-    resample_rate = sample_rate,  # target Hz; default = regularise to source
-    method = c("none", "linear", "locf"),
-    verbose = TRUE
-)
-```
-
-- `"none"`: nearest-match to original; new samples → `NA`
-- `"linear"`/`"locf"`: interpolate numeric via `stats::approx()`
-- Non-numeric cols always either `"locf"` (up-sample) or first-in-bin (down-sample)
-- `resample_rate = sample_rate`: regularise only, no rate change
-
----
-
-### 3.3 Clean
-
-```r
-replace_mnirs(
-    data, nirs_channels  = NULL, time_channel   = NULL,
-    invalid_values = NULL,   # numeric vec; exact values to replace
-    invalid_above  = NULL,   # numeric(1); replace x >= threshold
-    invalid_below  = NULL,   # numeric(1); replace x <= threshold
-    outlier_cutoff = NULL,   # numeric(1); Hampel MAD multiplier; NULL = skip
-    width          = NULL,   # integer; rolling window in samples
-    span           = NULL,   # numeric; rolling window in time units
-    method = c("linear", "median", "locf", "none"),
-    verbose = TRUE
-)
-```
-
-Processing order: invalid → outliers → missing (NA).
-`outlier_cutoff`: `3` = Pearson 3-sigma; `2` ≈ Tukey 1.5·IQR; `0` = median filter.
-
-Vector-level:
-```r
-replace_invalid(x, t, invalid_values, invalid_above, invalid_below,
-                width, span, method = c("median", "none"), ...)
-replace_outliers(x, t, outlier_cutoff = 3, width, span,
-                 method = c("median", "none"), ...)
-replace_missing(x, t, width, span,
-                method = c("linear", "median", "locf"), ...)
-```
-
-`replace_invalid()`/`replace_outliers()` default `"median"`;
-`replace_mnirs()`/`replace_missing()` default `"linear"`.
-
----
-
-### 3.4 Filter
-
-```r
-filter_mnirs(
-    data, nirs_channels = NULL, time_channel = NULL,
-    method = c("smooth_spline", "butterworth", "moving_average"),
-    na.rm = FALSE, verbose = TRUE, ...,
-    ## method-specific args:
-    spar, order, W, fc, sample_rate, type, edges, width, span, partial
-)
-```
-
-**Aliases:** `"smooth_spline"` = `"spline"`, `"smooth spline"`,
-`"smooth-spline"`; `"butterworth"` = `"butter"`; `"moving_average"` =
-`"ma"`, `"moving average"`, `"moving-average"`.
-
-**Method args:**
-- **`"smooth_spline"`** (`stats::smooth.spline()`): `spar` (NULL = GCV auto); errors on NA/duplicated time.
-- **`"butterworth"`** (needs `{signal}`): `order` (default `2L`), `W`/`fc` (normalised or Hz), `sample_rate`, `type` (`"low"`/`"high"`/`"stop"`/`"pass"`), `edges` (`"rev"`/`"rep1"`/`"none"`); errors on NA.
-- **`"moving_average"`**: `width` (samples) or `span` (time units); `partial` (default `FALSE`).
-
-Vector-level:
-```r
-filter_moving_average(x, t, width, span, partial = FALSE, na.rm = FALSE, ...)
-filter_ma(...)     # alias for filter_moving_average()
-filter_butterworth(x, order = 2L, W, type = "low", edges = "rev", na.rm = FALSE)
-```
-
----
-
-### 3.5 Transform
-
-```r
-shift_mnirs(
-    data, nirs_channels = NULL, time_channel = NULL,
-    group_channels = c("ensemble", "distinct"),
-    to = NULL,    # numeric(1); target level (overrides `by`)
-    by = NULL,    # numeric(1); shift amount
-    width = NULL, # integer; window in samples
-    span = NULL,  # numeric; window in time units
-    position = c("min", "max", "first"),
-    verbose = TRUE
-)
-
-rescale_mnirs(
-    data, nirs_channels = NULL,
-    group_channels = c("ensemble", "distinct"),
-    range,        # numeric(2): c(min, max)
-    verbose = TRUE
-)
-```
-
-`shift_mnirs()` moves values up/down, preserves absolute amplitude; 
-`rescale_mnirs()` expands/contracts range. 
-
-**`group_channels`:**
-
-| Syntax | Behaviour |
+| attribute | contract |
 |---|---|
-| `"ensemble"` (default) | all channels share one reference (relative scaling preserved) |
-| `"distinct"` | each channel independent |
-| `list(c("A", "B"), c("C"))` | A+B share reference; C independent |
+| `nirs_device` | detected device; scalar character/`NULL` |
+| `nirs_channels` | numeric signal column names |
+| `time_channel` | numeric time; finite, sorted, strictly increasing after import repair |
+| `event_channel` | optional character labels or integer-like laps |
+| `sample_rate` | positive scalar Hz |
+| `start_timestamp` | optional POSIXct origin |
+| `interval_times` | extracted start/end metadata |
+| `interval_span` | extraction span metadata |
 
-Groups can be named (`list(smo2 = c("A", "B"))`); names key per-group args.
+Preserve column classes/order, row order, `mnirs` first in class, tibble/grouped class,
+and metadata. Explicit channel args override metadata. Re-specified `nirs_channels`
+replace, not append, metadata. `verbose` omitted ->
+`getOption("mnirs.verbose", TRUE)` where supported.
 
----
+Package-wide processing invariant: `time_channel` finite, sorted, strictly increasing.
+Import may expose invalid vendor time so `resample_mnirs()` can repair it; reject missing,
+repeated, or decreasing time before downstream algorithms that depend on ordering.
 
-### 3.6 Correct Blood Volume
+Accepted input varies by function. Processing/analysis entry points generally accept:
 
-```r
-correct_blood_volume(
-    data,
-    oxy_channel   = NULL,   # O2Hb/oxy[haem] column name
-    deoxy_channel = NULL,   # HHb/deoxy[haem] column name
-    total_channel = NULL,   # THb/total[haem] column name (blood-volume proxy)
-    verbose = TRUE
-)
+- one data frame -> one `mnirs` tibble;
+- named list of data frames -> named list; extraction/plot may add class `"mnirs"`;
+- `grouped_df` -> split groups through `as_data_list()`; requires suggested `dplyr`.
+
+Do not assume every vector-level helper accepts list/grouped input.
+
+## Happy path
+
+```text
+read_mnirs
+  -> resample_mnirs
+  -> replace_mnirs
+  -> filter_mnirs
+  -> [shift_mnirs | rescale_mnirs | correct_blood_volume]
+  -> extract_intervals
+  -> analyse_kinetics
+  -> plot/print
 ```
 
-Normalises for blood-volume changes (Beever & Tripp et al, 2020) and 
-accommodates negative values (using `shift_mnirs` internals).
-Requires ≥2 of 3 channels; third derived (`total = oxy + deoxy`, etc.).
-Only specified channels corrected; Names case-sensitive, must match exactly.
-`total[haem]` → 0 definitionally after.
+Bracketed transforms optional; order depends scientific question. Do not state whole
+pipeline compulsory. Typical constraints: regularise duplicates/irregular time before
+ensemble/filtering; replace missing values before spline/Butterworth; preserve raw data.
 
----
+## Cross-cutting machinery
 
-### 3.7 Extract Intervals
+- `R/validate_mnirs.R`: numeric/data/channel/time/event/sample-rate/window validation,
+  `validate_fix()`, time helpers, caller-aware errors.
+- `R/channel_args.R`: `parse_channel_name()` + `resolve_channel_args()` broadcast scalar
+  or named-list args per signal/group; `validate_group_channels()` resolves
+  `"ensemble"`, `"distinct"`, custom groups, omitted channels.
+- `R/as_data_list.R`: normalises single/list/grouped inputs;
+  `map_mnirs_intervals()` re-evaluates original call per frame.
+- `R/aanalyse_kinetics_helpers.R`: intentionally current filename; method aliases,
+  fit-window detection, interval/channel workers, diagnostics/result assembly. Do not
+  rename until load-order intent checked.
+- Tidy evaluation: channel args accept strings, symbols, external vectors, selected
+  expressions. Capture with `enquo()`/`enquos()`; resolve against data via
+  `parse_channel_name()`. Test all input forms when touching this layer.
+- Per-channel/group args: scalar applies globally; named list overrides matching
+  channel/group; one unnamed element is fallback; missing fallback can mean skip.
 
-```r
-extract_intervals(
-    data,                   # "mnirs" df OR list of "mnirs" dfs
-    nirs_channels = NULL, time_channel = NULL, event_channel = NULL,
-    sample_rate = NULL,
-    group_intervals = c("distinct", "ensemble"),
-    group_channels = NULL,  # per-group channel selection (see below)
-    start = NULL,  # by_time(numeric)/by_label(char)/by_lap(int)/by_sample(int)
-    end   = NULL,  # same; NULL = window (span) around start
-    span  = list(c(-60, 60)),  # boundaries c(before, after) per interval
-    zero_time = FALSE,         # rebase time to 0 per interval
-    verbose = TRUE,
-    event_groups = deprecated()  # renamed → group_intervals (0.7.0)
-)
-## returns named list of "mnirs" dfs
-```
+## Source index
 
-**List input:** when `data` is a list of "mnirs" dfs, results are flattened 
-into a single-layer list. Interval names become `interval_<df>.<interval>`; 
-other names (`"ensemble"`, custom group names) suffixed `<name>_<df>`.
-
-**`group_channels`** — selects which `nirs_channels` are ensemble-averaged
-per interval group; only relevant when `group_intervals` ensemble-averages.
-
-**Boundary helpers:**
-
-```r
-by_time(...)   # numeric time values
-by_label(..., ignore_case = FALSE, fixed = FALSE)  # event labels; regex by default
-by_lap(...)    # integer lap numbers (start = first sample, end = last)
-by_sample(...) # integer row indices
-```
-
-- Raw coercion: numeric → `by_time()`; character → `by_label()`; explicit integer (`2L`) → `by_lap()`
-- `start`/`end` may mix types; shorter recycled. `by_label()`/`by_lap()` need `event_channel`
-- `span = c(before, after)`: negative shifts start earlier, positive shifts end later; single value recycled by sign (`60` → `c(0, 60)`, `-60` → `c(-60, 0)`)
-- `span`/`group_channels` as `list()` recycled per interval group
-
-**`group_intervals`:**
-
-| Syntax | Behaviour |
+| concern | source; main symbols |
 |---|---|
-| `"distinct"` (default) | one df per detected interval |
-| `"ensemble"` | single ensemble-averaged df (needs regularised time grid) |
-| `list(c(1, 2), c(3, 4))` | one ensemble df per group; named lists pass names through |
+| import/constructor | `R/read_mnirs.R`; `read_mnirs()`, `create_mnirs_data()`, `example_mnirs()` |
+| device/file parsing | `R/read_mnirs_helpers.R`; detection, `read_file()`, table/time parsing |
+| regularisation | `R/resample_mnirs.R`; `resample_mnirs()` |
+| clean | `R/replace_mnirs.R`, `R/replace_helpers.R`; invalid/outlier/missing replacement, rolling windows |
+| filter | `R/filter_mnirs.R`; S3 generic + spline/Butterworth/moving-average methods |
+| transforms | `R/shift_mnirs.R`, `R/rescale_mnirs.R`, `R/correct_blood_volume.R` |
+| intervals | `R/extract_intervals.R`, `R/extract_interval_helpers.R`; `by_*()`, boundary/group/ensemble logic |
+| analysis dispatch | `R/analyse_kinetics.R`; generic, method S3 wrappers, US alias |
+| analysis engine | `R/aanalyse_kinetics_helpers.R`; window, broadcast, diagnostics, result builder |
+| response/slope | `R/analyse_response_time.R`, `R/analyse_peak_slope.R` |
+| exponential | `R/analyse_monoexponential.R`, `R/analyse_biexponential.R` |
+| sigmoid | `R/analyse_sigmoidal.R`; logistic/Gompertz families |
+| plot/print | `R/plot.mnirs.R`, `R/mnirs_methods.R`; optional ggplot2/scales |
+| package/data docs | `R/mnirs-package.R`, `R/data.R` |
 
----
+Tests mirror source stems. Large integration suites:
+`test-read_mnirs.R`, `test-extract_intervals.R`, `test-analyse_kinetics.R`.
+Small cross-cutting suites: `test-channel_args.R`, `test-call-attribution.R`,
+`test-validate_mnirs.R`. Fixtures: `tests/testthat/testdata/`; shipped examples:
+`inst/extdata/`.
 
-### 3.8 Analyse Kinetics
+## Import path
 
-```r
-analyse_kinetics(
-    data,           # "mnirs" df | named list of "mnirs" dfs | grouped df
-    nirs_channels = NULL, time_channel = NULL,
-    method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
-    start_time = NULL,  # fit onset (t = 0); NULL = interval_times metadata, else t[1] else 0
-    direction  = c("auto", "positive", "negative"),
-    end_window = Inf,   # truncate fit after extreme; Inf = global extreme
-    verbose = TRUE, ...,
-    ## method-specific args:
-    fraction, width, span, align, partial, na.rm, use_TD, shape
-)
-## analyze_kinetics(...)  # US-spelling alias
-```
+`read_mnirs()` -> `read_file()` -> detect delimiter/header/device/channels -> parse
+time/sample rate/start timestamp -> select/rename columns -> `create_mnirs_data()`.
+Supported via current reader path: CSV/TXT/TSV and XLS/XLSX. Auto-detection is heuristic;
+explicit named mappings `c(new = "source")` are authority. When debugging vendor files,
+record extension, header rows, exact column names/types, locale decimal, timestamp form,
+duplicates, missingness, and expected device/channel mapping. Never commit private data;
+reduce to smallest synthetic or approved fixture.
 
-`direction` also constrains fitted-amplitude sign for
-`"monoexponential"`/`"sigmoidal"`.
+## Processing semantics
 
-**Method aliases:**
+- `resample_mnirs()`: target regular grid. `method="none"` nearest-match only;
+  interpolation applies when regularising/up-sampling; numeric down-sampling contract is
+  time-weighted averaging. Integer/non-numeric columns use bin/LOCF logic. Updates
+  time/sample-rate metadata. Current numeric down-sampling deviation: MNIRS-004.
+- `replace_mnirs()`: invalid -> local MAD outliers -> missing. `width` = samples;
+  `span` = time units. Vector helpers expose stages.
+- `filter_mnirs()`: S3 dispatch. Spline uses stats; Butterworth requires suggested
+  `signal`; moving average uses rolling helpers. NA/duplicate constraints differ.
+- `shift_mnirs()` preserves amplitude; `rescale_mnirs()` changes range. Both share
+  custom channel grouping and per-group args. Treat group-key order/names as invariant.
+- `correct_blood_volume()` accepts one data frame only; list/grouped input unsupported by
+  design. Requires at least two of oxy/deoxy/total; derives third and applies correction
+  only to selected channels.
 
-| Canonical | Aliases |
-|---|---|
-| `"response_time"` | `"half response time"`, `"recovery time"`, `"half recovery time"`, `"half time"`, `"HRT"` |
-| `"peak_slope"` | `"slope"` |
-| `"monoexponential"` | `"monoexp"`, `"exp"`, `"exponential"`, `"MRT"`, `"tau"` |
-| `"sigmoidal"` | `"sigmoid"`, `"logistic"`, `"gompertz"`, `"xmid"` |
+## Interval and kinetics semantics
 
-**Per-method args (`...`):**
-- **`"response_time"`**: `fraction` (default `0.5`; `0.632` ≈ MRT).
-- **`"peak_slope"`**: `width` or `span` (one required); `align` (`"centre"`/`"left"`/`"right"`); `partial`, `na.rm` (default `FALSE`).
-- **`"monoexponential"`**: `use_TD` (default `TRUE`; 4-param → 3-param fallback).
-- **`"sigmoidal"`**: `shape` (`"symmetric"` default = `SSlogistic()`; `"gompertz"` early-inflection; `"gompertz_left"` late-inflection).
+- Boundaries: `by_time()`, `by_label()` (regex unless `fixed=TRUE`), `by_lap()`,
+  `by_sample()`. `start`/`end` recycle; `span` adjusts boundaries.
+- `group_intervals="distinct"` returns each interval; `"ensemble"` averages; custom
+  integer index lists group selected intervals and retain omitted ones separately.
+- Kinetics generic assigns method class then S3-dispatches: `response_time`,
+  `peak_slope`, `monoexponential`, `biexponential`, `sigmoidal`.
+- Parametric methods use self-starting `nls`; `fix` holds global parameters. Failed
+  convergence returns method-shaped NA coefficients plus warning when verbose.
+- `start_time` defines onset/reference; `direction` selects fit window; `end_window`
+  truncates after extreme. Keep elapsed vs absolute time frames explicit.
+- Biexponential `direction` affects fit window only through `find_kinetics_idx()`; it does
+  not constrain component/amplitude signs.
+- `mnirs_kinetics` contains `method`, per-interval/channel `model`, `coefficients`,
+  augmented `data` (`<channel>_fitted`), `interval_times`, `diagnostics`,
+  `channel_args`, and normalised `call`.
 
-Per-channel overrides via inline named `list()` (names must match
-`nirs_channels`):
-```r
-analyse_kinetics(data, nirs_channels = c(hhb, smo2), method = "peak_slope",
-    span = list(smo2 = 10), direction = list(hhb = "negative"))
-```
+## Debug checklist
 
-#### `"mnirs_kinetics"` return — formatted table & list internal components
+1. Reproduce with minimal frame retaining class/attributes; print `str(attributes(x))`.
+2. Identify layer: parse -> validation -> broadcast/group -> numeric kernel -> metadata
+   reconstruction -> plot/print.
+3. Compare direct vector helper, single `mnirs`, named list, grouped input as relevant.
+4. Probe NA/NaN/Inf, duplicate/unsorted time, empty/constant signal, one row/channel,
+   irregular sampling, boundaries, duplicate group keys, optional package absent.
+5. For fits: inspect resolved `channel_args`, valid window indices, start values/fixed
+   params, model object, fitted vector alignment, diagnostics parameter count.
+6. Assert values + type/class/names/order/attributes + condition class/message/call.
+7. Ask maintainer to run focused R-console test and report output; then wider suite/check.
 
-| Element | Type | Description |
-|---|---|---|
-| `method` | character | method used |
-| `model` | named list | per-interval per-channel model objects (`lm`/`nls`/`NULL`) |
-| `coefficients` | tibble | one row per channel per interval |
-| `data` | named list | input dfs with `<channel>_fitted` cols |
-| `interval_times` | data frame | `interval`, `start_times` (+ `end_times` when present) |
-| `diagnostics` | data frame | fit diagnostics |
-| `channel_args` | data frame | resolved args per channel per interval |
-| `call` | call | matched function call |
-
-**Coefficients** (prefixed `interval`, `nirs_channels`, `time_channel`):
-
-| Method | Columns |
-|---|---|
-| `"response_time"` | `A` baseline mean, `B` extreme, `response_time` (elapsed from `start_time`), `response_value` (observed at response), `fitted` (target `A + (B-A)*fraction`), `idx` (response row) |
-| `"peak_slope"` | `slope` (units `x/t`), `intercept`, `fitted` (predicted value at peak), `peak_slope_time` (elapsed from `start_time`), `idx` (window-centre row) |
-| `"monoexponential"` | `A` baseline, `B` asymptote, `tau` time constant, `k` rate constant (`1/tau`), `TD` time delay, `MRT` mean response time (`TD+tau`), `HRT` half-response time (`TD+tau·ln2`), `MRT_fitted`/`HRT_fitted` (predicted value at each) |
-| `"sigmoidal"` | `A` start asymptote, `B` end asymptote, `xmid` inflection time, `slope` (`dx/dt` at `xmid`), `xmid_fitted` (predicted value at `xmid`) |
-
-**Diagnostics:** `n_obs`, `r2`, `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, `bic`.
-
-**Vector-level:**
-```r
-response_time(x, t = seq_along(x), start_time = 0, fraction = 0.5,
-    direction = c("auto", "positive", "negative"), verbose = TRUE)
-## → A, B, response_time, response_value, fitted,
-##   baseline_idx, response_idx, extreme_idx
-
-peak_slope(x, t = seq_along(x), width = NULL, span = NULL,
-    align = c("centre", "left", "right"),
-    direction = c("auto", "positive", "negative"),
-    partial = FALSE, na.rm = FALSE, verbose = TRUE)
-## → slope, intercept, y, t, idx, fitted, window_idx, model
-
-monoexponential(t, A, B, tau, TD = NULL)
-## 3-param: A + (B - A) * (1 - exp(-t / tau))
-## 4-param: ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))
-nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = df)   # 3- or 4-param
-
-logistic(t, A, B, xmid, slope, asym = NULL)  # 4-param symmetric / 5-param Richards
-gompertz(t, A, B, xmid, slope)               # early-inflection
-gompertz_left(t, A, B, xmid, slope)          # late-inflection
-nls(x ~ SSlogistic(t, A, B, xmid, slope), data = df)      # 4- or 5-param (fragile)
-nls(x ~ SSgompertz(t, A, B, xmid, slope), data = df)
-nls(x ~ SSgompertz_left(t, A, B, xmid, slope), data = df)
-```
-
----
-
-### 3.9 Plot and Print
+Suggested maintainer commands in interactive R (agent does not execute):
 
 ```r
-plot.mnirs(x, points = FALSE, time_labels = FALSE, na.omit = FALSE, ...)
-## needs {ggplot2}; via plot(data); returns ggplot2 object
-## x = "mnirs" df or list of dfs (list → faceted panels)
-## na.omit = TRUE drops NA/non-finite; ... = facet_wrap args, n.breaks, breaks
-
-plot.mnirs_kinetics(x, fitted = TRUE, markers = TRUE, labels = TRUE, ...)
-## needs {ggplot2}; via plot(result); returns ggplot2 object
-## observed signal per channel, faceted by interval (builds on plot.mnirs)
-## fitted  = dashed fitted curve (parametric methods; not "response_time")
-## markers = dotted onset line + key coefficient point(s)
-## labels  = per-panel annotation of key coefficient(s)
-## ...     = label_size, others passed to plot.mnirs (points, time_labels, nrow, ncol, scales)
-
-print(result)  # "mnirs_kinetics"; formatted coefficient table (max 10 rows)
-print(data)    # "mnirs"; strips class, prints tibble
-
-theme_mnirs(base_size = 14, base_family = "sans",
-            border = c("partial", "full"),
-            ink = "black", paper = "white", accent = "#0080ff", ...)
-
-palette_mnirs()              # all 12 named colours
-palette_mnirs(4)             # first 4
-palette_mnirs("red", "blue") # by name
-
-scale_colour_mnirs(...)      # alias: scale_color_mnirs()
-scale_fill_mnirs(...)
-breaks_timespan(unit = "secs", n = 5)
-format_hmmss(x)              # numeric seconds → "mm:ss" or "h:mm:ss"
+testthat::test_file("tests/testthat/test-<stem>.R")
+testthat::test_local()
+devtools::document()
+devtools::check()
+pkgdown::check_pkgdown()
 ```
 
----
+CI authority: `.github/workflows/R-CMD-check.yaml` (macOS/Windows/Ubuntu; devel,
+release, oldrel), `test-coverage.yaml`, `pkgdown.yaml`. Local static verification:
+`git diff --check`, `git diff --stat`, targeted `rg`, generated-file consistency review.
 
-## 4. Dependencies
+## Dependencies and generated artefacts
 
-| Package | Role | Type | Condition |
-|---|---|---|---|
-| `cli` | user messages | Import | |
-| `data.table` | data manipulation | Import | |
-| `lifecycle` | deprecation | Import | |
-| `readxl` | XLS/XLSX | Import | |
-| `rlang` | NSE/tidy eval | Import | |
-| `stats` | models, interpolation | Import | |
-| `tibble` | `"mnirs"` class | Import | |
-| `tidyselect` | column selection | Import | |
-| `signal` | Butterworth | Suggests | `"butterworth"` method |
-| `ggplot2` | plotting | Suggests | `plot.mnirs()`, theme/scales |
-| `scales` | axis formatting | Suggests | `plot.mnirs()` |
-| `dplyr` | grouped df input | Suggests | grouped-df dispatch |
-| `knitr`, `quarto` | vignettes | Suggests | |
-| `zoo`, `testthat` | testing | Suggests | |
+Imports: cli, data.table, lifecycle, readxl, rlang, stats, tibble, tidyselect.
+Suggested capability boundaries: dplyr grouped input; ggplot2/scales plots; signal
+Butterworth; knitr/quarto docs; zoo tests. Guard suggested packages with
+`requireNamespace()`/existing helper and actionable condition.
 
----
+`README.md`, `NAMESPACE`, `man/*.Rd`, rendered vignette/site files are outputs.
+`AGENTS.md` and `CLAUDE.md` excluded by `.Rbuildignore`. Ignore separate shipped
+`inst/skills/AGENTS.md`; it is not development authority.
 
-## 5. Constraints
+## Maintainer decisions
 
-| Constraint | Detail |
-|---|---|
-| Irregular samples warning from `read_mnirs()` | fires in pipe before downstream `resample_mnirs()`; verify output |
-| Pipeline order | `resample → replace → filter`; wrong order = wrong results |
-| `"smooth_spline"`/`"butterworth"` fail on NA | `replace_mnirs()` first or `na.rm = TRUE` |
-| `"smooth_spline"` fails on duplicated time | `resample_mnirs()` first |
-| Ensemble needs regularised samples | `group_intervals = "ensemble"` warns if irregular |
-| Per-channel `list()` args | unrecognised list names warned and ignored |
-| `monoexponential` fallback | 4-param → 3-param; `NA` coefficients on convergence failure |
-| `direction`-bounded fit | `"monoexponential"`/`"sigmoidal"` return `NA` coefficients if direction unsatisfiable |
+- Target 0.7.0; ignore `inst/skills/AGENTS.md`.
+- Tests always require explicit edit approval.
+- Numeric down-sampling uses time-weighted averaging.
+- Time is finite, sorted, strictly increasing package-wide.
+- `correct_blood_volume()` remains single-frame only.
+- Biexponential `direction` controls fit window only via `find_kinetics_idx()`.
 
----
+## Maintainer clarification needed
 
-## 6. Key Source Files
-
-| File | Contents |
-|---|---|
-| `R/read_mnirs.R` | `read_mnirs()`, `example_mnirs()`, `create_mnirs_data()` |
-| `R/resample_mnirs.R` | `resample_mnirs()` |
-| `R/replace_mnirs.R` | `replace_mnirs()`, `replace_invalid/outliers/missing()` |
-| `R/filter_mnirs.R` | `filter_mnirs()`, `filter_moving_average()`, `filter_ma()`, `filter_butterworth()` |
-| `R/shift_mnirs.R` | `shift_mnirs()` |
-| `R/rescale_mnirs.R` | `rescale_mnirs()` |
-| `R/correct_blood_volume.R` | `correct_blood_volume()` |
-| `R/extract_intervals.R` | `extract_intervals()` |
-| `R/extract_interval_helpers.R` | `by_time/label/lap/sample()`, boundary resolution |
-| `R/analyse_kinetics.R` | `analyse_kinetics()`/`analyze_kinetics()` + S3 dispatch |
-| `R/analyse_kinetics_helpers.R` | channel/interval orchestration, `compute_diagnostics()` |
-| `R/analyse_peak_slope.R` | `peak_slope()`, `slope()`, `rolling_slope()` |
-| `R/analyse_monoexponential.R` | `monoexponential()`, `SSmonoexponential()` |
-| `R/analyse_sigmoidal.R` | `logistic()`, `gompertz()`, `gompertz_left()`, `SSlogistic/gompertz/gompertz_left()` |
-| `R/analyse_response_time.R` | `response_time()` |
-| `R/plot.mnirs.R` | `plot.mnirs()`, `plot.mnirs_kinetics()`, `kinetics_annotations()`, `as_plot_data()`, `theme_mnirs()`, `palette_mnirs()`, scale/format fns |
-| `R/mnirs_methods.R` | `print.mnirs()`, `print.mnirs_kinetics()` |
-| `R/channel_args.R` | `resolve_channel_args()` — per-channel/group arg broadcast |
-| `R/as_data_list.R` | `map_mnirs_intervals()`, `as_data_list()` — list/grouped dispatch |
-| `R/validate_mnirs.R` | input validation |
-| `R/data.R` | example file descriptions |
-
----
-
-## 7. Developer pointers
-
-| Workflow | Location |
-|---|---|
-| Input validation | `R/validate_mnirs.R` (`validate_nirs_channels/time_channel/sample_rate/width_span/x_t/numeric/group_channels()`) |
-| Per-channel arg broadcast | `resolve_channel_args()`, `R/channel_args.R` |
-| List/grouped-df dispatch | `map_mnirs_intervals()`, `as_data_list()`, `R/as_data_list.R` |
-| Kinetics orchestration + diagnostics | `R/analyse_kinetics_helpers.R` |
-| Interval boundary resolution | `R/extract_interval_helpers.R` |
-| Read/device detection | `R/read_mnirs_helpers.R` |
-| User-facing messages | `cli_abort()`/`cli_warn()`/`cli_inform()` |
-| Roxygen2 with markdown | pkgdown config in `_pkgdown.yml` |
+- For shift min/max windows, should edge windows be excluded (`partial=FALSE`)?
+- For constant signals, should `rescale_mnirs()` leave values unchanged, map to lower
+  bound, midpoint, or error?
