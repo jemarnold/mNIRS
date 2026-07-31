@@ -230,297 +230,180 @@ filter_mnirs <- function(
     if (is.list(method) && !any(nzchar(names(method) %||% ""))) {
         method <- unlist(method)
     }
-
-    ## per-channel method: resolve against channels, recurse once per
-    ## unique method with its channel subset, then merge filtered columns
-    if (is.list(method)) {
-        env <- sys.call()
-        nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, env)
-        per_channel <- resolve_channel_args(
-            nirs_channels,
-            args = list(method = method),
-            defaults = list(method = "smooth_spline"),
-            choices = list(
-                method = c("smooth_spline", "butterworth", "moving_average")
-            ),
-            verbose = verbose,
-            env = env
-        )
-        methods <- vapply(per_channel[nirs_channels], `[[`, "", "method")
-
-        ## recurse in first-appearance method order; per-channel arg lists
-        ## in `...` pass through, each method extracts only its own args
-        groups <- split(nirs_channels, factor(methods, unique(methods)))
-        call <- match.call()
-        call$data <- data
-        call$verbose <- verbose
-        eval_env <- parent.frame()
-        results <- lapply(setNames(nm = names(groups)), \(.m) {
-            call$method <- .m
-            call$nirs_channels <- groups[[.m]]
-            eval(call, envir = eval_env)
-        })
-
-        ## merge filtered columns and restore full channel metadata
-        metadata <- attributes(data)
-        data[unlist(groups, use.names = FALSE)] <- do.call(
-            cbind, unname(Map(\(.r, .ch) .r[.ch], results, groups))
-        )
-        metadata$nirs_channels <- unique(nirs_channels)
-        metadata$time_channel <- attr(results[[1L]], "time_channel")
-        sample_rate <- Filter(
-            Negate(is.null),
-            lapply(results, attr, "sample_rate")
-        )
-        if (length(sample_rate) > 0L) {
-            metadata$sample_rate <- sample_rate[[1L]]
-        }
-        return(create_mnirs_data(data, metadata))
+    if (!is.list(method)) {
+        method <- match.arg(method)
     }
 
-    method <- match.arg(method)
-
-    UseMethod(
-        "filter_mnirs",
-        structure(data, class = c(method, "mnirs_filtered"))
-    )
-}
-
-
-#' @rdname filter_mnirs
-#' @usage NULL
-#' @export
-filter_mnirs.smooth_spline <- function(
-    data,
-    nirs_channels = NULL,
-    time_channel = NULL,
-    method,
-    na.rm = FALSE,
-    verbose = TRUE,
-    ...
-) {
-    ## validation ==========================================
-    ## report conditions as coming from the user-facing generic
-    env <- sys.call(-1)
+    env <- sys.call()
     metadata <- attributes(data)
     nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, env)
     time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
 
-    ## broadcast global args, applying any per-channel list() overrides
-    per_channel <- resolve_channel_args(
-        nirs_channels,
-        args = list(spar = list(...)$spar),
-        verbose = verbose,
-        env = env
-    )
-
-    ## processing ==========================================
-    t_vec <- data[[time_channel]]
-
-    if (anyDuplicated(t_vec)) {
-        cli_abort(c(
-            "x" = "{.arg time_channel} has duplicated or irregular samples.",
-            "i" = "Re-sample first with {.fn mnirs::resample_mnirs}."
-        ), call = env)
-    }
-
-    data[nirs_channels] <- lapply(nirs_channels, \(.x) {
-        spar <- per_channel[[.x]]$spar
-        validate_numeric(
-            spar, 1, c(0, Inf), FALSE, msg1 = "one-element positive", env = env
-        )
-        x <- data[[.x]]
-        t <- t_vec
-        ## handle NAs
-        handle_na <- na.rm && anyNA(x)
-        if (handle_na) {
-            na_info <- preserve_na(x)
-            x <- na_info$x_valid
-            t <- t[!na_info$na_idx]
-        } else if (anyNA(x)) {
-            cli_abort(c(
-                "x" = "{.arg nirs_channels} = {.field {.x}} contains internal \\
-                {.val {NA}}'s.",
-                "i" = "Set {.arg na.rm = TRUE} to ignore {.val {NA}}'s."
-            ), call = env)
-        }
-
-        spline_model <- stats::smooth.spline(x = t, y = x, spar = spar)
-
-        if (is.null(spar) && verbose) {
-            cli_inform(c(
-                "i" = "{.arg nirs_channels} = {.field {.x}}: \\
-                `smooth.spline(spar = {.val {round(spline_model$spar, 3)}})`"
-            ), call = env)
-        }
-
-        if (handle_na) {
-            restore_na(spline_model$y, na_info)
-        } else {
-            spline_model$y
-        }
-    })
-
-    ## Metadata =================================
-    metadata$nirs_channels <- unique(nirs_channels)
-
-    return(create_mnirs_data(data, metadata))
-}
-
-
-#' @rdname filter_mnirs
-#' @usage NULL
-#' @export
-filter_mnirs.butterworth <- function(
-    data,
-    nirs_channels = NULL,
-    time_channel = NULL,
-    method,
-    na.rm = FALSE,
-    verbose = TRUE,
-    ...
-) {
-    ## validation ==========================================
-    ## report conditions as coming from the user-facing generic
-    env <- sys.call(-1)
-    metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, env)
-    time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
-    args <- list(...)
-    sample_rate <- args$sample_rate
-    sample_rate <- validate_sample_rate(
-        data, time_channel, sample_rate, verbose, env = env
-    )
-
-    ## broadcast global args, applying any per-channel list() overrides
+    ## broadcast global args, applying any per-channel list() overrides;
+    ## args irrelevant to a channel's method are resolved but unused
     per_channel <- resolve_channel_args(
         nirs_channels,
         args = list(
-            order = args$order %||% 2L,
-            W = args$W,
-            fc = args$fc,
-            type = args$type %||% "low",
-            edges = args$edges %||% "rev"
+            method = method,
+            spar = spar,
+            order = order,
+            W = W,
+            fc = fc,
+            type = type,
+            edges = edges,
+            width = width,
+            span = span,
+            partial = partial
         ),
-        defaults = list(order = 2L, type = "low", edges = "rev"),
+        defaults = list(
+            method = "smooth_spline", order = 2L, type = "low",
+            edges = "rev", partial = FALSE
+        ),
         choices = list(
+            method = c("smooth_spline", "butterworth", "moving_average"),
             type = c("low", "high", "stop", "pass"),
             edges = c("rev", "rep1", "none")
         ),
         verbose = verbose,
         env = env
     )
+    methods <- vapply(per_channel[nirs_channels], `[[`, "", "method")
+
+    ## method-specific one-time validation
+    t_vec <- data[[time_channel]]
+
+    if ("smooth_spline" %in% methods && anyDuplicated(t_vec)) {
+        cli_abort(c(
+            "x" = "{.arg time_channel} has duplicated or irregular samples.",
+            "i" = "Re-sample first with {.fn mnirs::resample_mnirs}."
+        ), call = env)
+    }
+
+    if ("butterworth" %in% methods) {
+        sample_rate <- validate_sample_rate(
+            data, time_channel, sample_rate, verbose, env = env
+        )
+        ## verbose validator hints emitted once for the first channel
+        first_butterworth <- nirs_channels[methods == "butterworth"][[1L]]
+    }
 
     ## processing ==========================================
     data[nirs_channels] <- Map(\(.nirs, .a) {
-        ## verbose validator hints emitted once for the first channel
-        .v <- verbose && .nirs == nirs_channels[[1L]]
+        switch(
+            .a$method,
+            smooth_spline = filter_smooth_spline(
+                x = data[[.nirs]],
+                t = t_vec,
+                spar = .a$spar,
+                channel = .nirs,
+                na.rm = na.rm,
+                verbose = verbose,
+                env = env
+            ),
+            butterworth = {
+                .v <- verbose && .nirs == first_butterworth
 
-        if (is.null(c(.a$W, .a$fc))) {
-            cli_abort(c(
-                "x" = "Cutoff frequency undefined.",
-                "i" = "One of {.arg W} or {.arg fc} must be defined for a \\
-                Butterworth filter."
-            ), call = env)
-        }
+                if (is.null(c(.a$W, .a$fc))) {
+                    cli_abort(c(
+                        "x" = "Cutoff frequency undefined.",
+                        "i" = "One of {.arg W} or {.arg fc} must be defined \\
+                        for a Butterworth filter."
+                    ), call = env)
+                }
 
-        fc_n <- if (.a$type %in% c("low", "high")) 1 else 2
-        ## order & W are validated in filter_butterworth
-        validate_numeric(
-            .a$fc, fc_n, c(0, Inf), inclusive = FALSE,
-            msg1 = paste0(fc_n, "-element positive"), env = env
-        )
+                fc_n <- if (.a$type %in% c("low", "high")) 1 else 2
+                ## order & W are validated in filter_butterworth
+                validate_numeric(
+                    .a$fc, fc_n, c(0, Inf), inclusive = FALSE,
+                    msg1 = paste0(fc_n, "-element positive"), env = env
+                )
 
-        if (!is.null(.a$W) && !is.null(.a$fc)) {
-            .a$fc <- NULL
-            if (.v) {
-                cli_inform(c(
-                    "i" = "{.val Butterworth} parameter {.arg W} = \\
-                    {.val {(.a$W)}} overrides {.arg fc}."
-                ), call = env)
-            }
-        }
+                if (!is.null(.a$W) && !is.null(.a$fc)) {
+                    .a$fc <- NULL
+                    if (.v) {
+                        cli_inform(c(
+                            "i" = "{.val Butterworth} parameter {.arg W} = \\
+                            {.val {(.a$W)}} overrides {.arg fc}."
+                        ), call = env)
+                    }
+                }
 
-        if (is.null(.a$W) && !is.null(.a$fc) && !is.null(sample_rate)) {
-            nq <- sample_rate * 0.5 ## nyquist frequency
-            .a$W <- .a$fc / nq
-            if (.a$W > 1 | .a$W <= 0) {
-                cli_abort(c(
-                    "x" = "{.arg fc} must be between {.val {0}} and half \\
-                    the {.arg sample_rate} ({.val {signif(nq, 3)}} Hz)"
-                ), call = env)
-            }
-        }
+                if (is.null(.a$W) && !is.null(.a$fc) && !is.null(sample_rate)) {
+                    nq <- sample_rate * 0.5 ## nyquist frequency
+                    .a$W <- .a$fc / nq
+                    if (.a$W > 1 | .a$W <= 0) {
+                        cli_abort(c(
+                            "x" = "{.arg fc} must be between {.val {0}} and \\
+                            half the {.arg sample_rate} \\
+                            ({.val {signif(nq, 3)}} Hz)"
+                        ), call = env)
+                    }
+                }
 
-        filter_butterworth(
-            data[[.nirs]], .a$order, .a$W, .a$type, .a$edges, na.rm, env = env
+                filter_butterworth(
+                    data[[.nirs]], .a$order, .a$W, .a$type, .a$edges, na.rm,
+                    env = env
+                )
+            },
+            moving_average = filter_moving_average(
+                x = data[[.nirs]],
+                t = t_vec,
+                width = .a$width,
+                span = .a$span,
+                partial = .a$partial,
+                na.rm = na.rm,
+                verbose = verbose,
+                bypass_checks = TRUE,
+                env = env
+            )
         )
     }, nirs_channels, per_channel[nirs_channels])
 
     ## Metadata =================================
     metadata$nirs_channels <- unique(nirs_channels)
     metadata$time_channel <- time_channel
-    metadata$sample_rate <- sample_rate
+    if ("butterworth" %in% methods) {
+        metadata$sample_rate <- sample_rate
+    }
 
     return(create_mnirs_data(data, metadata))
 }
 
 
-#' @rdname filter_mnirs
-#' @usage NULL
-#' @export
-filter_mnirs.moving_average <- function(
-    data,
-    nirs_channels = NULL,
-    time_channel = NULL,
-    method,
-    na.rm = FALSE,
-    verbose = TRUE,
-    ...
-) {
-    ## validation ==========================================
-    ## report conditions as coming from the user-facing generic
-    env <- sys.call(-1)
-    metadata <- attributes(data)
-    nirs_channels <- validate_nirs_channels(enquo(nirs_channels), data, env)
-    time_channel <- validate_time_channel(enquo(time_channel), data, env = env)
-    args <- list(...)
-
-    ## broadcast global args, applying any per-channel list() overrides
-    per_channel <- resolve_channel_args(
-        nirs_channels,
-        args = list(
-            width = args$width,
-            span = args$span,
-            partial = args$partial %||% FALSE
-        ),
-        defaults = list(partial = FALSE),
-        verbose = verbose,
-        env = env
+## apply a cubic smoothing spline to one channel, preserving NA positions;
+## conditions report as coming from the user-facing `filter_mnirs()` via `env`
+filter_smooth_spline <- function(x, t, spar, channel, na.rm, verbose, env) {
+    validate_numeric(
+        spar, 1, c(0, Inf), FALSE, msg1 = "one-element positive", env = env
     )
+    ## handle NAs
+    handle_na <- na.rm && anyNA(x)
+    if (handle_na) {
+        na_info <- preserve_na(x)
+        x <- na_info$x_valid
+        t <- t[!na_info$na_idx]
+    } else if (anyNA(x)) {
+        cli_abort(c(
+            "x" = "{.arg nirs_channels} = {.field {channel}} contains \\
+            internal {.val {NA}}'s.",
+            "i" = "Set {.arg na.rm = TRUE} to ignore {.val {NA}}'s."
+        ), call = env)
+    }
 
-    ## processing ==========================================
-    t_vec <- data[[time_channel]]
+    spline_model <- stats::smooth.spline(x = t, y = x, spar = spar)
 
-    data[nirs_channels] <- Map(\(.nirs, .a) {
-        filter_moving_average(
-            x = data[[.nirs]],
-            t = t_vec,
-            width = .a$width,
-            span = .a$span,
-            partial = .a$partial,
-            na.rm = na.rm,
-            verbose = verbose,
-            bypass_checks = TRUE,
-            env = env
-        )
-    }, nirs_channels, per_channel[nirs_channels])
+    if (is.null(spar) && verbose) {
+        cli_inform(c(
+            "i" = "{.arg nirs_channels} = {.field {channel}}: \\
+            `smooth.spline(spar = {.val {round(spline_model$spar, 3)}})`"
+        ), call = env)
+    }
 
-    ## Metadata =================================
-    metadata$nirs_channels <- unique(nirs_channels)
-    metadata$time_channel <- time_channel
-
-    return(create_mnirs_data(data, metadata))
+    if (handle_na) {
+        return(restore_na(spline_model$y, na_info))
+    } else {
+        return(spline_model$y)
+    }
 }
 
 
@@ -849,18 +732,7 @@ filter_butterworth <- function(
 }
 
 
-#' Apply a Butterworth digital filter
-#'
-#' @description
-#' `r lifecycle::badge("deprecated")`
-#'
-#' `filter_butter()` was renamed to [filter_butterworth()]
-#'
-#' @inheritParams filter_butterworth
-#'
-#' @returns A numeric vector the same length as `x`.
-#'
-#' @keywords internal
+#' @rdname filter_butterworth
 #' @export
 filter_butter <- function(
     x,
@@ -871,11 +743,8 @@ filter_butter <- function(
     na.rm = FALSE,
     ...
 ) {
-    lifecycle::deprecate_warn(
-        when = "0.7.0",
-        what = "filter_butter()",
-        with = "filter_butterworth()"
-    )
+    ## report conditions as coming from this wrapper unless overridden
+    env <- list(...)$env %||% environment()
     filter_butterworth(
         x = x,
         order = order,
@@ -883,6 +752,7 @@ filter_butter <- function(
         type = type,
         edges = edges,
         na.rm = na.rm,
+        env = env,
         ...
     )
 }
