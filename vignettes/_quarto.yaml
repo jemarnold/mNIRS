@@ -1,9 +1,0 @@
-# vignettes/_quarto.yml
-project:
-  type: default
-
-filters:
-  - fontawesome
-  - academicons
-
-csl: vancouver.csl
