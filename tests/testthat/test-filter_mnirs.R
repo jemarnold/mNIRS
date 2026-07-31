@@ -10,22 +10,6 @@ test_that("filter_moving_average() returns expected smoothed values", {
     # Width-based with single width (floor(1/2) = 0, so just x itself)
     result <- filter_moving_average(x, width = 1, verbose = FALSE)
     expect_equal(result, x)
-    
-    ## filter_ma alias for filter_moving_average
-    result <- filter_ma(
-        x,
-        width = 3,
-        verbose = FALSE,
-        partial = FALSE
-    )
-    expect_equal(result, c(NA, 2, 3, 4, NA))
-    result <- filter_ma(
-        x,
-        width = 3,
-        verbose = FALSE,
-        partial = TRUE
-    )
-    expect_equal(result, c(1.5, 2, 3, 4, 4.5))
 })
 
 test_that("filter_moving_average() handles custom time vectors", {
@@ -368,6 +352,30 @@ test_that("filter_butterworth works visually", {
         ggplot2::geom_line(ggplot2::aes(y = sin_wave, colour = "sin")) +
         ggplot2::geom_line(ggplot2::aes(y = noisy, colour = "noisy")) +
         ggplot2::geom_line(ggplot2::aes(y = filtered, colour = "filtered"))
+})
+
+
+## alias functions ===================================================
+test_that("filter_ma & filter_butter alias parents and report own names", {
+    skip_if_not_installed("signal")
+    x <- c(1, 2, 3, 4, 5)
+
+    ## aliases return identical results to their parent functions
+    expect_identical(
+        filter_ma(x, width = 3, verbose = FALSE),
+        filter_moving_average(x, width = 3, verbose = FALSE)
+    )
+    expect_identical(
+        filter_butter(x, order = 2, W = 0.1),
+        filter_butterworth(x, order = 2, W = 0.1)
+    )
+
+    ## conditions attribute to the alias name as called, not the parent
+    err <- expect_error(filter_ma(x), "Window size undefined")
+    expect_equal(rlang::call_name(conditionCall(err)), "filter_ma")
+
+    err <- expect_error(filter_butter(x, order = 0, W = 0.1), "n.*integer")
+    expect_equal(rlang::call_name(conditionCall(err)), "filter_butter")
 })
 
 

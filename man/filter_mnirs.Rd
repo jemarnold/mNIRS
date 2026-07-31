@@ -2,9 +2,6 @@
 % Please edit documentation in R/filter_mnirs.R
 \name{filter_mnirs}
 \alias{filter_mnirs}
-\alias{filter_mnirs.smooth_spline}
-\alias{filter_mnirs.butterworth}
-\alias{filter_mnirs.moving_average}
 \title{Filter a data frame}
 \usage{
 filter_mnirs(

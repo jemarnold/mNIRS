@@ -256,8 +256,11 @@ filter_mnirs <- function(
             partial = partial
         ),
         defaults = list(
-            method = "smooth_spline", order = 2L, type = "low",
-            edges = "rev", partial = FALSE
+            method = "smooth_spline",
+            order = 2L,
+            type = "low",
+            edges = "rev",
+            partial = FALSE
         ),
         choices = list(
             method = c("smooth_spline", "butterworth", "moving_average"),
@@ -283,12 +286,49 @@ filter_mnirs <- function(
         sample_rate <- validate_sample_rate(
             data, time_channel, sample_rate, verbose, env = env
         )
-        ## verbose validator hints emitted once for the first channel
+        metadata$sample_rate <- sample_rate
         first_butterworth <- nirs_channels[methods == "butterworth"][[1L]]
     }
 
     ## processing ==========================================
     data[nirs_channels] <- Map(\(.nirs, .a) {
+        ## resolve the Butterworth cutoff `W` for this channel: `W` overrides
+        ## `fc`; `fc` converts to `W` as a fraction of the Nyquist frequency.
+        ## verbose hints emitted once, for the first Butterworth channel
+        if (.a$method == "butterworth") {
+            if (is.null(c(.a$W, .a$fc))) {
+                cli_abort(c(
+                    "x" = "Cutoff frequency undefined.",
+                    "i" = "One of {.arg W} or {.arg fc} must be defined for a \\
+                    Butterworth filter."
+                ), call = env)
+            }
+
+            fc_n <- if (.a$type %in% c("low", "high")) 1 else 2
+            ## order & W are validated in filter_butterworth
+            validate_numeric(
+                .a$fc, fc_n, c(0, Inf), inclusive = FALSE,
+                msg1 = paste0(fc_n, "-element positive"), env = env
+            )
+
+            nq <- sample_rate * 0.5 ## nyquist frequency
+            W <- .a$W %||% (.a$fc / nq)
+
+            verbose_gate <- (!is.null(.a$W) && !is.null(.a$fc)) &&
+                (verbose && .nirs == first_butterworth)
+            if (verbose_gate) {
+                cli_inform(c(
+                    "i" = "{.val Butterworth} parameter {.arg W} = \\
+                    {.val {(.a$W)}} overrides {.arg fc}."
+                ), call = env)
+            } else if (is.null(.a$W) && any(W > 1 | W <= 0)) {
+                cli_abort(c(
+                    "x" = "{.arg fc} must be between {.val {0}} and half \\
+                    the {.arg sample_rate} ({.val {signif(nq, 3)}} Hz)"
+                ), call = env)
+            }
+        }
+
         switch(
             .a$method,
             smooth_spline = filter_smooth_spline(
@@ -300,51 +340,15 @@ filter_mnirs <- function(
                 verbose = verbose,
                 env = env
             ),
-            butterworth = {
-                .v <- verbose && .nirs == first_butterworth
-
-                if (is.null(c(.a$W, .a$fc))) {
-                    cli_abort(c(
-                        "x" = "Cutoff frequency undefined.",
-                        "i" = "One of {.arg W} or {.arg fc} must be defined \\
-                        for a Butterworth filter."
-                    ), call = env)
-                }
-
-                fc_n <- if (.a$type %in% c("low", "high")) 1 else 2
-                ## order & W are validated in filter_butterworth
-                validate_numeric(
-                    .a$fc, fc_n, c(0, Inf), inclusive = FALSE,
-                    msg1 = paste0(fc_n, "-element positive"), env = env
-                )
-
-                if (!is.null(.a$W) && !is.null(.a$fc)) {
-                    .a$fc <- NULL
-                    if (.v) {
-                        cli_inform(c(
-                            "i" = "{.val Butterworth} parameter {.arg W} = \\
-                            {.val {(.a$W)}} overrides {.arg fc}."
-                        ), call = env)
-                    }
-                }
-
-                if (is.null(.a$W) && !is.null(.a$fc) && !is.null(sample_rate)) {
-                    nq <- sample_rate * 0.5 ## nyquist frequency
-                    .a$W <- .a$fc / nq
-                    if (.a$W > 1 | .a$W <= 0) {
-                        cli_abort(c(
-                            "x" = "{.arg fc} must be between {.val {0}} and \\
-                            half the {.arg sample_rate} \\
-                            ({.val {signif(nq, 3)}} Hz)"
-                        ), call = env)
-                    }
-                }
-
-                filter_butterworth(
-                    data[[.nirs]], .a$order, .a$W, .a$type, .a$edges, na.rm,
-                    env = env
-                )
-            },
+            butterworth = filter_butterworth(
+                x = data[[.nirs]],
+                order = .a$order,
+                W = W,
+                type = .a$type,
+                edges = .a$edges,
+                na.rm = na.rm,
+                env = env
+            ),
             moving_average = filter_moving_average(
                 x = data[[.nirs]],
                 t = t_vec,
@@ -353,7 +357,6 @@ filter_mnirs <- function(
                 partial = .a$partial,
                 na.rm = na.rm,
                 verbose = verbose,
-                bypass_checks = TRUE,
                 env = env
             )
         )
@@ -362,9 +365,6 @@ filter_mnirs <- function(
     ## Metadata =================================
     metadata$nirs_channels <- unique(nirs_channels)
     metadata$time_channel <- time_channel
-    if ("butterworth" %in% methods) {
-        metadata$sample_rate <- sample_rate
-    }
 
     return(create_mnirs_data(data, metadata))
 }
@@ -412,7 +412,7 @@ filter_smooth_spline <- function(x, t, spar, channel, na.rm, verbose, env) {
 #' Apply a simple moving average smoothing filter to vector data.
 #' `filter_ma()` is an alias of `filter_moving_average()`.
 #'
-#' 
+#'
 #' @param partial Logical; default is `FALSE`, only returns values where a full
 #'   window of valid (non-`NA`) samples are available. If `TRUE`, ignores `NA`
 #'   and processes available valid samples (see *Details*).
@@ -483,10 +483,8 @@ filter_moving_average <- function(
     ## internal callers pass `env` through `...` to report conditions
     ## as coming from the user-facing function
     env <- list(...)$env %||% environment()
-    if (!(list(...)$bypass_checks %||% FALSE)) {
-        if (missing(verbose)) {
-            verbose <- getOption("mnirs.verbose", default = TRUE)
-        }
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
     }
     validate_x_t(x, t, env = env)
     validate_width_span(
@@ -544,30 +542,7 @@ filter_moving_average <- function(
 
 #' @rdname filter_moving_average
 #' @export
-filter_ma <- function(
-    x,
-    t = seq_along(x),
-    width = NULL,
-    span = NULL,
-    partial = FALSE,
-    na.rm = FALSE,
-    verbose = TRUE,
-    ...
-) {
-    ## report conditions as coming from this wrapper unless overridden
-    env <- list(...)$env %||% environment()
-    filter_moving_average(
-        x = x,
-        t = t,
-        width = width,
-        span = span,
-        partial = partial,
-        na.rm = na.rm,
-        verbose = verbose,
-        env = env,
-        ...
-    )
-}
+filter_ma <- filter_moving_average
 
 
 #' Apply a Butterworth digital filter
@@ -734,25 +709,4 @@ filter_butterworth <- function(
 
 #' @rdname filter_butterworth
 #' @export
-filter_butter <- function(
-    x,
-    order = 2L,
-    W,
-    type = c("low", "high", "stop", "pass"),
-    edges = c("rev", "rep1", "none"),
-    na.rm = FALSE,
-    ...
-) {
-    ## report conditions as coming from this wrapper unless overridden
-    env <- list(...)$env %||% environment()
-    filter_butterworth(
-        x = x,
-        order = order,
-        W = W,
-        type = type,
-        edges = edges,
-        na.rm = na.rm,
-        env = env,
-        ...
-    )
-}
+filter_butter <- filter_butterworth

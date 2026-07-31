@@ -2,9 +2,20 @@
 % Please edit documentation in R/filter_mnirs.R
 \name{filter_butterworth}
 \alias{filter_butterworth}
+\alias{filter_butter}
 \title{Apply a Butterworth digital filter}
 \usage{
 filter_butterworth(
+  x,
+  order = 2L,
+  W,
+  type = c("low", "high", "stop", "pass"),
+  edges = c("rev", "rep1", "none"),
+  na.rm = FALSE,
+  ...
+)
+
+filter_butter(
   x,
   order = 2L,
   W,
