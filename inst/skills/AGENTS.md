@@ -110,7 +110,7 @@ ensemble/filtering; replace missing values before spline/Butterworth; preserve r
 | import/constructor | `R/read_mnirs.R`; `read_mnirs()`, `create_mnirs_data()`, `example_mnirs()` |
 | device/file parsing | `R/read_mnirs_helpers.R`; detection, `read_file()`, table/time parsing |
 | regularisation | `R/resample_mnirs.R`; `resample_mnirs()` |
-| clean | `R/replace_mnirs.R`, `R/replace_helpers.R`; invalid/outlier/missing replacement, rolling windows |
+| clean | `R/replace_mnirs.R`, `R/rolling_helpers.R`; invalid/outlier/missing replacement, rolling windows |
 | filter | `R/filter_mnirs.R`; S3 generic + spline/Butterworth/moving-average methods |
 | transforms | `R/shift_mnirs.R`, `R/rescale_mnirs.R`, `R/correct_blood_volume.R` |
 | intervals | `R/extract_intervals.R`, `R/extract_interval_helpers.R`; `by_*()`, boundary/group/ensemble logic |
