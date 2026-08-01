@@ -198,7 +198,6 @@ test_that("compute_local_fun handles NA values", {
 test_that("compute_local_fun() handles empty windows", {
     x <- c(1, 2, 3)
     window_idx <- list(integer(0))
-    ## TODO returns NA, is this good?
     result <- compute_local_fun(x, window_idx, fn = median, na.rm = TRUE)
     expect_true(is.na(result))
 })

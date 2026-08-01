@@ -643,7 +643,6 @@ test_that("recycle_param handles ungrouped events with custom grouping", {
     expect_equal(result[[5]], c(-0.5, 0.5)) # ungrouped:  last param recycled
 })
 
-## TODO should this produce info message?
 test_that("recycle_param truncates when more grouped events than actual events", {
     ## group_intervals specifies events 1-6 but only 4 actual events
     result <- recycle_param(

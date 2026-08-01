@@ -12,6 +12,7 @@ docs
 /Meta/
 /.quarto/
 **/_extensions
+man/figures/mnirs_hexSticker.R
 *mnirs-hex*.png
 *mnirs-hex-v*.svg
 **/*.quarto_ipynb
@@ -20,5 +21,3 @@ docs
 tests/testthat/Rplots.pdf
 ~$*
 /tests/profiles
-/README_files
-README.html

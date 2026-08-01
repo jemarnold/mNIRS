@@ -191,7 +191,6 @@ execute:
 
 `correct_blood_volume()` — Correct for blood volume changes
 
-<!-- --- -->
 
 ```{=typst}
 #colbreak()
@@ -244,7 +243,7 @@ execute:
 #block(height: 1fr, 
   align(center + horizon, move(dx: 20pt,
     box(stroke: 0.5pt + rgb("#cccccc"), radius: 4pt, clip: true,
-      image("README-filter_mnirs-1.png", height: 100%, fit: "contain")
+      image("README-filter_mnirs-1.png", height: 60%, fit: "contain")
     )
   ))
 )

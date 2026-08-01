@@ -71,7 +71,7 @@ reference:
   - matches("gompertz")
 - title: Print & plot
   desc: |
-    Tools for printing functions and pretty plotting with `{ggplot2}`.
+    Tools for printing functions and pretty plotting with `{ggplot2}`
   contents:
   - starts_with("print")
   - starts_with("plot")
@@ -80,6 +80,7 @@ reference:
   - starts_with("scale")
   - breaks_timespan
   - format_hmmss
+  - print.mnirs
 - title: Files
   desc: |
     Example data files included in the package

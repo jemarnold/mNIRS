@@ -40,7 +40,10 @@ pak::pak("jemarnold/mnirs")
 
 ## Citation
 
-`<coming soon>`
+https://cran.r-universe.dev/mnirs/citation
+
+`<package manuscript coming soon>`
+
 
 
 ## Online App

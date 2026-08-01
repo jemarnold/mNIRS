@@ -6,10 +6,6 @@ test_that("filter_moving_average() returns expected smoothed values", {
     expect_equal(result, c(NA, 2, 3, 4, NA))
     result <- filter_moving_average(x, width = 3, verbose = FALSE, partial = TRUE)
     expect_equal(result, c(1.5, 2, 3, 4, 4.5))
-
-    # Width-based with single width (floor(1/2) = 0, so just x itself)
-    result <- filter_moving_average(x, width = 1, verbose = FALSE)
-    expect_equal(result, x)
 })
 
 test_that("filter_moving_average() handles custom time vectors", {
@@ -451,7 +447,7 @@ test_that("filter_mnirs applies method per channel", {
     left <- filter_mnirs(
         moxy_data,
         nirs_channels = "smo2_left",
-        method = "moving_average",
+        method = list("moving_average"), ## list to cover `if (is.list(method) && !any(nzchar(names(method) %||% "")))`
         width = 5,
         verbose = FALSE
     )

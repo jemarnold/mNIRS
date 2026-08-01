@@ -648,3 +648,76 @@ warn_call <- function(env = rlang::caller_env()) {
     }
     return(env[1])
 }
+
+
+#' wrap findInterval: informative 'time_channel' error message
+#' @keywords internal
+findInt_mnirs <- function(x, vec, ..., env = rlang::caller_env()) {
+    if (anyNA(vec) || is.unsorted(vec)) {
+        cli_abort(c(
+            "x" = "Irregular {.arg time_channel} samples detected.",
+            "i" = "{.arg time_channel} must be sorted without {.val {NA}}s."
+        ), call = env)
+    }
+    return(findInterval(x, vec, ...))
+}
+
+
+#' trim caller call to bare function name for warning headers
+#' `env` accepts an environment or a call, e.g. from `sys.call(-1)`
+#' @keywords internal
+warn_call <- function(env = rlang::caller_env()) {
+    if (is.environment(env)) {
+        env <- rlang::frame_call(env)
+    }
+    return(env[1])
+}
+
+
+#' Detect if numeric values fall within range of a vector
+#'
+#' Vectorised check for `x %in% vec`, inclusive or exclusive of left and right
+#' boundary values, specified independently.
+#'
+#' @param x A numeric vector.
+#' @param vec A numeric vector from which `left` and `right` boundary values
+#'   for `x` will be taken.
+#' @param inclusive A character vector to specify which of `left` and/or
+#'   `right` boundary values should be included in the range, or both (the
+#'   default), or excluded if `FALSE`.
+#'
+#' @details
+#' `inclusive = FALSE` can be used to test for positive non-zero values:
+#'   `within(x, c(0, Inf), inclusive = FALSE)`.
+#'
+#' @returns A logical vector the same length as `x`.
+#'
+#' @seealso [dplyr::between()]
+#'
+#' @keywords internal
+within <- function(x, vec, inclusive = c("left", "right")) {
+    if (!is.numeric(x)) {
+        abort_validation(substitute(x))
+    }
+    if (!is.numeric(vec)) {
+        abort_validation(substitute(vec))
+    }
+    inclusive <- match.arg(
+        as.character(inclusive), ## force FALSE to character
+        choices = c("left", "right", "FALSE"),
+        several.ok = TRUE
+    )
+
+    ## extract bounds from vec
+    left <- min(vec, na.rm = TRUE)
+    right <- max(vec, na.rm = TRUE)
+
+    if ("FALSE" %in% inclusive) {
+        return(x > left & x < right)
+    }
+
+    left_op <- if ("left" %in% inclusive) `>=` else `>`
+    right_op <- if ("right" %in% inclusive) `<=` else `<`
+
+    return(left_op(x, left) & right_op(x, right))
+}
