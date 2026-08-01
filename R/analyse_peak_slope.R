@@ -76,8 +76,8 @@ slope <- function(
 #'   when `partial = TRUE`.}
 #'   \item{`intercept`}{Logical; if `TRUE`, `slope()` also attaches the
 #'   y-intercept as `attr(slope_val, "intercept")`.}
-#'   \item{`window_idx`}{Logical; if `TRUE`, the list of per-observation
-#'   window indices is attached as `attr(slopes, "window_idx")`.}
+#'   \item{`window_idx`}{Logical; if `TRUE`, the window bounds from
+#'   [compute_window_bounds()] are attached as `attr(slopes, "bounds")`.}
 #' }
 #'
 #' @seealso [peak_slope()]
@@ -148,24 +148,54 @@ rolling_slope <- function(
     }
 
     ## processing =================================================
-    window_idx <- compute_local_windows(
+    bounds <- compute_window_bounds(
         t,
         width = width,
         span = span,
         align = align,
         env = env
     )
+    n_window <- bounds$end - bounds$start + 1L
 
-    if (verbose && all(lengths(window_idx) < min_obs)) {
+    if (verbose && all(n_window < min_obs)) {
         cli_warn(insufficient_warn, call = warn_call(env))
     }
 
-    slopes <- vapply(window_idx, \(.idx) {
-        slope(x[.idx], t[.idx], na.rm, min_obs = min_obs, bypass_checks = TRUE)
-    }, numeric(1))
+    ## non-finite pairs are dropped from the sums; NA/NaN in `x` (not Inf)
+    ## additionally propagate when na.rm = FALSE
+    valid <- is.finite(x) & is.finite(t)
+    if (!any(valid)) {
+        return(rep(NA_real_, n))
+    }
+
+    ## vectorised least squares: five windowed sums via cumsum kernels.
+    ## x and t centred to contain differencing error; slope is invariant
+    ## to shifting either axis
+    xc <- x - mean(x[valid])
+    tc <- t - mean(t[valid])
+    xc[!valid] <- 0
+    tc[!valid] <- 0
+
+    n_valid <- window_sums(valid, bounds)
+    s_t <- window_sums(tc, bounds)
+    s_x <- window_sums(xc, bounds)
+    s_tx <- window_sums(tc * xc, bounds)
+    s_t2 <- window_sums(tc * tc, bounds)
+
+    ## denom is n^2 * var(t): cancels to fp noise (either sign) when window
+    ## t values are near-identical, so guard at ~100 ulp of its scale
+    denom <- n_valid * s_t2 - s_t^2
+    slopes <- (n_valid * s_tx - s_t * s_x) / denom
+    degenerate <- denom <= 100 * .Machine$double.eps * n_valid * s_t2
+
+    ## min_obs counts the window span (including NAs), matching slope()
+    slopes[degenerate | n_window < min_obs] <- NA_real_
+    if (!na.rm && anyNA(x)) {
+        slopes[window_sums(is.na(x), bounds) > 0] <- NA_real_
+    }
 
     if (args$window_idx %||% FALSE) {
-        attr(slopes, "window_idx") <- window_idx
+        attr(slopes, "bounds") <- bounds
     }
 
     return(slopes)
@@ -181,7 +211,7 @@ rolling_slope <- function(
 #'
 #' @param ... Additional arguments.
 #' @inheritParams find_kinetics_idx
-#' @inheritParams compute_local_windows
+#' @inheritParams compute_window_bounds
 #' @inheritParams replace_invalid
 #' @inheritParams filter_moving_average
 #'
@@ -326,8 +356,9 @@ peak_slope <- function(
         negative = candidates[which.min(slopes[candidates])]
     )
 
-    ## get window indices at peak
-    window_idx <- attr(slopes, "window_idx")[[peak_idx]]
+    ## window indices at peak, derived from bounds
+    bounds <- attr(slopes, "bounds")
+    window_idx <- bounds$start[[peak_idx]]:bounds$end[[peak_idx]]
 
     ## fit lm on peak window
     fit_formula <- stats::as.formula("x ~ t", env = baseenv())

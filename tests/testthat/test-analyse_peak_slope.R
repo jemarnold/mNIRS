@@ -141,10 +141,10 @@ test_that("rolling_slope returns correct structure", {
     expect_type(result, "double")
     expect_equal(length(result), length(x))
 
-    ## attribute for window_idx
+    ## attribute for window bounds
     expect_equal(
-        attr(rolling_slope(x, width = 3, window_idx = TRUE), "window_idx"),
-        compute_local_windows(t = seq_along(x), width = 3)
+        attr(rolling_slope(x, width = 3, window_idx = TRUE), "bounds"),
+        compute_window_bounds(t = seq_along(x), width = 3)
     )
 })
 
@@ -1074,7 +1074,8 @@ test_that("rolling_slope works visually", {
     # x <- c(1, 3, 2, 5, 8, 7, 9, 12, 11, 15, 14, 17, 18)
     x <- c(1, 3, NA, 5, 8, 7, 9, 12, NA, NA, NA, 17, 18)
     t <- seq_along(x)
-    window_idx <- compute_local_windows(t, width = 3)
+    bounds <- compute_window_bounds(t, width = 3)
+    window_idx <- Map(`:`, bounds$start, bounds$end)
 
     ## partial = TRUE, na.rm = TRUE
     slopes <- vapply(window_idx, \(.idx) {

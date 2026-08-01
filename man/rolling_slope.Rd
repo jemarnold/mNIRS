@@ -85,8 +85,8 @@ per window to return a slope. Derived from \code{width} or \code{span}, or \code
 when \code{partial = TRUE}.}
 \item{\code{intercept}}{Logical; if \code{TRUE}, \code{slope()} also attaches the
 y-intercept as \code{attr(slope_val, "intercept")}.}
-\item{\code{window_idx}}{Logical; if \code{TRUE}, the list of per-observation
-window indices is attached as \code{attr(slopes, "window_idx")}.}
+\item{\code{window_idx}}{Logical; if \code{TRUE}, the window bounds from
+\code{\link[=compute_window_bounds]{compute_window_bounds()}} are attached as \code{attr(slopes, "bounds")}.}
 }
 }
 \seealso{

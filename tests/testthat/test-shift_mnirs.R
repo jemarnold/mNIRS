@@ -872,16 +872,13 @@ test_that("shift_mnirs works on Moxy", {
         verbose = FALSE
     ) |>
         dplyr::mutate(
-            dplyr::across(
-                dplyr::matches("smo2"),
-                \(.x) {
-                    replace_invalid(
-                        .x,
-                        invalid_values = c(0, 100),
-                        method = "none"
-                    )
-                }
-            )
+            dplyr::across(dplyr::matches("smo2"), \(.x) {
+                replace_invalid(
+                    .x,
+                    invalid_values = c(0, 100),
+                    method = "none"
+                )
+            })
         )
 
     data_shifted <- shift_mnirs(
@@ -895,8 +892,12 @@ test_that("shift_mnirs works on Moxy", {
         verbose = FALSE
     )
 
-    # plot(data) + ggplot2::ylim(0, 100) + geom_hline(yintercept = c(0, 100))
-    # plot(data_shifted) + ggplot2::ylim(0, 100) + geom_hline(yintercept = c(0, 100))
+    # plot(data) +
+    #     ggplot2::ylim(0, 100) +
+    #     ggplot2::geom_hline(yintercept = c(0, 100))
+    # plot(data_shifted) +
+    #     ggplot2::ylim(0, 100) +
+    #     ggplot2::geom_hline(yintercept = c(0, 100))
 
     ## check grouping together: min value should come from smo2_right
     expect_false(any(data_shifted$smo2_left == 0, na.rm = TRUE))
@@ -987,7 +988,6 @@ test_that("shift_mnirs works on Train.Red", {
     #     ggplot2::ylim(0, 100) +
     #     ggplot2::geom_hline(yintercept = c(0))
 
-    #! floating point error: data_shifted$smo2_left[data_shifted$smo2_left <= 2]
     ## check grouping together: min value should come from each group
     expect_true(any(data_shifted$smo2_left == 0, na.rm = TRUE))
     expect_true(any(data_shifted$smo2_right == 0, na.rm = TRUE))

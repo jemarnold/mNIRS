@@ -1,37 +1,29 @@
-## Test compute_local_windows() =========================================
-test_that("compute_local_windows respects width and span boundaries", {
+## Test compute_window_bounds() (width/span boundaries) ================
+test_that("compute_window_bounds respects width and span boundaries", {
     t <- 1:10
 
-    ## odd width: symmetrical, clamped at edges
-    result <- compute_local_windows(t, width = 3)
-    expect_equal(result[[1]], 1:2)
-    expect_equal(result[[5]], 4:6)
-    expect_equal(result[[10]], 9:10)
-
     ## even width: left-biased forward looking; "center" spelling accepted
-    result <- compute_local_windows(t, width = 2, align = "center")
-    expect_equal(result[[1]], 1:2)
-    expect_equal(result[[5]], 5:6)
-    expect_equal(result[[10]], 10)
+    result <- compute_window_bounds(t, width = 2, align = "center")
+    expect_equal(result$start, 1:10)
+    expect_equal(result$end, pmin(1:10 + 1, 10))
 
     ## span: windows within t ± span/2
     t <- seq(0, 10, by = 0.5)
-    result <- compute_local_windows(t, span = 2)
-    expect_equal(result[[1]], 1:3)
-    expect_equal(result[[10]], 8:12)
-    expect_equal(result[[21]], 19:21)
+    result <- compute_window_bounds(t, span = 2)
+    expect_equal(result$start[c(1, 10, 21)], c(1L, 8L, 19L))
+    expect_equal(result$end[c(1, 10, 21)], c(3L, 12L, 21L))
 })
 
-test_that("compute_local_windows handles degenerate width and span", {
+test_that("compute_window_bounds handles degenerate width and span", {
     t <- 1:10
 
     ## window covering all of t
-    expect_equal(compute_local_windows(t, width = 20), rep(list(t), 10))
-    expect_equal(compute_local_windows(t, span = 20), rep(list(t), 10))
+    expect_equal(compute_window_bounds(t, width = 20), list(start = rep(1L, 10), end = rep(10L, 10)))
+    expect_equal(compute_window_bounds(t, span = 20), list(start = rep(1L, 10), end = rep(10L, 10)))
 
     ## single-sample windows
-    expect_equal(compute_local_windows(t, width = 1), as.list(t))
-    expect_equal(compute_local_windows(t, span = 0), as.list(t))
+    expect_equal(compute_window_bounds(t, width = 1), list(start = 1:10, end = 1:10))
+    expect_equal(compute_window_bounds(t, span = 0), list(start = 1:10, end = 1:10))
 })
 
 ## Test compute_valid_neighbours() ======================================
@@ -88,7 +80,8 @@ test_that("compute_valid_neighbours handles degenerate width and span", {
 ## Test compute_local_fun() =============================================
 test_that("compute_local_fun calculates rolling medians", {
     x <- c(10, 20, 30, 40, 50)
-    window_idx <- compute_local_windows(x, width = 3)
+    bounds <- compute_window_bounds(x, width = 3)
+    window_idx <- Map(`:`, bounds$start, bounds$end)
     result <- compute_local_fun(x, window_idx, fn = median)
 
     expect_equal(result[1], median(x[1:2]))
@@ -155,20 +148,27 @@ test_that("compute_window_bounds width bounds clamp at edges", {
     expect_equal(result$end, 1:10)
 })
 
-test_that("compute_window_bounds agrees with compute_local_windows", {
+test_that("compute_window_bounds span windows stay within t ± span/2", {
     t <- seq(0, 10, by = 0.5)
-
-    ## span windows stay within t ± span/2
     result <- compute_window_bounds(t, span = 2)
     expect_true(all(t[result$start] >= t - 1 & t[result$end] <= t + 1))
+})
 
-    for (args in list(list(width = 5), list(span = 2))) {
-        bounds <- do.call(compute_window_bounds, c(list(t), args))
-        expect_equal(
-            Map(`:`, bounds$start, bounds$end),
-            do.call(compute_local_windows, c(list(t), args))
-        )
-    }
+## Test window_sums() ===================================================
+test_that("window_sums matches per-window sums", {
+    set.seed(7)
+    x <- rnorm(50) + 100 ## offset data exercises differencing error
+    bounds <- compute_window_bounds(seq_along(x), width = 5)
+    reference <- vapply(seq_along(x), \(.i) {
+        sum(x[bounds$start[.i]:bounds$end[.i]])
+    }, numeric(1))
+    expect_equal(window_sums(x, bounds), reference)
+
+    ## logical input sums to valid counts
+    expect_equal(
+        window_sums(is.finite(c(1, NA, 3)), compute_window_bounds(1:3, width = 3)),
+        c(1, 2, 1)
+    )
 })
 
 ## Test compute_local_mean() ============================================
@@ -198,6 +198,23 @@ test_that("compute_local_mean handles NA and Inf", {
     result <- compute_local_mean(c(1, Inf, 3, 4, 5), bounds, na.rm = TRUE)
     expect_equal(result[4:5], c(4, 4.5))
     expect_true(all(is.finite(result)))
+
+    ## no finite values at all: NA for every window, regardless of na.rm
+    expect_identical(
+        compute_local_mean(rep(NA_real_, 5), bounds, na.rm = TRUE),
+        rep(NA_real_, 5)
+    )
+    expect_identical(
+        compute_local_mean(c(Inf, -Inf, NaN, NA, Inf), bounds),
+        rep(NA_real_, 5)
+    )
+
+    ## guard returns one NA per window, not per element of x
+    short_bounds <- compute_window_bounds(seq_along(x), idx = 1:2, width = 3)
+    expect_identical(
+        compute_local_mean(rep(NA_real_, 5), short_bounds),
+        rep(NA_real_, 2)
+    )
 })
 
 test_that("compute_local_mean min_obs excludes partial windows", {
@@ -258,8 +275,8 @@ test_that("median_no_na matches median with na.rm", {
     expect_identical(median_no_na(c(NA_real_, NA_real_)), NA_real_)
 })
 
-## Test col_medians_padded() ============================================
-test_that("col_medians_padded matches per-column median", {
+## Test compute_col_medians() ============================================
+test_that("compute_col_medians matches per-column median", {
     set.seed(1)
     m <- matrix(runif(35, 60, 70), nrow = 5)
     ## NA padding with mixed even/odd valid counts per column
@@ -268,7 +285,7 @@ test_that("col_medians_padded matches per-column median", {
     m[1:4, 4] <- NA
     m[, 5] <- NA
 
-    result <- col_medians_padded(m)
+    result <- compute_col_medians(m)
     expect_equal(result, unname(apply(m, 2, median, na.rm = TRUE)))
     expect_true(is.na(result[5])) ## all-NA column
 })

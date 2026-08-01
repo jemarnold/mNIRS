@@ -66,14 +66,14 @@ compute_window_bounds <- function(
             right = c(-1, 0)
         ) *
             span
-        start_idx <- findInt_mnirs(
+        start_idx <- validate_findInt(
             t[idx] + offsets[1L],
             t,
             left.open = TRUE,
             env = env
         ) +
             1L
-        end_idx <- findInt_mnirs(t[idx] + offsets[2L], t, env = env)
+        end_idx <- validate_findInt(t[idx] + offsets[2L], t, env = env)
     }
 
     ## inclusive of x[i] for detect outliers
@@ -82,34 +82,27 @@ compute_window_bounds <- function(
 
 
 #' @description
-#' `compute_local_windows()`: Compute a list of rolling window indices along a
-#' time variable `t`.
+#' `window_sums()`: Windowed sums by cumulative-sum differencing.
+#'
+#' @param v A numeric vector to sum within windows. Callers should centre
+#'   `v` first to contain floating-point cancellation error.
+#' @param bounds A `list()` of `start` and `end` window index vectors from
+#'   `compute_window_bounds()`.
 #'
 #' @returns
-#' `compute_local_windows()`: A list the same length as `idx` and the same or
-#'   shorter length as `t` with numeric vectors of sample indices of length
-#'   `width` samples or `span` units of time `t`.
+#' `window_sums()`: A numeric vector the same length as `bounds$start`.
 #'
 #' @rdname compute_helpers
 #' @keywords internal
-compute_local_windows <- function(
-    t,
-    idx = seq_along(t),
-    width = NULL,
-    span = NULL,
-    align = c("centre", "left", "right"),
-    env = rlang::caller_env()
-) {
-    bounds <- compute_window_bounds(t, idx, width, span, align, env)
-    return(Map(`:`, bounds$start, bounds$end))
+window_sums <- function(v, bounds) {
+    cs <- cumsum(c(0, v))
+    return(cs[bounds$end + 1L] - cs[bounds$start])
 }
 
 
 #' @description
 #' `compute_local_mean()`: Compute rolling means from window bounds.
 #'
-#' @param bounds A `list()` of `start` and `end` window index vectors from
-#'   `compute_window_bounds()`.
 #' @param min_obs The minimum number of samples a window must span to return a
 #'   value. Shorter (partial) windows return `NA`.
 #' @inheritParams replace_invalid
@@ -118,24 +111,35 @@ compute_local_windows <- function(
 #' `compute_local_mean()`: A numeric vector the same length as `bounds$start`.
 #'
 #' @details
-#' `compute_local_mean()` averages each window directly with `mean()`, which
-#'   uses a two-pass sum and so returns exactly the same value as an
-#'   equivalent naive rolling mean.
+#' `compute_local_mean()` computes all window means in O(n) via
+#'   [window_sums()]. Values are centred first so the cumulative-sum
+#'   differencing error stays around `eps * sqrt(n) * sd`, far below
+#'   measurement resolution.
 #'
 #' @rdname compute_helpers
 #' @keywords internal
 compute_local_mean <- function(x, bounds, na.rm = FALSE, min_obs = 1L) {
     ## non-finite treated as missing: Inf would otherwise return NaN
-    x[!is.finite(x)] <- NA_real_
+    valid <- is.finite(x)
+    if (!any(valid)) {
+        return(rep(NA_real_, length(bounds$start)))
+    }
+
+    ## centre so cumsum differencing error stays ~eps * sqrt(n) * sd
+    offset <- mean(x[valid])
+    x0 <- x - offset
+    x0[!valid] <- 0
 
     n_window <- bounds$end - bounds$start + 1L
-    ## per-window mean of the raw values: no accumulated rounding error
-    y <- vapply(seq_along(bounds$start), \(.i) {
-        mean(x[bounds$start[.i]:bounds$end[.i]], na.rm = na.rm)
-    }, numeric(1))
+    n_valid <- window_sums(valid, bounds)
+    y <- window_sums(x0, bounds) / n_valid + offset
 
     ## empty (all-NA) windows and partial windows below min_obs return NA
-    y[n_window < min_obs | !is.finite(y)] <- NA_real_
+    y[n_valid == 0L | n_window < min_obs] <- NA_real_
+    ## NA propagates unless na.rm
+    if (!na.rm) {
+        y[n_valid < n_window] <- NA_real_
+    }
     return(y)
 }
 
@@ -217,7 +221,7 @@ compute_local_fun <- function(x, window_idx, fn, ...) {
 
 
 #' @description
-#' `col_medians_padded()`: Column medians of an `NA`-padded numeric matrix
+#' `compute_col_medians()`: Column medians of an `NA`-padded numeric matrix
 #' via a single radix sort. `NA`s sort last per column; medians indexed
 #' from per-column valid counts. Matches `median(w, na.rm = TRUE)`.
 #'
@@ -225,11 +229,11 @@ compute_local_fun <- function(x, window_idx, fn, ...) {
 #'   with `NA` where windows extend beyond the data.
 #'
 #' @returns
-#' `col_medians_padded()`: A numeric vector of length `ncol(m)`.
+#' `compute_col_medians()`: A numeric vector of length `ncol(m)`.
 #'
 #' @rdname compute_helpers
 #' @keywords internal
-col_medians_padded <- function(m) {
+compute_col_medians <- function(m) {
     w <- nrow(m)
     nv <- w - colSums(is.na(m))
     ## sort all windows at once: by column, then value, NAs last
@@ -272,7 +276,7 @@ compute_outliers <- function(
         ## width: fixed-size windows, vectorised over an NA-padded matrix.
         ## padding out-of-range cells with NA is equivalent to the clamped
         ## partial edge windows because medians ignore NA.
-        ## same offsets as compute_local_windows(align = "centre")
+        ## same offsets as compute_window_bounds(align = "centre")
         offsets <- (-floor((width - 1L) / 2L)):(floor(width / 2L))
         idx <- outer(offsets, seq_len(n), `+`)
         oob <- idx < 1L | idx > n
@@ -280,27 +284,20 @@ compute_outliers <- function(
         m <- matrix(x[idx], nrow = width)
         m[oob] <- NA_real_
 
-        local_medians <- col_medians_padded(m)
-        local_mad <- col_medians_padded(
-            abs(m - rep(local_medians, each = width))
-        )
+        local_meds <- compute_col_medians(m)
+        local_mad <- compute_col_medians(abs(m - rep(local_meds, each = width)))
     } else {
-        ## span: variable-size windows, per-window loop
-        window_idx <- compute_local_windows(
-            t,
-            width = NULL,
-            span = span,
-            env = env
-        )
+        ## span: variable-size windows, per-window loop over bounds
+        bounds <- compute_window_bounds(t, span = span, env = env)
         local_stats <- vapply(seq_len(n), \(.i) {
-            w <- x[window_idx[[.i]]]
+            w <- x[bounds$start[.i]:bounds$end[.i]]
             local_median <- median_no_na(w)
             local_mad <- median_no_na(abs(w - local_median))
 
             c(local_median, local_mad)
         }, numeric(2))
 
-        local_medians <- local_stats[1L, ]
+        local_meds <- local_stats[1L, ]
         local_mad <- local_stats[2L, ]
     }
 
@@ -309,7 +306,7 @@ compute_outliers <- function(
     smallest_var <- suppressWarnings(min(abs_diffs[abs_diffs > 1e-5]))
 
     ## logical outlier positions
-    abs_dev <- abs(x - local_medians)
+    abs_dev <- abs(x - local_meds)
     is_outlier <- abs_dev > smallest_var &
         abs_dev > (L * outlier_cutoff * local_mad)
     ## NAs from is_outlier check should return FALSE
@@ -317,7 +314,7 @@ compute_outliers <- function(
 
     ## return list of vectors w/ local logicals and medians
     return(list(
-        local_medians = local_medians,
+        local_medians = local_meds,
         is_outlier = is_outlier
     ))
 }
@@ -371,10 +368,10 @@ compute_valid_neighbours <- function(
     ## build per-NA valid neighbours with binary search on sorted `t_valid`
     ## falls back to naerest bracketing pair when no valid samples within `span`
     window_idx <- lapply(seq_len(n_na), \(.i) {
-        lo <- findInt_mnirs(
+        lo <- validate_findInt(
             t_na[.i] - half_span, t_valid, left.open = TRUE, env = env
         ) + 1L
-        hi <- findInt_mnirs(t_na[.i] + half_span, t_valid, env = env)
+        hi <- validate_findInt(t_na[.i] + half_span, t_valid, env = env)
         if (lo > hi) {
             pos <- findInterval(na_idx[.i], valid_idx)
             return(unique(valid_idx[c(pos, min(n_valid, pos + 1L))]))

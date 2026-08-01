@@ -354,18 +354,12 @@ replace_invalid <- function(
             )
         }
 
-        window_idx <- compute_local_windows(
-            t,
-            invalid_idx,
-            width,
-            span,
-            env = env
-        )
-        local_medians <- compute_local_fun(y, window_idx, median_no_na)
-        ## if method = "median"
+        bounds <- compute_window_bounds(t, invalid_idx, width, span, env = env)
         ## invalid_values removed to NA first,
         ## so returns local median excluding idx
-        y[invalid_idx] <- local_medians
+        y[invalid_idx] <- vapply(seq_along(invalid_idx), \(.i) {
+            median_no_na(y[bounds$start[.i]:bounds$end[.i]])
+        }, numeric(1))
     }
 
     return(y)

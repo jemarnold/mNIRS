@@ -230,20 +230,25 @@ shift_mnirs <- function(
         } else {
             ## local means exclude partial windows, so tapered windows at the
             ## edges cannot bias the min/max reference toward noise
-            shift_fun <- match.fun(.a$position)
+            bounds <- compute_window_bounds(
+                t_vec, width = .a$width, span = .a$span, env = env
+            )
+            which_fun <- match.fun(paste0("which.", .a$position))
             shift_values <- vapply(data[.cols], \(.x) {
-                shift_fun(
-                    filter_ma(
-                        .x,
-                        t = t_vec,
-                        width = .a$width,
-                        span = .a$span,
-                        na.rm = TRUE,
-                        verbose = FALSE,
-                        env = env
-                    ),
-                    na.rm = TRUE
+                smoothed <- filter_ma(
+                    .x,
+                    t = t_vec,
+                    width = .a$width,
+                    span = .a$span,
+                    na.rm = TRUE,
+                    verbose = FALSE,
+                    env = env
                 )
+                ## locate extremum window via fast rolling means, then
+                ## recompute reference exactly to avoid floating-point drift
+                ## from cumsum differencing
+                .i <- which_fun(smoothed)
+                mean(.x[bounds$start[.i]:bounds$end[.i]], na.rm = TRUE)
             }, numeric(1))
         }
 

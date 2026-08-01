@@ -2,12 +2,12 @@
 % Please edit documentation in R/replace_helpers.R
 \name{compute_window_bounds}
 \alias{compute_window_bounds}
-\alias{compute_local_windows}
+\alias{window_sums}
 \alias{compute_local_mean}
 \alias{window_min_obs}
 \alias{median_no_na}
 \alias{compute_local_fun}
-\alias{col_medians_padded}
+\alias{compute_col_medians}
 \alias{compute_outliers}
 \alias{compute_valid_neighbours}
 \title{Computes rolling local values}
@@ -21,14 +21,7 @@ compute_window_bounds(
   env = rlang::caller_env()
 )
 
-compute_local_windows(
-  t,
-  idx = seq_along(t),
-  width = NULL,
-  span = NULL,
-  align = c("centre", "left", "right"),
-  env = rlang::caller_env()
-)
+window_sums(v, bounds)
 
 compute_local_mean(x, bounds, na.rm = FALSE, min_obs = 1L)
 
@@ -38,7 +31,7 @@ median_no_na(w)
 
 compute_local_fun(x, window_idx, fn, ...)
 
-col_medians_padded(m)
+compute_col_medians(m)
 
 compute_outliers(
   x,
@@ -81,10 +74,13 @@ is \emph{backward looking} from the current sample.}
 errors and warnings as coming from the user-facing function rather
 than the validator.}
 
-\item{x}{A numeric vector of the response variable.}
+\item{v}{A numeric vector to sum within windows. Callers should centre
+\code{v} first to contain floating-point cancellation error.}
 
 \item{bounds}{A \code{list()} of \code{start} and \code{end} window index vectors from
 \code{compute_window_bounds()}.}
+
+\item{x}{A numeric vector of the response variable.}
 
 \item{min_obs}{The minimum number of samples a window must span to return a
 value. Shorter (partial) windows return \code{NA}.}
@@ -120,9 +116,7 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 \code{compute_window_bounds()}: A \code{list()} with \code{start} and \code{end} integer vectors
 the same length as \code{idx}, giving the inclusive window bounds at each index.
 
-\code{compute_local_windows()}: A list the same length as \code{idx} and the same or
-shorter length as \code{t} with numeric vectors of sample indices of length
-\code{width} samples or \code{span} units of time \code{t}.
+\code{window_sums()}: A numeric vector the same length as \code{bounds$start}.
 
 \code{compute_local_mean()}: A numeric vector the same length as \code{bounds$start}.
 
@@ -132,7 +126,7 @@ shorter length as \code{t} with numeric vectors of sample indices of length
 
 \code{compute_local_fun()}: A numeric vector the same length as \code{x}.
 
-\code{col_medians_padded()}: A numeric vector of length \code{ncol(m)}.
+\code{compute_col_medians()}: A numeric vector of length \code{ncol(m)}.
 
 \code{compute_outliers()}: A \code{list()} with vectors the same length as \code{x} for
 with numeric local medians and logical identifying where \code{is_outlier}.
@@ -146,8 +140,7 @@ side of the invalid \code{NA}s.
 \code{compute_window_bounds()}: Compute the start and end indices of rolling
 windows along a time variable \code{t}.
 
-\code{compute_local_windows()}: Compute a list of rolling window indices along a
-time variable \code{t}.
+\code{window_sums()}: Windowed sums by cumulative-sum differencing.
 
 \code{compute_local_mean()}: Compute rolling means from window bounds.
 
@@ -159,7 +152,7 @@ replicates \code{median.default} arithmetic without S3 dispatch.
 \code{compute_local_fun()}: Compute a rolling function along \code{x} from a list of
 rolling sample windows.
 
-\code{col_medians_padded()}: Column medians of an \code{NA}-padded numeric matrix
+\code{compute_col_medians()}: Column medians of an \code{NA}-padded numeric matrix
 via a single radix sort. \code{NA}s sort last per column; medians indexed
 from per-column valid counts. Matches \code{median(w, na.rm = TRUE)}.
 
@@ -182,9 +175,10 @@ unequal sample forward of \code{idx}, effectively returning \code{NA} at the las
 sample index. When \code{span} is specified, the local window is between
 \verb{[t - span/2, t + span/2]}.
 
-\code{compute_local_mean()} averages each window directly with \code{mean()}, which
-uses a two-pass sum and so returns exactly the same value as an
-equivalent naive rolling mean.
+\code{compute_local_mean()} computes all window means in O(n) via
+\code{\link[=window_sums]{window_sums()}}. Values are centred first so the cumulative-sum
+differencing error stays around \code{eps * sqrt(n) * sd}, far below
+measurement resolution.
 
 \code{window_min_obs()} converts \code{span} to a sample count via the estimated
 sample rate, less two samples to buffer irregular \code{t} at the start and
