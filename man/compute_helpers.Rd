@@ -3,10 +3,10 @@
 \name{compute_window_bounds}
 \alias{compute_window_bounds}
 \alias{window_sums}
-\alias{compute_local_mean}
 \alias{window_min_obs}
-\alias{median_no_na}
+\alias{compute_local_mean}
 \alias{compute_local_fun}
+\alias{median_no_na}
 \alias{compute_col_medians}
 \alias{compute_outliers}
 \alias{compute_valid_neighbours}
@@ -23,13 +23,13 @@ compute_window_bounds(
 
 window_sums(v, bounds)
 
-compute_local_mean(x, bounds, na.rm = FALSE, min_obs = 1L)
-
 window_min_obs(width, span, t, min_n = 1L, env = rlang::caller_env())
 
-median_no_na(w)
+compute_local_mean(x, bounds, na.rm = FALSE, min_obs = 1L)
 
 compute_local_fun(x, window_idx, fn, ...)
+
+median_no_na(w)
 
 compute_col_medians(m)
 
@@ -80,12 +80,12 @@ than the validator.}
 \item{bounds}{A \code{list()} of \code{start} and \code{end} window index vectors from
 \code{compute_window_bounds()}.}
 
+\item{min_n}{A lower bound on the returned number of samples.}
+
 \item{x}{A numeric vector of the response variable.}
 
 \item{min_obs}{The minimum number of samples a window must span to return a
 value. Shorter (partial) windows return \code{NA}.}
-
-\item{min_n}{A lower bound on the returned number of samples.}
 
 \item{window_idx}{A list the same or shorter length as \code{x} with numeric
 vectors for the sample indices of local rolling windows.}
@@ -118,13 +118,13 @@ the same length as \code{idx}, giving the inclusive window bounds at each index.
 
 \code{window_sums()}: A numeric vector the same length as \code{bounds$start}.
 
-\code{compute_local_mean()}: A numeric vector the same length as \code{bounds$start}.
-
 \code{window_min_obs()}: An integer value.
 
-\code{median_no_na()}: A numeric value.
+\code{compute_local_mean()}: A numeric vector the same length as \code{bounds$start}.
 
 \code{compute_local_fun()}: A numeric vector the same length as \code{x}.
+
+\code{median_no_na()}: A numeric value.
 
 \code{compute_col_medians()}: A numeric vector of length \code{ncol(m)}.
 
@@ -142,15 +142,15 @@ windows along a time variable \code{t}.
 
 \code{window_sums()}: Windowed sums by cumulative-sum differencing.
 
-\code{compute_local_mean()}: Compute rolling means from window bounds.
-
 \code{window_min_obs()}: Minimum number of samples spanned by a complete window.
 
-\code{median_no_na()}: Fast median for numeric vectors. Strips \code{NA}s and
-replicates \code{median.default} arithmetic without S3 dispatch.
+\code{compute_local_mean()}: Compute rolling means from window bounds.
 
 \code{compute_local_fun()}: Compute a rolling function along \code{x} from a list of
 rolling sample windows.
+
+\code{median_no_na()}: Fast median for numeric vectors. Strips \code{NA}s and
+replicates \code{median.default} arithmetic without S3 dispatch.
 
 \code{compute_col_medians()}: Column medians of an \code{NA}-padded numeric matrix
 via a single radix sort. \code{NA}s sort last per column; medians indexed
@@ -175,13 +175,13 @@ unequal sample forward of \code{idx}, effectively returning \code{NA} at the las
 sample index. When \code{span} is specified, the local window is between
 \verb{[t - span/2, t + span/2]}.
 
+\code{window_min_obs()} converts \code{span} to a sample count via the estimated
+sample rate, less two samples to buffer irregular \code{t} at the start and
+end of each window.
+
 \code{compute_local_mean()} computes all window means in O(n) via
 \code{\link[=window_sums]{window_sums()}}. Values are centred first so the cumulative-sum
 differencing error stays around \code{eps * sqrt(n) * sd}, far below
 measurement resolution.
-
-\code{window_min_obs()} converts \code{span} to a sample count via the estimated
-sample rate, less two samples to buffer irregular \code{t} at the start and
-end of each window.
 }
 \keyword{internal}

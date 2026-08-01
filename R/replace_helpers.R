@@ -101,6 +101,35 @@ window_sums <- function(v, bounds) {
 
 
 #' @description
+#' `window_min_obs()`: Minimum number of samples spanned by a complete window.
+#'
+#' @param min_n A lower bound on the returned number of samples.
+#'
+#' @returns
+#' `window_min_obs()`: An integer value.
+#'
+#' @details
+#' `window_min_obs()` converts `span` to a sample count via the estimated
+#'   sample rate, less two samples to buffer irregular `t` at the start and
+#'   end of each window.
+#'
+#' @rdname compute_helpers
+#' @keywords internal
+window_min_obs <- function(
+    width,
+    span,
+    t,
+    min_n = 1L,
+    env = rlang::caller_env()
+) {
+    ## `span` only converted when `width` is undefined
+    return(
+        max(width %||% (floor(span * estimate_sample_rate(t, env)) - 2L), min_n)
+    )
+}
+
+
+#' @description
 #' `compute_local_mean()`: Compute rolling means from window bounds.
 #'
 #' @param min_obs The minimum number of samples a window must span to return a
@@ -145,31 +174,23 @@ compute_local_mean <- function(x, bounds, na.rm = FALSE, min_obs = 1L) {
 
 
 #' @description
-#' `window_min_obs()`: Minimum number of samples spanned by a complete window.
+#' `compute_local_fun()`: Compute a rolling function along `x` from a list of
+#' rolling sample windows.
 #'
-#' @param min_n A lower bound on the returned number of samples.
+#' @param window_idx A list the same or shorter length as `x` with numeric
+#'   vectors for the sample indices of local rolling windows.
+#' @param fn A function to pass through for local rolling calculation.
+#' @param ... Additional arguments.
 #'
 #' @returns
-#' `window_min_obs()`: An integer value.
-#'
-#' @details
-#' `window_min_obs()` converts `span` to a sample count via the estimated
-#'   sample rate, less two samples to buffer irregular `t` at the start and
-#'   end of each window.
+#' `compute_local_fun()`: A numeric vector the same length as `x`.
 #'
 #' @rdname compute_helpers
 #' @keywords internal
-window_min_obs <- function(
-    width,
-    span,
-    t,
-    min_n = 1L,
-    env = rlang::caller_env()
-) {
-    ## `span` only converted when `width` is undefined
-    return(
-        max(width %||% (floor(span * estimate_sample_rate(t, env)) - 2L), min_n)
-    )
+compute_local_fun <- function(x, window_idx, fn, ...) {
+    vapply(seq_along(window_idx), \(.i) {
+        fn(x[window_idx[[.i]]], ...)
+    }, numeric(1))
 }
 
 
@@ -196,27 +217,6 @@ median_no_na <- function(w) {
     } else {
         mean(sort.int(w, partial = half + 0L:1L)[half + 0L:1L])
     }
-}
-
-
-#' @description
-#' `compute_local_fun()`: Compute a rolling function along `x` from a list of
-#' rolling sample windows.
-#'
-#' @param window_idx A list the same or shorter length as `x` with numeric
-#'   vectors for the sample indices of local rolling windows.
-#' @param fn A function to pass through for local rolling calculation.
-#' @param ... Additional arguments.
-#'
-#' @returns
-#' `compute_local_fun()`: A numeric vector the same length as `x`.
-#'
-#' @rdname compute_helpers
-#' @keywords internal
-compute_local_fun <- function(x, window_idx, fn, ...) {
-    vapply(seq_along(window_idx), \(.i) {
-        fn(x[window_idx[[.i]]], ...)
-    }, numeric(1))
 }
 
 
