@@ -5,7 +5,7 @@
 \alias{compute_local_windows}
 \alias{compute_local_mean}
 \alias{window_min_obs}
-\alias{median_nona}
+\alias{median_no_na}
 \alias{compute_local_fun}
 \alias{col_medians_padded}
 \alias{compute_outliers}
@@ -34,7 +34,7 @@ compute_local_mean(x, bounds, na.rm = FALSE, min_obs = 1L)
 
 window_min_obs(width, span, t, min_n = 1L, env = rlang::caller_env())
 
-median_nona(w)
+median_no_na(w)
 
 compute_local_fun(x, window_idx, fn, ...)
 
@@ -128,7 +128,7 @@ shorter length as \code{t} with numeric vectors of sample indices of length
 
 \code{window_min_obs()}: An integer value.
 
-\code{median_nona()}: A numeric value.
+\code{median_no_na()}: A numeric value.
 
 \code{compute_local_fun()}: A numeric vector the same length as \code{x}.
 
@@ -149,12 +149,11 @@ windows along a time variable \code{t}.
 \code{compute_local_windows()}: Compute a list of rolling window indices along a
 time variable \code{t}.
 
-\code{compute_local_mean()}: Compute rolling means from window bounds without
-materialising the windows.
+\code{compute_local_mean()}: Compute rolling means from window bounds.
 
 \code{window_min_obs()}: Minimum number of samples spanned by a complete window.
 
-\code{median_nona()}: Fast median for numeric vectors. Strips \code{NA}s and
+\code{median_no_na()}: Fast median for numeric vectors. Strips \code{NA}s and
 replicates \code{median.default} arithmetic without S3 dispatch.
 
 \code{compute_local_fun()}: Compute a rolling function along \code{x} from a list of
@@ -183,10 +182,9 @@ unequal sample forward of \code{idx}, effectively returning \code{NA} at the las
 sample index. When \code{span} is specified, the local window is between
 \verb{[t - span/2, t + span/2]}.
 
-\code{compute_local_mean()} differences cumulative sums, so cost is independent
-of window size. Cumulative sums lose relative precision over long
-vectors; for NIRS magnitudes the absolute error stays far below the
-resolution of the measurement.
+\code{compute_local_mean()} averages each window directly with \code{mean()}, which
+uses a two-pass sum and so returns exactly the same value as an
+equivalent naive rolling mean.
 
 \code{window_min_obs()} converts \code{span} to a sample count via the estimated
 sample rate, less two samples to buffer irregular \code{t} at the start and

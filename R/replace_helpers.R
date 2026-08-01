@@ -106,8 +106,7 @@ compute_local_windows <- function(
 
 
 #' @description
-#' `compute_local_mean()`: Compute rolling means from window bounds without
-#' materialising the windows.
+#' `compute_local_mean()`: Compute rolling means from window bounds.
 #'
 #' @param bounds A `list()` of `start` and `end` window index vectors from
 #'   `compute_window_bounds()`.
@@ -119,29 +118,23 @@ compute_local_windows <- function(
 #' `compute_local_mean()`: A numeric vector the same length as `bounds$start`.
 #'
 #' @details
-#' `compute_local_mean()` differences cumulative sums, so cost is independent
-#'   of window size. Cumulative sums lose relative precision over long
-#'   vectors; for NIRS magnitudes the absolute error stays far below the
-#'   resolution of the measurement.
+#' `compute_local_mean()` averages each window directly with `mean()`, which
+#'   uses a two-pass sum and so returns exactly the same value as an
+#'   equivalent naive rolling mean.
 #'
 #' @rdname compute_helpers
 #' @keywords internal
 compute_local_mean <- function(x, bounds, na.rm = FALSE, min_obs = 1L) {
-    ## non-finite treated as missing: an Inf left in the running sum would
-    ## return NaN for every later window, not only those containing it
-    ok <- is.finite(x)
-    ## prefix sums of values and of valid counts, offset by one for indexing
-    cum_x <- c(0, cumsum(ifelse(ok, x, 0)))
-    cum_n <- c(0L, cumsum(ok))
+    ## non-finite treated as missing: Inf would otherwise return NaN
+    x[!is.finite(x)] <- NA_real_
 
-    n_valid <- cum_n[bounds$end + 1L] - cum_n[bounds$start]
     n_window <- bounds$end - bounds$start + 1L
-    y <- (cum_x[bounds$end + 1L] - cum_x[bounds$start]) / n_valid
+    ## per-window mean of the raw values: no accumulated rounding error
+    y <- vapply(seq_along(bounds$start), \(.i) {
+        mean(x[bounds$start[.i]:bounds$end[.i]], na.rm = na.rm)
+    }, numeric(1))
 
-    ## missing values propagate unless dropped; partial windows fail min_obs
-    if (!na.rm) {
-        y[n_valid < n_window] <- NA_real_
-    }
+    ## empty (all-NA) windows and partial windows below min_obs return NA
     y[n_window < min_obs | !is.finite(y)] <- NA_real_
     return(y)
 }
@@ -170,23 +163,22 @@ window_min_obs <- function(
     env = rlang::caller_env()
 ) {
     ## `span` only converted when `width` is undefined
-    span_width <- function() {
-        floor(span * estimate_sample_rate(t, env)) - 2L
-    }
-    return(max(width %||% span_width(), min_n))
+    return(
+        max(width %||% (floor(span * estimate_sample_rate(t, env)) - 2L), min_n)
+    )
 }
 
 
 #' @description
-#' `median_nona()`: Fast median for numeric vectors. Strips `NA`s and
+#' `median_no_na()`: Fast median for numeric vectors. Strips `NA`s and
 #' replicates `median.default` arithmetic without S3 dispatch.
 #'
 #' @returns
-#' `median_nona()`: A numeric value.
+#' `median_no_na()`: A numeric value.
 #'
 #' @rdname compute_helpers
 #' @keywords internal
-median_nona <- function(w) {
+median_no_na <- function(w) {
     if (anyNA(w)) {
         w <- w[!is.na(w)]
     }
@@ -302,8 +294,8 @@ compute_outliers <- function(
         )
         local_stats <- vapply(seq_len(n), \(.i) {
             w <- x[window_idx[[.i]]]
-            local_median <- median_nona(w)
-            local_mad <- median_nona(abs(w - local_median))
+            local_median <- median_no_na(w)
+            local_mad <- median_no_na(abs(w - local_median))
 
             c(local_median, local_mad)
         }, numeric(2))

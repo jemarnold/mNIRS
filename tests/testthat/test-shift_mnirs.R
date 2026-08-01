@@ -977,7 +977,6 @@ test_that("shift_mnirs works on Train.Red", {
             c("o2hb_left", "o2hb_right")
         ),
         to = 0,
-        by = NULL,
         span = 0,
         position = "min",
         verbose = FALSE
@@ -988,6 +987,7 @@ test_that("shift_mnirs works on Train.Red", {
     #     ggplot2::ylim(0, 100) +
     #     ggplot2::geom_hline(yintercept = c(0))
 
+    #! floating point error: data_shifted$smo2_left[data_shifted$smo2_left <= 2]
     ## check grouping together: min value should come from each group
     expect_true(any(data_shifted$smo2_left == 0, na.rm = TRUE))
     expect_true(any(data_shifted$smo2_right == 0, na.rm = TRUE))

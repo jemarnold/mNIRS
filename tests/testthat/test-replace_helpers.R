@@ -1,255 +1,274 @@
 ## Test compute_local_windows() =========================================
-test_that("compute_local_windows returns correct structure", {
+test_that("compute_local_windows respects width and span boundaries", {
     t <- 1:10
-    width <- 3
-    result <- compute_local_windows(t, width = width, span = NULL)
 
-    expect_type(result, "list")
-    expect_length(result, length(t))
-    expect_true(all(vapply(result, is.numeric, logical(1))))
-
-    ## with span
-    t <- seq(0, 10, by = 0.5)
-    span <- 1
-    result <- compute_local_windows(t, width = NULL, span = span)
-
-    expect_type(result, "list")
-    expect_length(result, length(t))
-})
-
-test_that("compute_local_windows respects width boundaries", {
-    t <- 1:10
-    width <- 3
-    result <- compute_local_windows(t, width = width)
-
-    # First element: can only look forward
+    ## odd width: symmetrical, clamped at edges
+    result <- compute_local_windows(t, width = 3)
     expect_equal(result[[1]], 1:2)
-    # Last element: can only look backward
+    expect_equal(result[[5]], 4:6)
     expect_equal(result[[10]], 9:10)
-    # Middle element: symmetrical window
-    expect_equal(result[[5]], c(4:6))
 
-    ## even width align centreed
-    width <- 2
-    result <- compute_local_windows(t, width = width, align = "centre")
-
-    # left-biased forward looking
+    ## even width: left-biased forward looking; "center" spelling accepted
+    result <- compute_local_windows(t, width = 2, align = "center")
     expect_equal(result[[1]], 1:2)
-    # Last element only at idx
+    expect_equal(result[[5]], 5:6)
     expect_equal(result[[10]], 10)
-    # left-biased forward looking
-    expect_equal(result[[5]], c(5:6))
 
-    ## with span
+    ## span: windows within t ± span/2
     t <- seq(0, 10, by = 0.5)
-    span <- 2
-    result <- compute_local_windows(t, span = span)
-
-    # First element: can only look forward
+    result <- compute_local_windows(t, span = 2)
     expect_equal(result[[1]], 1:3)
-    expect_equal(t[result[[1]]], t[1:3])
-    # Last element: can only look backward
+    expect_equal(result[[10]], 8:12)
     expect_equal(result[[21]], 19:21)
-    expect_equal(t[result[[21]]], t[19:21])
-    # Middle element: symmetrical window
-    expect_equal(result[[10]], c(8:12))
-    expect_equal(t[result[[10]]], t[c(8:12)])
 })
 
-test_that("compute_local_windows align = 'center'", {
+test_that("compute_local_windows handles degenerate width and span", {
     t <- 1:10
-    width <- 2
-    result <- compute_local_windows(t, width = width, align = "center")
 
-    expect_equal(result[[1]], 1:2)
-    expect_equal(result[[10]], 10)
-    expect_equal(result[[5]], c(5:6))
+    ## window covering all of t
+    expect_equal(compute_local_windows(t, width = 20), rep(list(t), 10))
+    expect_equal(compute_local_windows(t, span = 20), rep(list(t), 10))
+
+    ## single-sample windows
+    expect_equal(compute_local_windows(t, width = 1), as.list(t))
+    expect_equal(compute_local_windows(t, span = 0), as.list(t))
 })
 
-test_that("compute_local_windows width and span >= length(x) works", {
-    t <- 1:10
-    result <- compute_local_windows(t, width = 20)
-    expect_equal(result, rep(list(t), length(t)))
-
-    result <- compute_local_windows(t, span = 20)
-    expect_equal(result, rep(list(t), length(t)))
-})
-
-test_that("compute_local_windows works with width = 1 and span = 0", {
-    t <- 1:10
-    result <- compute_local_windows(t, width = 1)
-    expect_equal(result, as.list(t))
-
-    result <- compute_local_windows(t, span = 0)
-    expect_equal(result, as.list(t))
-
-    compute_local_windows(t, width = 1, span = 0)
-})
-
-## test compute_valid_neighbours() ===========================
-test_that("compute_valid_neighbours() works with width", {
+## Test compute_valid_neighbours() ======================================
+test_that("compute_valid_neighbours works with width", {
     x <- c(1, 2, NA, 4, 5, NA, 7)
-
-    # width = 1
     result <- compute_valid_neighbours(x, width = 3)
-    expect_length(result, 2) # Two NAs
+    expect_length(result, 2) ## one window per NA
     expect_equal(result[[1]], c(2, 4))
     expect_equal(result[[2]], c(5, 7))
 
-    # width = 3
+    ## wider window splits samples to either side
     x <- c(1, 2, 3, NA, 5, 6, 7)
     result <- compute_valid_neighbours(x, width = 4)
     expect_equal(result[[1]], c(2, 3, 5, 6))
 
-    # Edge case: NA at start
-    x <- c(NA, 20, 30, 40)
-    result <- compute_valid_neighbours(x, width = 3)
-    expect_equal(result[[1]], 2)
-
-    # Edge case: NA at end
-    x <- c(10, 20, 30, NA)
-    result <- compute_valid_neighbours(x, width = 3)
-    expect_equal(result[[1]], 3)
+    ## NA at start / end
+    expect_equal(compute_valid_neighbours(c(NA, 2, 3, 4), width = 3)[[1]], 2)
+    expect_equal(compute_valid_neighbours(c(1, 2, 3, NA), width = 3)[[1]], 3)
 })
 
-test_that("compute_valid_neighbours() works with span", {
+test_that("compute_valid_neighbours works with span", {
     t <- 0:4
     x <- c(1, 2, NA, 4, 5)
-
-    # span = 1 (includes t[2] = 1 and t[4] = 3)
     result <- compute_valid_neighbours(x, t = t, span = 1)
-    expect_length(result, 1)
     expect_equal(result[[1]], c(2, 4))
 
-    # span = 0.5 (no values of t within t ± span should return same as width = 1)
+    ## no valid samples within span: falls back to bracketing pair
     result <- compute_valid_neighbours(x, t = t, span = 0.5)
-    expect_equal(result[[1]], c(2, 4))
     expect_equal(result, compute_valid_neighbours(x, width = 3))
 
-    # Multiple NAs
+    ## multiple NAs
     x <- c(1, NA, 3, NA, 5)
     result <- compute_valid_neighbours(x, t = t, span = 1)
-    expect_length(result, 2)
     expect_equal(result[[1]], c(1, 3))
     expect_equal(result[[2]], c(3, 5))
 
-    # Edge case: NA at start
-    x <- c(NA, 2, 3, 4)
-    expect_equal(compute_valid_neighbours(x, span = 1)[[1]], 2)
-    expect_equal(compute_valid_neighbours(x, span = 0.5)[[1]], 2)
-
-    # Edge case: NA at end
-    x <- c(1, 2, 3, NA)
-    expect_equal(compute_valid_neighbours(x, span = 1)[[1]], 3)
-    expect_equal(compute_valid_neighbours(x, span = 0.5)[[1]], 3)
+    ## NA at start / end
+    expect_equal(compute_valid_neighbours(c(NA, 2, 3, 4), span = 0.5)[[1]], 2)
+    expect_equal(compute_valid_neighbours(c(1, 2, 3, NA), span = 0.5)[[1]], 3)
 })
 
-test_that("compute_valid_neighbours width and span >= length(x) works", {
+test_that("compute_valid_neighbours handles degenerate width and span", {
     x <- c(1, 2, NA, 4, 5)
-    result <- compute_valid_neighbours(x, width = 8)
-    expect_equal(result, list(x[!is.na(x)]))
 
-    result <- compute_valid_neighbours(x, span = 8)
-    expect_equal(result, list(x[!is.na(x)]))
+    ## window covering all valid samples
+    expect_equal(compute_valid_neighbours(x, width = 8), list(c(1, 2, 4, 5)))
+    expect_equal(compute_valid_neighbours(x, span = 8), list(c(1, 2, 4, 5)))
+
+    ## minimal windows return nearest neighbours
+    expect_equal(compute_valid_neighbours(x, width = 1)[[1]], c(2, 4))
+    expect_equal(compute_valid_neighbours(x, span = 0)[[1]], c(2, 4))
 })
 
-test_that("compute_valid_neighbours works with width = 1 and span = 0", {
-    x <- c(1, 2, NA, 4, 5)
-    result <- compute_valid_neighbours(x, width = 1)
-    expect_equal(result[[1]], c(2, 4))
-
-    result <- compute_valid_neighbours(x, span = 0)
-    expect_equal(result[[1]], c(2, 4))
-})
-
-## Test compute_local_fun() =========================================
-test_that("compute_local_fun returns correct length", {
-    x <- c(1, 2, 3, 4, 5)
-    window_idx <- compute_local_windows(x, width = 1)
-    result <- compute_local_fun(x, window_idx, fn = median)
-
-    expect_type(result, "double")
-    expect_length(result, length(x))
-})
-
-test_that("compute_local_fun calculates correct medians", {
+## Test compute_local_fun() =============================================
+test_that("compute_local_fun calculates rolling medians", {
     x <- c(10, 20, 30, 40, 50)
-    # Manual windows: each looks at neighbours
     window_idx <- compute_local_windows(x, width = 3)
     result <- compute_local_fun(x, window_idx, fn = median)
 
-    expect_equal(result[1], median(x[1:2])) # median of x[2]
-    expect_equal(result[2], median(x[1:3])) # median of x[c(1,3)]
-    expect_equal(result[5], median(x[4:5])) # median of x[4]
-})
+    expect_equal(result[1], median(x[1:2]))
+    expect_equal(result[2], median(x[1:3]))
+    expect_equal(result[5], median(x[4:5]))
 
-test_that("compute_local_fun handles NA values", {
-    ## this shouldn't happen with handle_na, but just in case
+    ## NA passthrough via ...
     x <- c(1, NA, 3, 4, 5)
-    window_idx <- compute_local_windows(x, width = 3)
     result <- compute_local_fun(x, window_idx, fn = median, na.rm = TRUE)
-
-    expect_false(all(is.na(result[1:3])))
-    expect_equal(result[1], median(x[1]))
-    expect_equal(result[2], median(x[c(1, 3)]))
-    expect_equal(result[3], median(x[c(3, 4)]))
+    expect_equal(result[1:3], c(1, 2, 3.5))
 })
 
-test_that("compute_local_fun() handles empty windows", {
-    x <- c(1, 2, 3)
-    window_idx <- list(integer(0))
-    result <- compute_local_fun(x, window_idx, fn = median, na.rm = TRUE)
-    expect_true(is.na(result))
-})
-
-test_that("compute_local_fun() handles single values", {
+test_that("compute_local_fun handles empty and single-sample windows", {
     x <- c(10, 20, 30)
-    window_idx <- list(1, 2, 3)
-    result <- compute_local_fun(x, window_idx, fn = median)
-    expect_equal(result, x)
+    expect_true(is.na(compute_local_fun(x, list(integer(0)), median, na.rm = TRUE)))
+    expect_equal(compute_local_fun(x, list(1, 2, 3), median), x)
 })
-
 
 ## Test compute_outliers() ==============================================
-test_that("compute_outliers returns list of logical and numeric vectors", {
+test_that("compute_outliers flags outliers with local medians", {
     x <- c(1, 2, 3, 100, 5)
     t <- 1:5
     result <- compute_outliers(x, t, outlier_cutoff = 3, width = 3)
 
     expect_type(result$local_medians, "double")
-    expect_type(result$is_outlier, "logical")
     expect_length(result$local_medians, length(x))
-    expect_length(result$is_outlier, length(x))
-    expect_true(result$is_outlier[4L]) # 100 should be flagged
-    expect_false(any(result$is_outlier[-4L])) # Normal values should not be flagged
+    expect_equal(result$is_outlier, c(FALSE, FALSE, FALSE, TRUE, FALSE))
 })
 
 test_that("compute_outliers threshold sensitivity via outlier_cutoff", {
     x <- c(1, 2, 3, 10, 5)
     t <- 1:5
-
-    # Strict threshold
     strict <- compute_outliers(x, t, outlier_cutoff = 1, width = 3)
-    # Lenient threshold
     lenient <- compute_outliers(x, t, outlier_cutoff = 10, width = 3)
 
-    expect_true(sum(strict$is_outlier) > sum(lenient$is_outlier))
+    expect_gt(sum(strict$is_outlier), sum(lenient$is_outlier))
     expect_equal(strict$local_medians, lenient$local_medians)
 })
 
-test_that("compute_outliers handles no outliers", {
-    x <- 1:5
+test_that("compute_outliers handles clean data and NA", {
     t <- 1:5
-    result <- compute_outliers(x, t, outlier_cutoff = 3, width = 3)
+    result <- compute_outliers(1:5, t, outlier_cutoff = 3, width = 3)
+    expect_false(any(result$is_outlier))
 
-    expect_true(all(!result$is_outlier))
+    ## this shouldn't happen with handle_na, but just in case
+    result <- compute_outliers(c(1, 2, NA, 100, 5), t, outlier_cutoff = 3, width = 3)
+    expect_false(any(result$is_outlier))
 })
 
-test_that("compute_outliers handles NA", {
-    ## this shouldn't happen with handle_na, but just in case
-    x <- c(1, 2, NA, 100, 5)
-    t <- 1:5
-    result <- compute_outliers(x, t, outlier_cutoff = 3, width = 3)
+## Test compute_window_bounds() =========================================
+test_that("compute_window_bounds width bounds clamp at edges", {
+    t <- 1:10
+    result <- compute_window_bounds(t, width = 3)
+    expect_equal(result$start, pmax(1:10 - 1, 1))
+    expect_equal(result$end, pmin(1:10 + 1, 10))
 
-    expect_true(all(!result$is_outlier))
+    ## left = forward looking; right = backward looking
+    result <- compute_window_bounds(t, width = 3, align = "left")
+    expect_equal(result$start, 1:10)
+    expect_equal(result$end, pmin(1:10 + 2, 10))
+
+    result <- compute_window_bounds(t, width = 3, align = "right")
+    expect_equal(result$start, pmax(1:10 - 2, 1))
+    expect_equal(result$end, 1:10)
+})
+
+test_that("compute_window_bounds agrees with compute_local_windows", {
+    t <- seq(0, 10, by = 0.5)
+
+    ## span windows stay within t ± span/2
+    result <- compute_window_bounds(t, span = 2)
+    expect_true(all(t[result$start] >= t - 1 & t[result$end] <= t + 1))
+
+    for (args in list(list(width = 5), list(span = 2))) {
+        bounds <- do.call(compute_window_bounds, c(list(t), args))
+        expect_equal(
+            Map(`:`, bounds$start, bounds$end),
+            do.call(compute_local_windows, c(list(t), args))
+        )
+    }
+})
+
+## Test compute_local_mean() ============================================
+test_that("compute_local_mean matches naive rolling mean", {
+    x <- c(10, 20, 30, 40, 50)
+    bounds <- compute_window_bounds(seq_along(x), width = 3)
+    reference <- vapply(seq_along(x), \(.i) {
+        mean(x[bounds$start[.i]:bounds$end[.i]])
+    }, numeric(1))
+    expect_equal(compute_local_mean(x, bounds), reference)
+})
+
+test_that("compute_local_mean handles NA and Inf", {
+    x <- c(1, 2, NA, 4, 5)
+    bounds <- compute_window_bounds(seq_along(x), width = 3)
+
+    ## NA propagates unless dropped
+    result <- compute_local_mean(x, bounds, na.rm = FALSE)
+    expect_equal(is.na(result), c(FALSE, TRUE, TRUE, TRUE, FALSE))
+    expect_equal(compute_local_mean(x, bounds, na.rm = TRUE), c(1.5, 1.5, 3, 4.5, 4.5))
+
+    ## all-NA window returns NA, not NaN
+    result <- compute_local_mean(c(NA, NA, NA, 4, 5), bounds, na.rm = TRUE)
+    expect_true(is.na(result[1]) && !is.nan(result[1]))
+
+    ## Inf treated as missing: later windows unaffected
+    result <- compute_local_mean(c(1, Inf, 3, 4, 5), bounds, na.rm = TRUE)
+    expect_equal(result[4:5], c(4, 4.5))
+    expect_true(all(is.finite(result)))
+})
+
+test_that("compute_local_mean min_obs excludes partial windows", {
+    x <- as.numeric(1:10)
+    bounds <- compute_window_bounds(seq_along(x), width = 5)
+    result <- compute_local_mean(x, bounds, min_obs = 5L)
+
+    ## edge windows span fewer than 5 samples
+    expect_true(all(is.na(result[c(1:2, 9:10)])))
+    expect_equal(result[3:8], as.numeric(3:8))
+})
+
+test_that("compute_local_mean floating point error stays below resolution", {
+    ## cumsum differencing loses relative precision over long vectors;
+    ## absolute error must stay far below NIRS measurement resolution
+    set.seed(42)
+    n <- 1e5
+    bounds <- compute_window_bounds(seq_len(n), width = 15)
+    check_idx <- c(1:100, seq(1000, n, by = 1000), (n - 99):n)
+    naive <- function(x) {
+        vapply(check_idx, \(.i) {
+            mean(x[bounds$start[.i]:bounds$end[.i]])
+        }, numeric(1))
+    }
+
+    ## realistic NIRS magnitudes
+    x <- runif(n, 60, 70) + rnorm(n, sd = 0.1)
+    expect_lt(max(abs(compute_local_mean(x, bounds)[check_idx] - naive(x))), 1e-8)
+
+    ## large offset with small signal: worst case for cancellation error
+    x <- 1e4 + rnorm(n, sd = 0.01)
+    expect_lt(max(abs(compute_local_mean(x, bounds)[check_idx] - naive(x))), 1e-6)
+})
+
+## Test window_min_obs() ================================================
+test_that("window_min_obs returns width or converted span", {
+    t <- seq(0, 99, by = 0.5) ## sample rate = 2
+
+    expect_equal(window_min_obs(width = 5, span = NULL, t), 5)
+    ## min_n floor applies
+    expect_equal(window_min_obs(width = 1, span = NULL, t, min_n = 2L), 2)
+
+    ## span converted via sample rate, less two-sample buffer
+    expect_equal(window_min_obs(width = NULL, span = 5, t), 8)
+    expect_equal(window_min_obs(width = NULL, span = 1, t, min_n = 2L), 2)
+})
+
+## Test median_no_na() ==================================================
+test_that("median_no_na matches median with na.rm", {
+    expect_identical(median_no_na(c(3, 1, 2)), median(c(3, 1, 2)))
+    ## even-n mean-of-pair identical to median.default on doubles
+    expect_identical(median_no_na(c(0.1, 0.2, 0.3, 0.7)), median(c(0.1, 0.2, 0.3, 0.7)))
+    expect_identical(
+        median_no_na(c(1, NA, 3, 2)),
+        median(c(1, NA, 3, 2), na.rm = TRUE)
+    )
+    expect_identical(median_no_na(numeric(0)), NA_real_)
+    expect_identical(median_no_na(c(NA_real_, NA_real_)), NA_real_)
+})
+
+## Test col_medians_padded() ============================================
+test_that("col_medians_padded matches per-column median", {
+    set.seed(1)
+    m <- matrix(runif(35, 60, 70), nrow = 5)
+    ## NA padding with mixed even/odd valid counts per column
+    m[1, 2] <- NA
+    m[1:2, 3] <- NA
+    m[1:4, 4] <- NA
+    m[, 5] <- NA
+
+    result <- col_medians_padded(m)
+    expect_equal(result, unname(apply(m, 2, median, na.rm = TRUE)))
+    expect_true(is.na(result[5])) ## all-NA column
 })

@@ -361,7 +361,7 @@ replace_invalid <- function(
             span,
             env = env
         )
-        local_medians <- compute_local_fun(y, window_idx, median_nona)
+        local_medians <- compute_local_fun(y, window_idx, median_no_na)
         ## if method = "median"
         ## invalid_values removed to NA first,
         ## so returns local median excluding idx
@@ -548,7 +548,7 @@ replace_missing <- function(
         y <- x
         na_idx <- which(is.na(x))
         window_idx <- compute_valid_neighbours(x, t, width, span, verbose, env)
-        local_medians <- compute_local_fun(x, window_idx, median_nona)
+        local_medians <- compute_local_fun(x, window_idx, median_no_na)
         y[na_idx] <- local_medians
     }
 
