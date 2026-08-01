@@ -109,7 +109,7 @@ rolling_slope <- function(
     align <- match.arg(align)
 
     insufficient_warn <- c(
-        "!" = "Insufficient valid samples detected in {.fn froll_slope}.",
+        "!" = "Insufficient valid samples detected in {.fn rolling_slope}.",
         "i" = "Check length of {.arg x} and {.arg width} or {.arg span}, \\
         or specify {.arg partial} = {.val {TRUE}}."
     )
@@ -137,14 +137,8 @@ rolling_slope <- function(
         validate_width_span(width, span, verbose, env = env)
     }
 
-    ## min_obs default to estimated width when span is specified
-    min_obs <- if (partial) {
-        2L
-    } else {
-        ## less strict span_width - 2 to allow start & end buffer
-        ## with irregular t values
-        max(width %||% (floor(span * estimate_sample_rate(t, env)) - 2L), 2L)
-    }
+    ## a slope needs two samples regardless of window size
+    min_obs <- if (partial) 2L else window_min_obs(width, span, t, 2L, env)
 
     if (n < min_obs) {
         if (verbose) {

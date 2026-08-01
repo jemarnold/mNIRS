@@ -1,7 +1,7 @@
 #' Computes rolling local values
 #'
-#' `compute_local_windows()`: Compute a list of rolling window indices along a
-#' time variable `t`.
+#' `compute_window_bounds()`: Compute the start and end indices of rolling
+#' windows along a time variable `t`.
 #'
 #' @param idx A numeric vector of indices of `t` at which to calculate local
 #'   windows. All indices of `t` by *default*, or can be used to only calculate
@@ -17,9 +17,8 @@
 #' @inheritParams replace_invalid
 #'
 #' @returns
-#' `compute_local_windows()`: A list the same length as `idx` and the same or
-#'   shorter length as `t` with numeric vectors of sample indices of length
-#'   `width` samples or `span` units of time `t`.
+#' `compute_window_bounds()`: A `list()` with `start` and `end` integer vectors
+#'   the same length as `idx`, giving the inclusive window bounds at each index.
 #'
 #' @details
 #' The local rolling window can be specified by either `width` as the number of
@@ -36,7 +35,7 @@
 #' @rdname compute_helpers
 #' @inheritParams validate_mnirs
 #' @keywords internal
-compute_local_windows <- function(
+compute_window_bounds <- function(
     t,
     idx = seq_along(t),
     width = NULL,
@@ -78,7 +77,103 @@ compute_local_windows <- function(
     }
 
     ## inclusive of x[i] for detect outliers
-    return(Map(`:`, start_idx, end_idx))
+    return(list(start = start_idx, end = end_idx))
+}
+
+
+#' @description
+#' `compute_local_windows()`: Compute a list of rolling window indices along a
+#' time variable `t`.
+#'
+#' @returns
+#' `compute_local_windows()`: A list the same length as `idx` and the same or
+#'   shorter length as `t` with numeric vectors of sample indices of length
+#'   `width` samples or `span` units of time `t`.
+#'
+#' @rdname compute_helpers
+#' @keywords internal
+compute_local_windows <- function(
+    t,
+    idx = seq_along(t),
+    width = NULL,
+    span = NULL,
+    align = c("centre", "left", "right"),
+    env = rlang::caller_env()
+) {
+    bounds <- compute_window_bounds(t, idx, width, span, align, env)
+    return(Map(`:`, bounds$start, bounds$end))
+}
+
+
+#' @description
+#' `compute_local_mean()`: Compute rolling means from window bounds without
+#' materialising the windows.
+#'
+#' @param bounds A `list()` of `start` and `end` window index vectors from
+#'   `compute_window_bounds()`.
+#' @param min_obs The minimum number of samples a window must span to return a
+#'   value. Shorter (partial) windows return `NA`.
+#' @inheritParams replace_invalid
+#'
+#' @returns
+#' `compute_local_mean()`: A numeric vector the same length as `bounds$start`.
+#'
+#' @details
+#' `compute_local_mean()` differences cumulative sums, so cost is independent
+#'   of window size. Cumulative sums lose relative precision over long
+#'   vectors; for NIRS magnitudes the absolute error stays far below the
+#'   resolution of the measurement.
+#'
+#' @rdname compute_helpers
+#' @keywords internal
+compute_local_mean <- function(x, bounds, na.rm = FALSE, min_obs = 1L) {
+    ## non-finite treated as missing: an Inf left in the running sum would
+    ## return NaN for every later window, not only those containing it
+    ok <- is.finite(x)
+    ## prefix sums of values and of valid counts, offset by one for indexing
+    cum_x <- c(0, cumsum(ifelse(ok, x, 0)))
+    cum_n <- c(0L, cumsum(ok))
+
+    n_valid <- cum_n[bounds$end + 1L] - cum_n[bounds$start]
+    n_window <- bounds$end - bounds$start + 1L
+    y <- (cum_x[bounds$end + 1L] - cum_x[bounds$start]) / n_valid
+
+    ## missing values propagate unless dropped; partial windows fail min_obs
+    if (!na.rm) {
+        y[n_valid < n_window] <- NA_real_
+    }
+    y[n_window < min_obs | !is.finite(y)] <- NA_real_
+    return(y)
+}
+
+
+#' @description
+#' `window_min_obs()`: Minimum number of samples spanned by a complete window.
+#'
+#' @param min_n A lower bound on the returned number of samples.
+#'
+#' @returns
+#' `window_min_obs()`: An integer value.
+#'
+#' @details
+#' `window_min_obs()` converts `span` to a sample count via the estimated
+#'   sample rate, less two samples to buffer irregular `t` at the start and
+#'   end of each window.
+#'
+#' @rdname compute_helpers
+#' @keywords internal
+window_min_obs <- function(
+    width,
+    span,
+    t,
+    min_n = 1L,
+    env = rlang::caller_env()
+) {
+    ## `span` only converted when `width` is undefined
+    span_width <- function() {
+        floor(span * estimate_sample_rate(t, env)) - 2L
+    }
+    return(max(width %||% span_width(), min_n))
 }
 
 

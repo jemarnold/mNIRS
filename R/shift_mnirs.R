@@ -228,36 +228,20 @@ shift_mnirs <- function(
                 na.rm = TRUE
             )
         } else {
-            ## find local windows within width/span centred around idx
-            window_idx <- compute_local_windows(
-                t = t_vec, width = .a$width, span = .a$span, env = env
-            )
-
-            ## exclude partial windows to avoid bias on noise
-            ## min_obs default to estimated width when span is specified
-            ## less strict span_width - 2 to allow start & end buffer
-            ## with irregular t values
-            min_obs <- max(
-                .a$width %||%
-                    (floor(.a$span * estimate_sample_rate(t_vec, env)) - 2L),
-                1L
-            )
-            window_idx <- window_idx[lengths(window_idx) >= min_obs]
-
-            ## no complete window: reference would be Inf/-Inf
-            if (length(window_idx) == 0L) {
-                cli_abort(c(
-                    "x" = "Insufficient valid samples detected.",
-                    "i" = "{.arg width} or {.arg span} must be smaller than \\
-                    the range of {.arg data}."
-                ), call = env)
-            }
-
+            ## local means exclude partial windows, so tapered windows at the
+            ## edges cannot bias the min/max reference toward noise
             shift_fun <- match.fun(.a$position)
-            ## compute min or max along local means per channel
             shift_values <- vapply(data[.cols], \(.x) {
                 shift_fun(
-                    compute_local_fun(.x, window_idx, mean, na.rm = TRUE),
+                    filter_ma(
+                        .x,
+                        t = t_vec,
+                        width = .a$width,
+                        span = .a$span,
+                        na.rm = TRUE,
+                        verbose = FALSE,
+                        env = env
+                    ),
                     na.rm = TRUE
                 )
             }, numeric(1))
