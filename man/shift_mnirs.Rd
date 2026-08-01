@@ -118,6 +118,10 @@ through without processing to the output data frame.
 \code{nirs_channels} and \code{time_channel} can be retrieved automatically from
 \code{data} of class \emph{"mnirs"} which has been processed with \code{{mnirs}},
 if not defined explicitly.
+
+When \code{position} is \emph{"min"} or \emph{"max"}, only full windows of \code{width} or
+\code{span} are considered, to avoid bias from noise at edge conditions with
+partial samples.
 }
 \section{Per-channel arguments}{
 

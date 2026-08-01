@@ -56,6 +56,10 @@
 #' `nirs_channels` and `time_channel` can be retrieved automatically from
 #'   `data` of class *"mnirs"* which has been processed with `{mnirs}`,
 #'   if not defined explicitly.
+#' 
+#' When `position` is *"min"* or *"max"*, only full windows of `width` or 
+#'   `span` are considered, to avoid bias from noise at edge conditions with
+#'   partial samples.
 #'
 #' @section Per-channel arguments:
 #'
@@ -225,10 +229,30 @@ shift_mnirs <- function(
             )
         } else {
             ## find local windows within width/span centred around idx
-            ## TODO need to fix edges. Should be partial = FALSE
             window_idx <- compute_local_windows(
                 t = t_vec, width = .a$width, span = .a$span, env = env
             )
+
+            ## exclude partial windows to avoid bias on noise
+            ## min_obs default to estimated width when span is specified
+            ## less strict span_width - 2 to allow start & end buffer
+            ## with irregular t values
+            min_obs <- max(
+                .a$width %||%
+                    (floor(.a$span * estimate_sample_rate(t_vec, env)) - 2L),
+                1L
+            )
+            window_idx <- window_idx[lengths(window_idx) >= min_obs]
+
+            ## no complete window: reference would be Inf/-Inf
+            if (length(window_idx) == 0L) {
+                cli_abort(c(
+                    "x" = "Insufficient valid samples detected.",
+                    "i" = "{.arg width} or {.arg span} must be smaller than \\
+                    the range of {.arg data}."
+                ), call = env)
+            }
+
             shift_fun <- match.fun(.a$position)
             ## compute min or max along local means per channel
             shift_values <- vapply(data[.cols], \(.x) {

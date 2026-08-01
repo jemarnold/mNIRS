@@ -116,6 +116,64 @@ test_that("shift_mnirs handles position = 'max' correctly", {
     expect_equal(result$ch1, 91:100)
 })
 
+test_that("shift_mnirs min/max reference ignores partial edge windows", {
+    ## tapered edge windows average fewer samples, so a noisy edge sample is
+    ## diluted less and would otherwise be selected as the reference
+    spike <- tibble(time = 0:59, ch1 = c(70, rep(100, 59)))
+
+    shift_ref <- function(data, ...) {
+        result <- shift_mnirs(
+            data,
+            nirs_channels = "ch1",
+            time_channel = "time",
+            to = 0,
+            verbose = FALSE,
+            ...
+        )
+        ## reference value recovered from the shift applied to a known sample
+        data$ch1[[2L]] - result$ch1[[2L]]
+    }
+
+    ## width: complete windows give (70 + 10 * 100) / 11, not the partial 95
+    expect_equal(shift_ref(spike, width = 11, position = "min"), 1070 / 11)
+
+    ## span: min_obs is floor(span * sample_rate) - 2 == 8 samples = 70 + 7*100
+    expect_equal(shift_ref(spike, span = 10, position = "min"), 770 / 8)
+
+    drop <- tibble(time = 0:59, ch1 = c(130, rep(100, 59)))
+    ## max mirrors min at the same edge
+    expect_equal(
+        shift_ref(drop, width = 11, position = "max"),
+        1130 / 11
+    )
+    expect_equal(
+        shift_ref(drop, span = 10, position = "max"),
+        830 / 8
+    )
+
+    ## a clean monotonic decline is biased by the trailing window alone
+    decline <- tibble(time = 0:59, ch1 = seq(100, 50, length.out = 60))
+    expect_equal(
+        shift_ref(decline, width = 11, position = "min"),
+        mean(decline$ch1[50:60])
+    )
+})
+
+test_that("shift_mnirs errors when width exceeds the data range", {
+    expect_error(
+        shift_mnirs(
+            tibble(time = 1:5, ch1 = 1:5),
+            nirs_channels = "ch1",
+            time_channel = "time",
+            to = 0,
+            width = 11,
+            position = "min",
+            verbose = FALSE
+        ),
+        "Insufficient valid samples"
+    )
+})
+
 test_that("shift_mnirs handles position = 'first' with span and width", {
     data <- tibble(
         time = seq(0, 9, by = 1),
