@@ -51,8 +51,10 @@ lap numbers.
 values for ensemble-averaging. If \code{NULL}, will be estimated from
 \code{time_channel} (see \emph{Details}).}
 
-\item{group_intervals}{Either a character string or a \code{list()} of integer
-vectors specifying how to group intervals (see \emph{Details}).
+\item{group_intervals}{Either a character string or a non-empty \code{list()} of
+non-empty integer-valued numeric vectors specifying how to group intervals
+(see \emph{Details}). Custom indices must be between \code{1} and the number of
+detected intervals.
 \describe{
 \item{\code{"distinct"}}{The default. Extract each interval as an independent
 data frame.}

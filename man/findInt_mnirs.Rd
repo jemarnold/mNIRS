@@ -4,7 +4,7 @@
 \alias{findInt_mnirs}
 \title{wrap findInterval: informative 'time_channel' error message}
 \usage{
-findInt_mnirs(..., env = rlang::caller_env())
+findInt_mnirs(x, vec, ..., env = rlang::caller_env())
 }
 \description{
 wrap findInterval: informative 'time_channel' error message

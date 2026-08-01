@@ -96,7 +96,7 @@ regardless of \code{method}:
 \item For \code{method = "none"}, existing rows are matched to the nearest original
 values of \code{time_channel} without interpolation or filling, meaning newly
 created samples and any \code{NA}s in the original data are returned as \code{NA}.
-\item When down-sampling, numeric columns use time-weighted averaging.
+\item When down-sampling, numeric columns use linear interpolation averaging.
 Non-numeric columns use the first valid value in each output bin.
 }
 }

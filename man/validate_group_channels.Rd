@@ -15,24 +15,24 @@ validate_group_channels(
 \item{nirs_channels}{Character vector of resolved channel names.}
 
 \item{group_channels}{A quosure from \code{rlang::enquo()}, a character
-string (\code{"ensemble"} or \code{"distinct"}), or a \code{list()} of channel-name
-vectors. Lists may be named; unnamed groups are keyed by their first
-member.}
+string (\code{"ensemble"} or \code{"distinct"}), or a \code{list()} of (optionally named)
+channel-name vectors.}
 
 \item{data}{A data frame for parsing bare-symbol group members.}
 
 \item{env}{Environment for symbol evaluation.}
 }
 \value{
-A named list of character vectors covering all
-\code{nirs_channels}, each channel appearing in exactly one group.
+A uniquely named list of non-empty character vectors covering
+all \code{nirs_channels}, each channel appearing in exactly one group.
 }
 \description{
 Converts the \code{group_channels} argument to a named list of channel-name
 vectors. String shortcuts expand against \code{nirs_channels}: \code{"ensemble"}
 places all channels in one group (preserving relative scaling) and
 \code{"distinct"} places each channel in its own group. Custom \code{list()}
-groupings may use bare symbols or character names; channels omitted
+groupings may use bare symbols or character names. Groups must be
+non-empty and their resulting names must be unique. Channels omitted
 from a custom grouping are processed independently, matching
 \code{group_intervals} behaviour in \code{\link[=extract_intervals]{extract_intervals()}}.
 }

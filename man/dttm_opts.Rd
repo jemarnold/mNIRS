@@ -7,6 +7,7 @@
 dttm_opts
 }
 \description{
-Datetime format strings for POSIXct parsing
+Time-only format must stay first: \code{parse_time_channel()} splits on
+\code{dttm_opts[1L]} vs \code{dttm_opts[-1L]} to detect an absolute date-time series.
 }
 \keyword{internal}

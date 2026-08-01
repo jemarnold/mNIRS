@@ -34,7 +34,8 @@ preserving the relative scaling between channels.}
 the relative scaling between channels.}
 \item{\code{list(c("A", "B"), c("C", "D"))}}{Operate on channels \code{A} & \code{B}
 in one group, and \code{C} & \code{D} in another group. Groups can be named
-(e.g. \code{list(smo2 = c("A", "B"))}).}
+(e.g. \code{list(smo2 = c("A", "B"))}). Each group must be non-empty
+and resulting group names must be unique.}
 }}
 
 \item{range}{A numeric vector in the form \code{c(min, max)}, indicating the

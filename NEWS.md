@@ -1,6 +1,175 @@
-# mnirs 0.6.6
+# mnirs 0.7.0
 
-* Performance improvements with `read_mnirs()` and especially `replace_mnirs` / `replace_outliers`, which creates a significant bottleneck with large files (still slow, but now 30+% less slow).
+## Highlights
+
+This minor version update includes mostly internal refactoring, but enough user-facing changes and a few breaking deprecations, so that it's more than just a patch. This version lays the foundation for the incoming (hopefully soon) *mnirs* `analyse_kinetics` suite of functions.
+
+## Working with lists and grouped data frames
+
+* Core processing functions (`resample_mnirs()`, `replace_mnirs()`, `filter_mnirs()`, `shift_mnirs()`, and `rescale_mnirs()`) now accept as the `data` input either a single data frame, a list of data frames, or a grouped data frame (requires `{dplyr}`). Single data frames are processed and returned directly, as previously. Listed and grouped data frames are each processed independently and returned as a named list.
+
+* `extract_intervals()` now also accepts a list of data frames or a grouped data frame and returns one flattened, named list of extracted intervals.
+
+``` r
+replace_mnirs(
+    data = list(df1, df2),
+    outlier_cutoff = 3,
+    span = 5
+)
+#> $interval_1
+#> # A tibble:
+#>     time  smo2    o2hb
+#>    <dbl> <dbl>   <dbl>
+#>  1   0    42.8 -0.0289
+#>  2   0.1  42.8 -0.0524
+#>  3   0.2  42.8 -0.0916
+#>  4   0.3  42.9 -0.138 
+#>  5   0.4  43.2 -0.205 
+#> 
+#> $interval_2
+#> # A tibble:
+#>     time  smo2  o2hb
+#>    <dbl> <dbl> <dbl>
+#>  1   9.9  51.7 -2.29
+#>  2  10    51.7 -2.32
+#>  3  10.1  51.8 -2.31
+#>  4  10.2  52.2 -2.22
+#>  5  10.3  52.4 -2.12
+```
+
+## Channel grouping and processing
+
+* **BREAKING CHANGE**: `extract_intervals()`, `shift_mnirs()`, and `rescale_mnirs()` gain argument `group_channels`, which separates channel selection from channel grouping. `nirs_channels` selects channels; the new `group_channels` argument channels specifies *"distinct"*, *"ensemble"*, or custom channel groupp construction.
+
+``` r
+shift_mnirs(
+    data,
+    nirs_channels = c(smo2, o2hb),
+    group_channels = "ensemble",
+    to = 0,
+    span = 5
+)
+```
+
+* `filter_mnirs()` and `replace_mnirs()` now accept named lists for channel-specific processing arguments, in addition to a single global value as previously. `rescale_mnirs()` and `shift_mnirs()` accept processing arguments specified by channel or group. This way each `nirs_channel` can be processed with unique parameters.
+
+``` r
+filter_mnirs(
+    data,
+    nirs_channels = c(smo2, o2hb),
+    method = list(smo2 = "moving_average", o2hb = "butterworth"),
+    span = 5,     ## only used by "moving_average" channels
+    order = 2,    ## only used by "butterworth" channels (and below args)
+    W = 0.02,
+    type = "low",
+    na.rm = TRUE
+)
+```
+
+## Function and argument renaming
+
+* `filter_butterworth()` and `filter_moving_average()` are now the renamed canonical functions. `filter_butter()` and `filter_ma()` remain available as aliases.
+
+* **BREAKING CHANGE**: `extract_intervals()` new argument `group_intervals` replaces deprecated `event_groups`. This is where interval grouping is specified for *"distinct"* or *"ensemble"*-averaged, or custom group list construction.
+
+``` r
+interval_list <- extract_intervals(
+    data,
+    nirs_channels = c(smo2_left, smo2_right),
+    group_intervals = "ensemble",
+    start = by_time(368, 1084),
+    span = c(-20, 90)
+)
+#> $ensemble
+#> # A tibble:
+#>     time smo2_left smo2_right
+#>    <dbl>     <dbl>      <dbl>
+#>  1 -20        56.3       59.2
+#>  2 -19.9      56.1       59.2
+#>  3 -19.8      56.1       59.2
+#>  4 -19.7      56.2       58.9
+#>  5 -19.6      56.4       58.9
+```
+
+
+## Performance improvements & bug fixes
+
+### `read_mnirs()`
+
+* Improved reading of delimited files containing extra spaces around quoted values.
+* Documented support for `.txt` files.
+* Made automatic device and channel detection more efficient and improved related messages.
+* `nirs_channel` now identified before type conversion, ensuring coercion to numeric.
+* Added a warning when all values in `nirs_channels` become missing during numeric coercion.
+* Improved handling of timestamp values; absolute date-times, time-only values, header timestamps, and POSIXct-type `time_channel` column.
+* Refined `sample_rate` detection and warnings for irregular samples.
+
+### `create_mnirs_data()`
+
+* Grouped data now remain grouped when *mnirs* metadata is added or refreshed.
+
+### `resample_mnirs()`
+
+* `data` arg now accepts a list or grouped data frame and returns one processed data frame per data frame.
+* Clarified documentation that downsampling numeric columns uses averages based on linear interpolation, rather than time-weighted averages.
+
+### `replace_mnirs()`
+
+* `data` arg now accepts a list or grouped data frame and returns one processed data frame per data frame.
+* Arguments can be specified per-`nirs_channels` as named lists.
+* Improved performance via local-median calculations when values are missing.
+* Made fixed-width outlier detection faster by calculating rolling medians across many windows together.
+* Added clearer checks for invalid window settings and unsorted or missing time values.
+
+### `filter_mnirs()`
+
+* `data` arg now accepts a list or grouped data frame and returns one processed data frame per data frame.
+* Arguments can be specified per-`nirs_channels` as named lists.
+* Filter settings such as `spar`, `W`, `fc`, `width`, and `span` are now explicit function arguments, making available options easier to discover.
+* Simplified filter selection so each channel is sent directly to its chosen filter method.
+* `filter_butterworth()` and `filter_moving_average()` are now the main worker functions; `filter_butter()` and `filter_ma()` remain available as aliases.
+* Improved checks and messages for missing values, cutoff frequencies, window sizes, and unsupported settings.
+
+### `shift_mnirs()`
+
+* `data` arg now accepts a list or grouped data frame and returns one processed data frame per data frame.
+* Arguments can be specified per-`nirs_channels` as named lists, or per-named group via `group_channels` (see below).
+* **BREAKING CHANGE**: Channel grouping through a list to process channels together is now supplied to `group_channels`. Supplying a list to `nirs_channels` is deprecated.
+* `nirs_channels` now defaults to `NULL`, allowing channels to be taken from *mnirs* metadata as elsewhere in the package.
+
+### `rescale_mnirs()`
+
+* `data` arg now accepts a list or grouped data frame and returns one processed data frame per data frame.
+* Arguments can be specified per-`nirs_channels` as named lists, or per-named group via `group_channels` (see below).
+* **BREAKING CHANGE**: Channel grouping through a list to process channels together is now supplied to `group_channels`. Supplying a list to `nirs_channels` is deprecated.
+* `nirs_channels` now defaults to `NULL`, allowing channels to be taken from *mnirs* metadata as elsewhere in the package.
+
+### `extract_intervals()`
+
+* `data` arg now accepts a list or grouped data frame and returns *one named list* with interval names that identify their source data frame and interval sequence number.
+* Arguments can be specified per-`nirs_channels` as named lists.
+* **BREAKING CHANGE**: Interval grouping for ensemble-averaging is now supplied to `group_intervals`, renamed from `event_groups`. `event_groups` is now deprecated.
+* **BREAKING CHANGE**: Channel grouping through a list to process channels together is now supplied to `group_channels`. Supplying a list to `nirs_channels` is deprecated.
+* Added checks for interval groups and their selected channels, with clearer errors for invalid group numbers, unknown channels, and invalid time boundaries.
+* Updated ensemble averaging so each interval group can use its own per-channel argument selection.
+* Improved naming, zero-time handling, and preservation of *mnirs* metadata in extracted intervals.
+
+### `plot.mnirs()`
+
+* `data` arg accepts a list or grouped data frame and returns facetted plots per data frame (existing functionality since *mnirs 0.6.3*, documenting for clarity).
+* Time (x-) axis now displays units `mm:ss` for data lasting less than one hour and `h:mm:ss` for longer data.
+* Facets now follow the order of intervals in the input instead of being reordered alphabetically.
+* Improved error messages for empty or invalid lists of data frames.
+
+### Internal validation & shared functions
+
+* Improved errors and warnings package-wide so they point to the function called by the user rather than an internal checking function.
+* Added `as_data_list.R` containing shared support for processing `data` argument from one data frame, a list of data frames, or a grouped data frame. Existing *mnirs* metadata is kept for each interval.
+* Added `channel_args.R` containing shared support for setting processing options separately for each `nirs_channel` or per-group (for `shift_mnirs()`, `replace_mnirs()`, and `extract_intervals()`) as a list named by `nirs_channels`. One (vector) value can still be supplied to all channels by default.
+* Added clear warnings for unknown channel names and errors for conflicting values within a group.
+
+
+
 
 # mnirs 0.6.5
 

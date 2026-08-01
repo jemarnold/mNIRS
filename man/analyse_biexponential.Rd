@@ -8,7 +8,7 @@ analyse_biexponential(
   data,
   nirs_channels = NULL,
   time_channel = NULL,
-  use_TD = TRUE,
+  use_TD = FALSE,
   fix = NULL,
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
