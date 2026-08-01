@@ -152,7 +152,9 @@ resample_mnirs <- function(
         ## the closer of the left/right neighbours. `left.open = TRUE`
         ## ensures that on duplicate t_vec values the *first* duplicate
         ## wins (matches the previous "first match" tie-breaking).
-        left <- findInt_mnirs(t_out, t_vec, all.inside = TRUE, left.open = TRUE)
+        left <- validate_findInt(
+            t_out, t_vec, all.inside = TRUE, left.open = TRUE
+        )
         right <- pmin(left + 1L, n_vec)
         ## branchless nearest-pick; left wins on tie
         idx <- left
@@ -193,7 +195,7 @@ resample_mnirs <- function(
         } else if (n_out < n_vec) {
             ## down-sample: assign each original sample to its output bin,
             ## take first non-NA value falling in each bin (or NA if all NA)
-            bin <- pmin(pmax(findInt_mnirs(t_vec, t_out), 1L), n_out)
+            bin <- pmin(pmax(validate_findInt(t_vec, t_out), 1L), n_out)
             out[idx_names] <- lapply(data_list[idx_names], \(.x) {
                 ok <- which(!is.na(.x))
                 .x[ok[match(seq_len(n_out), bin[ok])]]
@@ -201,7 +203,7 @@ resample_mnirs <- function(
         } else {
             ## up-sample / regularise: assign each output sample to
             ## most recent original sample at or before current
-            idx <- findInt_mnirs(t_out, t_vec, rightmost.closed = FALSE)
+            idx <- validate_findInt(t_out, t_vec, rightmost.closed = FALSE)
             idx[idx == 0L] <- 1L
             out[idx_names] <- lapply(data_list[idx_names], \(.x) .x[idx])
         }

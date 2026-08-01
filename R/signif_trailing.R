@@ -224,7 +224,7 @@ signif_pvalue <- function(
     x[is.infinite(x)] <- NA_real_
 
     if (display == "symbol" && symbol_repeat) {
-        return(strrep(symbol, 3L - findInt_mnirs(x, c(0.001, 0.01, alpha))))
+        return(strrep(symbol, 3L - validate_findInt(x, c(0.001, 0.01, alpha))))
     }
     if (display == "symbol") {
         return(ifelse(x >= alpha, "", symbol))

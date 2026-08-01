@@ -628,7 +628,7 @@ validate_fix <- function(fix, params, env = rlang::caller_env()) {
 
 #' wrap findInterval: informative 'time_channel' error message
 #' @keywords internal
-findInt_mnirs <- function(x, vec, ..., env = rlang::caller_env()) {
+validate_findInt <- function(x, vec, ..., env = rlang::caller_env()) {
     if (anyNA(vec) || is.unsorted(vec)) {
         cli_abort(c(
             "x" = "Irregular {.arg time_channel} samples detected.",

@@ -296,7 +296,6 @@ test_that("SSlogistic() 5-param recovers asym < 0.5 (early acceleration)", {
 
 test_that("SSlogistic() 4-param converges on most random realisations", {
     skip("Manual fit convergence check")
-    skip_if(!interactive(), "Manual fit convergence check")
     ## quantify fit success rate for the 4-param symmetric form;
     ## should be highly reliable across varied true xmid/slope values
     n_rep <- 1000L
@@ -340,7 +339,6 @@ test_that("SSlogistic() 4-param converges on most random realisations", {
 
 test_that("SSlogistic() 5-param converges on most random realisations", {
     skip("Manual fit convergence check")
-    skip_if(!interactive(), "Manual fit convergence check")
 
     ## quantify fit success rate across noisy realisations spanning asym range;
     ## the 5-param model is known to be fragile
@@ -379,9 +377,8 @@ test_that("SSlogistic() 5-param converges on most random realisations", {
 
 test_that("SSlogistic() converges on real dataset", {
     skip("Manual fit convergence check")
-    skip_if(!interactive(), "Manual fit convergence check")
+    
     file_path <- test_path("testdata/reoxy_list.rds")
-    skip_if_not(file.exists(file_path), "testdata not available")
 
     ## 65 real_world reoxy intervals
     reoxy_list <- readRDS(file_path)
@@ -611,9 +608,8 @@ test_that("SSgompertz() handles falling curves (B < A)", {
 
 test_that("SSgompertz()/SSgompertz_left() converge on real dataset", {
     skip("Manual fit convergence check")
-    skip_if(!interactive(), "Manual fit convergence check")
+    
     file_path <- test_path("testdata/reoxy_list.rds")
-    skip_if_not(file.exists(file_path), "testdata not available")
 
     reoxy_list <- readRDS(file_path)
 

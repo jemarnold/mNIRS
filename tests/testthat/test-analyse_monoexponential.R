@@ -836,9 +836,8 @@ test_that("extract model coefs", {
 
 test_that("SSmonoexponential() converges on real dataset", {
     skip("Manual fit convergence check")
-    skip_if(!interactive(), "Manual fit convergence check")
+    
     file_path <- test_path("testdata/reoxy_list.rds")
-    skip_if_not(file.exists(file_path), "testdata not available")
 
     ## 65 real_world reoxy intervals
     reoxy_list <- readRDS(file_path)

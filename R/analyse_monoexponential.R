@@ -66,8 +66,7 @@ monoexponential <- function(t, A, B, tau, TD = NULL) {
         y <- A + (B - A) * (1 - exp(-t / tau))
     } else {
         ## 4-parameter: with time delay
-        y <- A + (B - A) * (1 - exp(-(t - TD) / tau))
-        y[t < TD] <- A
+        y <- ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))
     }
     return(y)
 }
