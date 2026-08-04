@@ -298,6 +298,72 @@ test_that("as_plot_data unions nirs_channels across elements", {
     expect_equal(attr(result, "nirs_channels"), c("HHb", "O2Hb"))
 })
 
+test_that("as_plot_data maps each channel to the intervals declaring it", {
+    a <- structure(
+        data.frame(time = 1:3, HHb = 1:3),
+        class = c("mnirs", "data.frame"),
+        nirs_channels = "HHb",
+        time_channel = "time"
+    )
+    b <- structure(
+        data.frame(time = 1:3, HHb = 4:6, O2Hb = 7:9),
+        class = c("mnirs", "data.frame"),
+        nirs_channels = c("HHb", "O2Hb"),
+        time_channel = "time"
+    )
+    result <- as_plot_data(list(pre = a, post = b))
+
+    expect_equal(
+        attr(result, "channel_map"),
+        list(HHb = c("pre", "post"), O2Hb = "post")
+    )
+})
+
+## plot.mnirs() per-facet channels ============================
+test_that("plot.mnirs draws each channel only in declaring facets", {
+    a <- structure(
+        data.frame(time = 1:3, HHb = 1:3),
+        class = c("mnirs", "data.frame"),
+        nirs_channels = "HHb",
+        time_channel = "time"
+    )
+    b <- structure(
+        data.frame(time = 1:3, O2Hb = 4:6),
+        class = c("mnirs", "data.frame"),
+        nirs_channels = "O2Hb",
+        time_channel = "time"
+    )
+    p <- plot(as_plot_data(list(pre = a, post = b)))
+
+    ## one line layer per channel, each restricted to its own interval
+    expect_equal(as.character(unique(p$layers[[1L]]$data$interval)), "pre")
+    expect_equal(as.character(unique(p$layers[[2L]]$data$interval)), "post")
+
+    ## legend still spans the union of channels
+    expect_equal(attr(p$data, "nirs_channels"), c("HHb", "O2Hb"))
+})
+
+test_that("plot.mnirs ignores columns absent from nirs_channels", {
+    ## O2Hb column present but undeclared: must not be drawn in this facet
+    a <- structure(
+        data.frame(time = 1:3, HHb = 1:3, O2Hb = 10:12),
+        class = c("mnirs", "data.frame"),
+        nirs_channels = "HHb",
+        time_channel = "time"
+    )
+    b <- structure(
+        data.frame(time = 1:3, HHb = 4:6, O2Hb = 7:9),
+        class = c("mnirs", "data.frame"),
+        nirs_channels = c("HHb", "O2Hb"),
+        time_channel = "time"
+    )
+    p <- plot(as_plot_data(list(pre = a, post = b)))
+
+    o2_layer <- p$layers[[which(attr(p$data, "nirs_channels") == "O2Hb")]]
+    expect_equal(as.character(unique(o2_layer$data$interval)), "post")
+    expect_false(any(o2_layer$data$O2Hb %in% 10:12))
+})
+
 ## plot.mnirs() ===============================================
 test_that("na.omit removes rows with any NA in nirs_channels", {
     x <- mock_mnirs()
@@ -480,7 +546,7 @@ test_that("plot.mnirs works on lists", {
     expect_no_error(ggplot2::ggplot_build(p))
 })
 
-test_that("plot.mnirs() returns ggplot2 warnings for missing values", {
+test_that("plot.mnirs() does not warn when channels differ across facets", {
     a <- structure(
         data.frame(time = 1:3, HHb = 1:3),
         class = c("mnirs", "data.frame"),
@@ -495,11 +561,8 @@ test_that("plot.mnirs() returns ggplot2 warnings for missing values", {
     )
     result <- as_plot_data(x = list(a, b))
 
-    w <- tryCatch(
-        print(plot(result)),
-        warning = \(w) conditionMessage(w)
-    )
-    expect_match(w, "Removed.*containing missing")
+    ## padded NA rows are filtered per channel, so nothing is dropped at draw
+    expect_no_warning(print(plot(result)))
 })
 
 test_that("plot.mnirs moxy.perfpro works", {

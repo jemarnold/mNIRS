@@ -36,7 +36,9 @@ pak::pak("jemarnold/mnirs")
 
 ## Citation
 
-`<coming soon>`
+<https://cran.r-universe.dev/mnirs/citation>
+
+`<package manuscript coming soon>`
 
 ## Online App
 
@@ -93,7 +95,7 @@ data_raw <- read_mnirs(
 #> ! Estimated `sample_rate` = 2 Hz.
 #> ℹ Define `sample_rate` explicitly to override.
 #> Warning in read_mnirs(): ! Duplicate or irregular `time_channel` samples detected.
-#> ℹ `time` = 211.59 and 1183.6.
+#> ℹ time = 211.59 and 1183.6.
 #> ℹ Re-sample with `mnirs::resample_mnirs()`.
 
 ## Note the above info message that sample_rate was estimated correctly at 2 Hz 👆
