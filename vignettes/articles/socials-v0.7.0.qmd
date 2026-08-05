@@ -1,0 +1,190 @@
+---
+title: "mnirs 0.7.0 — social posts"
+format:
+    html:
+        embed-resources: true
+        toc: false
+execute:
+  echo: true
+  message: false
+  warning: false
+  dpi: 300
+  fig-align: center
+  out-width: "100%"
+knitr:
+    opts_chunk:
+        eval: false
+        collapse: true
+        comment: '#>'
+---
+
+## Post 1 — Intro
+
+{mnirs} R package for reading, processing, and analysing muscle near-infrared spectroscopy data🦵🔦 updated to 0.7.0 🎉
+
+Mostly internal changes getting ready for `mnirs::analyse_kinetics()` (soon!)
+
+Here are the key changes: 1/5🧵🔗👇 #rstats #nirs #muscleoxygenation
+
+
+![](../../man/figures/mnirs-hex.svg){width=200}
+
+------------------------------------------------------------------------
+
+## Post 2 — Lists & grouped data frames
+
+Core processing functions now accept a list of data frames or grouped dfs with `dplyr::group_by`
+
+You could `filter_mnirs()` over a list of dfs from multiple `read_mnirs()` files,
+
+Or `extract_intervals()` from a longer session and `rescale_mnirs()` each independently
+
+```{r}
+#| eval: true
+#| echo: false
+
+library(mnirs)
+library(ggplot2)
+
+options(pillar.print_max = 5, pillar.print_min = 5)
+
+theme_set(theme_mnirs())
+
+data <- read_mnirs(
+    file_path = example_mnirs("moxy_interval"),
+    nirs_channels = c(
+        smo2 = "SmO2 Live",
+        thb = "THb"
+    ),
+    time_channel = c(time = "hh:mm:ss")
+)
+
+data_list <- extract_intervals(
+    data,
+    nirs_channels = smo2,
+    group_intervals = "distinct",
+    start = by_time(124, 1210),
+    end = by_time(364, 1450),
+    span = c(-60, 120),
+    zero_time = TRUE
+)
+
+df1 <- data_list[[1L]]
+df2 <- data_list[[2L]]
+df1$thb <- NULL
+df2$thb <- NULL
+```
+
+```{r}
+#| eval: true
+
+data_list <- filter_mnirs(
+    data = list(df1, df2),
+    method = "butterworth",
+    type = "low",
+    order = 2,
+    W = 0.2
+)
+
+data_list
+
+plot(data_list)
+```
+
+------------------------------------------------------------------------
+
+## Post 3 — Per-channel arguments
+
+{mnirs} 0.7.0 can now process each nirs_channel with independent settings:
+
+You can replace invalid values with different criteria for "smo2" and "thb"
+
+Or filter_mnirs() one channel with "moving average" and another with "butterworth", side by side.
+
+```{r}
+#| eval: true
+#| echo: false
+
+
+
+lo <- c(275, 319, 490, 496, 550, 700, 702, 710, 722)
+hi <- c(240, 244, 800)
+data$smo2[lo] <- 0
+data$smo2[hi] <- 100
+set.seed(12)
+data$thb[lo] <- data$thb[lo] + rnorm(length(lo), 0, 1)
+data$thb[hi] <- data$thb[hi] + rnorm(length(hi), 0, 1)
+
+data <- rescale_mnirs(data, group_channels = "distinct", range = list(smo2 = c(0, 100), thb = c(00, 20)))
+
+```
+
+```{r}
+#| eval: true
+#| echo: true
+
+data_clean <- replace_mnirs(
+    data,
+    invalid_above = list(smo2 = 80, thb = 13), ## assign independent values
+    invalid_below = list(thb = 10),  ## assign only one channel, ...
+    invalid_values = list(smo2 = 0), ## or the other (with a warning)
+    method = "none"                  ## replace with NA
+)
+
+## rows where invalid values were replaced
+invalid <- data[is.na(data_clean$smo2) | is.na(data_clean$thb), ]
+
+## plot the clean data and overlay replaced invalid values
+plot(data_clean, time_labels = TRUE) +
+    geom_line(data = data, aes(y = smo2, colour = "smo2"), alpha = 0.2) +
+    geom_point(data = invalid, aes(y = smo2, colour = "smo2")) +
+
+    geom_line(data = data, aes(y = thb, colour = "thb"), alpha = 0.2) +
+    geom_point(data = invalid, aes(y = thb, colour = "thb"))
+```
+
+
+------------------------------------------------------------------------
+
+## Post 4 — `group_channels`
+
+A minor breaking change ⚠️ to `shift_mnirs()`, `replace_mnirs()`, and `extract_mnirs()`
+
+`group_channels` arg handles channels
+
+`group_intervals` arg handles intervals for `extract_intervals()` 
+
+Options are "distinct", "ensemble", or a custom group list
+
+```{r}
+#| eval: true
+
+data_rescaled <- rescale_mnirs(
+    data_clean,
+    nirs_channels = c(smo2, thb), ## pick the channels
+    group_channels = "distinct",  ## how they are grouped
+    range = c(0, 100),            ## same range for both channels
+)
+
+## `group_intervals replaces `event_groups`
+ensemble <- extract_intervals(
+    data_rescaled,
+    group_intervals = "ensemble",
+    start = by_time(124, 486, 848, 1210), ## extract four intervals,
+    end = by_time(364, 726, 1088, 1450),  ## return one ensemble-averaged
+    span = c(-10, 60)
+)
+
+ensemble
+
+plot(ensemble, time_labels = TRUE)
+```
+
+------------------------------------------------------------------------
+
+## Post 5 — link
+
+{mnirs} 0.7.0 can be downloaded from CRAN 🧑‍💻: `install.packages("mnirs")`
+
+More information on the {mnirs} package website: https://jemarnold.github.io/mnirs/index.html
+

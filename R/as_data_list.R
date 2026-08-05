@@ -87,8 +87,8 @@ as_data_list <- function(data, env = rlang::caller_env()) {
 #'   data frame is split by grouping levels and each group is processed as
 #'   a separate interval, returned as a named list.
 #'
-#' @returns A named list of processed *"mnirs"* data frames, one per
-#'   interval.
+#' @returns A named list of class *"mnirs"* containing processed *"mnirs"*
+#'   data frames, one per interval.
 #'
 #' @keywords internal
 map_mnirs_intervals <- function(
@@ -98,8 +98,12 @@ map_mnirs_intervals <- function(
     env = rlang::caller_env()
 ) {
     data_list <- as_data_list(data, env = env)
-    return(lapply(data_list, \(.df) {
+    result <- lapply(data_list, \(.df) {
         call$data <- .df
         eval(call, envir = eval_env)
-    }))
+    })
+    ## class list for `plot.mnirs()` / `print.mnirs()` dispatch
+    class(result) <- c("mnirs", class(result))
+
+    return(result)
 }

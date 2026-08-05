@@ -788,7 +788,6 @@ test_that("replace_mnirs global verbose works", {
 })
 
 test_that("replace_mnirs works visually on moxy data", {
-    skip_if_not_installed("ggplot2")
     skip("visual check of ggplots")
     data <- read_mnirs(
         file_path = example_mnirs("moxy_ramp.xlsx"),
