@@ -15,16 +15,13 @@
 ^[.]?air[.]toml$
 ^\.vscode$
 ^vignettes/articles$
-^cran-comments\.md$
-^mnirs_hexSticker\.R$
 mnirs-hex.*\.png$
 mnirs-hex-v.*\.svg$
-^CLAUDE\.md$
-^AGENTS\.md$
 ^tests/testthat/testdata$
 ^tests/profiles$
 ^\.claude$
 ^man/figures/README-mnirs-app\.gif$
 ^CRAN-SUBMISSION$
+^cran-comments\.md$
 ^README_files$
 ^README\.html$

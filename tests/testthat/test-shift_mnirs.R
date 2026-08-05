@@ -865,6 +865,8 @@ test_that("shift_mnirs() preserves grouping with external group_channels", {
 
 ## integration tests ================================================
 test_that("shift_mnirs works on Moxy", {
+    skip_if_not_installed("dplyr")
+
     data <- read_mnirs(
         file_path = example_mnirs("moxy_ramp.xlsx"),
         nirs_channels = c(smo2_left = "SmO2 Live", smo2_right = "SmO2 Live(2)"),
@@ -910,6 +912,8 @@ test_that("shift_mnirs works on Moxy", {
 })
 
 test_that("shift_mnirs(position = 'first') works on Moxy", {
+    skip_if_not_installed("dplyr")
+    
     data <- read_mnirs(
         file_path = example_mnirs("moxy_ramp.xlsx"),
         nirs_channels = c(smo2_left = "SmO2 Live", smo2_right = "SmO2 Live(2)"),
