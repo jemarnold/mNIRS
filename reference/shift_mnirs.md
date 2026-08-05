@@ -155,6 +155,10 @@ preferred over `span`.
 `data` of class *"mnirs"* which has been processed with `{mnirs}`, if
 not defined explicitly.
 
+When `position` is *"min"* or *"max"*, only full windows of `width` or
+`span` are considered, to avoid bias from noise at edge conditions with
+partial samples.
+
 ## Per-channel arguments
 
 Arguments apply globally to all `nirs_channels` by default. Relevant

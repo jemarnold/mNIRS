@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mnirs</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -40,7 +40,13 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.7.0" id="mnirs-070">mnirs 0.7.0<a class="anchor" aria-label="anchor" href="#mnirs-070"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.7.1" id="mnirs-071">mnirs 0.7.1<a class="anchor" aria-label="anchor" href="#mnirs-071"></a></h2>
+<ul><li><p><code><a href="../reference/shift_mnirs.html">shift_mnirs()</a></code> now properly excludes partial windows at data edges, where fewer samples can bias calculation of <em>“min”</em> or <em>“max”</em> shift values on noise.</p></li>
+<li><p><code><a href="../reference/replace_mnirs.html">replace_mnirs()</a></code>, <code><a href="../reference/shift_mnirs.html">shift_mnirs()</a></code>, and <code><a href="../reference/filter_moving_average.html">filter_moving_average()</a></code> should gain a serious performance improvement when calculating rolling means, at the cost of negligible loss of precision on the order of ± ~1e-11.</p></li>
+<li><p>Lists of data frames exported from core functions now contain <code>class = "mnirs"</code> and should now <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> properly.</p></li>
+</ul></div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.0" id="mnirs-070">mnirs 0.7.0<a class="anchor" aria-label="anchor" href="#mnirs-070"></a></h2><p class="text-muted">CRAN release: 2026-08-01</p>
 <div class="section level3">
 <h3 id="highlights-0-7-0">Highlights<a class="anchor" aria-label="anchor" href="#highlights-0-7-0"></a></h3>
 <p>This minor version update includes mostly internal refactoring, but enough user-facing changes and a few breaking deprecations, so that it’s more than just a patch. This version lays the foundation for the incoming (hopefully soon) <em>mnirs</em> <code>analyse_kinetics</code> suite of functions.</p>

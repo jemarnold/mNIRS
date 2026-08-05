@@ -15,7 +15,7 @@ to zero."><meta name="twitter:card" content="summary"><meta name="twitter:creato
 
     <a class="navbar-brand me-2" href="../index.html">mnirs</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -189,6 +189,9 @@ through without processing to the output data frame.</p></li>
 </ul><p><code>nirs_channels</code> and <code>time_channel</code> can be retrieved automatically from
 <code>data</code> of class <em>"mnirs"</em> which has been processed with <code>{mnirs}</code>,
 if not defined explicitly.</p>
+<p>When <code>position</code> is <em>"min"</em> or <em>"max"</em>, only full windows of <code>width</code> or
+<code>span</code> are considered, to avoid bias from noise at edge conditions with
+partial samples.</p>
     </div>
     <div class="section level2">
     <h2 id="per-channel-arguments">Per-channel arguments<a class="anchor" aria-label="anchor" href="#per-channel-arguments"></a></h2>

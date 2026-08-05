@@ -33,7 +33,6 @@
 <url><loc>https://jemarnold.github.io/mnirs/reference/filter_butterworth.html</loc></url>
 <url><loc>https://jemarnold.github.io/mnirs/reference/filter_mnirs.html</loc></url>
 <url><loc>https://jemarnold.github.io/mnirs/reference/filter_moving_average.html</loc></url>
-<url><loc>https://jemarnold.github.io/mnirs/reference/findInt_mnirs.html</loc></url>
 <url><loc>https://jemarnold.github.io/mnirs/reference/find_interval_time.html</loc></url>
 <url><loc>https://jemarnold.github.io/mnirs/reference/format_hmmss.html</loc></url>
 <url><loc>https://jemarnold.github.io/mnirs/reference/index.html</loc></url>
@@ -72,6 +71,7 @@
 <url><loc>https://jemarnold.github.io/mnirs/reference/shift_mnirs.html</loc></url>
 <url><loc>https://jemarnold.github.io/mnirs/reference/theme_mnirs.html</loc></url>
 <url><loc>https://jemarnold.github.io/mnirs/reference/train.red_intervals.csv.html</loc></url>
+<url><loc>https://jemarnold.github.io/mnirs/reference/validate_findInt.html</loc></url>
 <url><loc>https://jemarnold.github.io/mnirs/reference/validate_group_channels.html</loc></url>
 <url><loc>https://jemarnold.github.io/mnirs/reference/validate_interval_channels.html</loc></url>
 <url><loc>https://jemarnold.github.io/mnirs/reference/validate_mnirs.html</loc></url>

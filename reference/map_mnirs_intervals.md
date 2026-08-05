@@ -41,7 +41,8 @@ map_mnirs_intervals(data, call, eval_env, env = rlang::caller_env())
 
 ## Value
 
-A named list of processed *"mnirs"* data frames, one per interval.
+A named list of class *"mnirs"* containing processed *"mnirs"* data
+frames, one per interval.
 
 ## Data input formats
 

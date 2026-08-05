@@ -1,6 +1,27 @@
 # Changelog
 
+## mnirs 0.7.1
+
+- [`shift_mnirs()`](https://jemarnold.github.io/mnirs/reference/shift_mnirs.md)
+  now properly excludes partial windows at data edges, where fewer
+  samples can bias calculation of *“min”* or *“max”* shift values on
+  noise.
+
+- [`replace_mnirs()`](https://jemarnold.github.io/mnirs/reference/replace_mnirs.md),
+  [`shift_mnirs()`](https://jemarnold.github.io/mnirs/reference/shift_mnirs.md),
+  and
+  [`filter_moving_average()`](https://jemarnold.github.io/mnirs/reference/filter_moving_average.md)
+  should gain a serious performance improvement when calculating rolling
+  means, at the cost of negligible loss of precision on the order of ±
+  ~1e-11.
+
+- Lists of data frames exported from core functions now contain
+  `class = "mnirs"` and should now
+  [`plot()`](https://rdrr.io/r/graphics/plot.default.html) properly.
+
 ## mnirs 0.7.0
+
+CRAN release: 2026-08-01
 
 ### Highlights
 

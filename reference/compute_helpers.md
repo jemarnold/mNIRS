@@ -1,15 +1,22 @@
 # Computes rolling local values
 
-`compute_local_windows()`: Compute a list of rolling window indices
-along a time variable `t`.
+`compute_window_bounds()`: Compute the start and end indices of rolling
+windows along a time variable `t`.
 
-`median_nona()`: Fast median for numeric vectors. Strips `NA`s and
-replicates `median.default` arithmetic without S3 dispatch.
+`window_sums()`: Windowed sums by cumulative-sum differencing.
+
+`window_min_obs()`: Minimum number of samples spanned by a complete
+window.
+
+`compute_local_mean()`: Compute rolling means from window bounds.
 
 `compute_local_fun()`: Compute a rolling function along `x` from a list
 of rolling sample windows.
 
-`col_medians_padded()`: Column medians of an `NA`-padded numeric matrix
+`median_no_na()`: Fast median for numeric vectors. Strips `NA`s and
+replicates `median.default` arithmetic without S3 dispatch.
+
+`compute_col_medians()`: Column medians of an `NA`-padded numeric matrix
 via a single radix sort. `NA`s sort last per column; medians indexed
 from per-column valid counts. Matches `median(w, na.rm = TRUE)`.
 
@@ -23,7 +30,7 @@ along `x` to either side of `NA`s.
 ## Usage
 
 ``` r
-compute_local_windows(
+compute_window_bounds(
   t,
   idx = seq_along(t),
   width = NULL,
@@ -32,11 +39,17 @@ compute_local_windows(
   env = rlang::caller_env()
 )
 
-median_nona(w)
+window_sums(v, bounds)
+
+window_min_obs(width, span, t, min_n = 1L, env = rlang::caller_env())
+
+compute_local_mean(x, bounds, na.rm = FALSE, min_obs = 1L)
 
 compute_local_fun(x, window_idx, fn, ...)
 
-col_medians_padded(m)
+median_no_na(w)
+
+compute_col_medians(m)
 
 compute_outliers(
   x,
@@ -93,9 +106,28 @@ compute_valid_neighbours(
   warnings as coming from the user-facing function rather than the
   validator.
 
+- v:
+
+  A numeric vector to sum within windows. Callers should centre `v`
+  first to contain floating-point cancellation error.
+
+- bounds:
+
+  A [`list()`](https://rdrr.io/r/base/list.html) of `start` and `end`
+  window index vectors from `compute_window_bounds()`.
+
+- min_n:
+
+  A lower bound on the returned number of samples.
+
 - x:
 
   A numeric vector of the response variable.
+
+- min_obs:
+
+  The minimum number of samples a window must span to return a value.
+  Shorter (partial) windows return `NA`.
 
 - window_idx:
 
@@ -137,15 +169,23 @@ compute_valid_neighbours(
 
 ## Value
 
-`compute_local_windows()`: A list the same length as `idx` and the same
-or shorter length as `t` with numeric vectors of sample indices of
-length `width` samples or `span` units of time `t`.
+`compute_window_bounds()`: A
+[`list()`](https://rdrr.io/r/base/list.html) with `start` and `end`
+integer vectors the same length as `idx`, giving the inclusive window
+bounds at each index.
 
-`median_nona()`: A numeric value.
+`window_sums()`: A numeric vector the same length as `bounds$start`.
+
+`window_min_obs()`: An integer value.
+
+`compute_local_mean()`: A numeric vector the same length as
+`bounds$start`.
 
 `compute_local_fun()`: A numeric vector the same length as `x`.
 
-`col_medians_padded()`: A numeric vector of length `ncol(m)`.
+`median_no_na()`: A numeric value.
+
+`compute_col_medians()`: A numeric vector of length `ncol(m)`.
 
 `compute_outliers()`: A [`list()`](https://rdrr.io/r/base/list.html)
 with vectors the same length as `x` for with numeric local medians and
@@ -168,3 +208,12 @@ specified. Even `width` values will bias `align` to *"left"*, with the
 unequal sample forward of `idx`, effectively returning `NA` at the last
 sample index. When `span` is specified, the local window is between
 `[t - span/2, t + span/2]`.
+
+`window_min_obs()` converts `span` to a sample count via the estimated
+sample rate, less two samples to buffer irregular `t` at the start and
+end of each window.
+
+`compute_local_mean()` computes all window means in O(n) via
+`window_sums()`. Values are centred first so the cumulative-sum
+differencing error stays around `eps * sqrt(n) * sd`, far below
+measurement resolution.
