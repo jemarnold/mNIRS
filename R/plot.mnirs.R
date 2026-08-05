@@ -66,6 +66,7 @@ plot.mnirs <- function(
 
     nirs_channels <- attr(x, "nirs_channels")
     time_channel <- attr(x, "time_channel")
+    channel_map <- attr(x, "channel_map")
 
     ## pre-compute conditionals
     x_name <- if (time_labels) {
@@ -127,9 +128,17 @@ plot.mnirs <- function(
             )
         )
 
-    ## add one geom per channel
+    ## add one geom per channel, restricted to the panels declaring it
     layers <- lapply(nirs_channels, function(ch) {
-        ch_data <- if (na.omit) x[is.finite(x[[ch]]), ] else x
+        keep <- if (is.null(channel_map)) {
+            TRUE
+        } else {
+            x[["interval"]] %in% channel_map[[ch]]
+        }
+        if (na.omit) {
+            keep <- keep & is.finite(x[[ch]])
+        }
+        ch_data <- x[keep, , drop = FALSE]
         ch_aes <- ggplot2::aes(y = .data[[ch]], colour = ch)
         c(
             list(ggplot2::geom_line(ch_aes, data = ch_data)),
@@ -162,6 +171,14 @@ plot.mnirs <- function(
 
 #' Validate and bind a list of mnirs data frames for plotting
 #' @inheritParams validate_mnirs
+#'
+#' @returns For a single-element list, that element unchanged. Otherwise a
+#'   row-bound `data.frame` with an `interval` factor column, carrying
+#'   attributes `nirs_channels` (the union across elements), `time_channel`,
+#'   and `channel_map` — a named list mapping each channel to the interval
+#'   names whose source element declares it, so [plot.mnirs()] draws each
+#'   channel only in its own panels.
+#'
 #' @keywords internal
 as_plot_data <- function(x, env = rlang::caller_env()) {
     if (length(x) == 0L) {
@@ -207,11 +224,18 @@ as_plot_data <- function(x, env = rlang::caller_env()) {
         return(x[[1L]])
     }
 
+    ## declared channels per element, before padding obscures them
+    declared <- lapply(x, \(.df) attr(.df, "nirs_channels") %||% character(0))
+
     ## union of nirs_channels across all elements
-    nirs_channels <- unique(unlist(
-        lapply(x, attr, "nirs_channels"),
-        use.names = FALSE
-    ))
+    nirs_channels <- unique(unlist(declared, use.names = FALSE))
+
+    ## invert to channel -> intervals declaring it, so each geom draws only
+    ## in the panels whose source element declares that channel
+    channel_map <- lapply(nirs_channels, \(.ch) {
+        names(declared)[vapply(declared, \(.d) .ch %in% .d, logical(1))]
+    })
+    names(channel_map) <- nirs_channels
 
     ## pad each element with NA for any missing nirs_channels
     x <- lapply(x, \(.df) {
@@ -231,6 +255,7 @@ as_plot_data <- function(x, env = rlang::caller_env()) {
     )
     attr(plot_data, "nirs_channels") <- nirs_channels
     attr(plot_data, "time_channel") <- time_channels[[1L]]
+    attr(plot_data, "channel_map") <- channel_map
 
     return(plot_data)
 }

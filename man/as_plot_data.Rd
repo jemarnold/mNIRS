@@ -13,6 +13,14 @@ as_plot_data(x, env = rlang::caller_env())
 errors and warnings as coming from the user-facing function rather
 than the validator.}
 }
+\value{
+For a single-element list, that element unchanged. Otherwise a
+row-bound \code{data.frame} with an \code{interval} factor column, carrying
+attributes \code{nirs_channels} (the union across elements), \code{time_channel},
+and \code{channel_map} — a named list mapping each channel to the interval
+names whose source element declares it, so \code{\link[=plot.mnirs]{plot.mnirs()}} draws each
+channel only in its own panels.
+}
 \description{
 Validate and bind a list of mnirs data frames for plotting
 }

@@ -116,6 +116,64 @@ test_that("shift_mnirs handles position = 'max' correctly", {
     expect_equal(result$ch1, 91:100)
 })
 
+test_that("shift_mnirs min/max reference ignores partial edge windows", {
+    ## tapered edge windows average fewer samples, so a noisy edge sample is
+    ## diluted less and would otherwise be selected as the reference
+    spike <- tibble(time = 0:59, ch1 = c(70, rep(100, 59)))
+
+    shift_ref <- function(data, ...) {
+        result <- shift_mnirs(
+            data,
+            nirs_channels = "ch1",
+            time_channel = "time",
+            to = 0,
+            verbose = FALSE,
+            ...
+        )
+        ## reference value recovered from the shift applied to a known sample
+        data$ch1[[2L]] - result$ch1[[2L]]
+    }
+
+    ## width: complete windows give (70 + 10 * 100) / 11, not the partial 95
+    expect_equal(shift_ref(spike, width = 11, position = "min"), 1070 / 11)
+
+    ## span: min_obs is floor(span * sample_rate) - 2 == 8 samples = 70 + 7*100
+    expect_equal(shift_ref(spike, span = 10, position = "min"), 770 / 8)
+
+    drop <- tibble(time = 0:59, ch1 = c(130, rep(100, 59)))
+    ## max mirrors min at the same edge
+    expect_equal(
+        shift_ref(drop, width = 11, position = "max"),
+        1130 / 11
+    )
+    expect_equal(
+        shift_ref(drop, span = 10, position = "max"),
+        830 / 8
+    )
+
+    ## a clean monotonic decline is biased by the trailing window alone
+    decline <- tibble(time = 0:59, ch1 = seq(100, 50, length.out = 60))
+    expect_equal(
+        shift_ref(decline, width = 11, position = "min"),
+        mean(decline$ch1[50:60])
+    )
+})
+
+test_that("shift_mnirs errors when width exceeds the data range", {
+    expect_error(
+        shift_mnirs(
+            tibble(time = 1:5, ch1 = 1:5),
+            nirs_channels = "ch1",
+            time_channel = "time",
+            to = 0,
+            width = 11,
+            position = "min",
+            verbose = FALSE
+        ),
+        "Insufficient valid samples"
+    )
+})
+
 test_that("shift_mnirs handles position = 'first' with span and width", {
     data <- tibble(
         time = seq(0, 9, by = 1),
@@ -806,6 +864,8 @@ test_that("shift_mnirs() preserves grouping with external group_channels", {
 
 ## integration tests ================================================
 test_that("shift_mnirs works on Moxy", {
+    skip_if_not_installed("dplyr")
+
     data <- read_mnirs(
         file_path = example_mnirs("moxy_ramp.xlsx"),
         nirs_channels = c(smo2_left = "SmO2 Live", smo2_right = "SmO2 Live(2)"),
@@ -813,16 +873,13 @@ test_that("shift_mnirs works on Moxy", {
         verbose = FALSE
     ) |>
         dplyr::mutate(
-            dplyr::across(
-                dplyr::matches("smo2"),
-                \(.x) {
-                    replace_invalid(
-                        .x,
-                        invalid_values = c(0, 100),
-                        method = "none"
-                    )
-                }
-            )
+            dplyr::across(dplyr::matches("smo2"), \(.x) {
+                replace_invalid(
+                    .x,
+                    invalid_values = c(0, 100),
+                    method = "none"
+                )
+            })
         )
 
     data_shifted <- shift_mnirs(
@@ -836,8 +893,12 @@ test_that("shift_mnirs works on Moxy", {
         verbose = FALSE
     )
 
-    # plot(data) + ggplot2::ylim(0, 100) + geom_hline(yintercept = c(0, 100))
-    # plot(data_shifted) + ggplot2::ylim(0, 100) + geom_hline(yintercept = c(0, 100))
+    # plot(data) +
+    #     ggplot2::ylim(0, 100) +
+    #     ggplot2::geom_hline(yintercept = c(0, 100))
+    # plot(data_shifted) +
+    #     ggplot2::ylim(0, 100) +
+    #     ggplot2::geom_hline(yintercept = c(0, 100))
 
     ## check grouping together: min value should come from smo2_right
     expect_false(any(data_shifted$smo2_left == 0, na.rm = TRUE))
@@ -850,6 +911,8 @@ test_that("shift_mnirs works on Moxy", {
 })
 
 test_that("shift_mnirs(position = 'first') works on Moxy", {
+    skip_if_not_installed("dplyr")
+    
     data <- read_mnirs(
         file_path = example_mnirs("moxy_ramp.xlsx"),
         nirs_channels = c(smo2_left = "SmO2 Live", smo2_right = "SmO2 Live(2)"),
@@ -918,7 +981,6 @@ test_that("shift_mnirs works on Train.Red", {
             c("o2hb_left", "o2hb_right")
         ),
         to = 0,
-        by = NULL,
         span = 0,
         position = "min",
         verbose = FALSE

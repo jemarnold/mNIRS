@@ -1,3 +1,11 @@
+# mnirs 0.7.1
+
+* `shift_mnirs()` now properly excludes partial windows at data edges, where fewer samples can bias calculation of *"min"* or *"max"* shift values on noise.
+
+* `replace_mnirs()`, `shift_mnirs()`, and `filter_moving_average()` should gain a serious performance improvement when calculating rolling means, at the cost of negligible loss of precision on the order of ± ~1e-11.
+
+* Lists of data frames exported from core functions now contain `class = "mnirs"` and should now `plot()` properly.
+
 # mnirs 0.7.0
 
 ## Highlights

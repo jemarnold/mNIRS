@@ -791,12 +791,12 @@ test_that("validate_start_time() errors when start_time exceeds time range", {
     )
 })
 
-## findInt_mnirs() ==================================
-test_that("findInt_mnirs provides informative error", {
-    expect_error(findInt_mnirs(1, c(3, 1, 2)), "time_channel.*sorted")
-    expect_error(findInt_mnirs(1, c(1, NA, 2)), "time_channel.*sorted")
+## validate_findInt() ==================================
+test_that("validate_findInt provides informative error", {
+    expect_error(validate_findInt(1, c(3, 1, 2)), "time_channel.*sorted")
+    expect_error(validate_findInt(1, c(1, NA, 2)), "time_channel.*sorted")
     ## duplicates permitted
-    expect_equal(findInt_mnirs(1, c(1, 2, 2, 3)), 1)
+    expect_equal(validate_findInt(1, c(1, 2, 2, 3)), 1)
     ## valid input passes through to findInterval()
-    expect_equal(findInt_mnirs(2.5, 1:5), findInterval(2.5, 1:5))
+    expect_equal(validate_findInt(2.5, 1:5), findInterval(2.5, 1:5))
 })

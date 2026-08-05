@@ -58,7 +58,7 @@ reference:
   - starts_with("by_")
 - title: Print & plot
   desc: |
-    Tools for printing functions and pretty plotting with `{ggplot2}`.
+    Tools for printing functions and pretty plotting with `{ggplot2}`
   contents:
   - starts_with("print")
   - starts_with("plot")

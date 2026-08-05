@@ -23,8 +23,8 @@ errors and warnings as coming from the user-facing function rather
 than the validator.}
 }
 \value{
-A named list of processed \emph{"mnirs"} data frames, one per
-interval.
+A named list of class \emph{"mnirs"} containing processed \emph{"mnirs"}
+data frames, one per interval.
 }
 \description{
 Shared entry point for \verb{*_mnirs()} transformer functions accepting a list

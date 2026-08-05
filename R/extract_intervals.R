@@ -221,7 +221,7 @@ extract_intervals <- function(
         nested <- map_mnirs_intervals(data, match.call(), parent.frame())
         ## rename intervals `interval_<df>.<interval>` before flattening;
         ## other names (e.g. "ensemble", <custom>) get `<name>_<df>` suffix
-        nested <- lapply(seq_along(nested), \(.i) {
+        result <- lapply(seq_along(nested), \(.i) {
             .x <- nested[[.i]]
             names(.x) <- ifelse(
                 startsWith(names(.x), "interval_"),
@@ -230,8 +230,9 @@ extract_intervals <- function(
             )
             .x
         })
-        result <- unlist(nested, recursive = FALSE)
-        class(result) <- c("mnirs", class(result))
+        
+        result <- unlist(result, recursive = FALSE)
+        class(result) <- class(nested)
         return(result)
     }
 
