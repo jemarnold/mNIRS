@@ -110,6 +110,59 @@ test_that("SSbiexponential() fixes A at a constant", {
 })
 
 
+## biexp_grid_start() ===============================================
+test_that("biexp_grid_start() recovers known time constants", {
+    t <- 0:200
+    x <- biexponential(t, A = 70, B1 = 25, tau1 = 10, B2 = 15, tau2 = 60)
+
+    seed <- biexp_grid_start(x, t)
+
+    expect_named(seed, c("A", "B1", "tau1", "B2", "tau2", "rss"))
+    ## grid resolution is coarse by design; nls polishes from the seed
+    expect_true(seed$tau1 > 10 / 1.5 && seed$tau1 < 10 * 1.5)
+    expect_true(seed$tau2 > 60 / 1.5 && seed$tau2 < 60 * 1.5)
+    expect_true(all.equal(seed$A, 70, tolerance = 5, scale = 1))
+    expect_true(all.equal(seed$B1, 25, tolerance = 5, scale = 1))
+    expect_true(all.equal(seed$B2, 15, tolerance = 5, scale = 1))
+    ## noiseless data: the profiled residual is a small share of total SS
+    expect_true(seed$rss >= 0)
+    expect_true(seed$rss < sum((x - mean(x))^2) * 0.01)
+})
+
+test_that("biexp_grid_start() confines the grid to the ratio ridge", {
+    t <- 0:200
+    x <- biexponential(t, A = 70, B1 = 25, tau1 = 10, B2 = 15, tau2 = 60)
+
+    default <- biexp_grid_start(x, t)
+    bounded <- biexp_grid_start(x, t, tau_ratio = 8)
+
+    expect_true(default$tau2 >= default$tau1 * 2.5)
+    expect_true(bounded$tau2 >= bounded$tau1 * 8)
+})
+
+test_that("biexp_grid_start() is invariant to the time units of t", {
+    t <- 0:200
+    x <- biexponential(t, A = 70, B1 = 25, tau1 = 10, B2 = 15, tau2 = 60)
+
+    ## grid limits scale with the span of t, so seeding in minutes rather
+    ## than seconds rescales the time constants and leaves amplitudes alone
+    secs <- biexp_grid_start(x, t)
+    mins <- biexp_grid_start(x, t / 60)
+
+    expect_equal(mins$tau1, secs$tau1 / 60)
+    expect_equal(mins$tau2, secs$tau2 / 60)
+    expect_equal(mins$A, secs$A)
+    expect_equal(mins$B1, secs$B1)
+})
+
+test_that("biexp_grid_start() returns NULL for a degenerate predictor", {
+    ## no span to grid over
+    expect_null(biexp_grid_start(1:5, rep(0, 5)))
+    ## non-finite span
+    expect_null(biexp_grid_start(1:5, c(0, NA, 2, 3, 4)))
+})
+
+
 ## analyse_biexponential() ==========================================
 
 ## helper: create nadir-recovery test data with known parameters
@@ -273,6 +326,70 @@ test_that("analyse_biexponential() suppresses fit-failure warning when verbose =
     )
 })
 
+test_that("analyse_biexponential() validates tau_ratio", {
+    data <- create_biexp_data()
+
+    ## a ratio of 1 admits the singular tau2 == tau1 design
+    expect_error(
+        analyse_biexponential(data, nirs_channels = "smo2", tau_ratio = 1),
+        "tau_ratio"
+    )
+    expect_error(
+        analyse_biexponential(data, nirs_channels = "smo2", tau_ratio = "2"),
+        "tau_ratio"
+    )
+    expect_error(
+        analyse_biexponential(
+            data, nirs_channels = "smo2", tau_ratio = c(2, 3)
+        ),
+        "tau_ratio"
+    )
+})
+
+test_that("analyse_biexponential() end_window truncates the fit window", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        end_window = 40,
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+
+    fitted_data <- attr(result, "fitted_data")$smo2
+    expect_true(nrow(fitted_data) < nrow(data))
+    expect_equal(attr(result, "diagnostics")$n_obs, nrow(fitted_data))
+})
+
+test_that("analyse_biexponential() fits a negative-amplitude response", {
+    ## inverted kinetics: the response rises to a peak before settling back.
+    ## amplitudes are unconstrained, so the sign is recovered from the data
+    set.seed(31)
+    t <- 0:119
+    x <- biexponential(t, A = 30, B1 = -25, tau1 = 10, B2 = -15, tau2 = 50) +
+        rnorm(120, 0, 0.3)
+    data <- create_mnirs_data(
+        data.frame(time = t, smo2 = x),
+        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+    )
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+
+    expect_true(all.equal(result$B1, -25, tolerance = 5, scale = 1))
+    expect_true(all.equal(result$B2, -15, tolerance = 5, scale = 1))
+    expect_true(attr(result, "diagnostics")$r2 > 0.9)
+    ## the closed-form nadir needs two positive amplitudes; with neither the
+    ## reported extremum falls back to the onset boundary
+    expect_equal(result$nadir_time, 0)
+    expect_equal(result$nadir_value, result$A)
+})
+
 
 ## time delay =======================================================
 
@@ -286,9 +403,76 @@ test_that("analyse_biexponential() use_TD = FALSE forces the 5-param fit", {
         verbose = FALSE
     )
 
+    ## the stored model is fit in ratio parameterisation (lt1, lr); the
+    ## reported coefficients are converted back to the natural tau scale
     expect_named(coef(attr(result, "model")$smo2),
-        c("A", "B1", "tau1", "B2", "tau2"))
+        c("A", "B1", "lt1", "B2", "lr"))
     expect_true(is.na(result$TD))
+})
+
+test_that("analyse_biexponential() falls back to the 5-parameter fit", {
+    ## six observations under-determine the 6-parameter model but not the
+    ## 5-parameter model, so the TD fit is rejected and the retry announced
+    data <- create_biexp_data(n = 6, noise_sd = 0.1)
+
+    warns <- capture_warnings(
+        result <- analyse_biexponential(
+            data,
+            nirs_channels = "smo2",
+            use_TD = TRUE
+        )
+    )
+
+    expect_match(warns[[1L]], "6-parameter")
+    expect_match(warns[[1L]], "Attempting")
+    ## TD is absent from the reduced model whether or not the retry converges
+    expect_true(is.na(result$TD))
+})
+
+test_that("analyse_biexponential() reports natural time constants", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+
+    ## tau1/tau2 recover exp(lt1) and exp(lt1 + lr) from the stored model
+    coefs <- coef(attr(result, "model")$smo2)
+    expect_equal(result$tau1, unname(exp(coefs[["lt1"]])))
+    expect_equal(result$tau2, unname(exp(coefs[["lt1"]] + coefs[["lr"]])))
+})
+
+test_that("analyse_biexponential() separates the fast and slow components", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+
+    ## the ratio bound keeps the two components identifiable; without it the
+    ## time constants collapse together and the amplitudes cancel
+    expect_true(result$tau2 >= result$tau1 * 2.5 - 1e-6)
+    expect_true(result$tau1 > 0)
+})
+
+test_that("analyse_biexponential() tau_ratio bounds the time constants", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        tau_ratio = 5,
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+
+    expect_true(result$tau2 >= result$tau1 * 5 - 1e-6)
 })
 
 test_that("analyse_biexponential() nadir_time is elapsed from start_time", {
@@ -316,7 +500,7 @@ test_that("analyse_biexponential() nadir_time is elapsed from start_time", {
 
     ## must fit the 6-param model, not fall back to the 5-param form
     expect_named(coef(attr(result, "model")$smo2),
-        c("A", "B1", "tau1", "B2", "tau2", "TD"))
+        c("A", "B1", "lt1", "B2", "lr", "TD"))
 
     ## nadir_time equals the elapsed time from start_time to the fitted
     ## minimum; the old onset-relative value omits the ~TD offset
@@ -351,7 +535,7 @@ test_that("analyse_biexponential() nadir_value matches the fitted minimum with T
     )
 
     expect_named(coef(attr(result, "model")$smo2),
-        c("A", "B1", "tau1", "B2", "tau2", "TD"))
+        c("A", "B1", "lt1", "B2", "lr", "TD"))
 
     ## closed-form nadir agrees with the numeric minimum of the fit
     fitted <- attr(result, "fitted_data")$smo2$fitted
@@ -398,10 +582,86 @@ test_that("analyse_biexponential() fix holds parameters constant", {
 
     ## fixed A excluded from the fitted model coefficients
     expect_named(
-        coef(attr(result, "model")$smo2), c("B1", "tau1", "B2", "tau2")
+        coef(attr(result, "model")$smo2), c("B1", "lt1", "B2", "lr")
     )
     expect_equal(attr(result, "channel_args")$fix, "list(A = 0)")
     expect_false(is.na(attr(result, "diagnostics")$adj_r2))
+})
+
+test_that("analyse_biexponential() fix holds tau1 constant", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        fix = list(tau1 = 12),
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+
+    expect_equal(result$tau1, 12)
+    ## a fixed time constant drops its log-scale counterpart from the model
+    expect_named(coef(attr(result, "model")$smo2), c("A", "B1", "B2", "lr"))
+    ## the ratio bound still applies about the fixed value
+    expect_true(result$tau2 >= 12 * 2.5 - 1e-6)
+})
+
+test_that("analyse_biexponential() fix holds tau2 constant", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        fix = list(tau2 = 50),
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+
+    expect_equal(result$tau2, 50)
+    expect_named(coef(attr(result, "model")$smo2), c("A", "B1", "lt1", "B2"))
+    ## a fixed tau2 caps tau1 at tau2 / tau_ratio from the other side
+    expect_true(result$tau1 <= 50 / 2.5 + 1e-6)
+})
+
+test_that("analyse_biexponential() fix holds TD constant", {
+    set.seed(21)
+    TD <- 8
+    t <- 0:119
+    x <- biexponential(
+        t, A = 70, B1 = 25, tau1 = 5, B2 = 15, tau2 = 40, TD = TD
+    ) + rnorm(120, 0, 0.2)
+    data <- create_mnirs_data(
+        data.frame(time = t, smo2 = x),
+        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+    )
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = TRUE,
+        fix = list(TD = TD),
+        verbose = FALSE
+    )
+
+    expect_equal(result$TD, TD)
+    ## a fixed TD is excluded from estimation and disables the 5-param retry
+    expect_named(
+        coef(attr(result, "model")$smo2), c("A", "B1", "lt1", "B2", "lr")
+    )
+})
+
+test_that("analyse_biexponential() TD is only fixable when use_TD = TRUE", {
+    data <- create_biexp_data()
+
+    expect_error(
+        analyse_biexponential(
+            data,
+            nirs_channels = "smo2",
+            use_TD = FALSE,
+            fix = list(TD = 0)
+        ),
+        "not recognised"
+    )
 })
 
 test_that("analyse_biexponential() validates fix argument", {
@@ -478,7 +738,7 @@ test_that("analyse_kinetics() passes fix to the biexponential method", {
 
     expect_equal(result$coefficients$A, 0)
     expect_named(
-        coef(result$model[[1L]]$smo2), c("B1", "tau1", "B2", "tau2")
+        coef(result$model[[1L]]$smo2), c("B1", "lt1", "B2", "lr")
     )
 })
 
@@ -494,6 +754,128 @@ test_that("analyse_kinetics() passes use_TD to the biexponential method", {
     )
 
     expect_named(
-        coef(result$model[[1L]]$smo2), c("A", "B1", "tau1", "B2", "tau2")
+        coef(result$model[[1L]]$smo2), c("A", "B1", "lt1", "B2", "lr")
     )
+})
+
+
+## integration tests ================================================
+
+test_that("SSbiexponential() converges on real dataset", {
+    skip("Manual fit convergence check")
+
+    ## 5 real-world 5-1 min work-recovery intervals, 4 channels each
+    intervals <- readRDS(test_path("testdata/5-1_intervals_short.rds"))
+
+    library(ggplot2)
+    # intervals[[2]] |>
+        # plot() +
+        # geom_vline(xintercept = 0, linetype = 2)
+    nls(
+        smo2_left_vl ~ SSbiexponential(time, A, B1, tau1, B2, tau2, TD),
+        data = intervals[[1]]
+    )
+    
+    attributes(intervals[[4]])
+    analyse_kinetics(
+        intervals[[4]],
+        method = "monoexp",
+    ) |> plot()
+    ## fit one signal at a time across all intervals; report convergence
+    ## success rate per signal to flag regressions on real interval data.
+    ## the onset is at t = 0; the pre-interval baseline is excluded so the
+    ## curve starts at A rather than mid-transition
+    fit_5param <- function(signal) {
+        vapply(intervals, \(df) {
+            df <- df[df$time >= 0, ]
+            data <- data.frame(t = df$time, x = df[[signal]])
+            model <- tryCatch(
+                nls(x ~ SSbiexponential(t, A, B1, tau1, B2, tau2), data = data),
+                error = \(e) NULL,
+                warning = \(w) NULL
+            )
+            as.integer(!is.null(model))
+        }, integer(1L))
+    }
+
+    vl_left_success <- mean(fit_5param("smo2_left_vl"))
+    vl_left_success
+    vl_right_success <- mean(fit_5param("smo2_right_vl"))
+    vl_right_success
+    rf_left_success <- mean(fit_5param("smo2_left_rf"))
+    rf_left_success
+    rf_right_success <- mean(fit_5param("smo2_right_rf"))
+    rf_right_success
+
+    expect_true(vl_left_success >= 0.8)
+    expect_true(vl_right_success >= 0.8)
+    expect_true(rf_left_success >= 0.8)
+    expect_true(rf_right_success >= 0.8)
+
+    fit_6param <- function(signal) {
+        vapply(intervals, \(df) {
+            df <- df[df$time >= 0, ]
+            data <- data.frame(t = df$time, x = df[[signal]])
+            model <- tryCatch(
+                nls(
+                    x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, TD),
+                    data = data
+                ),
+                error = \(e) NULL,
+                warning = \(w) NULL
+            )
+            as.integer(!is.null(model))
+        }, integer(1L))
+    }
+
+    vl_left_success <- mean(fit_6param("smo2_left_vl"))
+    vl_left_success
+    vl_right_success <- mean(fit_6param("smo2_right_vl"))
+    vl_right_success
+    rf_left_success <- mean(fit_6param("smo2_left_rf"))
+    rf_left_success
+    rf_right_success <- mean(fit_6param("smo2_right_rf"))
+    rf_right_success
+
+    expect_true(vl_left_success >= 0.6)
+    expect_true(vl_right_success >= 0.6)
+    expect_true(rf_left_success >= 0.6)
+    expect_true(rf_right_success >= 0.6)
+})
+
+test_that("analyse_biexponential() converges on real dataset", {
+    skip("Manual fit convergence check")
+
+    intervals <- readRDS(test_path("testdata/5-1_intervals_short.rds"))
+    nirs_channels <- c(
+        "smo2_left_vl", "smo2_right_vl", "smo2_left_rf", "smo2_right_rf"
+    )
+
+    ## end-to-end path: window detection, ratio-parameterised fit and
+    ## back-conversion. start_time = 0 anchors the fit at the interval onset
+    results <- lapply(intervals, \(df) {
+        analyse_biexponential(
+            df,
+            nirs_channels = nirs_channels,
+            start_time = 0,
+            use_TD = FALSE,
+            verbose = FALSE
+        )
+    })
+
+    coefs <- do.call(rbind, results)
+    success <- tapply(!is.na(coefs$tau1), coefs$nirs_channels, mean)
+    success
+
+    expect_true(all(success >= 0.8))
+
+    ## converged fits should describe the desaturation-recovery shape and
+    ## keep the two components separated by the default ratio bound
+    ok <- !is.na(coefs$tau1)
+    expect_true(all(coefs$tau2[ok] >= coefs$tau1[ok] * 2.5 - 1e-6))
+    expect_true(all(coefs$nadir_value[ok] <= coefs$A[ok]))
+
+    r2 <- unlist(lapply(results, \(x) attr(x, "diagnostics")$r2))
+    mean(r2, na.rm = TRUE)
+    expect_true(mean(r2 > 0.9, na.rm = TRUE) >= 0.8)
 })

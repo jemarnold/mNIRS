@@ -70,6 +70,14 @@
 #'   `fix = list(A = 0)` fixes the starting amplitude at `0`. Fixed
 #'   parameters are excluded from estimation and reported at their fixed
 #'   values. Applied globally across `nirs_channels`. See *Details*.
+#' @param tau_ratio **biexponential**: A numeric lower bound on the ratio of
+#'   the slow to the fast time constant, `tau2 / tau1`; default is `2.5`. As
+#'   `tau2` approaches `tau1` the two components become indistinguishable and
+#'   the fit is singular, so the ratio is bounded away from that limit. The
+#'   ratio is often only weakly identified and settles on this bound, in which
+#'   case it sets the separation of the fast and slow components; lower values
+#'   admit more similar time constants and larger, more strongly cancelling
+#'   amplitudes.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
 #'
@@ -467,7 +475,8 @@ analyse_kinetics.biexponential <- function(
     end_window = Inf,
     verbose = TRUE,
     ...,
-    fix = NULL
+    fix = NULL,
+    tau_ratio = 2.5
 ) {
     ## TODO: pass additional stats::nls() args
     ## resolve global verbose option when caller omits the argument

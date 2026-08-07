@@ -378,10 +378,8 @@ test_that("SSlogistic() 5-param converges on most random realisations", {
 test_that("SSlogistic() converges on real dataset", {
     skip("Manual fit convergence check")
     
-    file_path <- test_path("testdata/reoxy_list.rds")
-
     ## 65 real_world reoxy intervals
-    reoxy_list <- readRDS(file_path)
+    reoxy_list <- readRDS(test_path("testdata/reoxy_list.rds"))
     
     ## fit one signal at a time across all data frames; report convergence
     ## success rate per signal to flag regressions on real reoxygenation data
@@ -609,9 +607,7 @@ test_that("SSgompertz() handles falling curves (B < A)", {
 test_that("SSgompertz()/SSgompertz_left() converge on real dataset", {
     skip("Manual fit convergence check")
     
-    file_path <- test_path("testdata/reoxy_list.rds")
-
-    reoxy_list <- readRDS(file_path)
+    reoxy_list <- readRDS(test_path("testdata/reoxy_list.rds"))
 
     fit_shape <- function(signal, ss_fn) {
         result <- lapply(reoxy_list, \(df) {

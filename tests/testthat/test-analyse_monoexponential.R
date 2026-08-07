@@ -837,10 +837,8 @@ test_that("extract model coefs", {
 test_that("SSmonoexponential() converges on real dataset", {
     skip("Manual fit convergence check")
     
-    file_path <- test_path("testdata/reoxy_list.rds")
-
     ## 65 real_world reoxy intervals
-    reoxy_list <- readRDS(file_path)
+    reoxy_list <- readRDS(test_path("testdata/reoxy_list.rds"))
     
     ## fit one signal at a time across all data frames; report convergence
     ## success rate per signal to flag regressions on real reoxygenation data

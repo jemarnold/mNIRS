@@ -381,7 +381,7 @@ kinetics_dispatch <- list(
     response_time = c("fraction"),
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
     monoexponential = c("use_TD", "fix"),
-    biexponential = c("use_TD", "fix"),
+    biexponential = c("use_TD", "fix", "tau_ratio"),
     sigmoidal = c("shape", "fix")
 )
 
@@ -779,6 +779,110 @@ build_ss_formula <- function(fn, params, fix = list()) {
 full_coefs <- function(model, params, fix = list()) {
     coefs <- c(stats::coef(model), unlist(fix))
     return(coefs[intersect(params, names(coefs))])
+}
+
+
+#' Grid search starting estimates for a biexponential fit
+#'
+#' Deterministic seed for [SSbiexponential()] and [fit_biexp_ratio()]. The
+#' biexponential is linear in `A`, `B1` and `B2` once `tau1` and `tau2` are
+#' held fixed, so the amplitudes are profiled out by least squares at every
+#' point of a log-spaced grid of time constants rather than searched.
+#'
+#' @details
+#' The grid is confined to the ridge `tau2 >= tau_ratio * tau1`. As `tau2`
+#' approaches `tau1` the two exponential basis vectors coincide, the design
+#' matrix becomes singular, and the amplitudes diverge with cancelling signs;
+#' the ridge excludes that degenerate region.
+#'
+#' Grid limits scale with the span of `t`, so the seed does not depend on the
+#' time units of the data. One log-spaced grid serves both components, so the
+#' saturating basis `1 - exp(-t / tau)` is built once and its Gram matrix
+#' supplies every candidate pair: each pair is then solved in closed form from
+#' its own 3x3 sub-block, with no further pass over the data.
+#'
+#' No sign constraint is placed on `B1` or `B2`. NIRS response amplitudes may
+#' legitimately be negative, so identifiability is enforced through the time
+#' constants alone. This is not a `direction` mechanism, which steers only the
+#' fit window.
+#'
+#' @param x A numeric vector of the response variable.
+#' @param t A numeric vector of the predictor variable (time).
+#' @param tau_ratio A numeric lower bound on `tau2 / tau1`.
+#' @param TD A numeric time delay subtracted from `t` before fitting.
+#' @param n_tau Integer resolution of the time constant grid.
+#'
+#' @returns A named list of starting estimates (`A`, `B1`, `tau1`, `B2`,
+#'   `tau2`) with the attained `rss`, or `NULL` if no grid point is usable.
+#'
+#' @keywords internal
+biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
+    span <- diff(range(t))
+    if (!is.finite(span) || span <= 0) {
+        return(NULL)
+    }
+
+    ## response onset is flat before TD, so the delay shifts the time base
+    t_fit <- pmax(t - TD, 0)
+    taus <- exp(seq(log(span / 100), log(span * 10), length.out = n_tau))
+    basis <- vapply(taus, \(.tau) 1 - exp(-t_fit / .tau), numeric(length(t_fit)))
+
+    ## candidate (tau1, tau2) pairs on the ridge
+    pairs <- which(outer(taus * tau_ratio, taus, "<="), arr.ind = TRUE)
+    if (nrow(pairs) == 0L) {
+        return(NULL)
+    }
+    i <- pairs[, 1L]
+    j <- pairs[, 2L]
+
+    ## normal equations for the design [1, -u_i, u_j]; signs match
+    ## biexponential(), so the solved amplitudes are on the reported scale
+    gram <- crossprod(basis)
+    diag_gram <- diag(gram)
+    su <- colSums(basis)
+    xu <- as.vector(crossprod(basis, x))
+
+    a11 <- length(t_fit)
+    a12 <- -su[i]
+    a13 <- su[j]
+    a22 <- diag_gram[i]
+    a23 <- -gram[cbind(i, j)]
+    a33 <- diag_gram[j]
+    v1 <- sum(x)
+    v2 <- -xu[i]
+    v3 <- xu[j]
+
+    ## cofactors of the symmetric 3x3 system, evaluated across all pairs at
+    ## once; a per-pair solve() would dominate the cost of the search
+    c11 <- a22 * a33 - a23^2
+    c12 <- a13 * a23 - a12 * a33
+    c13 <- a12 * a23 - a13 * a22
+    c22 <- a11 * a33 - a13^2
+    c23 <- a12 * a13 - a11 * a23
+    c33 <- a11 * a22 - a12^2
+    det_m <- a11 * c11 + a12 * c12 + a13 * c13
+
+    A <- (c11 * v1 + c12 * v2 + c13 * v3) / det_m
+    B1 <- (c12 * v1 + c22 * v2 + c23 * v3) / det_m
+    B2 <- (c13 * v1 + c23 * v2 + c33 * v3) / det_m
+
+    ## at the least-squares solution the residual sum of squares reduces to
+    ## x'x - b'X'x. a non-positive determinant marks a rank-deficient pair
+    rss <- sum(x^2) - (A * v1 + B1 * v2 + B2 * v3)
+    rss[!is.finite(rss) | det_m <= 0] <- NA_real_
+    if (all(is.na(rss))) {
+        return(NULL)
+    }
+
+    best <- which.min(rss)
+    return(list(
+        A = A[[best]],
+        B1 = B1[[best]],
+        tau1 = taus[[i[[best]]]],
+        B2 = B2[[best]],
+        tau2 = taus[[j[[best]]]],
+        rss = max(rss[[best]], 0)
+    ))
 }
 
 
