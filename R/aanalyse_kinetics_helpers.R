@@ -464,7 +464,9 @@ setup_kinetics_worker <- function(
 #'   returning a list with `coefs` (1-row data frame of method coefficients,
 #'   *without* `nirs_channels`/`time_channel`), `model`, `fitted_data`
 #'   (`window_idx`/`fitted`), and `diag` (1-row data frame from
-#'   [compute_diagnostics()]).
+#'   [compute_diagnostics()]). `t_fit` is always time elapsed from
+#'   `start_time`, so time coefficients need no further offset, and
+#'   `window_idx` must index the original data frame rows.
 #' @param interval_name Character; the interval name recorded in the `interval`
 #'   column of the returned coefficients, `diagnostics`, and `channel_args`.
 #' @param extra_args Named list of additional arguments recorded in the
@@ -509,7 +511,8 @@ analyse_kinetics_channels <- function(
             )
             .a$direction <- valid$direction
             x_fit <- data[[.nirs]][valid$idx]
-            t_fit <- t_vec[valid$idx]
+            ## fit on time elapsed from onset
+            t_fit <- t_vec[valid$idx] - .a$start_time
 
             ## method-specific fit; coefs/diag carry method columns only
             fit <- fit_fn(.nirs, x_fit, t_fit, .a, valid, verbose)
@@ -667,6 +670,7 @@ validate_kinetics_args <- function(
 build_na_results <- function(na_coefs) {
     na_diag <- data.frame(
         n_obs = 0L,
+        n_params = NA_integer_,
         r2 = NA_real_,
         adj_r2 = NA_real_,
         rmse = NA_real_,
@@ -1077,8 +1081,8 @@ enforce_direction <- function(
 #'   `stats::BIC()` for `lm` and `nls` fits. `aicc` is the small-sample
 #'   correction and is `NA` when `n_obs - k - 1 <= 0`.
 #'
-#' @returns A 1-row `data.frame` with columns `n_obs`, `r2`, `adj_r2`,
-#'   `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, and `bic`.
+#' @returns A 1-row `data.frame` with columns `n_obs`, `n_params`, `r2`,
+#'   `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, and `bic`.
 #'
 #' @keywords internal
 compute_diagnostics <- function(
@@ -1093,6 +1097,7 @@ compute_diagnostics <- function(
 
     return_na <- data.frame(
         n_obs = n_obs,
+        n_params = n_params,
         r2 = NA_real_,
         adj_r2 = NA_real_,
         rmse = NA_real_,
@@ -1172,6 +1177,7 @@ compute_diagnostics <- function(
 
     return(data.frame(
         n_obs = n_obs,
+        n_params = n_params,
         r2 = r2,
         adj_r2 = adj_r2,
         rmse = rmse,

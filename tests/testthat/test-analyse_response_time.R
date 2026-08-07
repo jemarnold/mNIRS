@@ -369,7 +369,9 @@ test_that("analyse_response_time diagnostics structure", {
     expect_equal(diag$nirs_channels, "x")
     expect_all_true(
         is.na(unlist(
-            diag[!names(diag) %in% c("interval", "nirs_channels", "n_obs")]
+            diag[!names(diag) %in% c(
+                "interval", "nirs_channels", "n_obs", "n_params"
+            )]
         ))
     )
 })

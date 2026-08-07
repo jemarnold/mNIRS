@@ -705,7 +705,8 @@ analyse_logistic <- function(
         coefs <- enforced$coefs
         fitted_vals <- stats::predict(model)
 
-        xmid_offset <- coefs[["xmid"]] - .a$start_time
+        ## xmid is already elapsed from start_time, matching the fit time base
+        xmid_offset <- coefs[["xmid"]]
 
         ## predict response at the inflection point xmid
         xmid_fitted <- as.numeric(

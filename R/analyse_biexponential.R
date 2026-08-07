@@ -536,19 +536,22 @@ analyse_biexponential <- function(
     biexp_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
         params <- c("A", "B1", "tau1", "B2", "tau2", if (.a$use_TD) "TD")
 
-        ## fit on time elapsed from onset. the exponentials are saturated by
-        ## an absolute clock offset, which makes TD unidentifiable and
-        ## inflates the amplitudes, so the shift is applied before fitting
-        ## rather than to the reported TD afterwards
-        t_rel <- t_fit - .a$start_time
+        ## the 6-param model clamps to a flat `A` before `TD`, so the
+        ## pre-onset baseline anchors `A`. the 5-param model has no such
+        ## region and diverges at t < 0, so it is fit from `start_time` onward
+        keep_rows <- function(.params) {
+            if ("TD" %in% .params) rep(TRUE, length(t_fit)) else t_fit >= 0
+        }
 
         ## attempt nls fit; a failed 6-param fit falls back to the
         ## 5-param model unless TD is user-fixed
         retry <- .a$use_TD && !"TD" %in% names(fix)
         attempt <- \(.params, .retry) {
+            ## dropping TD narrows the window, so subset per attempt
+            keep <- keep_rows(.params)
             fit_biexp_ratio(
-                x_fit,
-                t_rel,
+                x_fit[keep],
+                t_fit[keep],
                 .params,
                 fix,
                 tau_ratio,
@@ -575,6 +578,7 @@ analyse_biexponential <- function(
 
         coefs <- ratio_to_natural(model, params, fix)
         fitted_vals <- stats::predict(model)
+        keep <- keep_rows(params)
 
         ## model parameters in biexponential() argument order
         pars <- as.list(coefs[c("A", "B1", "tau1", "B2", "tau2")])
@@ -616,12 +620,12 @@ analyse_biexponential <- function(
             ),
             model = model,
             fitted_data = data.frame(
-                window_idx = valid$idx,
+                window_idx = valid$idx[keep],
                 fitted = fitted_vals
             ),
             diag = compute_diagnostics(
-                x_fit,
-                t_fit,
+                x_fit[keep],
+                t_fit[keep],
                 fitted_vals,
                 n_params = length(stats::coef(model)),
                 verbose,

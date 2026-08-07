@@ -469,12 +469,14 @@ analyse_peak_slope <- function(
                 slope           = slopes$slope,
                 intercept       = slopes$intercept,
                 fitted          = slopes$y, ## predicted response value at idx
-                peak_slope_time = slopes$t - .a$start_time,
+                ## already elapsed from start_time, matching the fit time base
+                peak_slope_time = slopes$t,
                 idx             = slopes$idx
             ),
             model = slopes$model,
             fitted_data = data.frame(
-                window_idx = slopes$window_idx,
+                ## map the rolling window back into original data frame rows
+                window_idx = valid$idx[slopes$window_idx],
                 fitted     = slopes$fitted
             ),
             diag = compute_diagnostics(

@@ -242,9 +242,11 @@ analyse_response_time <- function(
     response_time_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
         ## quote = TRUE so `env` (a defused call object for condition
         ## attribution) is passed as-is, not evaluated by do.call
+        ## `t_fit` is elapsed from start_time, so the baseline splits at 0.
+        ## `.a` itself is left intact for `channel_args` reporting
         response <- do.call(response_time, c(
             list(x = x_fit, t = t_fit),
-            .a,
+            replace(.a, "start_time", 0),
             list(verbose = verbose, bypass_checks = TRUE, env = env),
             args
         ), quote = TRUE)
@@ -258,13 +260,14 @@ analyse_response_time <- function(
             idx            = response$response_idx
         )
 
-        ## bind baseline vec with `A`, and response and extreme scalars
+        ## bind baseline vec with `A`, and response and extreme scalars,
+        ## mapping fit-window positions back to original data frame rows
         fitted_data <- data.frame(
-            window_idx = c(
+            window_idx = valid$idx[c(
                 response$baseline_idx,
                 response$response_idx,
                 response$extreme_idx
-            ),
+            )],
             fitted = c(
                 rep(response$A, length(response$baseline_idx)),
                 response$fitted,

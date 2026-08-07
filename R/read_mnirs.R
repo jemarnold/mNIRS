@@ -319,6 +319,7 @@ create_mnirs_data <- function(data, ...) {
         args
     }
 
+    #! check missing `utils` dependency
     metadata <- utils::modifyList(attributes(data), incoming_metadata)
 
     ## preserve grouping: `new_tibble()` resets class, so re-add `grouped_df`

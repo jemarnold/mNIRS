@@ -112,6 +112,15 @@
 #' starting fitted amplitude `A` and the start of the `TD` and `MRT`, or
 #' `xmid` parameters. (see respective *method* sections below).
 #'
+#' All methods are fitted on time *elapsed from* `start_time`, so the
+#' returned time coefficients are relative to response onset (e.g. `t = 0`).
+#'
+#' The time-delay models (*"monoexponential"* and *"biexponential"* with
+#' `use_TD = TRUE`) are flat at `A` before `TD`, so the pre-onset baseline is
+#' included in the fit and anchors `A`. Their reduced forms (`use_TD = FALSE`,
+#' or a `TD` fit that failed and fell back) have no such flat region and are
+#' fitted only where `time_channel >= start_time`.
+#'
 #' ## Response **direction** and the fit **end_window**
 #'
 #' By default, `direction` is detected automatically as either *"positive"*
@@ -255,7 +264,10 @@
 #'       an [nls][stats::nls] object; for `"response_time"`, `NULL`. `NULL`
 #'       for channels where fitting failed. When a `direction`-bounded
 #'       refit was required, the stored model is parameterised with
-#'       amplitude `D = B - A` in place of `B`.}
+#'       amplitude `D = B - A` in place of `B`. Models are fitted on time
+#'       *elapsed from* `start_time`, so [predict][stats::predict] expects
+#'       `.t` in those units; the offset for each interval is returned in
+#'       `interval_times$start_times`.}
 #'   \item{`coefficients`}{A [tibble][tibble::tibble-package] of coefficients
 #'       with one row per `nirs_channel` per interval, containing 
 #'       method-specific parameters.}
@@ -266,9 +278,13 @@
 #'       fitting (the supplied `start_time`, else the [extract_intervals()]
 #'       metadata, else 0 or the first positive time value) -- and `end_times`
 #'       when any interval carries an end time from the metadata.}
-#'   \item{`diagnostics`}{A data frame of model diagnostics (`n_obs`, `r2`,
-#'       `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, `bic`) with one
-#'       row per `nirs_channel` per interval.}
+#'   \item{`diagnostics`}{A data frame of model diagnostics (`n_obs`,
+#'       `n_params`, `r2`, `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`,
+#'       `bic`) with one row per `nirs_channel` per interval. `n_params`
+#'       counts the free parameters estimated by the solver, excluding any
+#'       held by `fix`, so a reduced-parameter fallback fit is distinguishable
+#'       from a full one. Only model fits sharing an `n_obs` and `n_params`
+#'       are fairly comparable by `aic`/`bic`.}
 #'   \item{`channel_args`}{A data frame of the resolved arguments used for
 #'       each `nirs_channel` with one row per `nirs_channel` per interval.}
 #'   \item{`call`}{The matched call.}

@@ -344,12 +344,23 @@ analyse_monoexponential <- function(
 
     ## method-specific fit: self-starting monoexponential via nls
     monoexponential_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
-        fit_data <- data.frame(.x = x_fit, .t = t_fit)
         params <- c("A", "B", "tau", if (.a$use_TD) "TD")
+
+        ## the 4-param model is flat at `A` before `TD`, so the pre-onset
+        ## baseline anchors `A`. the 3-param model has no such region and
+        ## diverges at t < 0, so it is fit from `start_time` onward
+        keep_rows <- function(.params) {
+            if ("TD" %in% .params) rep(TRUE, length(t_fit)) else t_fit >= 0
+        }
+        fit_frame <- function(.params) {
+            keep <- keep_rows(.params)
+            data.frame(.x = x_fit[keep], .t = t_fit[keep])
+        }
 
         ## attempt nls fit; a failed 4-param fit falls back to the
         ## 3-param model unless TD is user-fixed
         retry <- .a$use_TD && !"TD" %in% names(fix)
+        fit_data <- fit_frame(params)
         model <- tryCatch(
             nls(
                 build_ss_formula(quote(SSmonoexponential), params, fix),
@@ -362,6 +373,8 @@ analyse_monoexponential <- function(
         )
         if (is.null(model) && retry) {
             params <- setdiff(params, "TD")
+            ## dropping TD narrows the window, so rebuild the fit frame
+            fit_data <- fit_frame(params)
             model <- tryCatch(
                 nls(
                     build_ss_formula(quote(SSmonoexponential), params, fix),
@@ -407,8 +420,10 @@ analyse_monoexponential <- function(
         model <- enforced$model
         coefs <- enforced$coefs
         fitted_vals <- stats::predict(model)
+        keep <- keep_rows(params)
 
-        TD_arg <- if ("TD" %in% params) coefs[["TD"]] - .a$start_time else NULL
+        ## TD is already elapsed from start_time, matching the fit time base
+        TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL
         TD_val <- TD_arg %||% NA_real_
         MRT_val <- sum(TD_arg, coefs[["tau"]])
         HRT_val <- sum(TD_arg, coefs[["tau"]] * log(2))
@@ -437,12 +452,12 @@ analyse_monoexponential <- function(
             ),
             model = model,
             fitted_data = data.frame(
-                window_idx = valid$idx,
+                window_idx = valid$idx[keep],
                 fitted     = fitted_vals
             ),
             diag = compute_diagnostics(
-                x_fit,
-                t_fit,
+                x_fit[keep],
+                t_fit[keep],
                 fitted_vals,
                 n_params = length(stats::coef(model)),
                 verbose,

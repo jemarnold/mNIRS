@@ -64,8 +64,8 @@ test_that("compute_diagnostics returns correct structure", {
     expect_s3_class(result, "data.frame")
     expect_named(
         result,
-        c("n_obs", "r2", "adj_r2", 
-        "rmse", "snr", "cv_rmse", 
+        c("n_obs", "n_params", "r2", "adj_r2",
+        "rmse", "snr", "cv_rmse",
         "aic", "aicc", "bic")
     )
     expect_type(result$n_obs, "integer")
