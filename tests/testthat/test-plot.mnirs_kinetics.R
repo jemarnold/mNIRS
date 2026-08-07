@@ -58,7 +58,7 @@ make_monoexp <- function(A = 50, B = 80, channels = "smo2", n = 60) {
 }
 
 ## biexponential excursion-recovery (per test-analyse_biexponential.R)
-make_biexp <- function(A = 70, B1 = 25, B2 = 15, channels = "smo2", n = 121) {
+make_biexp <- function(A = 70, B1 = 45, B2 = 60, channels = "smo2", n = 121) {
     set.seed(1)
     t <- seq(0, n - 1, length.out = n)
     df <- setNames(
@@ -66,7 +66,8 @@ make_biexp <- function(A = 70, B1 = 25, B2 = 15, channels = "smo2", n = 121) {
         c("time", channels[1])
     )
     for (ch in channels[-1]) {
-        df[[ch]] <- biexponential(t, A + 5, B1, 5, B2, 40) + rnorm(n, 0, 0.5)
+        df[[ch]] <- biexponential(t, A + 5, B1 + 5, 5, B2 + 5, 40) +
+            rnorm(n, 0, 0.5)
     }
     create_mnirs_data(
         df,
@@ -132,8 +133,8 @@ kin_monoexp <- function(A = 50, B = 80, channels = "smo2", faceted = FALSE) {
 
 kin_biexp <- function(
     A = 70,
-    B1 = 25,
-    B2 = 15,
+    B1 = 45,
+    B2 = 60,
     channels = "smo2",
     faceted = FALSE
 ) {
@@ -251,16 +252,16 @@ test_that("kinetics_annotations places label in the vacated corner", {
 })
 
 test_that("kinetics_annotations biexponential corner follows the plateau", {
-    ## net trend is plateau (A - B1 + B2) against A, i.e. the sign of B2 - B1
+    ## net trend is the plateau B2 against the baseline A
 
-    ## plateau below baseline (B1 > B2) -> falls -> top corner (Inf)
-    fall <- kin_biexp(B1 = 25, B2 = 10)
-    expect_true(all(fall$coefficients$plateau < fall$coefficients$A))
+    ## fall-recover: plateau below baseline -> falls -> top corner (Inf)
+    fall <- kin_biexp(B1 = 45, B2 = 55)
+    expect_true(all(fall$coefficients$B2 < fall$coefficients$A))
     expect_true(all(kinetics_annotations(fall)$yval_corner == Inf))
 
-    ## plateau above baseline (B2 > B1) -> rises -> bottom corner (-Inf)
-    rise <- kin_biexp(B1 = 10, B2 = 25)
-    expect_true(all(rise$coefficients$plateau > rise$coefficients$A))
+    ## rise-overshoot: plateau above baseline -> rises -> bottom corner (-Inf)
+    rise <- kin_biexp(B1 = 95, B2 = 85)
+    expect_true(all(rise$coefficients$B2 > rise$coefficients$A))
     expect_true(all(kinetics_annotations(rise)$yval_corner == -Inf))
 })
 

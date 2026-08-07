@@ -7,12 +7,13 @@
 #' @param t A numeric vector of the predictor variable (time).
 #' @param A A numeric parameter for the starting value of the response
 #'   variable (the `t = 0` intercept).
-#' @param B1 A numeric parameter for the amplitude of the *fast* component;
-#'   the size of the initial excursion to the turning point.
+#' @param B1 A numeric parameter for the asymptote of the *fast* component;
+#'   the value the initial excursion heads toward at the turning point.
 #' @param tau1 A numeric parameter for the *fast* time constant (\eqn{\tau_1}),
 #'   in units of the predictor variable `t`. Dominates the initial steep fall.
-#' @param B2 A numeric parameter for the amplitude of the *slow* component;
-#'   the size of the recovery from the turning point toward the plateau.
+#' @param B2 A numeric parameter for the asymptote of the *slow* component;
+#'   the stable plateau the response recovers toward as `t` approaches
+#'   infinity.
 #' @param tau2 A numeric parameter for the *slow* time constant (\eqn{\tau_2}),
 #'   in units of the predictor variable `t`. Typically `tau2 >> tau1`.
 #' @param TD A numeric parameter for the time delay before the onset of the
@@ -27,23 +28,30 @@
 #' ## Model equations
 #'
 #' 5-parameter model:
-#'   `A - B1 * (1 - exp(-t / tau1)) + B2 * (1 - exp(-t / tau2))`
+#'   `A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))`
 #'
 #' 6-parameter model (with time delay), where `ts = pmax(t - TD, 0)`:
-#'   `A - B1 * (1 - exp(-ts / tau1)) + B2 * (1 - exp(-ts / tau2))`
+#'   `A + (B1 - A) * (1 - exp(-ts / tau1)) + (B2 - B1) * (1 - exp(-ts / tau2))`
 #'
 #' Clamping the shifted time at zero holds the curve at the baseline `A` until
 #' the onset of the response at `t = TD`.
 #'
-#' The fast component `B1`/`tau1` subtracts, driving the steep initial
-#' response to the excursion point; the slow component `B2`/`tau2` adds, pulling
-#' the curve back once the fast term saturates. Amplitudes may be negative, in
-#' which case both response components are mirrored and the turning point is
-#' a maximum rather than a minimum. The two components carry independent
-#' amplitudes and are not exchangeable.
+#' All three of `A`, `B1`, and `B2` are values on the response scale,
+#' consistent with the asymptote parameters of [monoexponential()] and the
+#' sigmoidal models. The fast component `B1`/`tau1` drives the steep initial
+#' response from `A` toward `B1`; the slow component `B2`/`tau2` pulls the
+#' curve on toward the plateau `B2` once the fast term saturates. An excursion
+#' response places `B1` beyond both `A` and `B2` (below for a fall-recover
+#' response, above for a rise-overshoot); the turning point is a minimum or a
+#' maximum accordingly. `B1` is the target of the fast component, *near* but
+#' not exactly the fitted turning value, because the slow component already
+#' moves during the fast phase; the exact turning point is reported by
+#' [analyse_kinetics()] as `excursion_value`. When `B1` lies between `A` and
+#' `B2` the curve is a monotone two-phase response, and when `B1 = B2` the
+#' slow term vanishes and the model reduces to the exact [monoexponential()]
+#' with asymptote `B2`.
 #'
-#' The response value as `t` approaches infinity is the *plateau*,
-#' `A - B1 + B2`.
+#' The response value as `t` approaches infinity is the plateau, `B2`.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -54,7 +62,7 @@
 #' ## create a biexponential excursion-recovery curve with random noise
 #' set.seed(1)
 #' t <- 0:120
-#' x <- biexponential(t, A = 70, B1 = 25, tau1 = 5, B2 = 15, tau2 = 40) +
+#' x <- biexponential(t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40) +
 #'     rnorm(length(t), 0, 0.8)
 #' data <- data.frame(t, x)
 #'
@@ -76,11 +84,13 @@
 biexponential <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
     if (is.null(TD)) {
         ## 5-parameter: no time delay
-        y <- A - B1 * (1 - exp(-t / tau1)) + B2 * (1 - exp(-t / tau2))
+        y <- A + (B1 - A) * (1 - exp(-t / tau1)) +
+            (B2 - B1) * (1 - exp(-t / tau2))
     } else {
         ## 6-parameter: with time delay
         ts <- pmax(t - TD, 0)
-        y <- A - B1 * (1 - exp(-ts / tau1)) + B2 * (1 - exp(-ts / tau2))
+        y <- A + (B1 - A) * (1 - exp(-ts / tau1)) +
+            (B2 - B1) * (1 - exp(-ts / tau2))
     }
     return(y)
 }
@@ -243,7 +253,7 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #' ## create a biexponential excursion-recovery curve with random noise
 #' set.seed(13)
 #' t <- 0:120
-#' x <- biexponential(t, A = 70, B1 = 25, tau1 = 5, B2 = 15, tau2 = 40) +
+#' x <- biexponential(t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40) +
 #'     rnorm(length(t), 0, 0.8)
 #' data <- data.frame(t, x)
 #'
@@ -289,6 +299,31 @@ SSbiexponential <- selfStart(
 )
 
 
+#' Translate natural-scale fixed parameters to the log-ratio scale
+#'
+#' A fixed `tau1` becomes a constant `lt1`; a fixed `tau2` becomes an `lr`
+#' expression in `lt1`, which [build_ss_formula()] substitutes verbatim.
+#'
+#' @param fix Named list of fixed parameter values on the natural scale.
+#'
+#' @returns A named list of fixed values on the `lt1`/`lr` scale.
+#'
+#' @keywords internal
+biexp_fix_ss <- function(fix) {
+    fix_ss <- fix[setdiff(names(fix), c("tau1", "tau2"))]
+    if (!is.null(fix$tau1)) {
+        fix_ss$lt1 <- log(fix$tau1)
+    }
+    if (!is.null(fix$tau2)) {
+        fix_ss$lr <- substitute(
+            LT2 - L,
+            list(LT2 = log(fix$tau2), L = fix_ss$lt1 %||% quote(lt1))
+        )
+    }
+    return(fix_ss)
+}
+
+
 #' Fit a biexponential in ratio parameterisation
 #'
 #' [fit_biexp_ratio()]: Fits [biexponential()] with the time constants
@@ -301,8 +336,9 @@ SSbiexponential <- selfStart(
 #' limit where the design matrix is singular. Unbounded fits converge poorly
 #' on real NIRS data regardless of scale.
 #'
-#' Amplitudes are unbounded: NIRS responses may have negative amplitudes, so
-#' identifiability rests on the time constants alone.
+#' The asymptotes `B1` and `B2` are unbounded: NIRS responses may fall or
+#' rise in either direction, so identifiability rests on the time constants
+#' alone.
 #'
 #' A user-fixed `tau1` or `tau2` is substituted into the re-parameterised
 #' formula rather than estimated: fixing `tau1` drops `lt1` and leaves `lr`
@@ -376,9 +412,7 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         TD = c(TD_seed, 0, span)
     )
 
-    ## translate natural-scale params and fix to the SS log-ratio scale: a
-    ## fixed tau1 becomes a constant lt1; a fixed tau2 becomes an lr
-    ## expression in lt1, which build_ss_formula() substitutes verbatim
+    ## translate natural-scale params and fix to the SS log-ratio scale
     params_ss <- unname(c(
         A = "A",
         B1 = "B1",
@@ -387,16 +421,7 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         tau2 = "lr",
         TD = "TD"
     )[params])
-    fix_ss <- fix[setdiff(names(fix), c("tau1", "tau2"))]
-    if (!is.null(fix$tau1)) {
-        fix_ss$lt1 <- log(fix$tau1)
-    }
-    if (!is.null(fix$tau2)) {
-        fix_ss$lr <- substitute(
-            LT2 - L,
-            list(LT2 = log(fix$tau2), L = fix_ss$lt1 %||% quote(lt1))
-        )
-    }
+    fix_ss <- biexp_fix_ss(fix)
 
     ## free parameters in formula order; port matches unnamed bounds
     ## positionally, so start/lower/upper stay aligned with the formula
@@ -451,7 +476,7 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
 #' @inheritParams analyse_kinetics
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
-#'   `nirs_channels`, `A`, `B1`, `tau1`, `B2`, `tau2`, `TD`, `plateau`,
+#'   `nirs_channels`, `A`, `B1`, `tau1`, `B2`, `tau2`, `TD`,
 #'   `excursion_time`, `excursion_value`. Per-channel metadata are attached as
 #'   attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
@@ -525,9 +550,9 @@ analyse_biexponential <- function(
     ## NA scaffold (method columns only) for convergence failure
     # fmt: skip
     na_coefs <- as.data.frame(setNames(
-        rep(list(NA_real_), 9L),
+        rep(list(NA_real_), 8L),
         c(
-            "A", "B1", "tau1", "B2", "tau2", "TD", "plateau",
+            "A", "B1", "tau1", "B2", "tau2", "TD",
             "excursion_time", "excursion_value"
         )
     ))
@@ -596,28 +621,86 @@ analyse_biexponential <- function(
             return(build_na_results(na_coefs))
         }
 
-        ## back-convert log-ratio time constants to the natural scale; a
-        ## fixed time constant has no log-scale counterpart in the model
-        coefs <- c(stats::coef(model), unlist(fix))
-        coefs[["tau1"]] <- fix$tau1 %||% exp(coefs[["lt1"]])
-        coefs[["tau2"]] <- fix$tau2 %||% (coefs[["tau1"]] * exp(coefs[["lr"]]))
-        fitted_vals <- stats::predict(model)
         keep <- keep_rows(params)
 
+        ## enforce direction: bounded refit on D = B1 - A when the fast
+        ## component heads away from the detected response. B2 stays free,
+        ## so monotone two-phase fits in the response direction remain valid
+        cf <- stats::coef(model)
+        fix_ss <- biexp_fix_ss(fix)
+        names(fix_ss)[names(fix_ss) == "B1"] <- "B"
+        free_extra <- setdiff(names(cf), c("A", "B1"))
+        extra <- cf[free_extra]
+        ## port errors on a start sitting on a boundary, so the ratio is
+        ## nudged strictly inside its bound
+        if ("lr" %in% free_extra) {
+            extra[["lr"]] <- max(extra[["lr"]], log(tau_ratio * 1.01))
+        }
+        span <- diff(range(t_fit[keep]))
+        tau1_cap <- (fix$tau2 %||% Inf) / tau_ratio
+        enforced <- enforce_direction(
+            model,
+            c(
+                A = unname(fix$A %||% cf[["A"]]),
+                B = unname(fix$B1 %||% cf[["B1"]]),
+                cf[free_extra]
+            ),
+            data.frame(.x = x_fit[keep], .t = t_fit[keep]),
+            direction = .a$direction,
+            amp_fn = quote(biexponential_ratio),
+            extra = extra,
+            extra_lower = c(
+                if ("lt1" %in% free_extra) c(lt1 = log(span / 1000)),
+                if ("lr" %in% free_extra) c(lr = log(tau_ratio)),
+                if ("TD" %in% free_extra) c(TD = 0)
+            ),
+            extra_upper = c(
+                if ("lt1" %in% free_extra) c(lt1 = log(tau1_cap)),
+                if ("TD" %in% free_extra) c(TD = span)
+            ),
+            ## the tau and TD boxes are legitimate constraints, often
+            ## attained; only the amplitude floor marks degeneracy
+            floor_params = "D",
+            fn = quote(SSbiexponential),
+            fix = fix_ss,
+            .nirs = .nirs,
+            interval_name = interval_name,
+            verbose = verbose,
+            env = env
+        )
+        if (is.null(enforced)) {
+            return(build_na_results(na_coefs))
+        }
+        model <- enforced$model
+        coefs <- enforced$coefs
+        fitted_vals <- stats::predict(model)
+
+        ## back-convert log-ratio time constants to the natural scale; a
+        ## fixed time constant has no log-scale counterpart in the model.
         ## model parameters in biexponential() argument order
-        pars <- as.list(coefs[c("A", "B1", "tau1", "B2", "tau2")])
+        tau1_val <- fix$tau1 %||% exp(coefs[["lt1"]])
+        pars <- list(
+            A = unname(coefs[["A"]]),
+            B1 = unname(coefs[["B"]]),
+            tau1 = unname(tau1_val),
+            B2 = unname(fix$B2 %||% coefs[["B2"]]),
+            tau2 = unname(fix$tau2 %||% (tau1_val * exp(coefs[["lr"]])))
+        )
 
         ## TD is already elapsed from start_time, matching the fit time base
-        TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL
+        TD_arg <- if ("TD" %in% params) {
+            unname(fix$TD %||% coefs[["TD"]])
+        } else {
+            NULL
+        }
 
         ## interior excursion where dy/dt = 0 has a closed form, elapsed since
-        ## model onset (TD, or 0 for the 5-param model). the root needs only
-        ## the ratio (B2/tau2)/(B1/tau1) to be positive, i.e. amplitudes of the
-        ## same sign; opposite signs make the curve monotone and the turning
-        ## point sits at the onset boundary. amplitudes may be negative, in
-        ## which case the excursion is a maximum rather than a minimum
+        ## model onset (TD, or 0 for the 5-param model). the root needs the
+        ## fast and slow differences (A - B1) and (B2 - B1) on the same side,
+        ## i.e. B1 beyond both A and B2; a B1 between them makes the curve
+        ## monotone and the turning point sits at the onset boundary
         s <- with(pars, {
-            ratio <- (B2 / tau2) / (B1 / tau1)
+            ratio <- ((B2 - B1) / tau2) / ((A - B1) / tau1)
             root <- if (is.finite(ratio) && ratio > 0) {
                 log(ratio) / (1 / tau2 - 1 / tau1)
             } else {
@@ -639,7 +722,6 @@ analyse_biexponential <- function(
             coefs = data.frame(
                 pars,
                 TD = TD_arg %||% NA_real_,
-                plateau = pars$A - pars$B1 + pars$B2,
                 excursion_time = excursion_time_val,
                 excursion_value = excursion_value_val
             ),

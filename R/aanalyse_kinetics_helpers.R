@@ -805,10 +805,10 @@ full_coefs <- function(model, params, fix = list()) {
 #' supplies every candidate pair: each pair is then solved in closed form from
 #' its own 3x3 sub-block, with no further pass over the data.
 #'
-#' No sign constraint is placed on `B1` or `B2`. NIRS response amplitudes may
-#' legitimately be negative, so identifiability is enforced through the time
-#' constants alone. This is not a `direction` mechanism, which steers only the
-#' fit window.
+#' No ordering constraint is placed on the asymptotes `B1` or `B2` relative
+#' to `A`. NIRS responses may legitimately fall or rise in either direction,
+#' so identifiability is enforced through the time constants alone. This is
+#' not a `direction` mechanism, which steers only the fit window.
 #'
 #' @param x A numeric vector of the response variable.
 #' @param t A numeric vector of the predictor variable (time).
@@ -839,8 +839,8 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
     i <- pairs[, 1L]
     j <- pairs[, 2L]
 
-    ## normal equations for the design [1, -u_i, u_j]; signs match
-    ## biexponential(), so the solved amplitudes are on the reported scale
+    ## normal equations for the design [1, -u_i, u_j]; the subtract/add
+    ## amplitudes are converted to the asymptote scale at return
     gram <- crossprod(basis)
     diag_gram <- diag(gram)
     su <- colSums(basis)
@@ -878,12 +878,15 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
         return(NULL)
     }
 
+    ## convert the solved amplitudes to the asymptote scale of
+    ## biexponential(): B1 = A - B1_amp, B2 = B1 + B2_amp
     best <- which.min(rss)
+    B1_best <- A[[best]] - B1[[best]]
     return(list(
         A = A[[best]],
-        B1 = B1[[best]],
+        B1 = B1_best,
         tau1 = taus[[i[[best]]]],
-        B2 = B2[[best]],
+        B2 = B1_best + B2[[best]],
         tau2 = taus[[j[[best]]]],
         rss = max(rss[[best]], 0)
     ))
@@ -915,6 +918,11 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
 #'   `extra` params. Sign-floor bounds should be data-scaled small
 #'   values (not `.Machine$double.eps`) so pinned-floor degeneracy is
 #'   detectable.
+#' @param floor_params An *optional* character vector naming the refit
+#'   parameters subject to the pinned-floor degeneracy check. `NULL`
+#'   (*default*) checks every finite-bounded parameter; pass a subset
+#'   (e.g. `"D"`) when other bounds are legitimate box constraints
+#'   expected to be attained.
 #' @param fn Symbol or character; the self-start fn named in the
 #'   warning.
 #' @param .nirs Character; the channel name.
@@ -937,6 +945,7 @@ enforce_direction <- function(
     extra,
     extra_lower = NULL,
     extra_upper = NULL,
+    floor_params = NULL,
     fn,
     .nirs,
     interval_name,
@@ -1024,9 +1033,13 @@ enforce_direction <- function(
 
     ## any coefficient pinned at a sign-floor bound (e.g. D, slope,
     ## tau) indicates a degenerate flat fit: no genuine response in
-    ## the requested direction
+    ## the requested direction. floor_params exempts legitimate box
+    ## constraints that are expected to be attained
     cf <- if (is.null(refit)) NULL else coef(refit)
     floors <- abs(ifelse(is.finite(lower), lower, upper))
+    if (!is.null(floor_params)) {
+        floors[!names(floors) %in% floor_params] <- Inf
+    }
     if (is.null(cf) || any(is.finite(floors) & abs(cf) <= 2 * floors)) {
         return(direction_failed())
     }

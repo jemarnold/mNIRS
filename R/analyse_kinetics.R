@@ -131,10 +131,12 @@
 #' within the subsequent `end_window` time span. The curve fitting window
 #' extends to the end of `end_window` beyond the detected peak/trough.
 #'
-#' For *"monoexponential"* and *"sigmoidal"* methods, `direction` also
-#' constrains the sign of the fitted amplitude `B - A`, and the sigmoidal
-#' `slope`. A fit that cannot satisfy the requested direction returns `NA`
-#' coefficients with a warning.
+#' For *"monoexponential"*, *"biexponential"*, and *"sigmoidal"* methods,
+#' `direction` also constrains the sign of the fitted amplitude `B - A`
+#' (`B1 - A` for *"biexponential"*), and the sigmoidal `slope`. The
+#' biexponential slow asymptote `B2` is unconstrained, so monotone two-phase
+#' fits in the response direction are permitted. A fit that cannot satisfy
+#' the requested direction returns `NA` coefficients with a warning.
 #'
 #' ## method = "response_time"
 #'
@@ -209,18 +211,22 @@
 #' excursion to a rounded turning point; a *slow* component (`B2`, `tau2`)
 #' recovers toward a stable plateau. The turning point is reported as
 #' `excursion_time` and `excursion_value`, and is a minimum or a maximum
-#' depending on the sign of the fitted amplitudes.
+#' depending on the response `direction`.
 #'
 #' Model equation:
 #'
-#' `A - B1 * (1 - exp(-t / tau1)) + B2 * (1 - exp(-t / tau2))`
+#' `A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))`
 #'
-#' `A` is the starting value, `B1`/`tau1` the fast drop amplitude and time
-#' constant, and `B2`/`tau2` the slow recovery amplitude and time constant
-#' (typically `tau2 >> tau1`). The response *plateau* as `t` approaches
-#' infinity is `A - B1 + B2`. Set `use_TD = TRUE` (*default*) to add an
-#' optional time-delay parameter `TD`. See [biexponential()] for the model
-#' family and [SSbiexponential()] for self-start initialisation.
+#' `A` is the starting value; `B1`/`tau1` the fast asymptote and time
+#' constant; `B2`/`tau2` the slow asymptote and time constant (typically
+#' `tau2 >> tau1`). All three of `A`, `B1`, `B2` are values on the response
+#' scale, consistent with the [monoexponential()] and sigmoidal asymptotes.
+#' The response *plateau* as `t` approaches infinity is `B2`. `B1` is the
+#' target of the fast excursion, *near* but not exactly the fitted turning
+#' value; the exact turning point is reported as `excursion_value`. Set
+#' `use_TD = TRUE` (*default*) to add an optional time-delay parameter `TD`.
+#' See [biexponential()] for the model family and [SSbiexponential()] for
+#' self-start initialisation.
 #'
 #' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`.
 #'

@@ -399,7 +399,7 @@ plot.mnirs_kinetics <- function(
 #' per interval, for [plot.mnirs_kinetics()]. Marker x-coordinates are the
 #' resolved onset plus the method's time coefficient. Labels sit in the corner
 #' the fitted curve vacates: `yval_corner` is the top (`Inf`) when the signal
-#' falls (`A > B`, or `A > plateau` for `"biexponential"`) and the bottom
+#' falls (`A > B`, or `A > B2` for `"biexponential"`) and the bottom
 #' (`-Inf`) when it rises, with `vjust` staggering stacked labels by channel
 #' rank within each interval-corner.
 #'
@@ -487,10 +487,10 @@ kinetics_annotations <- function(x) {
 
     ## place labels in the corner the fitted curve vacates: top-right when
     ## the signal falls (A > B), bottom-right when it rises. biexponential
-    ## has two amplitudes, so its net trend is the plateau against the
+    ## has two asymptotes, so its net trend is the plateau B2 against the
     ## baseline. peak_slope has neither, so fall back to the local slope sign
-    rises <- if ("plateau" %in% names(coefs)) {
-        coefs$plateau > coefs$A
+    rises <- if ("B2" %in% names(coefs)) {
+        coefs$B2 > coefs$A
     } else if (all(c("A", "B") %in% names(coefs))) {
         coefs$B > coefs$A
     } else {
