@@ -282,6 +282,9 @@ plot.mnirs_kinetics <- function(
         p <- p +
             lapply(nirs, \(.ch) {
             fcol <- paste0(.ch, "_fitted")
+            if (!fcol %in% names(plot_data)) {
+                return(NULL)
+            }
             ggplot2::geom_line(
                 ggplot2::aes(y = .data[[fcol]], colour = .ch),
                 data = plot_data[is.finite(plot_data[[fcol]]), , drop = FALSE],
@@ -321,6 +324,9 @@ plot.mnirs_kinetics <- function(
         p <- p +
             lapply(nirs, \(.ch) {
             fcol <- paste0(.ch, "_fitted")
+            if (!fcol %in% names(plot_data)) {
+                return(NULL)
+            }
             post <- is.finite(plot_data[[fcol]]) &
                 plot_data[[time_channel]] > plot_data$start_times
             key_point(
@@ -574,10 +580,13 @@ as_plot_data <- function(x, env = rlang::caller_env()) {
     })
     names(channel_map) <- nirs_channels
 
-    ## pad each element with NA for any missing nirs_channels
+    ## pad each element with NA for any column it lacks, so elements with
+    ## asymmetrical channels (and their derived `_fitted` columns) row-bind
+    all_cols <- unique(unlist(lapply(x, names), use.names = FALSE))
+    all_cols <- union(all_cols, nirs_channels)
     x <- lapply(x, \(.df) {
-        .df[setdiff(nirs_channels, names(.df))] <- NA_real_
-        .df
+        .df[setdiff(all_cols, names(.df))] <- NA_real_
+        .df[all_cols]
     })
 
     ## add interval column to each element, then row-bind
