@@ -59,7 +59,7 @@
 #'   `TRUE` to attempt to fit a model with a time-delay parameter `TD`. For
 #'   **monoexponential** this is the 4-parameter [SSmonoexponential()] model
 #'   (A, B, tau, TD); for **biexponential** the 6-parameter
-#'   [SSbiexponential()] model (A, B1, tau1, B2, tau2, TD). If the fit fails,
+#'   [biexponential()] model (A, B1, tau1, B2, tau2, TD). If the fit fails,
 #'   or if `use_TD = FALSE`, attempts the reduced model without `TD`.
 #' @param shape **sigmoidal**: Character; the 4-parameter sigmoidal shape
 #'   to fit. One of `"symmetric"` (*default*; calls [SSlogistic()]),

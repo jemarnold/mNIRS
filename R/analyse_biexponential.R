@@ -38,7 +38,7 @@
 #' The fast component `B1`/`tau1` subtracts, driving the steep initial
 #' response to the excursion point; the slow component `B2`/`tau2` adds, pulling
 #' the curve back once the fast term saturates. Amplitudes may be negative, in
-#' which case both response components are mirrored and the turning point is 
+#' which case both response components are mirrored and the turning point is
 #' a maximum rather than a minimum. The two components carry independent
 #' amplitudes and are not exchangeable.
 #'
@@ -58,7 +58,7 @@
 #'     rnorm(length(t), 0, 0.8)
 #' data <- data.frame(t, x)
 #'
-#' model <- nls(x ~ SSbiexponential(t, A, B1, tau1, B2, tau2), data = data)
+#' model <- nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr), data = data)
 #' summary(model)
 #'
 #' y <- predict(model, data)
@@ -86,10 +86,62 @@ biexponential <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
 }
 
 
+#' Biexponential function in log-ratio parameterisation
+#'
+#' [biexponential()] with the time constants re-parameterised as
+#' `lt1 = log(tau1)` and `lr = log(tau2 / tau1)`, the scale on which
+#' [SSbiexponential()] is estimated.
+#'
+#' @inheritParams biexponential
+#' @param lt1 A numeric parameter for the log *fast* time constant.
+#' @param lr A numeric parameter for the log ratio of the *slow* to the
+#'   *fast* time constant.
+#'
+#' @returns A numeric vector of predicted values the same length as the
+#'   predictor variable `t`.
+#'
+#' @keywords internal
+biexponential_ratio <- function(t, A, B1, lt1, B2, lr, TD = NULL) {
+    tau1 <- exp(lt1)
+    return(biexponential(t, A, B1, tau1, B2, tau1 * exp(lr), TD))
+}
+
+
+#' Profile the biexponential time delay by separable least squares
+#'
+#' A coarse sweep of candidate delays locates the RSS basin, then a
+#' refinement around it. [stats::nls()] polishes the value from there, so
+#' the profile only needs to be close.
+#'
+#' @param x,t Numeric vectors of the response and predictor variables.
+#' @param tau_ratio A numeric lower bound on `tau2 / tau1`.
+#' @param span Numeric range of `t`.
+#'
+#' @returns A numeric time delay seed, or `NULL` when no candidate solves.
+#'
+#' @keywords internal
+biexp_profile_TD <- function(x, t, tau_ratio, span) {
+    profile <- \(.grid) {
+        rss <- vapply(.grid, \(.td) {
+            biexp_grid_start(x, t, tau_ratio, .td)$rss %||% NA_real_
+        }, numeric(1))
+        if (all(is.na(rss))) NULL else .grid[[which.min(rss)]]
+    }
+    coarse <- seq(0, span / 3, length.out = 12L)
+    TD <- profile(coarse)
+    if (is.null(TD)) {
+        return(NULL)
+    }
+    step <- coarse[[2L]]
+    fine <- profile(seq(max(TD - step, 0), TD + step, length.out = 7L))
+    return(fine %||% TD)
+}
+
+
 #' Initiate self-starting biexponential model
 #'
 #' [biexp_init()]: Returns initial values for the parameters in a `selfStart`
-#' model.
+#' model, with the time constants on the log-ratio scale (`lt1`, `lr`).
 #'
 #' @param mCall A matched call to the function `model`.
 #' @param data A data frame with time `t` and the response variable.
@@ -109,39 +161,29 @@ biexp_init <- function(mCall, data, LHS, ...) {
 
     ## user-fixed parameter values seed the remaining free estimates
     fixed <- list(...)$fixed %||% list()
-
-    ## check if TD parameter exists in the call
     has_TD <- "TD" %in% names(mCall)
+    span <- diff(range(t))
 
-    ## time delay from the steepest derivative changepoint, in the same
-    ## absolute frame as t; the fit window shift happens downstream
-    TD_init <- fixed$TD %||% max(t[which.max(abs(diff(x) / diff(t)))], 0)
+    ## TD profiled by the same separable RSS sweep as the package fit path
+    TD_init <- fixed$TD %||%
+        if (has_TD) biexp_profile_TD(x, t, 2.5, span) %||% 0 else 0
 
-    ## profile the amplitudes out of a grid of time constants. deterministic,
-    ## and far better seeded than an asymptote heuristic, which averages the
-    ## first fifth of the window and so straddles the whole fast drop
-    grid <- biexp_grid_start(x, t, TD = if (has_TD) TD_init else 0)
-
+    ## profile the amplitudes out of a grid of time constants
+    grid <- biexp_grid_start(x, t, TD = TD_init)
     if (is.null(grid)) {
-        ## fall back to the asymptote heuristic when no grid point solves
-        ab <- init_asymptotes(x)
-        span <- max(diff(range(t)), .Machine$double.eps)
-        grid <- list(
-            A = ab$A,
-            B1 = max(ab$A - min(x), .Machine$double.eps),
-            tau1 = span / 10,
-            B2 = max(ab$B - min(x), .Machine$double.eps),
-            tau2 = span / 2
-        )
+        stop("No starting estimates could be resolved from the response.")
     }
 
-    ## user-fixed values take precedence over the grid optimum
+    ## user-fixed values take precedence over the grid optimum. the grid is
+    ## confined to tau2 >= 2.5 * tau1, so lr starts at or above log(2.5); the
+    ## nudge keeps it strictly inside that bound for callers fitting with
+    ## algorithm = "port", which errors on a start sitting on a boundary
     start <- c(
         A = fixed$A %||% grid$A,
         B1 = fixed$B1 %||% grid$B1,
-        tau1 = fixed$tau1 %||% grid$tau1,
+        lt1 = fixed$lt1 %||% log(grid$tau1),
         B2 = fixed$B2 %||% grid$B2,
-        tau2 = fixed$tau2 %||% grid$tau2
+        lr = fixed$lr %||% max(log(grid$tau2 / grid$tau1), log(2.5 * 1.01))
     )
 
     if (has_TD) {
@@ -155,31 +197,40 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #' Self-starting biexponential model
 #'
 #' Creates initial coefficient estimates for a `selfStart` wrapper around
-#' [biexponential()], for use with [stats::nls()]. Supports both the
-#' 5-parameter form (A, B1, tau1, B2, tau2) and the 6-parameter form
-#' (A, B1, tau1, B2, tau2, TD); arity is inferred from the formula passed
+#' [biexponential()], for use with [stats::nls()]. The time constants are
+#' estimated on the log-ratio scale, `lt1 = log(tau1)` and
+#' `lr = log(tau2 / tau1)`, which expresses the `tau2 / tau1` separation of
+#' the two components as a simple bound on `lr`. Supports both the
+#' 5-parameter form (A, B1, lt1, B2, lr) and the 6-parameter form
+#' (A, B1, lt1, B2, lr, TD); arity is inferred from the formula passed
 #' to [stats::nls()].
 #'
 #' @usage
-#' SSbiexponential(t, A, B1, tau1, B2, tau2, TD)
+#' SSbiexponential(t, A, B1, lt1, B2, lr, TD)
 #'
-#' @inheritParams biexponential
+#' @inheritParams biexponential_ratio
 #'
 #' @details
-#' 5-parameter model: `x ~ SSbiexponential(t, A, B1, tau1, B2, tau2)`
+#' 5-parameter model: `x ~ SSbiexponential(t, A, B1, lt1, B2, lr)`
 #'
-#' 6-parameter model: `x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, TD)`
+#' 6-parameter model: `x ~ SSbiexponential(t, A, B1, lt1, B2, lr, TD)`
 #'
 #' The 5-parameter form is recommended for small samples or when no obvious
 #'   time delay is expected, as it converges more reliably. [stats::nls()]
 #'   reads the free parameters from the formula right-hand side, so omitting
 #'   `TD` incurs no degrees-of-freedom penalty.
 #'
+#' [stats::coef()] returns the log-scale `lt1` and `lr`; recover the natural
+#'   time constants as `tau1 = exp(lt1)` and `tau2 = exp(lt1 + lr)`.
+#'
+#' [analyse_kinetics()] fits this model with `algorithm = "port"` and box
+#'   bounds.
+#'
 #' ## Fixing parameters
 #'
 #' Any parameter may be held constant by writing a value in place of its
-#'   name in the formula, e.g. `x ~ SSbiexponential(t, A = 0, B1, tau1, B2,
-#'   tau2)` fixes the baseline at `A = 0`. Fixed parameters are excluded from
+#'   name in the formula, e.g. `x ~ SSbiexponential(t, A = 0, B1, lt1, B2,
+#'   lr)` fixes the baseline at `A = 0`. Fixed parameters are excluded from
 #'   estimation and are not returned by [stats::coef()].
 #'
 #' @returns A numeric vector of predicted values the same length as the
@@ -190,18 +241,32 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #'
 #' @examples
 #' ## create a biexponential excursion-recovery curve with random noise
-#' set.seed(1)
+#' set.seed(13)
 #' t <- 0:120
 #' x <- biexponential(t, A = 70, B1 = 25, tau1 = 5, B2 = 15, tau2 = 40) +
 #'     rnorm(length(t), 0, 0.8)
 #' data <- data.frame(t, x)
 #'
-#' model <- nls(x ~ SSbiexponential(t, A, B1, tau1, B2, tau2), data = data)
+#' model <- nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr), data = data)
 #' summary(model)
+#'
+#' ## convert the log-scale time constants to the natural scale
+#' with(as.list(coef(model)), c(tau1 = exp(lt1), tau2 = exp(lt1 + lr)))
+#'
+#' ## match the analyse_kinetics() fit path: port with box bounds keeping
+#' ## tau1 within the data span and tau2 / tau1 >= 2.5
+#' span <- diff(range(t))
+#' model_port <- nls(
+#'     x ~ SSbiexponential(t, A, B1, lt1, B2, lr),
+#'     data = data,
+#'     algorithm = "port",
+#'     lower = c(-Inf, -Inf, log(span / 1000), -Inf, log(2.5))
+#' )
+#' summary(model_port)
 #'
 #' ## fix the baseline A at a known value
 #' model_fixed <- nls(
-#'     x ~ SSbiexponential(t, A = 70, B1, tau1, B2, tau2), data = data
+#'     x ~ SSbiexponential(t, A = 70, B1, lt1, B2, lr), data = data
 #' )
 #' summary(model_fixed)
 #'
@@ -218,9 +283,9 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #'
 #' @export
 SSbiexponential <- selfStart(
-    model = biexponential,
-    initial = init_fixed(biexp_init, c("A", "B1", "tau1", "B2", "tau2", "TD")),
-    parameters = c("A", "B1", "tau1", "B2", "tau2", "TD")
+    model = biexponential_ratio,
+    initial = init_fixed(biexp_init, c("A", "B1", "lt1", "B2", "lr", "TD")),
+    parameters = c("A", "B1", "lt1", "B2", "lr", "TD")
 )
 
 
@@ -230,11 +295,11 @@ SSbiexponential <- selfStart(
 #' re-parameterised as `lt1 = log(tau1)` and `lr = log(tau2 / tau1)`.
 #'
 #' @details
-#' [stats::nls()] does not converge on the natural `tau1`/`tau2` scale for
-#' this model, failing even when started at the generating parameter values.
-#' Estimating the log time constant and the log ratio instead decouples the
-#' two components and bounds the ratio away from the degenerate `tau2 = tau1`
-#' limit, where the design matrix is singular.
+#' Convergence rests on `algorithm = "port"` with box bounds: the log-ratio
+#' scale expresses the `tau2 / tau1 >= tau_ratio` constraint as a simple box
+#' bound on `lr`, keeping the fit away from the degenerate `tau2 = tau1`
+#' limit where the design matrix is singular. Unbounded fits converge poorly
+#' on real NIRS data regardless of scale.
 #'
 #' Amplitudes are unbounded: NIRS responses may have negative amplitudes, so
 #' identifiability rests on the time constants alone.
@@ -283,24 +348,9 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         )))
     }
 
-    ## TD is profiled separably: a coarse sweep locates the basin, then a
-    ## refinement around it. nls polishes the value from there, so the
-    ## profile only needs to be close
     TD_seed <- fix$TD %||% 0
     if (has_TD && is.null(fix$TD)) {
-        profile <- \(.grid) {
-            rss <- vapply(.grid, \(.td) {
-                biexp_grid_start(x, t, tau_ratio, .td)$rss %||% NA_real_
-            }, numeric(1))
-            if (all(is.na(rss))) NULL else .grid[[which.min(rss)]]
-        }
-        coarse <- seq(0, span / 3, length.out = 12L)
-        TD_seed <- profile(coarse) %||% 0
-        step <- coarse[[2L]]
-        TD_seed <- profile(
-            seq(max(TD_seed - step, 0), TD_seed + step, length.out = 7L)
-        ) %||%
-            TD_seed
+        TD_seed <- biexp_profile_TD(x, t, tau_ratio, span) %||% 0
         seed <- biexp_grid_start(x, t, tau_ratio, TD_seed) %||% seed
     }
 
@@ -326,46 +376,38 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         TD = c(TD_seed, 0, span)
     )
 
-    ## drop parameters the formula holds constant; a fixed time constant
-    ## removes its log-scale counterpart
-    free <- setdiff(
-        names(bounds),
-        c(
-            names(fix),
-            if (!is.null(fix$tau1)) "lt1",
-            if (!is.null(fix$tau2)) "lr",
-            if (!has_TD) "TD"
+    ## translate natural-scale params and fix to the SS log-ratio scale: a
+    ## fixed tau1 becomes a constant lt1; a fixed tau2 becomes an lr
+    ## expression in lt1, which build_ss_formula() substitutes verbatim
+    params_ss <- unname(c(
+        A = "A",
+        B1 = "B1",
+        tau1 = "lt1",
+        B2 = "B2",
+        tau2 = "lr",
+        TD = "TD"
+    )[params])
+    fix_ss <- fix[setdiff(names(fix), c("tau1", "tau2"))]
+    if (!is.null(fix$tau1)) {
+        fix_ss$lt1 <- log(fix$tau1)
+    }
+    if (!is.null(fix$tau2)) {
+        fix_ss$lr <- substitute(
+            LT2 - L,
+            list(LT2 = log(fix$tau2), L = fix_ss$lt1 %||% quote(lt1))
         )
-    )
-    ## port matches unnamed bounds positionally, so keep them aligned
+    }
+
+    ## free parameters in formula order; port matches unnamed bounds
+    ## positionally, so start/lower/upper stay aligned with the formula
+    free <- setdiff(params_ss, names(fix_ss))
     start <- vapply(bounds[free], `[[`, numeric(1), 1L)
     lower <- vapply(bounds[free], `[[`, numeric(1), 2L)
     upper <- vapply(bounds[free], `[[`, numeric(1), 3L)
 
-    ## substitute fixed values into the formula in place of their symbols
-    sub <- \(.p) fix[[.p]] %||% as.name(.p)
-    tau1_expr <- fix$tau1 %||% quote(exp(lt1))
-    tau2_expr <- fix$tau2 %||% substitute(T1 * exp(lr), list(T1 = tau1_expr))
-    time_expr <- if (has_TD) {
-        substitute(pmax(.t - TD, 0), list(TD = sub("TD")))
-    } else {
-        quote(.t)
-    }
-    rhs <- substitute(
-        A - B1 * (1 - exp(-tt / t1)) + B2 * (1 - exp(-tt / t2)),
-        list(
-            A = sub("A"),
-            B1 = sub("B1"),
-            B2 = sub("B2"),
-            t1 = tau1_expr,
-            t2 = tau2_expr,
-            tt = time_expr
-        )
-    )
-
     model <- tryCatch(
         nls(
-            stats::as.formula(call("~", quote(.x), rhs)),
+            build_ss_formula(quote(SSbiexponential), params_ss, fix_ss),
             data.frame(.x = x, .t = t),
             start = start,
             algorithm = "port",
@@ -379,24 +421,6 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
 }
 
 
-#' Convert ratio-parameterised coefficients to the natural scale
-#'
-#' @param model An [nls][stats::nls] model in ratio parameterisation.
-#' @param params Character vector of natural parameter names in model order.
-#' @param fix Named list of fixed parameter values.
-#'
-#' @returns A named numeric vector on the natural `tau1`/`tau2` scale.
-#'
-#' @keywords internal
-ratio_to_natural <- function(model, params, fix = list()) {
-    coefs <- c(stats::coef(model), unlist(fix))
-    ## a fixed time constant has no log-scale counterpart in the model
-    coefs[["tau1"]] <- fix$tau1 %||% exp(coefs[["lt1"]])
-    coefs[["tau2"]] <- fix$tau2 %||% (coefs[["tau1"]] * exp(coefs[["lr"]]))
-    return(coefs[intersect(params, names(coefs))])
-}
-
-
 #' Analyse biexponential kinetics across NIRS channels
 #'
 #' Internal channel-level dispatch for
@@ -405,9 +429,9 @@ ratio_to_natural <- function(model, params, fix = list()) {
 #' data frame. See [analyse_kinetics()] for user-facing documentation.
 #'
 #' @param use_TD Logical; `TRUE` attempts to fit a 6-parameter
-#'   [SSbiexponential()] model (A, B1, tau1, B2, tau2, TD) with a time delay.
+#'   [biexponential()] model (A, B1, tau1, B2, tau2, TD) with a time delay.
 #'   If the 6-parameter fit fails, or if `use_TD = FALSE`, attempts to fit a
-#'   reduced 5-parameter [SSbiexponential()] model (A, B1, tau1, B2, tau2).
+#'   reduced 5-parameter [biexponential()] model (A, B1, tau1, B2, tau2).
 #'   The user-facing default (`TRUE`) is set by [analyse_kinetics()].
 #' @param fix An *optional* named list of model parameters (`A`, `B1`, `tau1`,
 #'   `B2`, `tau2`, `TD`) to hold constant during fitting, e.g.
@@ -572,7 +596,11 @@ analyse_biexponential <- function(
             return(build_na_results(na_coefs))
         }
 
-        coefs <- ratio_to_natural(model, params, fix)
+        ## back-convert log-ratio time constants to the natural scale; a
+        ## fixed time constant has no log-scale counterpart in the model
+        coefs <- c(stats::coef(model), unlist(fix))
+        coefs[["tau1"]] <- fix$tau1 %||% exp(coefs[["lt1"]])
+        coefs[["tau2"]] <- fix$tau2 %||% (coefs[["tau1"]] * exp(coefs[["lr"]]))
         fitted_vals <- stats::predict(model)
         keep <- keep_rows(params)
 
