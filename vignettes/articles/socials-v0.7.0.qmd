@@ -22,7 +22,7 @@ knitr:
 
 {mnirs} R package for reading, processing, and analysing muscle near-infrared spectroscopy data🦵🔦 updated to 0.7.0 🎉
 
-Mostly internal changes getting ready for `mnirs::analyse_kinetics()` (soon!)
+Mostly internal performance improvements getting ready for `mnirs::analyse_kinetics()` soon!
 
 Here are the key changes: 1/5🧵🔗👇 #rstats #nirs #muscleoxygenation
 
@@ -33,9 +33,9 @@ Here are the key changes: 1/5🧵🔗👇 #rstats #nirs #muscleoxygenation
 
 ## Post 2 — Lists & grouped data frames
 
-Core processing functions now accept a list of data frames or grouped dfs with `dplyr::group_by`
+2/5 Core processing functions now accept a list of data frames or grouped dfs with `dplyr::group_by()`:
 
-You could `filter_mnirs()` over a list of dfs from multiple `read_mnirs()` files,
+You can `filter_mnirs()` over a list of dfs from multiple `read_mnirs()` files,
 
 Or `extract_intervals()` from a longer session and `rescale_mnirs()` each independently
 
@@ -95,11 +95,11 @@ plot(data_list)
 
 ## Post 3 — Per-channel arguments
 
-{mnirs} 0.7.0 can now process each nirs_channel with independent settings:
+3/5 {mnirs} 0.7.0 can now process each `nirs_channel` with independent settings:
 
-You can replace invalid values with different criteria for "smo2" and "thb"
+You can `replace_mnirs()` invalid values with different criteria each for “smo2” and “thb”
 
-Or filter_mnirs() one channel with "moving average" and another with "butterworth", side by side.
+Or `filter_mnirs()` one channel with “moving average” and another with “butterworth”, side by side
 
 ```{r}
 #| eval: true
@@ -126,9 +126,9 @@ data <- rescale_mnirs(data, group_channels = "distinct", range = list(smo2 = c(0
 data_clean <- replace_mnirs(
     data,
     invalid_above = list(smo2 = 80, thb = 13), ## assign independent values
-    invalid_below = list(thb = 10),  ## assign only one channel, ...
-    invalid_values = list(smo2 = 0), ## or the other (with a warning)
-    method = "none"                  ## replace with NA
+    invalid_below = list(thb = 10),            ## assign only one channel, ...
+    invalid_values = list(smo2 = 0),           ## or the other (with a warning)
+    method = "none"                            ## replace with NA
 )
 
 ## rows where invalid values were replaced
@@ -148,13 +148,13 @@ plot(data_clean, time_labels = TRUE) +
 
 ## Post 4 — `group_channels`
 
-A minor breaking change ⚠️ to `shift_mnirs()`, `replace_mnirs()`, and `extract_mnirs()`
+4/5 A minor ⚠️ breaking change to `shift_mnirs()`, `replace_mnirs()`, and `extract_intervals()`:
 
 `group_channels` arg handles channels
 
-`group_intervals` arg handles intervals for `extract_intervals()` 
+`group_intervals` arg handles intervals for `extract_intervals()`
 
-Options are "distinct", "ensemble", or a custom group list
+Options are “distinct”, “ensemble”, or a custom group list
 
 ```{r}
 #| eval: true
@@ -184,7 +184,12 @@ plot(ensemble, time_labels = TRUE)
 
 ## Post 5 — link
 
-{mnirs} 0.7.0 can be downloaded from CRAN 🧑‍💻: `install.packages("mnirs")`
+5/5 {mnirs} 0.7.0 can be downloaded from CRAN 🧑‍💻:
+
+`install.packages("mnirs")`
+
+(0.7.1 updated on github because I already found a bug) 
+https://github.com/jemarnold/mnirs
 
 More information on the {mnirs} package website: https://jemarnold.github.io/mnirs/index.html
 
