@@ -57,6 +57,26 @@ make_monoexp <- function(A = 50, B = 80, channels = "smo2", n = 60) {
     )
 }
 
+## biexponential nadir-recovery (per test-analyse_biexponential.R)
+make_biexp <- function(A = 70, B1 = 25, B2 = 15, channels = "smo2", n = 121) {
+    set.seed(1)
+    t <- seq(0, n - 1, length.out = n)
+    df <- setNames(
+        data.frame(t, biexponential(t, A, B1, 5, B2, 40) + rnorm(n, 0, 0.5)),
+        c("time", channels[1])
+    )
+    for (ch in channels[-1]) {
+        df[[ch]] <- biexponential(t, A + 5, B1, 5, B2, 40) + rnorm(n, 0, 0.5)
+    }
+    create_mnirs_data(
+        df,
+        nirs_channels = channels,
+        time_channel = "time",
+        sample_rate = 1,
+        interval_times = 0
+    )
+}
+
 ## sigmoidal (per create_sigmoidal_data)
 make_sigmoidal <- function(channels = "smo2", n = 60) {
     set.seed(13)
@@ -110,6 +130,22 @@ kin_monoexp <- function(A = 50, B = 80, channels = "smo2", faceted = FALSE) {
     )
 }
 
+kin_biexp <- function(
+    A = 70,
+    B1 = 25,
+    B2 = 15,
+    channels = "smo2",
+    faceted = FALSE
+) {
+    analyse_kinetics(
+        as_input(make_biexp(A, B1, B2, channels), faceted),
+        nirs_channels = channels,
+        method = "biexponential",
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+}
+
 kin_sigmoidal <- function(channels = "smo2", faceted = FALSE) {
     analyse_kinetics(
         as_input(make_sigmoidal(channels), faceted),
@@ -157,6 +193,12 @@ test_that("kinetics_annotations xval is onset plus method offset", {
         me$interval_times$start_times + me$coefficients$MRT
     )
 
+    be <- kin_biexp()
+    expect_equal(
+        kinetics_annotations(be)$xval,
+        be$interval_times$start_times + be$coefficients$nadir_time
+    )
+
     sg <- kin_sigmoidal()
     expect_equal(
         kinetics_annotations(sg)$xval,
@@ -181,9 +223,21 @@ test_that("kinetics_annotations formats method-specific labels", {
         "MRT = .+ s\ntau = "
     )
     expect_match(
+        kinetics_annotations(kin_biexp())$label,
+        "nadir = .+ s\ntau1 = .+\ntau2 = "
+    )
+    expect_match(
         kinetics_annotations(kin_sigmoidal())$label,
         "xmid = .+ s\nslope = "
     )
+})
+
+test_that("kinetics_annotations biexponential marks the fitted nadir", {
+    x <- kin_biexp()
+    ann <- kinetics_annotations(x)
+    expect_equal(ann$yval, x$coefficients$nadir_value)
+    ## nadir sits below the baseline for a nadir-recovery response
+    expect_true(all(ann$yval < x$coefficients$A))
 })
 
 test_that("kinetics_annotations places label in the vacated corner", {
@@ -194,6 +248,20 @@ test_that("kinetics_annotations places label in the vacated corner", {
     ## falling signal (A > B) -> top corner (Inf)
     fall <- kin_monoexp(A = 80, B = 50)
     expect_true(all(kinetics_annotations(fall)$yval_corner == Inf))
+})
+
+test_that("kinetics_annotations biexponential corner follows the plateau", {
+    ## net trend is plateau (A - B1 + B2) against A, i.e. the sign of B2 - B1
+
+    ## plateau below baseline (B1 > B2) -> falls -> top corner (Inf)
+    fall <- kin_biexp(B1 = 25, B2 = 10)
+    expect_true(all(fall$coefficients$plateau < fall$coefficients$A))
+    expect_true(all(kinetics_annotations(fall)$yval_corner == Inf))
+
+    ## plateau above baseline (B2 > B1) -> rises -> bottom corner (-Inf)
+    rise <- kin_biexp(B1 = 10, B2 = 25)
+    expect_true(all(rise$coefficients$plateau > rise$coefficients$A))
+    expect_true(all(kinetics_annotations(rise)$yval_corner == -Inf))
 })
 
 test_that("kinetics_annotations peak_slope corner follows slope sign", {
@@ -233,6 +301,7 @@ test_that("plot.mnirs_kinetics returns a ggplot and renders for each method", {
         peak_slope = kin_peak_slope(),
         response_time = kin_response_time(),
         monoexponential = kin_monoexp(),
+        biexponential = kin_biexp(),
         sigmoidal = kin_sigmoidal()
     )
     lapply(objs, function(x) {
@@ -256,6 +325,20 @@ test_that("fitted = FALSE drops the parametric fitted layers", {
         plot(x, fitted = FALSE, markers = FALSE, labels = FALSE)$layers
     )
     expect_gt(n_on, n_off)
+})
+
+test_that("biexponential draws the fitted curve and a nadir key-point", {
+    x <- kin_biexp()
+    geoms <- layer_geoms(plot(x, labels = FALSE))
+    ## base signal line + dashed fitted line
+    expect_equal(sum(geoms == "GeomLine"), 2L)
+    ## onset vline + single nadir marker
+    expect_true("GeomVline" %in% geoms)
+    expect_equal(sum(geoms == "GeomPoint"), 1L)
+
+    ## fitted = FALSE drops the dashed overlay only
+    off <- layer_geoms(plot(x, fitted = FALSE, labels = FALSE))
+    expect_equal(sum(off == "GeomLine"), 1L)
 })
 
 test_that("response_time has no fitted curve or points", {

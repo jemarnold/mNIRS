@@ -544,9 +544,11 @@ validate_start_time <- function(
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
-    ## fall back to metadata, first non-negative value, or zero
+    ## fall back to interval onset, first non-negative value, or zero
+    ## unlist takes first ensemble t0-corrected time (probably t = 0)
+    it <- unlist(attr(data, "interval_times"))
     start_time <- start_time %||%
-        attr(data, "interval_times") %||%
+        (if (is.numeric(it) && length(it) > 0L) it[[1L]]) %||%
         c(t_vec[t_vec >= 0], 0)[1L]
     validate_numeric(start_time, 1L, env = env)
     t1 <- t_vec[1L]

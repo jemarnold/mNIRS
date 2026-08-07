@@ -178,8 +178,8 @@ plot.mnirs <- function(
 #'
 #' @param x An *"mnirs_kinetics"* object from [analyse_kinetics()].
 #' @param fitted Logical. Default is `TRUE`; overlays a dashed fitted curve for
-#'   parametric methods (`"peak_slope"`, `"monoexponential"`, `"sigmoidal"`).
-#'   `"response_time"` has no fitted curve.
+#'   parametric methods (`"peak_slope"`, `"monoexponential"`,
+#'   `"biexponential"`, `"sigmoidal"`). `"response_time"` has no fitted curve.
 #' @param markers Logical. Default is `TRUE`; draws a dotted vertical line at
 #'   the response onset (`start_time`) and key coefficient points.
 #' @param labels Logical. Default is `TRUE`; annotates each panel with the key
@@ -187,9 +187,12 @@ plot.mnirs <- function(
 #' @param ... Additional arguments.
 #' 
 #' @details
-#' Accepts some arguments in `...`, such as `label_size` passed to 
+#' Accepts some arguments in `...`, such as `label_size` passed to
 #' [ggplot2::geom_text()]. Also accepts args passed to [plot.mnirs()], such as
 #' `points`, `time_labels`, `nrow`, `ncol`, or `scales`.
+#'
+#' A method with no annotation spec in [kinetics_annotations()] plots the
+#' observed signal and fitted curve only, without markers or labels.
 #'
 #' @returns A [ggplot2][ggplot2::ggplot()] object.
 #'
@@ -290,16 +293,20 @@ plot.mnirs_kinetics <- function(
     }
 
     ## per-interval-per-channel markers and labels ============
+    ## methods with no annotation spec plot the fitted curve alone
     ann <- kinetics_annotations(x)
+
+    if (is.null(ann)) {
+        return(p)
+    }
+
     if (!faceted) {
         ann$interval <- NULL
     }
 
     if (markers) {
         ## dotted onset line at the resolved start_time per interval
-        vdata <- unique(
-            ann[intersect(c("interval", "start_times"), names(ann))]
-        )
+        vdata <- unique(ann[intersect(c("interval", "start_times"), names(ann))])
         p <- p +
             ggplot2::geom_vline(
                 ggplot2::aes(xintercept = .data$start_times),
@@ -307,56 +314,57 @@ plot.mnirs_kinetics <- function(
                 linetype = "dotted",
                 colour = "grey50"
             )
-        if (x$method == "response_time") {
-            ## response and extreme (fitted values after the onset) as points
-            p <- p +
-                lapply(nirs, \(.ch) {
-                fcol <- paste0(.ch, "_fitted")
-                post <- is.finite(plot_data[[fcol]]) &
-                    plot_data[[time_channel]] > plot_data$start_times
-                key_point(
-                    ggplot2::aes(y = .data[[fcol]], colour = .ch),
-                    plot_data[post, , drop = FALSE]
-                )
-            })
-            ## baseline as a single point at the onset (start_time, A)
-            base_pts <- merge(
-                x$coefficients[c("interval", "nirs_channels", "A")],
-                x$interval_times[c("interval", "start_times")],
-                by = "interval",
-                sort = FALSE
+    }
+
+    if (markers && x$method == "response_time") {
+        ## response and extreme (fitted values after onset) as points
+        p <- p +
+            lapply(nirs, \(.ch) {
+            fcol <- paste0(.ch, "_fitted")
+            post <- is.finite(plot_data[[fcol]]) &
+                plot_data[[time_channel]] > plot_data$start_times
+            key_point(
+                ggplot2::aes(y = .data[[fcol]], colour = .ch),
+                plot_data[post, , drop = FALSE]
             )
-            if (!faceted) {
-                base_pts$interval <- NULL
-            }
-            p <- p +
-                key_point(
-                    ggplot2::aes(
-                        x = .data$start_times,
-                        y = .data$A,
-                        colour = .data$nirs_channels
-                    ),
-                    base_pts,
-                    inherit.aes = FALSE
-                )
-        } else {
-            ## single key-point marker for parametric methods
-            p <- p +
-                key_point(
-                    ggplot2::aes(
-                        x = .data$xval,
-                        y = .data$yval,
-                        colour = .data$nirs_channels
-                    ),
-                    ann[is.finite(ann$xval), , drop = FALSE],
-                    inherit.aes = FALSE
-                )
+        })
+        ## baseline as a single point at the onset (start_time, A)
+        base_pts <- merge(
+            x$coefficients[c("interval", "nirs_channels", "A")],
+            x$interval_times[c("interval", "start_times")],
+            by = "interval",
+            sort = FALSE
+        )
+        if (!faceted) {
+            base_pts$interval <- NULL
         }
+        p <- p +
+            key_point(
+                ggplot2::aes(
+                    x = .data$start_times,
+                    y = .data$A,
+                    colour = .data$nirs_channels
+                ),
+                base_pts,
+                inherit.aes = FALSE
+            )
+    } else if (markers) {
+        ## single key-point marker for parametric methods
+        p <- p +
+            key_point(
+                ggplot2::aes(
+                    x = .data$xval,
+                    y = .data$yval,
+                    colour = .data$nirs_channels
+                ),
+                ann[is.finite(ann$xval), , drop = FALSE],
+                inherit.aes = FALSE
+            )
     }
 
     if (labels) {
-        ## anchor to the top or bottom-right corner per row; staggered vjust
-        ## keeps multi-channel labels from overlapping
+        ## anchor to the top or bottom-right corner per row; staggered
+        ## vjust keeps multi-channel labels from overlapping
         p <- p +
             ggplot2::geom_text(
                 ggplot2::aes(
@@ -385,13 +393,16 @@ plot.mnirs_kinetics <- function(
 #' per interval, for [plot.mnirs_kinetics()]. Marker x-coordinates are the
 #' resolved onset plus the method's time coefficient. Labels sit in the corner
 #' the fitted curve vacates: `yval_corner` is the top (`Inf`) when the signal
-#' falls (`A > B`) and the bottom (`-Inf`) when it rises, with `vjust`
-#' staggering stacked labels by channel rank within each interval-corner.
+#' falls (`A > B`, or `A > plateau` for `"biexponential"`) and the bottom
+#' (`-Inf`) when it rises, with `vjust` staggering stacked labels by channel
+#' rank within each interval-corner.
 #'
 #' @param x An *"mnirs_kinetics"* object from [analyse_kinetics()].
 #'
 #' @returns A `data.frame` with columns `interval`, `nirs_channels`,
 #'   `start_times`, `xval`, `yval`, `label`, `yval_corner`, and `vjust`.
+#'   `NULL` for a method with no annotation spec, in which case
+#'   [plot.mnirs_kinetics()] draws the fitted curve alone.
 #'
 #' @keywords internal
 kinetics_annotations <- function(x) {
@@ -432,6 +443,16 @@ kinetics_annotations <- function(x) {
                 fmt(coefs$tau)
             )
         ),
+        biexponential = list(
+            offset = "nadir_time",
+            y = "nadir_value",
+            label = sprintf(
+                "nadir = %s s\ntau1 = %s\ntau2 = %s",
+                fmt(coefs$nadir_time),
+                fmt(coefs$tau1),
+                fmt(coefs$tau2)
+            )
+        ),
         sigmoidal = list(
             offset = "xmid",
             y = "xmid_fitted",
@@ -442,6 +463,11 @@ kinetics_annotations <- function(x) {
             )
         )
     )
+
+    ## methods without an annotation spec degrade to a curve-only plot
+    if (is.null(spec)) {
+        return(NULL)
+    }
 
     ann <- data.frame(
         interval = coefs$interval,
@@ -454,9 +480,12 @@ kinetics_annotations <- function(x) {
     )
 
     ## place labels in the corner the fitted curve vacates: top-right when
-    ## the signal falls (A > B), bottom-right when it rises. peak_slope has
-    ## no A/B, so fall back to the local slope sign as the trend proxy
-    rises <- if (all(c("A", "B") %in% names(coefs))) {
+    ## the signal falls (A > B), bottom-right when it rises. biexponential
+    ## has two amplitudes, so its net trend is the plateau against the
+    ## baseline. peak_slope has neither, so fall back to the local slope sign
+    rises <- if ("plateau" %in% names(coefs)) {
+        coefs$plateau > coefs$A
+    } else if (all(c("A", "B") %in% names(coefs))) {
         coefs$B > coefs$A
     } else {
         coefs$slope > 0
@@ -470,8 +499,7 @@ kinetics_annotations <- function(x) {
         ann$interval,
         ann$yval_corner,
         FUN = seq_along
-    ) -
-        1
+    ) - 1
     ann$vjust <- ifelse(rises, -0.4 - rank * 1.4, 1.4 + rank * 1.4)
 
     return(ann)
