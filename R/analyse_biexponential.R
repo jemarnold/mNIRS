@@ -497,18 +497,12 @@ analyse_biexponential <- function(
     )
 
     ## NA scaffold (method columns only) for convergence failure
+    # fmt: skip
     na_coefs <- as.data.frame(setNames(
         rep(list(NA_real_), 9L),
         c(
-            "A",
-            "B1",
-            "tau1",
-            "B2",
-            "tau2",
-            "TD",
-            "plateau",
-            "nadir_time",
-            "nadir_value"
+            "A", "B1", "tau1", "B2", "tau2", "TD", "plateau",
+            "extremum_time", "extremum_value"
         )
     ))
 

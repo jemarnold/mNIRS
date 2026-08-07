@@ -251,13 +251,16 @@ analyse_response_time <- function(
             args
         ), quote = TRUE)
 
+        ## `response_time()` indexes the fit window; map the response sample
+        ## back to its original data frame row, which differs whenever
+        ## non-finite samples were dropped. NA idx maps to NA
         coefs <- data.frame(
             A              = response$A,
             B              = response$B,
             response_time  = response$response_time,
             response_value = response$response_value,
             fitted         = response$fitted,
-            idx            = response$response_idx
+            idx            = valid$idx[response$response_idx]
         )
 
         ## bind baseline vec with `A`, and response and extreme scalars,

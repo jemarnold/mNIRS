@@ -512,7 +512,7 @@ analyse_kinetics_channels <- function(
             .a$direction <- valid$direction
             x_fit <- data[[.nirs]][valid$idx]
             ## fit on time elapsed from onset
-            t_fit <- t_vec[valid$idx] - .a$start_time
+            t_fit <- t_vec[valid$idx] - (.a$start_time %||% 0)
 
             ## method-specific fit; coefs/diag carry method columns only
             fit <- fit_fn(.nirs, x_fit, t_fit, .a, valid, verbose)

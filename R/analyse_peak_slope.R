@@ -464,6 +464,11 @@ analyse_peak_slope <- function(
             args
         ), quote = TRUE)
 
+        ## `peak_slope()` indexes the fit window; map the peak back to its
+        ## original data frame row, which differs whenever non-finite
+        ## samples were dropped from the window. NA idx maps to NA
+        peak_idx <- valid$idx[slopes$idx]
+
         list(
             coefs = data.frame(
                 slope           = slopes$slope,
@@ -471,7 +476,7 @@ analyse_peak_slope <- function(
                 fitted          = slopes$y, ## predicted response value at idx
                 ## already elapsed from start_time, matching the fit time base
                 peak_slope_time = slopes$t,
-                idx             = slopes$idx
+                idx             = peak_idx
             ),
             model = slopes$model,
             fitted_data = data.frame(
