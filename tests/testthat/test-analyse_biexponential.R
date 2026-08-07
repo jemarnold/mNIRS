@@ -165,7 +165,7 @@ test_that("biexp_grid_start() returns NULL for a degenerate predictor", {
 
 ## analyse_biexponential() ==========================================
 
-## helper: create nadir-recovery test data with known parameters
+## helper: create excursion-recovery test data with known parameters
 create_biexp_data <- function(
     A = 70,
     B1 = 25,
@@ -212,7 +212,7 @@ test_that("analyse_biexponential() returns correct structure", {
     expect_named(result, c(
         "interval", "nirs_channels", "time_channel",
         "A", "B1", "tau1", "B2", "tau2", "TD",
-        "plateau", "nadir_time", "nadir_value"
+        "plateau", "excursion_time", "excursion_value"
     ))
     expect_equal(nrow(result), 1L)
 
@@ -243,14 +243,14 @@ test_that("analyse_biexponential() recovers known parameters", {
     ## plateau = A - B1 + B2
     expect_true(all.equal(result$plateau, result$A - result$B1 + result$B2,
         tolerance = 1e-6, scale = 1))
-    ## nadir sits inside the window, below the starting value
-    expect_true(result$nadir_time > 0)
-    expect_true(result$nadir_value < result$A)
+    ## excursion sits inside the window, below the starting value
+    expect_true(result$excursion_time > 0)
+    expect_true(result$excursion_value < result$A)
     ## good fit
     expect_true(attr(result, "diagnostics")$r2 > 0.9)
 })
 
-test_that("analyse_biexponential() nadir matches the fitted curve minimum", {
+test_that("analyse_biexponential() excursion matches the fitted curve minimum", {
     result <- analyse_biexponential(
         create_biexp_data(noise_sd = 0.3),
         nirs_channels = "smo2",
@@ -259,8 +259,8 @@ test_that("analyse_biexponential() nadir matches the fitted curve minimum", {
     )
 
     fitted <- attr(result, "fitted_data")$smo2$fitted
-    ## closed-form nadir agrees with the numeric minimum of the fit
-    expect_true(all.equal(result$nadir_value, min(fitted), tolerance = 0.1,
+    ## closed-form excursion agrees with the numeric minimum of the fit
+    expect_true(all.equal(result$excursion_value, min(fitted), tolerance = 0.1,
         scale = 1))
 })
 
@@ -384,10 +384,40 @@ test_that("analyse_biexponential() fits a negative-amplitude response", {
     expect_true(all.equal(result$B1, -25, tolerance = 5, scale = 1))
     expect_true(all.equal(result$B2, -15, tolerance = 5, scale = 1))
     expect_true(attr(result, "diagnostics")$r2 > 0.9)
-    ## the closed-form nadir needs two positive amplitudes; with neither the
-    ## reported extremum falls back to the onset boundary
-    expect_equal(result$nadir_time, 0)
-    expect_equal(result$nadir_value, result$A)
+    ## the closed-form root needs same-signed amplitudes, not positive ones,
+    ## so an inverted response reports a genuine interior excursion. with both
+    ## amplitudes negative that turning point is a maximum above the baseline
+    fitted <- attr(result, "fitted_data")$smo2$fitted
+    expect_true(result$excursion_time > 0)
+    expect_true(result$excursion_value > result$A)
+    expect_true(all.equal(result$excursion_value, max(fitted), tolerance = 0.1,
+        scale = 1))
+})
+
+
+test_that("analyse_biexponential() excursion falls back on mixed-sign amplitudes", {
+    ## opposite-signed amplitudes make the curve monotone: no interior root
+    ## exists and the turning point sits at the onset boundary
+    set.seed(37)
+    t <- 0:119
+    x <- biexponential(t, A = 70, B1 = 25, tau1 = 5, B2 = -15, tau2 = 50) +
+        rnorm(120, 0, 0.3)
+    data <- create_mnirs_data(
+        data.frame(time = t, smo2 = x),
+        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+    )
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+
+    skip_if(is.na(result$tau1), "fit did not converge")
+    expect_true(result$B1 * result$B2 < 0)
+    expect_equal(result$excursion_time, 0)
+    expect_equal(result$excursion_value, result$A)
 })
 
 
@@ -475,8 +505,8 @@ test_that("analyse_biexponential() tau_ratio bounds the time constants", {
     expect_true(result$tau2 >= result$tau1 * 5 - 1e-6)
 })
 
-test_that("analyse_biexponential() nadir_time is elapsed from start_time", {
-    ## 6-parameter TD fit with a non-zero start_time: nadir_time must be
+test_that("analyse_biexponential() excursion_time is elapsed from start_time", {
+    ## 6-parameter TD fit with a non-zero start_time: excursion_time must be
     ## measured from start_time, not from the model's internal (TD) onset
     set.seed(11)
     start_time <- 20
@@ -502,17 +532,17 @@ test_that("analyse_biexponential() nadir_time is elapsed from start_time", {
     expect_named(coef(attr(result, "model")$smo2),
         c("A", "B1", "lt1", "B2", "lr", "TD"))
 
-    ## nadir_time equals the elapsed time from start_time to the fitted
+    ## excursion_time equals the elapsed time from start_time to the fitted
     ## minimum; the old onset-relative value omits the ~TD offset
     fd <- attr(result, "fitted_data")$smo2
     t_at_min <- data$time[fd$window_idx[which.min(fd$fitted)]]
-    expect_true(all.equal(result$nadir_time, t_at_min - start_time,
+    expect_true(all.equal(result$excursion_time, t_at_min - start_time,
         tolerance = 1.5, scale = 1))
-    expect_true(result$nadir_time > TD)
+    expect_true(result$excursion_time > TD)
 })
 
-test_that("analyse_biexponential() nadir_value matches the fitted minimum with TD", {
-    ## origin-invariant evaluation: nadir_value must equal the fitted-curve
+test_that("analyse_biexponential() excursion_value matches the fitted minimum with TD", {
+    ## origin-invariant evaluation: excursion_value must equal the fitted-curve
     ## minimum even when TD and a non-zero start_time shift the time frame
     set.seed(12)
     start_time <- 20
@@ -537,11 +567,11 @@ test_that("analyse_biexponential() nadir_value matches the fitted minimum with T
     expect_named(coef(attr(result, "model")$smo2),
         c("A", "B1", "lt1", "B2", "lr", "TD"))
 
-    ## closed-form nadir agrees with the numeric minimum of the fit
+    ## closed-form excursion agrees with the numeric minimum of the fit
     fitted <- attr(result, "fitted_data")$smo2$fitted
-    expect_true(all.equal(result$nadir_value, min(fitted), tolerance = 0.15,
+    expect_true(all.equal(result$excursion_value, min(fitted), tolerance = 0.15,
         scale = 1))
-    expect_true(result$nadir_value < result$A)
+    expect_true(result$excursion_value < result$A)
 })
 
 
@@ -705,7 +735,7 @@ test_that("analyse_kinetics() dispatches to the biexponential method", {
     expect_s3_class(result, "mnirs_kinetics")
     expect_equal(result$method, "biexponential")
     expect_true(all(
-        c("B1", "tau1", "B2", "tau2", "plateau", "nadir_time") %in%
+        c("B1", "tau1", "B2", "tau2", "plateau", "excursion_time") %in%
             names(result$coefficients)
     ))
 })
@@ -870,10 +900,13 @@ test_that("analyse_biexponential() converges on real dataset", {
     expect_true(all(success >= 0.8))
 
     ## converged fits should describe the desaturation-recovery shape and
-    ## keep the two components separated by the default ratio bound
+    ## keep the two components separated by the default ratio bound. the
+    ## excursion only lies below the baseline for a downward excursion, so the
+    ## direction check is restricted to positive amplitudes
     ok <- !is.na(coefs$tau1)
     expect_true(all(coefs$tau2[ok] >= coefs$tau1[ok] * 2.5 - 1e-6))
-    expect_true(all(coefs$nadir_value[ok] <= coefs$A[ok]))
+    down <- ok & coefs$B1 > 0 & coefs$B2 > 0
+    expect_true(all(coefs$excursion_value[down] <= coefs$A[down]))
 
     r2 <- unlist(lapply(results, \(x) attr(x, "diagnostics")$r2))
     mean(r2, na.rm = TRUE)

@@ -803,16 +803,20 @@ test_that("analyse_peak_slope handles edge cases", {
     results <- analyse_peak_slope(
         df,
         width = 3,
+        align = "centre",
         partial = TRUE,
         verbose = FALSE
     )
     
     expect_all_false(is.na(results$slope))
     expect_all_true(results$slope > 0)
-    expect_equal(attr(results, "fitted_data")$x$window_idx, c(3, 4, 5))
+    ## window_idx indexes the original data frame, skipping non-finite rows
+    expect_equal(attr(results, "fitted_data")$x$window_idx, c(5, 6, 7))
     expect_equal(attr(results, "fitted_data")$x$fitted, c(5, 7, 9))
+    expect_equal(df$x[attr(results, "fitted_data")$x$window_idx], c(5, 7, 9))
     expect_equal(attr(results, "fitted_data")$q$window_idx, c(1, 2))
     expect_equal(attr(results, "fitted_data")$q$fitted, c(2, 4))
+    expect_equal(df$q[attr(results, "fitted_data")$q$window_idx], c(2, 4))
 })
 
 test_that("analyse_peak_slope validates data structure", {
@@ -984,15 +988,20 @@ test_that("analyse_peak_slope fitted values match window", {
 
     expect_length(fitted, length(window_idx))
 
+    ## the model is fitted on time elapsed from start_time, so `intercept`
+    ## is in that frame while `window_idx` indexes the original data frame
+    start_time <- attr(results, "channel_args")$start_time
+    t_rel <- t[window_idx] - start_time
+
     ## verify fitted values match slope * t + intercept
     expect_equal(
         fitted,
-        results$intercept + results$slope * t[window_idx]
+        results$intercept + results$slope * t_rel
     )
     ## verify fitted values match lm predictions
     expect_equal(
         fitted,
-        predict(lm(x[window_idx] ~ t[window_idx])),
+        predict(lm(x[window_idx] ~ t_rel)),
         ignore_attr = TRUE
     )
 })

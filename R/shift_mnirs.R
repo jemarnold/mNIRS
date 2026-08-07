@@ -244,7 +244,7 @@ shift_mnirs <- function(
                     verbose = FALSE,
                     env = env
                 )
-                ## locate extremum window via fast rolling means, then
+                ## locate extreme window via fast rolling means, then
                 ## recompute reference exactly to avoid floating-point drift
                 ## from cumsum differencing
                 .i <- which_fun(smoothed)

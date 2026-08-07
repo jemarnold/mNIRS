@@ -1,18 +1,18 @@
 #' Biexponential function
 #'
 #' Calculate a 5- or 6-parameter biexponential curve: a fast component that
-#' drops to a rounded nadir, followed by a slow component that recovers
-#' toward a stable plateau.
+#' carries the response to a rounded turning point, followed by a slow
+#' component that recovers toward a stable plateau.
 #'
 #' @param t A numeric vector of the predictor variable (time).
 #' @param A A numeric parameter for the starting value of the response
 #'   variable (the `t = 0` intercept).
 #' @param B1 A numeric parameter for the amplitude of the *fast* component;
-#'   the depth of the initial drop to the nadir.
+#'   the size of the initial excursion to the turning point.
 #' @param tau1 A numeric parameter for the *fast* time constant (\eqn{\tau_1}),
 #'   in units of the predictor variable `t`. Dominates the initial steep fall.
 #' @param B2 A numeric parameter for the amplitude of the *slow* component;
-#'   the size of the recovery from the nadir toward the plateau.
+#'   the size of the recovery from the turning point toward the plateau.
 #' @param tau2 A numeric parameter for the *slow* time constant (\eqn{\tau_2}),
 #'   in units of the predictor variable `t`. Typically `tau2 >> tau1`.
 #' @param TD A numeric parameter for the time delay before the onset of the
@@ -33,10 +33,12 @@
 #'   `ifelse(t <= TD, A, A - B1 * (1 - exp(-(t - TD) / tau1)) +
 #'     B2 * (1 - exp(-(t - TD) / tau2)))`
 #'
-#' The fast component `B1`/`tau1` subtracts, driving the steep initial fall to
-#' the nadir; the slow component `B2`/`tau2` adds, pulling the curve back up
-#' once the fast term saturates. The two components carry independent
-#' amplitudes and are not exchangeable.
+#' The fast component `B1`/`tau1` subtracts, driving the steep initial
+#' excursion to the turning point; the slow component `B2`/`tau2` adds, pulling
+#' the curve back once the fast term saturates. Amplitudes may be negative, in
+#' which case both excursions are mirrored and the turning point is a maximum
+#' rather than a minimum. The two components carry independent amplitudes and
+#' are not exchangeable.
 #'
 #' The response value as `t` approaches infinity is the *plateau*,
 #' `A - B1 + B2`.
@@ -47,7 +49,7 @@
 #' @seealso [analyse_kinetics()], [SSbiexponential()], [monoexponential()]
 #'
 #' @examples
-#' ## create a nadir-recovery biexponential curve with random noise
+#' ## create a biexponential excursion-recovery curve with random noise
 #' set.seed(1)
 #' t <- 0:120
 #' x <- biexponential(t, A = 70, B1 = 25, tau1 = 5, B2 = 15, tau2 = 40) +
@@ -187,7 +189,7 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #'   [SSmonoexponential()]
 #'
 #' @examples
-#' ## create a nadir-recovery biexponential curve with random noise
+#' ## create a biexponential excursion-recovery curve with random noise
 #' set.seed(1)
 #' t <- 0:120
 #' x <- biexponential(t, A = 70, B1 = 25, tau1 = 5, B2 = 15, tau2 = 40) +
@@ -399,8 +401,8 @@ ratio_to_natural <- function(model, params, fix = list()) {
 #'
 #' Internal channel-level dispatch for
 #' `analyse_kinetics(method = "biexponential")`. Fits a biexponential
-#' nadir-recovery curve to each `nirs_channel` within a single *"mnirs"* data
-#' frame. See [analyse_kinetics()] for user-facing documentation.
+#' excursion-recovery curve to each `nirs_channel` within a single *"mnirs"*
+#' data frame. See [analyse_kinetics()] for user-facing documentation.
 #'
 #' @param use_TD Logical; `TRUE` attempts to fit a 6-parameter
 #'   [SSbiexponential()] model (A, B1, tau1, B2, tau2, TD) with a time delay.
@@ -426,7 +428,7 @@ ratio_to_natural <- function(model, params, fix = list()) {
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
 #'   `nirs_channels`, `A`, `B1`, `tau1`, `B2`, `tau2`, `TD`, `plateau`,
-#'   `nadir_time`, `nadir_value`. Per-channel metadata are attached as
+#'   `excursion_time`, `excursion_value`. Per-channel metadata are attached as
 #'   attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
 #'     where fitting failed.
@@ -502,7 +504,7 @@ analyse_biexponential <- function(
         rep(list(NA_real_), 9L),
         c(
             "A", "B1", "tau1", "B2", "tau2", "TD", "plateau",
-            "extremum_time", "extremum_value"
+            "excursion_time", "excursion_value"
         )
     ))
 
@@ -580,28 +582,29 @@ analyse_biexponential <- function(
         ## TD is already elapsed from start_time, matching the fit time base
         TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL
 
-        ## nadir: interior extremum where dy/dt = 0 has a closed form, elapsed
-        ## since model onset (TD, or 0 for the 5-param model). valid only with
-        ## a genuine two-component response (positive amplitudes, distinct
-        ## taus, root > 0), else the curve is monotone and the extremum sits
-        ## at the onset boundary. amplitudes may be negative, so their sign is
-        ## checked before taking any logarithm
+        ## interior excursion where dy/dt = 0 has a closed form, elapsed since
+        ## model onset (TD, or 0 for the 5-param model). the root needs only
+        ## the ratio (B2/tau2)/(B1/tau1) to be positive, i.e. amplitudes of the
+        ## same sign; opposite signs make the curve monotone and the turning
+        ## point sits at the onset boundary. amplitudes may be negative, in
+        ## which case the excursion is a maximum rather than a minimum
         s <- with(pars, {
-            root <- if (B1 > 0 && B2 > 0) {
-                (log(B2 / tau2) - log(B1 / tau1)) / (1 / tau2 - 1 / tau1)
+            ratio <- (B2 / tau2) / (B1 / tau1)
+            root <- if (is.finite(ratio) && ratio > 0) {
+                log(ratio) / (1 / tau2 - 1 / tau1)
             } else {
                 NA_real_
             }
             if (is.finite(root) && root > 0) root else 0
         })
 
-        ## nadir_time reported elapsed from start_time, mirroring
+        ## excursion_time reported elapsed from start_time, mirroring
         ## MRT = TD + tau; adding TD_arg shifts the onset-relative s into the
         ## same frame, so t - TD in biexponential() recovers s exactly
-        nadir_time_val <- sum(TD_arg, s)
-        nadir_value_val <- do.call(
+        excursion_time_val <- sum(TD_arg, s)
+        excursion_value_val <- do.call(
             biexponential,
-            c(list(t = nadir_time_val), pars, list(TD = TD_arg))
+            c(list(t = excursion_time_val), pars, list(TD = TD_arg))
         )
 
         list(
@@ -609,8 +612,8 @@ analyse_biexponential <- function(
                 pars,
                 TD = TD_arg %||% NA_real_,
                 plateau = pars$A - pars$B1 + pars$B2,
-                nadir_time = nadir_time_val,
-                nadir_value = nadir_value_val
+                excursion_time = excursion_time_val,
+                excursion_value = excursion_value_val
             ),
             model = model,
             fitted_data = data.frame(

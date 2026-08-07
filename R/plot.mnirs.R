@@ -444,11 +444,11 @@ kinetics_annotations <- function(x) {
             )
         ),
         biexponential = list(
-            offset = "nadir_time",
-            y = "nadir_value",
+            offset = "excursion_time",
+            y = "excursion_value",
             label = sprintf(
-                "nadir = %s s\ntau1 = %s\ntau2 = %s",
-                fmt(coefs$nadir_time),
+                "excursion = %s s\ntau1 = %s\ntau2 = %s",
+                fmt(coefs$excursion_time),
                 fmt(coefs$tau1),
                 fmt(coefs$tau2)
             )

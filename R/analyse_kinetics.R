@@ -203,11 +203,13 @@
 #'
 #' Aliases: `method = c("biexp", "double exponential")`.
 #'
-#' A parametric approach fitting a self-starting biexponential nadir-recovery
-#' function to the response curve using [stats::nls()] with
+#' A parametric approach fitting a self-starting biexponential
+#' excursion-recovery function to the response curve using [stats::nls()] with
 #' [SSbiexponential()]. A *fast* component (`B1`, `tau1`) drives the initial
-#' drop to a rounded nadir; a *slow* component (`B2`, `tau2`) recovers toward
-#' a stable plateau.
+#' excursion to a rounded turning point; a *slow* component (`B2`, `tau2`)
+#' recovers toward a stable plateau. The turning point is reported as
+#' `excursion_time` and `excursion_value`, and is a minimum or a maximum
+#' depending on the sign of the fitted amplitudes.
 #'
 #' Model equation:
 #'

@@ -57,7 +57,7 @@ make_monoexp <- function(A = 50, B = 80, channels = "smo2", n = 60) {
     )
 }
 
-## biexponential nadir-recovery (per test-analyse_biexponential.R)
+## biexponential excursion-recovery (per test-analyse_biexponential.R)
 make_biexp <- function(A = 70, B1 = 25, B2 = 15, channels = "smo2", n = 121) {
     set.seed(1)
     t <- seq(0, n - 1, length.out = n)
@@ -196,7 +196,7 @@ test_that("kinetics_annotations xval is onset plus method offset", {
     be <- kin_biexp()
     expect_equal(
         kinetics_annotations(be)$xval,
-        be$interval_times$start_times + be$coefficients$nadir_time
+        be$interval_times$start_times + be$coefficients$excursion_time
     )
 
     sg <- kin_sigmoidal()
@@ -224,7 +224,7 @@ test_that("kinetics_annotations formats method-specific labels", {
     )
     expect_match(
         kinetics_annotations(kin_biexp())$label,
-        "nadir = .+ s\ntau1 = .+\ntau2 = "
+        "excursion = .+ s\ntau1 = .+\ntau2 = "
     )
     expect_match(
         kinetics_annotations(kin_sigmoidal())$label,
@@ -232,11 +232,11 @@ test_that("kinetics_annotations formats method-specific labels", {
     )
 })
 
-test_that("kinetics_annotations biexponential marks the fitted nadir", {
+test_that("kinetics_annotations biexponential marks the fitted excursion", {
     x <- kin_biexp()
     ann <- kinetics_annotations(x)
-    expect_equal(ann$yval, x$coefficients$nadir_value)
-    ## nadir sits below the baseline for a nadir-recovery response
+    expect_equal(ann$yval, x$coefficients$excursion_value)
+    ## excursion sits below the baseline for a downward response
     expect_true(all(ann$yval < x$coefficients$A))
 })
 
@@ -327,12 +327,12 @@ test_that("fitted = FALSE drops the parametric fitted layers", {
     expect_gt(n_on, n_off)
 })
 
-test_that("biexponential draws the fitted curve and a nadir key-point", {
+test_that("biexponential draws the fitted curve and an excursion key-point", {
     x <- kin_biexp()
     geoms <- layer_geoms(plot(x, labels = FALSE))
     ## base signal line + dashed fitted line
     expect_equal(sum(geoms == "GeomLine"), 2L)
-    ## onset vline + single nadir marker
+    ## onset vline + single excursion marker
     expect_true("GeomVline" %in% geoms)
     expect_equal(sum(geoms == "GeomPoint"), 1L)
 
