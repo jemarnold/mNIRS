@@ -22,8 +22,10 @@
 #'
 #' 3-parameter model: `A + (B - A) * (1 - exp(-t / tau))`
 #'
-#' 4-parameter model:
-#'   `ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))`
+#' 4-parameter model: `A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau))`
+#'
+#' Clamping the shifted time at zero holds the curve at the baseline `A` until
+#' the onset of the response at `t = TD`.
 #'
 #' The rate constant `k` is the reciprocal of `tau` (`k = 1 / tau`) in
 #' reciprocal units of `time_channel`; i.e. `sec^-1s`).
@@ -66,7 +68,7 @@ monoexponential <- function(t, A, B, tau, TD = NULL) {
         y <- A + (B - A) * (1 - exp(-t / tau))
     } else {
         ## 4-parameter: with time delay
-        y <- ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))
+        y <- A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau))
     }
     return(y)
 }

@@ -184,7 +184,7 @@
 #' Model equations:
 #'
 #' - 3-parameter: `A + (B - A) * (1 - exp(-t / tau))`
-#' - 4-parameter: `ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))`
+#' - 4-parameter: `A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau))`
 #'
 #' `TD` is the *time delay* from `start_time` to the onset of the exponential
 #' response curve. `tau` is the *time constant* of the response. The 

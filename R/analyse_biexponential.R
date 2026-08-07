@@ -29,16 +29,18 @@
 #' 5-parameter model:
 #'   `A - B1 * (1 - exp(-t / tau1)) + B2 * (1 - exp(-t / tau2))`
 #'
-#' 6-parameter model (with time delay):
-#'   `ifelse(t <= TD, A, A - B1 * (1 - exp(-(t - TD) / tau1)) +
-#'     B2 * (1 - exp(-(t - TD) / tau2)))`
+#' 6-parameter model (with time delay), where `ts = pmax(t - TD, 0)`:
+#'   `A - B1 * (1 - exp(-ts / tau1)) + B2 * (1 - exp(-ts / tau2))`
+#'
+#' Clamping the shifted time at zero holds the curve at the baseline `A` until
+#' the onset of the response at `t = TD`.
 #'
 #' The fast component `B1`/`tau1` subtracts, driving the steep initial
-#' excursion to the turning point; the slow component `B2`/`tau2` adds, pulling
+#' response to the excursion point; the slow component `B2`/`tau2` adds, pulling
 #' the curve back once the fast term saturates. Amplitudes may be negative, in
-#' which case both excursions are mirrored and the turning point is a maximum
-#' rather than a minimum. The two components carry independent amplitudes and
-#' are not exchangeable.
+#' which case both response components are mirrored and the turning point is 
+#' a maximum rather than a minimum. The two components carry independent
+#' amplitudes and are not exchangeable.
 #'
 #' The response value as `t` approaches infinity is the *plateau*,
 #' `A - B1 + B2`.
@@ -77,10 +79,8 @@ biexponential <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
         y <- A - B1 * (1 - exp(-t / tau1)) + B2 * (1 - exp(-t / tau2))
     } else {
         ## 6-parameter: with time delay
-        y <- A -
-            B1 * (1 - exp(-(t - TD) / tau1)) +
-            B2 * (1 - exp(-(t - TD) / tau2))
-        y[t < TD] <- A
+        ts <- pmax(t - TD, 0)
+        y <- A - B1 * (1 - exp(-ts / tau1)) + B2 * (1 - exp(-ts / tau2))
     }
     return(y)
 }

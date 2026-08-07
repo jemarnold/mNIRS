@@ -387,7 +387,7 @@ peak_slope(x, t = seq_along(x), width = NULL, span = NULL,
 
 monoexponential(t, A, B, tau, TD = NULL)
 ## 3-param: A + (B - A) * (1 - exp(-t / tau))
-## 4-param: ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))
+## 4-param: A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau))
 nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = df)   # 3- or 4-param
 
 logistic(t, A, B, xmid, slope, asym = NULL)  # 4-param symmetric / 5-param Richards
