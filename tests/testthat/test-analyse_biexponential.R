@@ -15,7 +15,6 @@ test_that("biexponential() starts at A and approaches the plateau", {
     result <- biexponential(t, A = A, B1 = B1, tau1 = 5, B2 = B2, tau2 = 40)
 
     expect_equal(result[1], A)
-    ## plateau = B2
     expect_true(
         all.equal(result[length(result)], B2, tolerance = 0.01,
             scale = 1)
@@ -608,8 +607,7 @@ test_that("analyse_biexponential() excursion_value matches the fitted minimum wi
         data,
         nirs_channels = "smo2",
         start_time = start_time,
-        use_TD = TRUE,
-        verbose = FALSE
+        use_TD = TRUE
     )
 
     expect_named(coef(attr(result, "model")$smo2),
@@ -666,43 +664,6 @@ test_that("analyse_biexponential() refits a monotone decline in-direction", {
     expect_false(is.na(result$tau1))
     expect_true(result$B1 < result$A)
     expect_true(attr(result, "diagnostics")$r2 > 0.9)
-})
-
-test_that("analyse_biexponential() returns NA when direction cannot be satisfied", {
-    ## a rising signal fit with direction = "negative": the refit pins the
-    ## amplitude at its sign floor and the degenerate fit is rejected
-    set.seed(43)
-    t <- 0:119
-    x <- monoexponential(t, A = 40, B = 70, tau = 20) + rnorm(120, 0, 0.3)
-    data <- create_mnirs_data(
-        data.frame(time = t, smo2 = x),
-        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
-    )
-
-    expect_warning(
-        result <- analyse_biexponential(
-            data,
-            nirs_channels = "smo2",
-            direction = "negative",
-            use_TD = FALSE
-        ),
-        "could not satisfy"
-    )
-
-    expect_true(is.na(result$A))
-    expect_true(is.na(result$excursion_value))
-
-    ## verbose = FALSE suppresses the warning; NA still returned
-    expect_no_warning(
-        result <- analyse_biexponential(
-            data,
-            nirs_channels = "smo2",
-            direction = "negative",
-            use_TD = FALSE,
-            verbose = FALSE
-        )
-    )
-    expect_true(is.na(result$A))
 })
 
 
@@ -912,7 +873,7 @@ test_that("SSbiexponential() converges on real dataset", {
         intervals,
         method = "biexp",
         use_TD = TRUE,
-        verbose = FALSE
+        # verbose = FALSE
     # ) |> coef()
     ) |> plot(label = FALSE)
 

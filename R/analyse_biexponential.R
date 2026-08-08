@@ -299,31 +299,6 @@ SSbiexponential <- selfStart(
 )
 
 
-#' Translate natural-scale fixed parameters to the log-ratio scale
-#'
-#' A fixed `tau1` becomes a constant `lt1`; a fixed `tau2` becomes an `lr`
-#' expression in `lt1`, which [build_ss_formula()] substitutes verbatim.
-#'
-#' @param fix Named list of fixed parameter values on the natural scale.
-#'
-#' @returns A named list of fixed values on the `lt1`/`lr` scale.
-#'
-#' @keywords internal
-biexp_fix_ss <- function(fix) {
-    fix_ss <- fix[setdiff(names(fix), c("tau1", "tau2"))]
-    if (!is.null(fix$tau1)) {
-        fix_ss$lt1 <- log(fix$tau1)
-    }
-    if (!is.null(fix$tau2)) {
-        fix_ss$lr <- substitute(
-            LT2 - L,
-            list(LT2 = log(fix$tau2), L = fix_ss$lt1 %||% quote(lt1))
-        )
-    }
-    return(fix_ss)
-}
-
-
 #' Fit a biexponential in ratio parameterisation
 #'
 #' [fit_biexp_ratio()]: Fits [biexponential()] with the time constants
@@ -412,7 +387,9 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         TD = c(TD_seed, 0, span)
     )
 
-    ## translate natural-scale params and fix to the SS log-ratio scale
+    ## translate natural-scale params and fix to the SS log-ratio scale: a
+    ## fixed tau1 becomes a constant lt1; a fixed tau2 becomes an lr
+    ## expression in lt1, which build_ss_formula() substitutes verbatim
     params_ss <- unname(c(
         A = "A",
         B1 = "B1",
@@ -421,7 +398,16 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         tau2 = "lr",
         TD = "TD"
     )[params])
-    fix_ss <- biexp_fix_ss(fix)
+    fix_ss <- fix[setdiff(names(fix), c("tau1", "tau2"))]
+    if (!is.null(fix$tau1)) {
+        fix_ss$lt1 <- log(fix$tau1)
+    }
+    if (!is.null(fix$tau2)) {
+        fix_ss$lr <- substitute(
+            LT2 - L,
+            list(LT2 = log(fix$tau2), L = fix_ss$lt1 %||% quote(lt1))
+        )
+    }
 
     ## free parameters in formula order; port matches unnamed bounds
     ## positionally, so start/lower/upper stay aligned with the formula
@@ -621,78 +607,19 @@ analyse_biexponential <- function(
             return(build_na_results(na_coefs))
         }
 
+        ## back-convert log-ratio time constants to the natural scale; a
+        ## fixed time constant has no log-scale counterpart in the model
+        coefs <- c(stats::coef(model), unlist(fix))
+        coefs[["tau1"]] <- fix$tau1 %||% exp(coefs[["lt1"]])
+        coefs[["tau2"]] <- fix$tau2 %||% (coefs[["tau1"]] * exp(coefs[["lr"]]))
+        fitted_vals <- stats::predict(model)
         keep <- keep_rows(params)
 
-        ## enforce direction: bounded refit on D = B1 - A when the fast
-        ## component heads away from the detected response. B2 stays free,
-        ## so monotone two-phase fits in the response direction remain valid
-        cf <- stats::coef(model)
-        fix_ss <- biexp_fix_ss(fix)
-        names(fix_ss)[names(fix_ss) == "B1"] <- "B"
-        free_extra <- setdiff(names(cf), c("A", "B1"))
-        extra <- cf[free_extra]
-        ## port errors on a start sitting on a boundary, so the ratio is
-        ## nudged strictly inside its bound
-        if ("lr" %in% free_extra) {
-            extra[["lr"]] <- max(extra[["lr"]], log(tau_ratio * 1.01))
-        }
-        span <- diff(range(t_fit[keep]))
-        tau1_cap <- (fix$tau2 %||% Inf) / tau_ratio
-        enforced <- enforce_direction(
-            model,
-            c(
-                A = unname(fix$A %||% cf[["A"]]),
-                B = unname(fix$B1 %||% cf[["B1"]]),
-                cf[free_extra]
-            ),
-            data.frame(.x = x_fit[keep], .t = t_fit[keep]),
-            direction = .a$direction,
-            amp_fn = quote(biexponential_ratio),
-            extra = extra,
-            extra_lower = c(
-                if ("lt1" %in% free_extra) c(lt1 = log(span / 1000)),
-                if ("lr" %in% free_extra) c(lr = log(tau_ratio)),
-                if ("TD" %in% free_extra) c(TD = 0)
-            ),
-            extra_upper = c(
-                if ("lt1" %in% free_extra) c(lt1 = log(tau1_cap)),
-                if ("TD" %in% free_extra) c(TD = span)
-            ),
-            ## the tau and TD boxes are legitimate constraints, often
-            ## attained; only the amplitude floor marks degeneracy
-            floor_params = "D",
-            fn = quote(SSbiexponential),
-            fix = fix_ss,
-            .nirs = .nirs,
-            interval_name = interval_name,
-            verbose = verbose,
-            env = env
-        )
-        if (is.null(enforced)) {
-            return(build_na_results(na_coefs))
-        }
-        model <- enforced$model
-        coefs <- enforced$coefs
-        fitted_vals <- stats::predict(model)
-
-        ## back-convert log-ratio time constants to the natural scale; a
-        ## fixed time constant has no log-scale counterpart in the model.
         ## model parameters in biexponential() argument order
-        tau1_val <- fix$tau1 %||% exp(coefs[["lt1"]])
-        pars <- list(
-            A = unname(coefs[["A"]]),
-            B1 = unname(coefs[["B"]]),
-            tau1 = unname(tau1_val),
-            B2 = unname(fix$B2 %||% coefs[["B2"]]),
-            tau2 = unname(fix$tau2 %||% (tau1_val * exp(coefs[["lr"]])))
-        )
+        pars <- as.list(coefs[c("A", "B1", "tau1", "B2", "tau2")])
 
         ## TD is already elapsed from start_time, matching the fit time base
-        TD_arg <- if ("TD" %in% params) {
-            unname(fix$TD %||% coefs[["TD"]])
-        } else {
-            NULL
-        }
+        TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL
 
         ## interior excursion where dy/dt = 0 has a closed form, elapsed since
         ## model onset (TD, or 0 for the 5-param model). the root needs the

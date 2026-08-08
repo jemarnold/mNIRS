@@ -918,11 +918,6 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
 #'   `extra` params. Sign-floor bounds should be data-scaled small
 #'   values (not `.Machine$double.eps`) so pinned-floor degeneracy is
 #'   detectable.
-#' @param floor_params An *optional* character vector naming the refit
-#'   parameters subject to the pinned-floor degeneracy check. `NULL`
-#'   (*default*) checks every finite-bounded parameter; pass a subset
-#'   (e.g. `"D"`) when other bounds are legitimate box constraints
-#'   expected to be attained.
 #' @param fn Symbol or character; the self-start fn named in the
 #'   warning.
 #' @param .nirs Character; the channel name.
@@ -945,7 +940,6 @@ enforce_direction <- function(
     extra,
     extra_lower = NULL,
     extra_upper = NULL,
-    floor_params = NULL,
     fn,
     .nirs,
     interval_name,
@@ -1033,13 +1027,9 @@ enforce_direction <- function(
 
     ## any coefficient pinned at a sign-floor bound (e.g. D, slope,
     ## tau) indicates a degenerate flat fit: no genuine response in
-    ## the requested direction. floor_params exempts legitimate box
-    ## constraints that are expected to be attained
+    ## the requested direction.
     cf <- if (is.null(refit)) NULL else coef(refit)
     floors <- abs(ifelse(is.finite(lower), lower, upper))
-    if (!is.null(floor_params)) {
-        floors[!names(floors) %in% floor_params] <- Inf
-    }
     if (is.null(cf) || any(is.finite(floors) & abs(cf) <= 2 * floors)) {
         return(direction_failed())
     }
