@@ -84,12 +84,14 @@
 biexponential <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
     if (is.null(TD)) {
         ## 5-parameter: no time delay
-        y <- A + (B1 - A) * (1 - exp(-t / tau1)) +
+        y <- A +
+            (B1 - A) * (1 - exp(-t / tau1)) +
             (B2 - B1) * (1 - exp(-t / tau2))
     } else {
         ## 6-parameter: with time delay
         ts <- pmax(t - TD, 0)
-        y <- A + (B1 - A) * (1 - exp(-ts / tau1)) +
+        y <- A +
+            (B1 - A) * (1 - exp(-ts / tau1)) +
             (B2 - B1) * (1 - exp(-ts / tau2))
     }
     return(y)
@@ -315,6 +317,11 @@ SSbiexponential <- selfStart(
 #' rise in either direction, so identifiability rests on the time constants
 #' alone.
 #'
+#' The 6-parameter model is piecewise-flat in `TD`, so port may reach the
+#' optimum yet report false or singular convergence; such solutions are
+#' accepted when their coefficients are finite and their RSS does not exceed
+#' the deterministic grid seed.
+#'
 #' A user-fixed `tau1` or `tau2` is substituted into the re-parameterised
 #' formula rather than estimated: fixing `tau1` drops `lt1` and leaves `lr`
 #' free about the fixed value; fixing `tau2` drops `lr` and caps `lt1` at
@@ -417,17 +424,31 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
     upper <- vapply(bounds[free], `[[`, numeric(1), 3L)
 
     model <- tryCatch(
-        nls(
+        suppressWarnings(nls(
             build_ss_formula(quote(SSbiexponential), params_ss, fix_ss),
             data.frame(.x = x, .t = t),
             start = start,
             algorithm = "port",
             lower = lower,
             upper = upper,
-            control = stats::nls.control(maxiter = 500L)
-        ),
+            control = stats::nls.control(maxiter = 500L, warnOnly = TRUE)
+        )),
         error = fail
     )
+
+    ## the TD clamp is non-smooth in TD, so port can land on the optimum yet
+    ## fail its gradient certificate ("false"/"singular" convergence). such a
+    ## solution is kept when demonstrably good: finite coefficients with an
+    ## RSS no worse than the deterministic grid seed. all other convergence
+    ## failures are rejected
+    if (!is.null(model) && !model$convInfo$isConv) {
+        acceptable <- model$convInfo$stopCode %in% c(7L, 8L) &&
+            all(is.finite(stats::coef(model))) &&
+            stats::deviance(model) <= seed$rss
+        if (!acceptable) {
+            model <- fail(simpleError(model$convInfo$stopMessage))
+        }
+    }
     return(model)
 }
 

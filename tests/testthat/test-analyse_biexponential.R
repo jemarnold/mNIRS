@@ -784,6 +784,7 @@ test_that("analyse_biexponential() validates fix argument", {
         analyse_biexponential(
             data,
             nirs_channels = "smo2",
+            use_TD = TRUE,
             fix = list(A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40, TD = 0)
         ),
         "Nothing to estimate"
@@ -863,27 +864,29 @@ test_that("analyse_kinetics() passes use_TD to the biexponential method", {
 
 ## integration tests ================================================
 
-test_that("SSbiexponential() converges on real dataset", {
+test_that("analyse_biexponential() converges on real dataset", {
     skip("Manual fit convergence check")
 
-    ## 5 real-world 5-1 min work-recovery intervals, 4 channels each
-    
-    intervals <- readRDS(test_path("testdata/5-1_intervals_short.rds"))
+    ## 5 real-world 5-1 min work-recovery intervals, 4 channels each    
+    intervals <- readRDS(test_path("testdata/5-1_intervals.rds"))
     analyse_kinetics(
-        intervals,
+        lapply(intervals[[1]], \(.df) head(.df, -90)),
+        nirs_channels = c(smo2_left_vl, smo2_right_vl, smo2_left_rf, smo2_right_rf),
         method = "biexp",
         use_TD = TRUE,
         # verbose = FALSE
+    # )
     # ) |> coef()
     ) |> plot(label = FALSE)
 
-    lapply(intervals, \(df) {
-        data <- data.frame(t = df$time, x = df$smo2_right_rf)
-        tryCatch(
-            nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr), data = data),
-            error = \(e) NULL
-        )
-    })
+    # lapply(intervals, \(.df) {
+    #     analyse_biexponential(
+    #         .df,
+    #         nirs_channels = smo2_left_rf,
+    #         time_channel = time,
+    #         use_TD = TRUE,
+    #     )
+    # })
 
 
     ## fit one signal at a time across all intervals; report convergence
@@ -892,9 +895,13 @@ test_that("SSbiexponential() converges on real dataset", {
         vapply(intervals, \(df) {
             data <- data.frame(t = df$time, x = df[[signal]])
             model <- tryCatch(
-                nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr), data = data),
-                error = \(e) NULL,
-                warning = \(w) NULL
+                analyse_biexponential(
+                    data,
+                    nirs_channels = x,
+                    time_channel = t,
+                    use_TD = FALSE,
+                ),
+                error = \(e) NULL
             )
             as.integer(!is.null(model))
         }, integer(1L))
@@ -909,19 +916,20 @@ test_that("SSbiexponential() converges on real dataset", {
     rf_right_success <- mean(fit_5param("smo2_right_rf"))
     rf_right_success
 
-    expect_true(vl_left_success >= 0.8)
-    expect_true(vl_right_success >= 0.8)
-    expect_true(rf_left_success >= 0.8)
-    expect_true(rf_right_success >= 0.8)
+    expect_true(vl_left_success >= 1.0)
+    expect_true(vl_right_success >= 1.0)
+    expect_true(rf_left_success >= 1.0)
+    expect_true(rf_right_success >= 1.0)
 
     fit_6param <- function(signal) {
         vapply(intervals, \(df) {
-            df <- df[df$time >= 0, ]
             data <- data.frame(t = df$time, x = df[[signal]])
             model <- tryCatch(
-                nls(
-                    x ~ SSbiexponential(t, A, B1, lt1, B2, lr, TD),
-                    data = data
+                analyse_biexponential(
+                    data,
+                    nirs_channels = x,
+                    time_channel = t,
+                    use_TD = TRUE,
                 ),
                 error = \(e) NULL,
                 warning = \(w) NULL
@@ -939,10 +947,10 @@ test_that("SSbiexponential() converges on real dataset", {
     rf_right_success <- mean(fit_6param("smo2_right_rf"))
     rf_right_success
 
-    expect_true(vl_left_success >= 0.6)
-    expect_true(vl_right_success >= 0.6)
-    expect_true(rf_left_success >= 0.6)
-    expect_true(rf_right_success >= 0.6)
+    expect_true(vl_left_success >= 0.8)
+    expect_true(vl_right_success >= 0.8)
+    expect_true(rf_left_success >= 0.8)
+    expect_true(rf_right_success >= 0.8)
 })
 
 test_that("analyse_biexponential() converges on real dataset", {
@@ -960,7 +968,7 @@ test_that("analyse_biexponential() converges on real dataset", {
             df,
             nirs_channels = nirs_channels,
             start_time = 0,
-            use_TD = FALSE,
+            use_TD = TRUE,
             verbose = FALSE
         )
     })
@@ -968,8 +976,11 @@ test_that("analyse_biexponential() converges on real dataset", {
     coefs <- do.call(rbind, results)
     success <- tapply(!is.na(coefs$tau1), coefs$nirs_channels, mean)
     success
+    expect_true(all(success >= 1.0))
 
-    expect_true(all(success >= 0.8))
+    TD_success <- tapply(!is.na(coefs$TD), coefs$nirs_channels, mean)
+    TD_success
+    expect_true(all(TD_success >= 0.8))
 
     ## converged fits should describe the desaturation-recovery shape and
     ## keep the two components separated by the default ratio bound. the
