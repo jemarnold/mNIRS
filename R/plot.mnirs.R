@@ -129,17 +129,17 @@ plot.mnirs <- function(
         )
 
     ## add one geom per channel, restricted to the panels declaring it
-    layers <- lapply(nirs_channels, function(ch) {
+    layers <- lapply(nirs_channels, function(channel) {
         keep <- if (is.null(channel_map)) {
             TRUE
         } else {
-            x[["interval"]] %in% channel_map[[ch]]
+            x[["interval"]] %in% channel_map[[channel]]
         }
         if (na.omit) {
-            keep <- keep & is.finite(x[[ch]])
+            keep <- keep & is.finite(x[[channel]])
         }
         ch_data <- x[keep, , drop = FALSE]
-        ch_aes <- ggplot2::aes(y = .data[[ch]], colour = ch)
+        ch_aes <- ggplot2::aes(y = .data[[channel]], colour = channel)
         c(
             list(ggplot2::geom_line(ch_aes, data = ch_data)),
             if (points) {
@@ -777,7 +777,7 @@ palette_mnirs <- function(...) {
             "i" = "Valid names: {.val {names(colours)}}."
         ))
     }
-    return(colours[idx])
+    return(unname(colours[idx]))
 }
 
 

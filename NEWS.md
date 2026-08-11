@@ -1,3 +1,30 @@
+# mnirs 0.7.2
+
+* `palette_mnirs()` now returns unnamed colours, which was disrupting use with `ggplot2::scale_colour_manual()`.
+
+``` r
+custom_colours <- c(
+    smo2_left_vl = palette_mnirs("pink"),
+    smo2_right_vl = palette_mnirs("light blue"),
+    smo2_left_rf = palette_mnirs("purple"),
+    smo2_right_rf = palette_mnirs("dark blue")
+)
+#> custom_colours
+# smo2_left_vl smo2_right_vl  smo2_left_rf smo2_right_rf 
+#  "#ff80ff"   "#0080ff"   "#9f79ee" "#00468Bff" 
+
+plot(result) +
+    scale_colour_manual(
+        values = c(
+            smo2_left_vl = palette_mnirs("pink"),
+            smo2_right_vl = palette_mnirs("light blue"),
+            smo2_left_rf = palette_mnirs("purple"),
+            smo2_right_rf = palette_mnirs("dark blue")
+        )
+    )
+
+```
+
 # mnirs 0.7.1
 
 * `shift_mnirs()` now properly excludes partial windows at data edges, where fewer samples can bias calculation of *"min"* or *"max"* shift values on noise.
