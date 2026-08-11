@@ -331,7 +331,8 @@ SSbiexponential <- selfStart(
 #' @param params Character vector of parameter names in model order.
 #' @param fix Named list of fixed parameter values.
 #' @param tau_ratio A numeric lower bound on `tau2 / tau1`.
-#' @param on_error A function called with the [stats::nls()] error condition.
+#' @param on_error A function called with the [stats::nls()] error condition,
+#'   or with a warning condition when a non-converged fit is accepted.
 #'
 #' @returns An [nls][stats::nls] model in ratio parameterisation, or `NULL`.
 #'
@@ -440,15 +441,31 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
     ## fail its gradient certificate ("false"/"singular" convergence). such a
     ## solution is kept when demonstrably good: finite coefficients with an
     ## RSS no worse than the deterministic grid seed. all other convergence
-    ## failures are rejected
+    ## failures are rejected. either way the port stop code is reported in
+    ## prose through on_error: a warning for a kept fit, an error otherwise
     if (!is.null(model) && !model$convInfo$isConv) {
+        port_msg <- c(
+            "7" = "Singular convergence: parameters not individually identifiable.",
+            "8" = "False convergence: gradient certificate failed near a non-smooth point.",
+            "9" = "Function evaluation limit reached without convergence.",
+            "10" = "Iteration limit reached without convergence."
+        )
+        code <- as.character(model$convInfo$stopCode)
+        msg <- if (code %in% names(port_msg)) {
+            port_msg[[code]]
+        } else {
+            model$convInfo$stopMessage
+        }
         acceptable <- model$convInfo$stopCode %in% c(7L, 8L) &&
             all(is.finite(stats::coef(model))) &&
             stats::deviance(model) <= seed$rss
-        if (!acceptable) {
-            model <- fail(simpleError(model$convInfo$stopMessage))
+        if (acceptable) {
+            on_error(simpleWarning(msg))
+        } else {
+            model <- fail(simpleError(msg))
         }
     }
+
     return(model)
 }
 
@@ -564,20 +581,28 @@ analyse_biexponential <- function(
         )
     ))
 
-    ## construct warning messages for fit failure
+    ## construct warning messages for fit failure or a fit accepted despite
+    ## non-convergence (a warning condition rather than an error)
     fit_failed_warning <- function(.nirs, n_params, e, retry, verbose) {
         if (!verbose) {
             return(invisible(NULL))
         }
-        msg <- c(
-            "x" = "{n_params}-parameter {.fn biexponential} fit failed \\
-            for {.field {(.nirs)}} in {.field {interval_name}}.",
-            "!" = "{conditionMessage(e)}"
-        )
-        if (retry) {
-            msg <- c(
-                msg,
-                "i" = "Attempting 5-parameter {.fn biexponential} fit."
+        msg <- if (inherits(e, "warning")) {
+            c(
+                "!" = "{n_params}-parameter {.fn biexponential} fit warning \\
+                for {.field {(.nirs)}} in {.field {interval_name}}:",
+                "i" = "{conditionMessage(e)}",
+                "i" = "Fit accepted. Consider a reduced \\
+                {.fn analyse_kinetics} method."
+            )
+        } else {
+            c(
+                "x" = "{n_params}-parameter {.fn biexponential} fit failed \\
+                for {.field {(.nirs)}} in {.field {interval_name}}:",
+                "!" = "{conditionMessage(e)}",
+                if (retry) {
+                    c("i" = "Attempting 5-parameter {.fn biexponential} fit.")
+                }
             )
         }
         cli_warn(msg, call = warn_call(env))

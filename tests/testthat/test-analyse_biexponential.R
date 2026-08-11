@@ -868,10 +868,9 @@ test_that("analyse_biexponential() converges on real dataset", {
     skip("Manual fit convergence check")
 
     ## 5 real-world 5-1 min work-recovery intervals, 4 channels each    
-    intervals <- readRDS(test_path("testdata/5-1_intervals.rds"))
+    intervals <- readRDS(test_path("testdata/5-1_intervals_short.rds"))
     analyse_kinetics(
-        lapply(intervals[[1]], \(.df) head(.df, -90)),
-        nirs_channels = c(smo2_left_vl, smo2_right_vl, smo2_left_rf, smo2_right_rf),
+        intervals,
         method = "biexp",
         use_TD = TRUE,
         # verbose = FALSE
