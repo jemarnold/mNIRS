@@ -1076,6 +1076,29 @@ test_that("analyse_logistic() channel_args override defaults", {
     expect_equal(ch2_row$shape, "gompertz")
 })
 
+test_that("analyse_logistic() fix resolves per channel", {
+    ## ch2 asymptotes are A + 5 and B + 5 by construction
+    data <- create_logistic_data(
+        A = 10, B = 100, channels = c("ch1", "ch2"), n = 100, noise_sd = 1
+    )
+
+    result <- analyse_logistic(
+        data,
+        nirs_channels = c("ch1", "ch2"),
+        fix = list(ch1 = list(A = 10), ch2 = list(A = 15)),
+        verbose = FALSE
+    )
+
+    expect_equal(result$A, c(10, 15))
+
+    models <- attr(result, "model")
+    expect_false("A" %in% names(coef(models$ch1)))
+    expect_false("A" %in% names(coef(models$ch2)))
+
+    ca <- attr(result, "channel_args")
+    expect_equal(ca$fix, c("list(A = 10)", "list(A = 15)"))
+})
+
 test_that("analyse_logistic() fitted_data attribute is well-formed", {
     data <- create_logistic_data(n = 100, noise_sd = 1)
 

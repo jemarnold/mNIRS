@@ -394,6 +394,12 @@ kinetics_dispatch <- list(
 #' and validates the resolved per-channel arguments via
 #' [validate_kinetics_args()].
 #'
+#' `fix` is itself a named list, so it is classified before resolution: a
+#' plain list of parameter values applies globally to every channel, while a
+#' list whose elements are all lists is a per-channel map keyed by channel
+#' name. Method-specific validation of the resolved `fix` is left to the
+#' calling worker, whose fixable parameters depend on the model.
+#'
 #' @param data A single *"mnirs"* data frame.
 #' @param nirs_quo,time_quo Quosures of the worker's `nirs_channels` and
 #'   `time_channel` arguments (captured with `enquo()` in the worker frame).
@@ -420,6 +426,17 @@ setup_kinetics_worker <- function(
     time_channel <- validate_time_channel(time_quo, data, env = env)
     t_vec <- data[[time_channel]]
 
+    ## `fix` is a named list of parameters, which `resolve_channel_args()`
+    ## would misread as a channel map. Only a list of lists is per-channel;
+    ## a plain parameter list is withheld and broadcast after resolution
+    fix <- arg_list$fix
+    fix_map <- is.list(fix) &&
+        length(fix) > 0L &&
+        all(vapply(fix, is.list, logical(1)))
+    if (!fix_map) {
+        arg_list$fix <- NULL
+    }
+
     ## broadcast global args (applying per-channel list() overrides), then
     ## validate the resolved args once, before fitting any channel
     per_channel <- resolve_channel_args(
@@ -429,6 +446,10 @@ setup_kinetics_worker <- function(
         verbose = verbose,
         env = env
     )
+
+    if (!fix_map && !is.null(fix)) {
+        per_channel <- lapply(per_channel, \(.a) c(.a, list(fix = fix)))
+    }
     per_channel <- validate_kinetics_args(
         per_channel,
         data,
@@ -520,7 +541,15 @@ analyse_kinetics_channels <- function(
             ## serialise resolved args: NULL to NA, list() to its deparse(),
             ## dropping internal-only args, so they fit a flat data frame row
             arg_row <- lapply(c(.a, extra_args), \(.x) {
-                if (is.null(.x)) NA else if (is.list(.x)) deparse(.x) else .x
+                if (is.null(.x)) {
+                    NA
+                } else if (is.list(.x)) {
+                    ## deparse() wraps beyond its default width, which would
+                    ## expand the single-row data frame
+                    paste(deparse(.x), collapse = "")
+                } else {
+                    .x
+                }
             })
             arg_row[c("verbose", "bypass_checks", "interval_name")] <- NULL
 

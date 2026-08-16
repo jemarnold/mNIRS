@@ -557,8 +557,9 @@ shape_dispatch <- list(
 #' @param fix An *optional* named list of model parameters (`A`, `B`,
 #'   `xmid`, `slope`) to hold constant during fitting, e.g.
 #'   `fix = list(A = 0)`. Fixed parameters are excluded from estimation
-#'   and reported at their fixed values. Applied globally across
-#'   `nirs_channels`.
+#'   and reported at their fixed values. Applied to every channel, or
+#'   per-channel as a list of lists keyed by channel name, e.g.
+#'   `fix = list(smo2 = list(A = 0))`.
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
 #'
@@ -604,6 +605,7 @@ analyse_logistic <- function(
         enquo(time_channel),
         arg_list = list(
             shape = shape,
+            fix = fix,
             start_time = start_time,
             direction = direction,
             end_window = end_window
@@ -617,11 +619,15 @@ analyse_logistic <- function(
     )
     nirs_channels <- setup$nirs_channels
     time_channel <- setup$time_channel
-    per_channel <- setup$per_channel
 
-    ## global fixed parameters bypass per-channel resolution: a named
-    ## list would be misread as a channel map
-    fix <- validate_fix(fix, c("A", "B", "xmid", "slope"), env = env)
+    ## validate each channel's fixed parameters before any fitting.
+    ## `[` assignment keeps an unfixed channel's `fix` key present but
+    ## `NULL`, so every channel serialises the same `channel_args` columns
+    per_channel <- lapply(setup$per_channel, \(.a) {
+        f <- validate_fix(.a$fix, c("A", "B", "xmid", "slope"), env = env)
+        .a["fix"] <- list(if (length(f) > 0L) f else NULL)
+        .a
+    })
 
     ## NA scaffold (method columns only) for convergence failure
     na_coefs <- data.frame(
@@ -654,7 +660,7 @@ analyse_logistic <- function(
         params <- c("A", "B", "xmid", "slope")
 
         ## build nls formula with any fixed params as constants
-        nls_formula <- build_ss_formula(ch_fn, params, fix)
+        nls_formula <- build_ss_formula(ch_fn, params, .a$fix)
 
         model <- tryCatch(
             nls(nls_formula, fit_data),
@@ -668,14 +674,14 @@ analyse_logistic <- function(
             return(build_na_results(na_coefs))
         }
 
-        coefs <- full_coefs(model, params, fix)
+        coefs <- full_coefs(model, params, .a$fix)
 
         ## enforce direction: bounded refit on D = B - A and slope sign
         ## data-scaled slope floor: slope pinned here is a degenerate
         ## flat fit, not a genuine response
         want <- if (.a$direction == "positive") 1 else -1
         slope_eps <- diff(range(x_fit)) / diff(range(t_fit)) * 1e-6
-        free_extra <- setdiff(params, c("A", "B", names(fix)))
+        free_extra <- setdiff(params, c("A", "B", names(.a$fix)))
         extra <- coefs[free_extra]
         if ("slope" %in% free_extra) {
             extra[["slope"]] <- want * max(abs(coefs[["slope"]]), slope_eps)
@@ -692,7 +698,7 @@ analyse_logistic <- function(
                 c(slope = if (want > 0) Inf else -slope_eps)
             },
             fn = ch_fn,
-            fix = fix,
+            fix = .a$fix,
             .nirs = .nirs,
             interval_name = interval_name,
             verbose = verbose,
@@ -745,7 +751,7 @@ analyse_logistic <- function(
         logistic_fit,
         verbose,
         interval_name,
-        extra_args = c(args, list(fix = if (length(fix) > 0L) fix else NULL)),
+        extra_args = args,
         env = env
     ))
 }

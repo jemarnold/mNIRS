@@ -243,8 +243,9 @@ SSmonoexponential <- selfStart(
 #' @param fix An *optional* named list of model parameters to hold
 #'   constant during fitting, e.g. `fix = list(A = 0)`. Fixed parameters
 #'   are excluded from estimation and reported at their fixed values.
-#'   Applied globally across `nirs_channels`. `TD` is fixable only when
-#'   `use_TD = TRUE` for all channels; a fixed `TD` disables the
+#'   Applied to every channel, or per-channel as a list of lists keyed by
+#'   channel name, e.g. `fix = list(smo2 = list(A = 0))`. `TD` is fixable
+#'   for channels where `use_TD = TRUE`; a fixed `TD` disables the
 #'   3-parameter fallback.
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
@@ -291,6 +292,7 @@ analyse_monoexponential <- function(
         enquo(time_channel),
         arg_list = list(
             use_TD = use_TD,
+            fix = fix,
             start_time = start_time,
             direction = direction,
             end_window = end_window
@@ -301,15 +303,18 @@ analyse_monoexponential <- function(
     )
     nirs_channels <- setup$nirs_channels
     time_channel <- setup$time_channel
-    per_channel <- setup$per_channel
 
-    ## global fixed parameters bypass per-channel resolution: a named
-    ## list would be misread as a channel map. TD is only fixable when
-    ## every channel fits the 4-parameter model
-    use_TD_all <- all(vapply(per_channel, \(.a) .a$use_TD, logical(1)))
-    fix <- validate_fix(
-        fix, c("A", "B", "tau", if (use_TD_all) "TD"), env = env
-    )
+    ## validate each channel's fixed parameters against its own model:
+    ## TD is only fixable where that channel fits the 4-parameter model.
+    ## `[` assignment keeps an unfixed channel's `fix` key present but
+    ## `NULL`, so every channel serialises the same `channel_args` columns
+    per_channel <- lapply(setup$per_channel, \(.a) {
+        f <- validate_fix(
+            .a$fix, c("A", "B", "tau", if (.a$use_TD) "TD"), env = env
+        )
+        .a["fix"] <- list(if (length(f) > 0L) f else NULL)
+        .a
+    })
 
     ## NA scaffold (method columns only) for convergence failure
     na_coefs <- data.frame(
@@ -361,11 +366,11 @@ analyse_monoexponential <- function(
 
         ## attempt nls fit; a failed 4-param fit falls back to the
         ## 3-param model unless TD is user-fixed
-        retry <- .a$use_TD && !"TD" %in% names(fix)
+        retry <- .a$use_TD && !"TD" %in% names(.a$fix)
         fit_data <- fit_frame(params)
         model <- tryCatch(
             nls(
-                build_ss_formula(quote(SSmonoexponential), params, fix),
+                build_ss_formula(quote(SSmonoexponential), params, .a$fix),
                 fit_data
             ),
             error = \(e) {
@@ -379,7 +384,7 @@ analyse_monoexponential <- function(
             fit_data <- fit_frame(params)
             model <- tryCatch(
                 nls(
-                    build_ss_formula(quote(SSmonoexponential), params, fix),
+                    build_ss_formula(quote(SSmonoexponential), params, .a$fix),
                     fit_data
                 ),
                 error = \(e) {
@@ -393,10 +398,10 @@ analyse_monoexponential <- function(
             return(build_na_results(na_coefs))
         }
 
-        coefs <- full_coefs(model, params, fix)
+        coefs <- full_coefs(model, params, .a$fix)
 
         ## enforce direction: bounded refit on D = B - A when inverted
-        free_extra <- setdiff(params, c("A", "B", names(fix)))
+        free_extra <- setdiff(params, c("A", "B", names(.a$fix)))
         enforced <- enforce_direction(
             model,
             coefs,
@@ -410,7 +415,7 @@ analyse_monoexponential <- function(
                 c(tau = diff(range(t_fit)) * 1e-6)
             },
             fn = quote(SSmonoexponential),
-            fix = fix,
+            fix = .a$fix,
             .nirs = .nirs,
             interval_name = interval_name,
             verbose = verbose,
@@ -476,7 +481,7 @@ analyse_monoexponential <- function(
         monoexponential_fit,
         verbose,
         interval_name,
-        extra_args = c(args, list(fix = if (length(fix) > 0L) fix else NULL)),
+        extra_args = args,
         env = env
     ))
 }

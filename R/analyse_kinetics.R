@@ -29,7 +29,7 @@
 #'   (*default*), retrieves `interval_times` from *"mnirs"* metadata, or falls
 #'   back to `0` or the first positive time value (see *Details*).
 #' @param end_window A numeric value in units of `time_channel` specifying the
-#'   window in which to look for the end of the kinetics fit. 
+#'   window in which to look for the end of the kinetics fit.
 #'   `end_window = Inf` (*default*) returns the global extreme from the full
 #'   sample range (see *Details*).
 #' @param ... Additional arguments passed to the underlying method function.
@@ -69,7 +69,9 @@
 #'   named list of model parameters to hold constant during fitting, e.g.
 #'   `fix = list(A = 0)` fixes the starting amplitude at `0`. Fixed
 #'   parameters are excluded from estimation and reported at their fixed
-#'   values. Applied globally across `nirs_channels`. See *Details*.
+#'   values. Applied to every channel, or per-channel as a list of lists
+#'   keyed by channel name, e.g. `fix = list(smo2 = list(A = 0))`. See
+#'   *Details*.
 #' @param tau_ratio **biexponential**: A numeric lower bound on the ratio of
 #'   the slow to the fast time constant, `tau2 / tau1`; default is `2.5`. As
 #'   `tau2` approaches `tau1` the two components become indistinguishable and
@@ -136,6 +138,52 @@
 #' `slope`. A fit that cannot satisfy the requested direction returns `NA`
 #' coefficients with a warning.
 #'
+#' ## Per-channel arguments
+#'
+#' Arguments apply globally to all `nirs_channels` by default. Relevant
+#' arguments can instead be supplied uniquely per-channel as a named `list()`,
+#' with names matching `nirs_channels`, e.g.:
+#'
+#' ```r
+#' analyse_kinetics(
+#'     data,
+#'     nirs_channels = c(smo2_left, smo2_right),
+#'     method = "peak_slope",
+#'     span = list(10, smo2_right = 20),
+#'     direction = list(smo2_left = "negative", smo2_right = "auto")
+#' )
+#' ```
+#'
+#' - A non-list value applies to every channel (the *default* behaviour).
+#' - A `list()` named by `nirs_channels` applies per-channel values.
+#' - A single unnamed value in the list will be applied to unlisted channels
+#'   (e.g. `span = list(10, smo2_right = 20)` gives `smo2_right` 20 and every
+#'   other channel 10). If no unnamed fallback value in the list, channels not
+#'   named in the list fall back to the argument's default.
+#' - `list()` names not matching `nirs_channels` are warned about and
+#'   ignored.
+#'
+#' `start_time`, `direction`, and `end_window` are per-channel capable for
+#' every `method`, along with the `method`-specific arguments `fraction`
+#' (*response_time*); `width`, `span`, `align`, `partial`, and `na.rm`
+#' (*peak_slope*); `use_TD` (*monoexponential*, *biexponential*); `shape`
+#' (*sigmoidal*); and `fix` (*monoexponential*, *biexponential*,
+#' *sigmoidal*).
+#'
+#' `fix` is itself a named `list()` of model parameters, so a per-channel
+#' `fix` is supplied as a `list()` of `list()`s keyed by channel name. A plain
+#' parameter list applies to every channel:
+#'
+#' ```r
+#' ## fix `A` at 0 for every channel
+#' fix = list(A = 0)
+#'
+#' ## fix `A` per-channel, leaving other channels free
+#' fix = list(smo2_left = list(A = 0), smo2_right = list(A = 5, B = 100))
+#' ```
+#'
+#' `method` and `tau_ratio` are always applied globally.
+#'
 #' ## method = "response_time"
 #'
 #' Aliases:
@@ -187,8 +235,8 @@
 #' - 4-parameter: `A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau))`
 #'
 #' `TD` is the *time delay* from `start_time` to the onset of the exponential
-#' response curve. `tau` is the *time constant* of the response. The 
-#' *rate constant* `k` is the reciprocal (`k = 1 / tau`). The 
+#' response curve. `tau` is the *time constant* of the response. The
+#' *rate constant* `k` is the reciprocal (`k = 1 / tau`). The
 #' *mean response time* is the time sum `MRT = TD + tau`. See
 #' [monoexponential()] for the model family and [SSmonoexponential()] for
 #' self-start initialisation.
@@ -219,7 +267,7 @@
 #' constant; `B2`/`tau2` the slow asymptote and time constant (typically
 #' `tau2 >> tau1`). All three of `A`, `B1`, `B2` are values on the response
 #' scale, consistent with the [monoexponential()] and sigmoidal asymptotes.
-#' `B1` is the asymptotic target of the fast excursion, `B2` is the final 
+#' `B1` is the asymptotic target of the fast excursion, `B2` is the final
 #' response *plateau* as `t` approaches infinity. The exact turning point
 #' between the fast and slow responses is reported as `excursion_value`. Set
 #' `use_TD = TRUE` (*default*) to add an optional time-delay parameter `TD`.
@@ -233,7 +281,7 @@
 #' Aliases: `method = c("logistic", "gompertz", "xmid")`.
 #'
 #' A parametric approach fitting a self-starting 4-parameter sigmoidal function
-#' to the response curve using [stats::nls()] in one of three shapes. 
+#' to the response curve using [stats::nls()] in one of three shapes.
 #'
 #' Model equations (all 4-parameter):
 #'
@@ -250,7 +298,7 @@
 #' `xmid` is the time from `start_time` to the *inflection point*; the steepest
 #' moment of the response. `slope` is the response rate `dx/dt` at the
 #' inflection.
-#' 
+#'
 #' A *"symmetric"* shape is the default for an unbiased fit when no
 #' obvious asymmetry is expected. *"gompertz"* growth is appropriate
 #' for fast-onset, slow-tail responses. *"gompertz_left"* for slow-onset,
@@ -275,7 +323,7 @@
 #'       `.t` in those units; the offset for each interval is returned in
 #'       `interval_times$start_times`.}
 #'   \item{`coefficients`}{A [tibble][tibble::tibble-package] of coefficients
-#'       with one row per `nirs_channel` per interval, containing 
+#'       with one row per `nirs_channel` per interval, containing
 #'       method-specific parameters.}
 #'   \item{`data`}{A list of the original input data frames augmented with a
 #'       `*_fitted` column of fitted values for each processed `nirs_channel`.}
@@ -334,7 +382,7 @@
 #'
 #' ## along with diagnostics and other returned objects
 #' result$diagnostics
-#' 
+#'
 #' ## plot results
 #' plot(result)
 #'
@@ -344,7 +392,10 @@ analyse_kinetics <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     method = c(
-        "response_time", "peak_slope", "monoexponential", "biexponential",
+        "response_time",
+        "peak_slope",
+        "monoexponential",
+        "biexponential",
         "sigmoidal"
     ),
     start_time = NULL,

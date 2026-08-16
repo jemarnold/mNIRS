@@ -485,9 +485,10 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
 #' @param fix An *optional* named list of model parameters (`A`, `B1`, `tau1`,
 #'   `B2`, `tau2`, `TD`) to hold constant during fitting, e.g.
 #'   `fix = list(A = 0)`. Fixed parameters are excluded from estimation
-#'   and reported at their fixed values. Applied globally across
-#'   `nirs_channels`. `TD` is fixable only when `use_TD = TRUE` for all
-#'   channels; a fixed `TD` disables the 5-parameter fallback.
+#'   and reported at their fixed values. Applied to every channel, or
+#'   per-channel as a list of lists keyed by channel name, e.g.
+#'   `fix = list(smo2 = list(A = 0))`. `TD` is fixable for channels where
+#'   `use_TD = TRUE`; a fixed `TD` disables the 5-parameter fallback.
 #' @param tau_ratio A numeric lower bound on the ratio of the slow to the fast
 #'   time constant, `tau2 / tau1`; default is `2.5`. As `tau2` approaches
 #'   `tau1` the two components become indistinguishable and the fit is
@@ -542,6 +543,7 @@ analyse_biexponential <- function(
         enquo(time_channel),
         arg_list = list(
             use_TD = use_TD,
+            fix = fix,
             start_time = start_time,
             direction = direction,
             end_window = end_window
@@ -552,7 +554,6 @@ analyse_biexponential <- function(
     )
     nirs_channels <- setup$nirs_channels
     time_channel <- setup$time_channel
-    per_channel <- setup$per_channel
 
     ## a ratio of 1 or less admits tau2 == tau1, where the two components
     ## are indistinguishable and the design is singular
@@ -561,15 +562,19 @@ analyse_biexponential <- function(
         inclusive = "right", msg1 = "one-element", env = env
     )
 
-    ## global fixed parameters bypass per-channel resolution: a named
-    ## list would be misread as a channel map. TD is only fixable when
-    ## every channel fits the 6-parameter model
-    use_TD_all <- all(vapply(per_channel, \(.a) .a$use_TD, logical(1)))
-    fix <- validate_fix(
-        fix,
-        c("A", "B1", "tau1", "B2", "tau2", if (use_TD_all) "TD"),
-        env = env
-    )
+    ## validate each channel's fixed parameters against its own model:
+    ## TD is only fixable where that channel fits the 6-parameter model.
+    ## `[` assignment keeps an unfixed channel's `fix` key present but
+    ## `NULL`, so every channel serialises the same `channel_args` columns
+    per_channel <- lapply(setup$per_channel, \(.a) {
+        f <- validate_fix(
+            .a$fix,
+            c("A", "B1", "tau1", "B2", "tau2", if (.a$use_TD) "TD"),
+            env = env
+        )
+        .a["fix"] <- list(if (length(f) > 0L) f else NULL)
+        .a
+    })
 
     ## NA scaffold (method columns only) for convergence failure
     # fmt: skip
@@ -622,7 +627,7 @@ analyse_biexponential <- function(
 
         ## attempt nls fit; a failed 6-param fit falls back to the
         ## 5-param model unless TD is user-fixed
-        retry <- .a$use_TD && !"TD" %in% names(fix)
+        retry <- .a$use_TD && !"TD" %in% names(.a$fix)
         attempt <- \(.params, .retry) {
             ## dropping TD narrows the window, so subset per attempt
             keep <- keep_rows(.params)
@@ -630,7 +635,7 @@ analyse_biexponential <- function(
                 x_fit[keep],
                 t_fit[keep],
                 .params,
-                fix,
+                .a$fix,
                 tau_ratio,
                 \(e) {
                     fit_failed_warning(
@@ -655,9 +660,10 @@ analyse_biexponential <- function(
 
         ## back-convert log-ratio time constants to the natural scale; a
         ## fixed time constant has no log-scale counterpart in the model
-        coefs <- c(stats::coef(model), unlist(fix))
-        coefs[["tau1"]] <- fix$tau1 %||% exp(coefs[["lt1"]])
-        coefs[["tau2"]] <- fix$tau2 %||% (coefs[["tau1"]] * exp(coefs[["lr"]]))
+        coefs <- c(stats::coef(model), unlist(.a$fix))
+        coefs[["tau1"]] <- .a$fix$tau1 %||% exp(coefs[["lt1"]])
+        coefs[["tau2"]] <- .a$fix$tau2 %||%
+            (coefs[["tau1"]] * exp(coefs[["lr"]]))
         fitted_vals <- stats::predict(model)
         keep <- keep_rows(params)
 
@@ -722,7 +728,7 @@ analyse_biexponential <- function(
         biexp_fit,
         verbose,
         interval_name,
-        extra_args = c(args, list(fix = if (length(fix) > 0L) fix else NULL)),
+        extra_args = args,
         env = env
     ))
 }

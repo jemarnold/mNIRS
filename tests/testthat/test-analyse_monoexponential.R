@@ -1081,3 +1081,137 @@ test_that("analyse_kinetics() passes fix to the monoexponential method", {
     expect_equal(result$coefficients$A, 0)
     expect_named(coef(result$model[[1L]]$smo2), c("B", "tau"))
 })
+
+test_that("analyse_monoexponential() fix resolves per channel", {
+    ## ch2 baseline is A + 5 by construction
+    data <- create_monoexp_data(
+        A = 0, B = 30, tau = 25, n = 100, noise_sd = 0.3,
+        channels = c("ch1", "ch2")
+    )
+
+    result <- analyse_monoexponential(
+        data,
+        nirs_channels = c("ch1", "ch2"),
+        use_TD = FALSE,
+        fix = list(ch1 = list(A = 0), ch2 = list(A = 5)),
+        verbose = FALSE
+    )
+
+    expect_equal(result$A, c(0, 5))
+    expect_equal(result$tau, c(25, 25), tolerance = 2)
+
+    ## each channel's fixed A excluded from its own model coefficients
+    models <- attr(result, "model")
+    expect_named(coef(models$ch1), c("B", "tau"))
+    expect_named(coef(models$ch2), c("B", "tau"))
+
+    ## resolved per-channel fix recorded in channel_args
+    ca <- attr(result, "channel_args")
+    expect_equal(ca$fix, c("list(A = 0)", "list(A = 5)"))
+})
+
+test_that("analyse_monoexponential() fix applies unnamed list fallback", {
+    data <- create_monoexp_data(
+        A = 0, B = 30, tau = 25, n = 100, noise_sd = 0.3,
+        channels = c("ch1", "ch2")
+    )
+
+    result <- analyse_monoexponential(
+        data,
+        nirs_channels = c("ch1", "ch2"),
+        use_TD = FALSE,
+        fix = list(list(A = 0), ch2 = list(A = 5)),
+        verbose = FALSE
+    )
+
+    expect_equal(result$A, c(0, 5))
+})
+
+test_that("analyse_monoexponential() fix omitted channel is left free", {
+    data <- create_monoexp_data(
+        A = 0, B = 30, tau = 25, n = 100, noise_sd = 0.3,
+        channels = c("ch1", "ch2")
+    )
+
+    ## omitting a channel from `fix` leaves it free, and is reported
+    expect_warning(
+        result <- analyse_monoexponential(
+            data,
+            nirs_channels = c("ch1", "ch2"),
+            use_TD = FALSE,
+            fix = list(ch1 = list(A = 0)),
+            verbose = TRUE
+        ),
+        "not specified"
+    )
+
+    ## ch1 fixed and excluded from its model; ch2 estimates all 3 params
+    expect_equal(result$A[[1L]], 0)
+    models <- attr(result, "model")
+    expect_named(coef(models$ch1), c("B", "tau"))
+    expect_named(coef(models$ch2), c("A", "B", "tau"))
+
+    ## an unfixed channel keeps the column and records NA, so per-channel
+    ## rows still bind into one `channel_args` data frame
+    ca <- attr(result, "channel_args")
+    expect_equal(nrow(ca), 2L)
+    expect_equal(ca$fix, c("list(A = 0)", NA))
+})
+
+test_that("analyse_monoexponential() per-channel fix validates per channel", {
+    data <- create_monoexp_data(channels = c("ch1", "ch2"))
+
+    ## TD fixable for ch2 (use_TD = TRUE) but not ch1 (use_TD = FALSE)
+    expect_error(
+        analyse_monoexponential(
+            data,
+            nirs_channels = c("ch1", "ch2"),
+            use_TD = list(ch1 = FALSE, ch2 = TRUE),
+            fix = list(ch1 = list(TD = 5)),
+            verbose = FALSE
+        ),
+        "not recognised"
+    )
+
+    expect_no_error(
+        analyse_monoexponential(
+            data,
+            nirs_channels = c("ch1", "ch2"),
+            use_TD = list(ch1 = FALSE, ch2 = TRUE),
+            fix = list(ch2 = list(TD = 0)),
+            verbose = FALSE
+        )
+    )
+
+    ## a malformed per-channel value fails validation for that channel
+    expect_error(
+        analyse_monoexponential(
+            data,
+            nirs_channels = c("ch1", "ch2"),
+            use_TD = FALSE,
+            fix = list(ch1 = list(A = "zero")),
+            verbose = FALSE
+        ),
+        "uniquely named"
+    )
+})
+
+test_that("analyse_monoexponential() per-channel fix warns unknown channel", {
+    data <- create_monoexp_data(
+        A = 0, B = 30, n = 100, noise_sd = 0.3, channels = c("ch1", "ch2")
+    )
+
+    expect_warning(
+        result <- analyse_monoexponential(
+            data,
+            nirs_channels = c("ch1", "ch2"),
+            use_TD = FALSE,
+            fix = list(list(A = 0), nope = list(A = 99)),
+            verbose = TRUE
+        ),
+        "not recognised"
+    )
+
+    ## unknown key ignored; the unnamed fallback still applies
+    expect_equal(result$A, c(0, 0))
+})

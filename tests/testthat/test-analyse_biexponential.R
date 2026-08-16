@@ -766,6 +766,31 @@ test_that("analyse_biexponential() TD is only fixable when use_TD = TRUE", {
     )
 })
 
+test_that("analyse_biexponential() fix resolves per channel", {
+    ## ch2 asymptotes are each + 5 by construction
+    data <- create_biexp_data(
+        A = 0, B1 = -20, B2 = -10, noise_sd = 0.3,
+        channels = c("ch1", "ch2")
+    )
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = c("ch1", "ch2"),
+        use_TD = FALSE,
+        fix = list(ch1 = list(A = 0), ch2 = list(A = 5)),
+        verbose = FALSE
+    )
+
+    expect_equal(result$A, c(0, 5))
+
+    models <- attr(result, "model")
+    expect_named(coef(models$ch1), c("B1", "lt1", "B2", "lr"))
+    expect_named(coef(models$ch2), c("B1", "lt1", "B2", "lr"))
+
+    ca <- attr(result, "channel_args")
+    expect_equal(ca$fix, c("list(A = 0)", "list(A = 5)"))
+})
+
 test_that("analyse_biexponential() validates fix argument", {
     data <- create_biexp_data()
 
