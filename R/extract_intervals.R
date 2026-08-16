@@ -351,7 +351,7 @@ extract_intervals <- function(
     )
 
     ## add class "mnirs" ========================================
-    class(result) <- c("mnirs", class(result))
+    class(result) <- unique(c("mnirs", class(result)))
 
     return(result)
 }

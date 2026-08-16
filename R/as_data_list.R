@@ -103,7 +103,7 @@ map_mnirs_intervals <- function(
         eval(call, envir = eval_env)
     })
     ## class list for `plot.mnirs()` / `print.mnirs()` dispatch
-    class(result) <- c("mnirs", class(result))
+    class(result) <- unique(c("mnirs", class(result)))
 
     return(result)
 }
