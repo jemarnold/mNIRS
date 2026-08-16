@@ -1,0 +1,364 @@
+---
+title: "mnirs — Bluesky posts"
+format:
+  html:
+    self-contained: true
+    code-tools: false
+    include-in-header:
+      text: |
+        <style>
+          main.content {
+            max-width: 680px;
+            margin-left: auto;
+            margin-right: auto;
+          }
+        </style>
+execute:
+  echo: true
+  message: false
+  warning: false
+  fig-dpi: 600
+  cache: true
+---
+
+```{r setup}
+#| include: false
+library(mnirs)
+library(ggplot2)
+options(mnirs.verbose = FALSE)
+## print 5 rows only
+options(pillar.print_min = 5, pillar.print_max = 5)
+```
+
+## `read_mnirs()`
+
+Use #mnirs 🦵🔦 to easily read files and plot data from wearable NIRS devices
+
+Automatically detect NIRS channels from @MoxyMonitor @TrainRedSensors @Artinis_MS and others. or specify and rename custom channels
+
+\#rstats
+
+```{r read_mnirs}
+library(mnirs)
+
+## automatically detect or specify and rename channels
+data_mnirs <- read_mnirs(
+    file_path      = example_mnirs("moxy_ramp"),
+    nirs_channels  = c(
+        smo2_left  = "SmO2 Live",
+        smo2_right = "SmO2 Live(2)"
+    ),
+    time_channel   = c(time = "hh:mm:ss"),
+    event_channel  = c(lap = "Lap")
+)
+
+## built-in plotting with `{ggplot2}`
+plot(data_mnirs)
+```
+
+---
+
+## `replace_mnirs()`
+
+This is how #mnirs 🦵🔦 can easily replace data spikes, signal dropouts, local outliers, and invalid data
+
+\#rstats
+
+```{r replace_mnirs_display}
+#| eval: false
+
+library(mnirs)
+
+data_cleaned <- replace_mnirs(
+    data           = data_mnirs, # data of class "mnirs"
+    invalid_values = 0,          # specify invalid values
+    invalid_above  = 90,         # specify invalid_above/below range
+    outlier_cutoff = 3,          # median deviation (± SD) outlier filter
+    span           = 15,         # local outlier window in `time_channel` units
+    method         = "linear"    # linear interpolation over missing/replaced
+)
+
+plot(data_cleaned, time_labels = TRUE)
+```
+
+```{r replace_mnirs_run}
+#| echo: false
+#| eval: true
+
+data_cleaned <- replace_mnirs(
+    data_mnirs,
+    invalid_values = 0,
+    invalid_above = 90,
+    outlier_cutoff = 3,
+    span = 15,
+    method = "linear"
+)
+
+which_diff <- which(abs(data_mnirs$smo2_left - data_cleaned$smo2_left) >= 5)
+
+plot(data_cleaned, time_labels = TRUE) +
+    scale_y_continuous(expand = expansion(0.03)) +
+    geom_line(
+        data = data_mnirs,
+        aes(y = smo2_left, colour = "smo2_left"),
+        alpha = 0.3
+    ) +
+    geom_point(
+        data = data_mnirs[which_diff, ],
+        aes(y = smo2_left),
+        colour = palette_mnirs("red"),
+        shape = 4,
+        size = 5
+    )
+```
+
+
+
+---
+
+## `filter_mnirs()`
+
+Use #mnirs 🦵🔦 to easily smooth noisy NIRS data
+
+We can compare different digital filter methods with custom parameters
+
+Simple *"moving average"* or *"Butterworth"* low-pass filters are most common
+
+\#rstats 
+
+```{r filter_mnirs_display}
+#| eval: false
+
+library(mnirs)
+
+data_filtered <- filter_mnirs(
+    data_cleaned,           # data of class "mnirs" 
+    method = "butterworth", # specify a filter method
+    order  = 2,             # filter order (number of passes)
+    fc     = 0.02,          # cutoff frequency (Hz or fractional)
+    type   = "low",         # specify filter type
+    na.rm  = TRUE           # ignore missing data (`NA`)
+)
+
+plot(data_filtered, time_labels = TRUE)
+```
+
+```{r filter_mnirs_run}
+#| echo: false
+#| eval: true
+
+data_filtered <- filter_mnirs(
+    data_cleaned,
+    method = "butterworth",
+    order = 2,
+    fc = 0.02,
+    type = "low",
+    na.rm = TRUE
+)
+
+plot(data_filtered, time_labels = TRUE) +
+    coord_cartesian(ylim = c(0, 100)) +
+    geom_line(
+        data = data_cleaned,
+        aes(y = smo2_left, colour = "smo2_left"),
+        alpha = 0.3
+    ) +
+    geom_line(
+        data = data_cleaned,
+        aes(y = smo2_right, colour = "smo2_right"),
+        alpha = 0.3
+    )
+```
+
+
+---
+
+## `rescale_mnirs()`
+
+Use #mnirs 🦵🔦 to easily rescale NIRS signal range
+
+Process channels independently to a functional 0-100% exercise range like this ramp test, or a physiological range with occlusions
+
+\#rstats
+
+```{r rescale_mnirs_display}
+#| eval: false
+
+library(mnirs)
+
+data_rescaled <- rescale_mnirs(
+    data_filtered,               # data of class "mnirs"  
+    group_channels = "distinct", # process channels independently
+    range          = c(0, 100)   # define the new signal range
+)
+
+plot(data_rescaled, time_labels = TRUE)
+```
+
+```{r rescale_mnirs_run}
+#| echo: false
+#| eval: true
+
+data_rescaled <- rescale_mnirs(
+    data_filtered,
+    group_channels = "distinct",
+    range = c(0, 100)
+)
+
+plot(data_rescaled, time_labels = TRUE) +
+    geom_hline(yintercept = c(0, 100), linetype = "dotted")
+```
+
+---
+
+Use #mnirs 🦵🔦 to easily rescale NIRS signal range
+
+Process channels together to preserve relative scale between muscle sites, or for absolute NIRS signals (oxy/O<sub>2</sub>Hb, deoxy/HHb)
+
+\#rstats 
+
+```{r rescale_mnirs_display2}
+#| eval: false
+
+library(mnirs)
+
+data_rescaled <- rescale_mnirs(
+    data_filtered,               # data of class "mnirs"
+    group_channels = "ensemble", # process channels together
+    range          = c(0, 100)   # define the new signal range
+)
+
+plot(data_rescaled, time_labels = TRUE)
+```
+
+```{r rescale_mnirs_run2}
+#| echo: false
+#| eval: true
+
+data_rescaled <- rescale_mnirs(
+    data_filtered,
+    group_channels = "ensemble",
+    range = c(0, 100)
+)
+
+plot(data_rescaled, time_labels = TRUE) +
+    geom_hline(yintercept = c(0, 100), linetype = "dotted")
+```
+
+---
+
+## `shift_mnirs()`
+
+Use #mnirs 🦵🔦 to easily shift NIRS signal range
+
+Signals can be transformed to a change from baseline while preserving relative scale
+
+\#rstats
+
+```{r shift_mnirs_display}
+#| eval: false
+
+library(mnirs)
+
+data_shifted <- shift_mnirs(
+    data_filtered,               # data of class "mnirs"
+    group_channels = "distinct", # process channels separately
+    to             = 0,          # shift the target to zero
+    span           = 120,        # target a 2-min mean
+    position       = "first"     # at the starting baseline
+)
+
+plot(data_shifted, time_labels = TRUE)
+```
+
+```{r shift_mnirs_run}
+#| echo: false
+#| eval: true
+
+data_shifted <- shift_mnirs(
+    data_filtered,                              
+    group_channels = "distinct",
+    to             = 0,                          
+    span           = 120,                        
+    position       = "first"                     
+)
+
+plot(data_shifted, time_labels = TRUE) +
+    geom_hline(yintercept = 0, linetype = "dotted") +
+    geom_vline(xintercept = 120, linetype = "dotted")
+```
+
+---
+
+
+## `extract_intervals()`
+
+Use #mnirs 🦵🔦 to easily extract intervals from laps, times, or event labels
+
+Extract intervals independently as a list, or ensemble-average to a single data frame
+
+\#rstats
+
+```{r load_ensemble_data}
+#| echo: false
+
+data_intervals <- read_mnirs(
+    file_path = example_mnirs("moxy_interval"),
+    nirs_channels = c(smo2 = "SmO2 Live"),
+    time_channel = c(time = "hh:mm:ss"),
+    event_channel = c(lap = "Lap"),
+)
+```
+
+```{r extract_intervals_distinct}
+extract_intervals(
+    data_intervals,
+    start = by_time(124, 486, 848), # specify times in `time_channel` units
+    end = by_lap(3, 5, 7),          # or `lap` integer values
+    span = c(-60, 0),               # expand bounds around `c(start, end)`
+    group_intervals = "distinct",   # return each interval in a list
+) |>
+    ## plot lists of class "mnirs" as facets
+    plot()
+```
+
+```{r extract_intervals_ensemble}
+extract_intervals(
+    data_intervals,
+    start = by_time(124, 486, 848),
+    end = by_lap(3, 5, 7),
+    span = c(-60, 0),
+    group_intervals = "ensemble", # ensemble-average intervals
+) |> 
+    plot(time_labels = TRUE)
+```
+
+
+```{r extract_intervals_group}
+
+data_ensembled <- extract_intervals(
+    data_intervals,
+    start = by_lap(2, 4, 6, 3, 5, 7),
+    end = by_lap(2, 4, 6, 3, 5, 7),
+    span = list(c(-30, -60), c(-30, 0)),
+    group_intervals = list(c(1, 2, 3), c(4, 5, 6)),
+    zero_time = TRUE
+)
+
+plot(data_ensembled)
+```
+
+## `analyse_kinetics()`
+
+Use #mnirs 🦵🔦 to easily analyse deoxygenation & reoxygenation kinetics
+
+```{r analyse_kinetics}
+
+analyse_kinetics(
+    data_ensembled,
+    method = "biexp",
+    # start_time = c(),
+    verbose = TRUE
+) |> 
+    plot()
+```
