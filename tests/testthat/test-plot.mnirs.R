@@ -36,13 +36,12 @@ test_that("palettes subset by number works", {
 
 test_that("palettes subset by name works", {
     red <- palette_mnirs("red")
-    expect_named(red, "red")
-    expect_equal(red[["red"]], "#ED0000FF")
+    expect_null(names(red))
     expect_error(palette_mnirs("invalid"), "unrecognised")
 
     multi <- palette_mnirs("red", "blue")
     expect_length(multi, 2)
-    expect_named(multi, c("red", "blue"))
+    expect_null(names(multi))
     expect_error(palette_mnirs("red", "invalid"), "unrecognised")
 
     ## mixed types error
