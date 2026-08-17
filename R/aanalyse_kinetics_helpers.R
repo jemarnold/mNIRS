@@ -319,6 +319,108 @@ build_kinetics_results <- function(
 }
 
 
+#' Resolve per-interval arguments
+#'
+#' Peels the interval layer from `worker_args` before per-interval worker
+#' dispatch, mirroring the per-channel convention of
+#' [resolve_channel_args()]. An argument is treated as an interval map when
+#' it is a `list()` with at least one named key matching an interval name,
+#' no key matching a channel name (channel maps keep their existing
+#' per-channel meaning), and at most one unnamed element acting as the
+#' fallback for unlisted intervals. `fix` must additionally be a list of
+#' lists, so a plain parameter list (e.g. `fix = list(A = 0)`) stays global.
+#'
+#' Resolved values may themselves be per-channel maps, which pass untouched
+#' to [resolve_channel_args()] downstream. Intervals omitted from a map with
+#' no unnamed fallback resolve to `NULL`, falling through to the argument's
+#' default, matching omitted-channel behaviour.
+#'
+#' @param worker_args Named list of method-specific arguments.
+#' @param interval_names Character vector of interval names from
+#'   [as_data_list()].
+#' @param chan_names Character vector of resolved channel names, used only
+#'   to give channel keys precedence over interval keys.
+#' @inheritParams validate_mnirs
+#'
+#' @returns A named list with one element per interval; each element is the
+#'   `worker_args` list resolved for that interval.
+#'
+#' @keywords internal
+resolve_interval_args <- function(
+    worker_args,
+    interval_names,
+    chan_names,
+    verbose = TRUE,
+    env = rlang::caller_env()
+) {
+    ## `worker_args` comes from `mget()` of a named `unlist()` vector, so
+    ## its names attribute can itself carry names, which diverts `vapply()`
+    ## result naming; flatten once so name lookups are reliable
+    names(worker_args) <- unname(names(worker_args))
+
+    ## classify interval maps; channel keys win so existing per-channel
+    ## lists are never reinterpreted
+    is_map <- vapply(names(worker_args), \(.nm) {
+        .a <- worker_args[[.nm]]
+        if (!is.list(.a) || is.data.frame(.a)) {
+            return(FALSE)
+        }
+        keys <- names(.a) %||% rep("", length(.a))
+        named <- nzchar(keys)
+        if (!any(named) || sum(!named) > 1L) {
+            return(FALSE)
+        }
+        if (any(keys[named] %in% chan_names)) {
+            return(FALSE)
+        }
+        if (.nm == "fix" && !all(vapply(.a, is.list, logical(1)))) {
+            return(FALSE)
+        }
+        return(any(keys[named] %in% interval_names))
+    }, logical(1))
+
+    ## warn once per interval-map arg: unrecognised interval names are
+    ## ignored; omitted intervals with no unnamed fallback fall back to
+    ## the argument's default
+    if (verbose) {
+        lapply(names(worker_args)[is_map], \(.nm) {
+            keys <- names(worker_args[[.nm]])
+            unknown <- setdiff(keys[nzchar(keys)], interval_names)
+            if (length(unknown) > 0L) {
+                cli_warn(c(
+                    "!" = "{.arg {(.nm)}}: interval{?s} {.field {unknown}} \\
+                    not recognised.",
+                    "i" = "Per-interval named argument lists must match \\
+                    interval names exactly."
+                ), call = warn_call(env))
+            }
+            if (all(nzchar(keys))) {
+                omitted <- setdiff(interval_names, keys)
+                if (length(omitted) > 0L) {
+                    cli_warn(c(
+                        "i" = "{.arg {(.nm)}}: interval{?s} \\
+                        {.field {omitted}} not specified."
+                    ), call = warn_call(env))
+                }
+            }
+        })
+    }
+
+    ## peel each interval's values: named hit > unnamed fallback > NULL
+    return(lapply(setNames(nm = interval_names), \(.int) {
+        lapply(setNames(nm = names(worker_args)), \(.nm) {
+            .a <- worker_args[[.nm]]
+            if (!is_map[[.nm]]) {
+                return(.a)
+            }
+            unnamed <- .a[!nzchar(names(.a))]
+            fallback <- if (length(unnamed) > 0L) unnamed[[1L]]
+            return(.a[[.int]] %||% fallback)
+        })
+    }))
+}
+
+
 #' Run a kinetics worker over each interval and collate results
 #'
 #' Shared skeleton for `analyse_kinetics.*` methods: normalises `data`
@@ -356,13 +458,23 @@ analyse_kinetics_intervals <- function(
     ## normalise input to named list of data frames
     data_list <- as_data_list(data, env = env)
 
+    ## resolve channel names for interval-map classification only; genuine
+    ## channel errors surface later in the worker with proper context
+    chan_names <- tryCatch(
+        validate_nirs_channels(nirs_quo, data_list[[1L]], env),
+        error = \(e) character()
+    )
+    interval_args <- resolve_interval_args(
+        worker_args, names(data_list), chan_names, verbose, env
+    )
+
     ## iterate over each interval
     result_list <- lapply(seq_along(data_list), \(.i) {
         rlang::inject(worker(
             data = data_list[[.i]],
             nirs_channels = !!nirs_quo,
             time_channel = !!time_quo,
-            !!!worker_args,
+            !!!interval_args[[.i]],
             verbose = verbose,
             interval_name = names(data_list)[[.i]],
             bypass_checks = TRUE,

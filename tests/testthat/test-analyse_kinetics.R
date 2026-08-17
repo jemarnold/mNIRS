@@ -2476,3 +2476,179 @@ test_that("analyse_kinetics benchmark", {
     #     )
     # )
 })
+
+
+## resolve_interval_args ==================================================
+test_that("resolve_interval_args peels interval-keyed args", {
+    args <- list(
+        end_window = list(A = 30, B = 60),
+        width = 5,
+        direction = "auto"
+    )
+
+    result <- resolve_interval_args(
+        args, c("A", "B"), chan_names = "smo2", verbose = FALSE
+    )
+
+    expect_named(result, c("A", "B"))
+    expect_equal(result$A$end_window, 30)
+    expect_equal(result$B$end_window, 60)
+    ## global values broadcast unchanged
+    expect_equal(result$A$width, 5)
+    expect_equal(result$B$direction, "auto")
+})
+
+test_that("resolve_interval_args applies unnamed fallback", {
+    args <- list(end_window = list(30, B = 60))
+
+    result <- resolve_interval_args(
+        args, c("A", "B", "C"), character(), verbose = FALSE
+    )
+
+    expect_equal(result$A$end_window, 30)
+    expect_equal(result$B$end_window, 60)
+    expect_equal(result$C$end_window, 30)
+})
+
+test_that("resolve_interval_args omitted interval falls back to NULL", {
+    args <- list(end_window = list(A = 30))
+
+    result <- resolve_interval_args(
+        args, c("A", "B"), character(), verbose = FALSE
+    )
+
+    expect_equal(result$A$end_window, 30)
+    expect_null(result$B$end_window)
+})
+
+test_that("resolve_interval_args channel keys win over interval keys", {
+    ## key matches both an interval and a channel: per-channel meaning kept
+    args <- list(span = list(10, smo2 = 20))
+
+    result <- resolve_interval_args(
+        args, c("smo2", "B"), chan_names = "smo2", verbose = FALSE
+    )
+
+    ## passed through untouched for downstream channel resolution
+    expect_identical(result$smo2$span, list(10, smo2 = 20))
+    expect_identical(result$B$span, list(10, smo2 = 20))
+})
+
+test_that("resolve_interval_args handles fix nesting", {
+    interval_names <- c("A", "B")
+
+    ## plain parameter list stays global, even with keys matching intervals
+    args <- list(fix = list(A = 0))
+    result <- resolve_interval_args(
+        args, interval_names, character(), verbose = FALSE
+    )
+    expect_identical(result$A$fix, list(A = 0))
+    expect_identical(result$B$fix, list(A = 0))
+
+    ## interval-keyed parameter lists peel per interval
+    args <- list(fix = list(A = list(A = 0), B = list(A = 5)))
+    result <- resolve_interval_args(
+        args, interval_names, character(), verbose = FALSE
+    )
+    expect_identical(result$A$fix, list(A = 0))
+    expect_identical(result$B$fix, list(A = 5))
+
+    ## per-interval per-channel map passes each value through intact
+    args <- list(fix = list(A = list(smo2 = list(A = 0))))
+    result <- resolve_interval_args(
+        args, interval_names, character(), verbose = FALSE
+    )
+    expect_identical(result$A$fix, list(smo2 = list(A = 0)))
+    expect_null(result$B$fix)
+})
+
+test_that("resolve_interval_args warns on unknown and omitted intervals", {
+    ## a valid interval key makes this an interval map; the unnamed
+    ## fallback keeps the omitted-interval hint silent, so only the
+    ## unknown-key warning fires. an all-unknown-keys list is not an
+    ## interval map and is left for channel-layer warnings instead
+    expect_warning(
+        resolve_interval_args(
+            list(end_window = list(30, A = 30, typo = 60)),
+            c("A", "B"), character(), verbose = TRUE
+        ),
+        "typo.*not recognised"
+    )
+
+    ## fully named map omitting an interval hints once
+    expect_warning(
+        resolve_interval_args(
+            list(end_window = list(A = 30)),
+            c("A", "B"), character(), verbose = TRUE
+        ),
+        "B.*not specified"
+    )
+})
+
+
+## analyse_kinetics per-interval arguments ================================
+test_that("analyse_kinetics resolves per-interval and nested channel args", {
+    df1 <- create_kinetics_data()
+    df2 <- create_kinetics_data()
+
+    result <- analyse_kinetics(
+        list(A = df1, B = df2),
+        nirs_channels = c("smo2_left", "smo2_right"),
+        method = "response_time",
+        direction = list(
+            A = list(smo2_left = "negative", "positive"),
+            B = "positive"
+        ),
+        end_window = list(A = 2, B = 3),
+        verbose = FALSE
+    )
+
+    ca <- result$channel_args
+    expect_equal(
+        ca$direction[ca$interval == "A" & ca$nirs_channels == "smo2_left"],
+        "negative"
+    )
+    expect_equal(
+        ca$direction[ca$interval == "A" & ca$nirs_channels == "smo2_right"],
+        "positive"
+    )
+    expect_equal(unique(ca$direction[ca$interval == "B"]), "positive")
+    expect_equal(unique(ca$end_window[ca$interval == "A"]), 2)
+    expect_equal(unique(ca$end_window[ca$interval == "B"]), 3)
+})
+
+test_that("analyse_kinetics per-interval args key by group names", {
+    skip_if_not_installed("dplyr")
+
+    df <- data.frame(
+        time = rep(seq(0, 4.9, by = 0.1), 2),
+        smo2 = c(
+            sin(seq(0, 4.9, by = 0.1)) * 10 + 50,
+            cos(seq(0, 4.9, by = 0.1)) * 10 + 50
+        ),
+        group = rep(c("A", "B"), each = 50)
+    )
+    df <- create_mnirs_data(
+        df,
+        nirs_channels = "smo2",
+        time_channel = "time",
+        sample_rate = 10
+    )
+    grouped_df <- dplyr::group_by(df, group)
+
+    result <- analyse_kinetics(
+        grouped_df,
+        nirs_channels = "smo2",
+        method = "peak_slope",
+        width = list(A = 5, B = 7),
+        verbose = FALSE
+    )
+
+    ca <- result$channel_args
+    expect_equal(ca$width[ca$interval == "A"], 5)
+    expect_equal(ca$width[ca$interval == "B"], 7)
+    ## resolved widths drive the fit window per interval
+    diag <- result$diagnostics
+    expect_equal(diag$n_obs[diag$interval == "A"], 5L)
+    expect_equal(diag$n_obs[diag$interval == "B"], 7L)
+})

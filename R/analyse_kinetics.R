@@ -182,6 +182,39 @@
 #' fix = list(smo2_left = list(A = 0), smo2_right = list(A = 5, B = 100))
 #' ```
 #'
+#' ## Per-interval arguments
+#'
+#' For multi-interval input (a list of data frames or a grouped data frame),
+#' the same arguments can also be supplied per-interval as a named `list()`
+#' keyed by interval name (the list names, group keys, or `interval_<n>`),
+#' e.g.:
+#'
+#' ```r
+#' analyse_kinetics(
+#'     data_list,
+#'     method = "monoexponential",
+#'     end_window = list(interval_1 = 30, interval_2 = 60),
+#'     direction = list(
+#'         interval_1 = list(smo2_left = "negative", "auto"),
+#'         interval_2 = "positive"
+#'     )
+#' )
+#' ```
+#'
+#' - Channel names take precedence: a `list()` name matching
+#'   `nirs_channels` is always read as a per-channel key.
+#' - A resolved per-interval value may itself be a per-channel `list()`,
+#'   as `direction` above.
+#' - A single unnamed value in the list is the fallback for unlisted
+#'   intervals; otherwise intervals not named in the list fall back to the
+#'   argument's default.
+#' - `list()` names matching neither interval names nor `nirs_channels`
+#'   are warned about and ignored.
+#' - A per-interval `fix` is a `list()` of parameter lists keyed by
+#'   interval name, e.g. `fix = list(interval_1 = list(A = 0))`; each
+#'   element may itself be a per-channel map, e.g.
+#'   `fix = list(interval_1 = list(smo2 = list(A = 0)))`.
+#'
 #' `method` and `tau_ratio` are always applied globally.
 #'
 #' ## method = "response_time"

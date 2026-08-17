@@ -142,6 +142,11 @@ response_time <- function(
     } else {
         which.min(x_valid)
     }
+    ## no valid samples after start_time: which.max/min return integer(0),
+    ## which would collapse B and downstream 1-row results to length 0
+    if (length(extreme_idx) == 0L) {
+        extreme_idx <- NA_integer_
+    }
 
     A <- mean(x[baseline_idx], na.rm = TRUE)
     B <- x[extreme_idx]
