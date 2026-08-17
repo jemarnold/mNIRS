@@ -359,24 +359,15 @@ resolve_interval_args <- function(
     names(worker_args) <- unname(names(worker_args))
 
     ## classify interval maps; channel keys win so existing per-channel
-    ## lists are never reinterpreted
+    ## lists are never reinterpreted, and a plain `fix` parameter list
+    ## stays global
     is_map <- vapply(names(worker_args), \(.nm) {
         .a <- worker_args[[.nm]]
-        if (!is.list(.a) || is.data.frame(.a)) {
-            return(FALSE)
-        }
         keys <- names(.a) %||% rep("", length(.a))
-        named <- nzchar(keys)
-        if (!any(named) || sum(!named) > 1L) {
-            return(FALSE)
-        }
-        if (any(keys[named] %in% chan_names)) {
-            return(FALSE)
-        }
-        if (.nm == "fix" && !all(vapply(.a, is.list, logical(1)))) {
-            return(FALSE)
-        }
-        return(any(keys[named] %in% interval_names))
+        is_arg_map(.a) &&
+            !any(keys %in% chan_names) &&
+            any(keys %in% interval_names) &&
+            (.nm != "fix" || all(vapply(.a, is.list, logical(1))))
     }, logical(1))
 
     ## warn once per interval-map arg: unrecognised interval names are
@@ -385,24 +376,15 @@ resolve_interval_args <- function(
     if (verbose) {
         lapply(names(worker_args)[is_map], \(.nm) {
             keys <- names(worker_args[[.nm]])
-            unknown <- setdiff(keys[nzchar(keys)], interval_names)
-            if (length(unknown) > 0L) {
-                cli_warn(c(
-                    "!" = "{.arg {(.nm)}}: interval{?s} {.field {unknown}} \\
-                    not recognised.",
-                    "i" = "Per-interval named argument lists must match \\
-                    interval names exactly."
-                ), call = warn_call(env))
-            }
-            if (all(nzchar(keys))) {
-                omitted <- setdiff(interval_names, keys)
-                if (length(omitted) > 0L) {
-                    cli_warn(c(
-                        "i" = "{.arg {(.nm)}}: interval{?s} \\
-                        {.field {omitted}} not specified."
-                    ), call = warn_call(env))
-                }
-            }
+            omitted <- if (all(nzchar(keys))) setdiff(interval_names, keys)
+            warn_map_keys(
+                .nm,
+                unknown = setdiff(keys[nzchar(keys)], interval_names),
+                omitted = omitted,
+                what = "interval",
+                match_hint = "interval names",
+                env = env
+            )
         })
     }
 
@@ -509,8 +491,8 @@ kinetics_dispatch <- list(
 #' `fix` is itself a named list, so it is classified before resolution: a
 #' plain list of parameter values applies globally to every channel, while a
 #' list whose elements are all lists is a per-channel map keyed by channel
-#' name. Method-specific validation of the resolved `fix` is left to the
-#' calling worker, whose fixable parameters depend on the model.
+#' name. The resolved `fix` is validated per channel against `fix_params`
+#' when supplied.
 #'
 #' @param data A single *"mnirs"* data frame.
 #' @param nirs_quo,time_quo Quosures of the worker's `nirs_channels` and
@@ -518,6 +500,11 @@ kinetics_dispatch <- list(
 #' @param arg_list Named list of the method's per-channel-capable arguments.
 #' @param choices Named list of valid values for choice-type arguments,
 #'   passed to [resolve_channel_args()].
+#' @param fix_params An *optional* character vector of fixable model
+#'   parameter names, or a function of a channel's resolved argument list
+#'   returning that vector (for models whose fixable parameters depend on
+#'   another argument, e.g. `use_TD`). When supplied, each channel's
+#'   resolved `fix` is validated via [validate_fix()].
 #' @inheritParams validate_mnirs
 #'
 #' @returns A named list with `nirs_channels`, `time_channel`, `t_vec`, and
@@ -530,6 +517,7 @@ setup_kinetics_worker <- function(
     time_quo,
     arg_list,
     choices = list(),
+    fix_params = NULL,
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
@@ -569,6 +557,18 @@ setup_kinetics_worker <- function(
         verbose,
         env = env
     )
+
+    ## validate each channel's fixed parameters against its own model.
+    ## `[` assignment keeps an unfixed channel's `fix` key present but
+    ## `NULL`, so every channel serialises the same `channel_args` columns
+    if (!is.null(fix_params)) {
+        per_channel <- lapply(per_channel, \(.a) {
+            .p <- if (is.function(fix_params)) fix_params(.a) else fix_params
+            f <- validate_fix(.a$fix, .p, env = env)
+            .a["fix"] <- list(if (length(f) > 0L) f else NULL)
+            .a
+        })
+    }
 
     return(list(
         nirs_channels = nirs_channels,
@@ -827,6 +827,66 @@ build_na_results <- function(na_coefs) {
         fitted_data = data.frame(window_idx = NA_integer_, fitted = NA_real_),
         diag = na_diag
     ))
+}
+
+
+#' Warn on a failed or non-converged kinetics model fit
+#'
+#' Shared warning for the nls-based kinetics workers. Error conditions
+#' report a failed fit with an optional hint that the reduced
+#' (`n_params - 1`) model is attempted next; warning-class conditions
+#' report a fit accepted despite non-convergence.
+#'
+#' @param fn Symbol or character; the model fn named in the message.
+#' @param e The captured condition object.
+#' @param .nirs Character; the channel name.
+#' @param interval_name Character; the interval label.
+#' @param n_params Integer or `NULL`; parameter count prefixed to the fn
+#'   name.
+#' @param retry Logical; hint that the reduced model fit is attempted next.
+#' @inheritParams validate_mnirs
+#'
+#' @returns `invisible(NULL)`, invoked for its warning side effect.
+#'
+#' @keywords internal
+warn_fit_failed <- function(
+    fn,
+    e,
+    .nirs,
+    interval_name,
+    n_params = NULL,
+    retry = FALSE,
+    verbose = TRUE,
+    env = rlang::caller_env()
+) {
+    if (!verbose) {
+        return(invisible(NULL))
+    }
+    ## optional parameter count prefixes the model fn name
+    label <- paste0(
+        if (!is.null(n_params)) "{n_params}-parameter ",
+        "{.fn {as.character(fn)}}"
+    )
+    where <- " for {.field {(.nirs)}} in {.field {interval_name}}:"
+    msg <- if (inherits(e, "warning")) {
+        c(
+            "!" = paste0(label, " fit warning", where),
+            "i" = "{conditionMessage(e)}",
+            "i" = "Fit accepted. Consider a reduced \\
+            {.fn analyse_kinetics} method."
+        )
+    } else {
+        c(
+            "x" = paste0(label, " fit failed", where),
+            "!" = "{conditionMessage(e)}",
+            if (retry) {
+                c("i" = "Attempting {n_params - 1L}-parameter \\
+                {.fn {as.character(fn)}} fit.")
+            }
+        )
+    }
+    cli_warn(msg, call = warn_call(env))
+    return(invisible(NULL))
 }
 
 

@@ -437,16 +437,10 @@ analyse_peak_slope <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = list(
-            start_time = start_time,
-            width = width,
-            span = span,
-            align = align,
-            direction = direction,
-            end_window = end_window,
-            partial = partial,
-            na.rm = na.rm
-        ),
+        arg_list = mget(c(
+            "start_time", "width", "span", "align",
+            "direction", "end_window", "partial", "na.rm"
+        )),
         choices = list(direction = c("auto", "positive", "negative")),
         verbose = verbose,
         env = env

@@ -474,21 +474,14 @@ analyse_kinetics.response_time <- function(
     ...,
     fraction = 0.5
 ) {
-    ## resolve global verbose option when caller omits the argument
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    worker_args <- unlist(kinetics_dispatch[c("common", "response_time")])
     return(analyse_kinetics_intervals(
-        data        = data,
-        worker      = analyse_response_time,
-        method      = "response_time",
-        worker_args = mget(worker_args),
-        nirs_quo    = enquo(nirs_channels),
-        time_quo    = enquo(time_channel),
-        verbose     = verbose,
-        call        = match.call(),
-        env         = sys.call(-1)
+        data, analyse_response_time, "response_time",
+        mget(unlist(kinetics_dispatch[c("common", "response_time")])),
+        enquo(nirs_channels), enquo(time_channel), verbose,
+        match.call(), sys.call(-1)
     ))
 }
 
@@ -512,21 +505,14 @@ analyse_kinetics.peak_slope <- function(
     partial = FALSE,
     na.rm = FALSE
 ) {
-    ## resolve global verbose option when caller omits the argument
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    worker_args <- unlist(kinetics_dispatch[c("common", "peak_slope")])
     return(analyse_kinetics_intervals(
-        data        = data,
-        worker      = analyse_peak_slope,
-        method      = "peak_slope",
-        worker_args = mget(worker_args),
-        nirs_quo    = enquo(nirs_channels),
-        time_quo    = enquo(time_channel),
-        verbose     = verbose,
-        call        = match.call(),
-        env         = sys.call(-1)
+        data, analyse_peak_slope, "peak_slope",
+        mget(unlist(kinetics_dispatch[c("common", "peak_slope")])),
+        enquo(nirs_channels), enquo(time_channel), verbose,
+        match.call(), sys.call(-1)
     ))
 }
 
@@ -548,21 +534,14 @@ analyse_kinetics.monoexponential <- function(
     fix = NULL
 ) {
     ## TODO: pass additional stats::nls() args
-    ## resolve global verbose option when caller omits the argument
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    worker_args <- unlist(kinetics_dispatch[c("common", "monoexponential")])
     return(analyse_kinetics_intervals(
-        data        = data,
-        worker      = analyse_monoexponential,
-        method      = "monoexponential",
-        worker_args = mget(worker_args),
-        nirs_quo    = enquo(nirs_channels),
-        time_quo    = enquo(time_channel),
-        verbose     = verbose,
-        call        = match.call(),
-        env         = sys.call(-1)
+        data, analyse_monoexponential, "monoexponential",
+        mget(unlist(kinetics_dispatch[c("common", "monoexponential")])),
+        enquo(nirs_channels), enquo(time_channel), verbose,
+        match.call(), sys.call(-1)
     ))
 }
 
@@ -585,21 +564,14 @@ analyse_kinetics.biexponential <- function(
     tau_ratio = 2.5
 ) {
     ## TODO: pass additional stats::nls() args
-    ## resolve global verbose option when caller omits the argument
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    worker_args <- unlist(kinetics_dispatch[c("common", "biexponential")])
     return(analyse_kinetics_intervals(
-        data        = data,
-        worker      = analyse_biexponential,
-        method      = "biexponential",
-        worker_args = mget(worker_args),
-        nirs_quo    = enquo(nirs_channels),
-        time_quo    = enquo(time_channel),
-        verbose     = verbose,
-        call        = match.call(),
-        env         = sys.call(-1)
+        data, analyse_biexponential, "biexponential",
+        mget(unlist(kinetics_dispatch[c("common", "biexponential")])),
+        enquo(nirs_channels), enquo(time_channel), verbose,
+        match.call(), sys.call(-1)
     ))
 }
 
@@ -621,21 +593,14 @@ analyse_kinetics.sigmoidal <- function(
     fix = NULL
 ) {
     ## TODO: pass additional stats::nls() args
-    ## resolve global verbose option when caller omits the argument
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    worker_args <- unlist(kinetics_dispatch[c("common", "sigmoidal")])
     return(analyse_kinetics_intervals(
-        data        = data,
-        worker      = analyse_logistic,
-        method      = "sigmoidal",
-        worker_args = mget(worker_args),
-        nirs_quo    = enquo(nirs_channels),
-        time_quo    = enquo(time_channel),
-        verbose     = verbose,
-        call        = match.call(),
-        env         = sys.call(-1)
+        data, analyse_logistic, "sigmoidal",
+        mget(unlist(kinetics_dispatch[c("common", "sigmoidal")])),
+        enquo(nirs_channels), enquo(time_channel), verbose,
+        match.call(), sys.call(-1)
     ))
 }
 

@@ -603,31 +603,20 @@ analyse_logistic <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = list(
-            shape = shape,
-            fix = fix,
-            start_time = start_time,
-            direction = direction,
-            end_window = end_window
-        ),
+        arg_list = mget(c(
+            "shape", "fix", "start_time", "direction", "end_window"
+        )),
         choices = list(
             shape = c("symmetric", "gompertz", "gompertz_left"),
             direction = c("auto", "positive", "negative")
         ),
+        fix_params = c("A", "B", "xmid", "slope"),
         verbose = verbose,
         env = env
     )
     nirs_channels <- setup$nirs_channels
     time_channel <- setup$time_channel
-
-    ## validate each channel's fixed parameters before any fitting.
-    ## `[` assignment keeps an unfixed channel's `fix` key present but
-    ## `NULL`, so every channel serialises the same `channel_args` columns
-    per_channel <- lapply(setup$per_channel, \(.a) {
-        f <- validate_fix(.a$fix, c("A", "B", "xmid", "slope"), env = env)
-        .a["fix"] <- list(if (length(f) > 0L) f else NULL)
-        .a
-    })
+    per_channel <- setup$per_channel
 
     ## NA scaffold (method columns only) for convergence failure
     na_coefs <- data.frame(
@@ -637,19 +626,6 @@ analyse_logistic <- function(
         slope = NA_real_,
         xmid_fitted = NA_real_
     )
-
-    ## construct warning messages for fit failure
-    fit_failed_warning <- function(.nirs, fn, e, verbose) {
-        if (!verbose) {
-            return(invisible(NULL))
-        }
-        cli_warn(c(
-            "x" = "{.fn {as.character(fn)}} fit failed for \\
-            {.field {(.nirs)}} in {.field {interval_name}}.",
-            "!" = "{conditionMessage(e)}"
-        ), call = warn_call(env))
-        return(invisible(NULL))
-    }
 
     ## method-specific fit: self-starting sigmoidal via nls
     logistic_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
@@ -665,7 +641,10 @@ analyse_logistic <- function(
         model <- tryCatch(
             nls(nls_formula, fit_data),
             error = \(e) {
-                fit_failed_warning(.nirs, ch_fn, e, verbose)
+                warn_fit_failed(
+                    ch_fn, e, .nirs, interval_name,
+                    verbose = verbose, env = env
+                )
                 NULL
             }
         )

@@ -50,17 +50,9 @@ resolve_channel_args <- function(
     units <- group_channels %||% setNames(as.list(nirs_channels), nirs_channels)
     valid_ch <- unique(c(nirs_channels, names(units)))
 
-    ## an argument is a per-channel map when it is a list with at least one
-    ## named element and at most one unnamed element (the fallback for
-    ## unlisted channels); anything else (unnamed vectors and fully
+    ## anything that is not a channel map (unnamed vectors and fully
     ## unnamed lists) is global
-    per_channel <- vapply(args, \(.a) {
-        if (!is.list(.a) || is.data.frame(.a)) {
-            return(FALSE)
-        }
-        named <- nzchar(names(.a))
-        any(named) && sum(!named) <= 1L
-    }, logical(1))
+    per_channel <- vapply(args, is_arg_map, logical(1))
 
     ## warn once per per-channel arg: unrecognised channel names are
     ## ignored; omitted channels with no unnamed fallback fall back to
@@ -68,26 +60,20 @@ resolve_channel_args <- function(
     if (verbose) {
         lapply(names(args)[per_channel], \(.nm) {
             keys <- names(args[[.nm]])
-            unknown <- setdiff(keys[nzchar(keys)], valid_ch)
-            if (length(unknown) > 0L) {
-                cli_warn(c(
-                    "!" = "{.arg {(.nm)}}: channel{?s} {.field {unknown}} \\
-                    not recognised.",
-                    "i" = "Per-channel named argument lists must match \\
-                    {.arg nirs_channels} exactly."
-                ), call = warn_call(env))
-            }
-            if (all(nzchar(keys))) {
-                omitted <- names(units)[!vapply(names(units), \(.key) {
+            ## a group is covered by its own key or any member-channel key
+            omitted <- if (all(nzchar(keys))) {
+                names(units)[!vapply(names(units), \(.key) {
                     any(c(.key, units[[.key]]) %in% keys)
                 }, logical(1))]
-                if (length(omitted) > 0L) {
-                    cli_warn(c(
-                        "i" = "{.arg {(.nm)}}: channel{?s} {.field {omitted}} \\
-                        not specified."
-                    ), call = warn_call(env))
-                }
             }
+            warn_map_keys(
+                .nm,
+                unknown = setdiff(keys[nzchar(keys)], valid_ch),
+                omitted = omitted,
+                what = "channel",
+                match_hint = "{.arg nirs_channels}",
+                env = env
+            )
         })
     }
 
@@ -132,6 +118,77 @@ resolve_channel_args <- function(
         })
     })
     return(out)
+}
+
+
+#' Classify a per-channel/per-interval argument map
+#'
+#' An argument is a map when it is a `list()` with at least one named
+#' element and at most one unnamed element (the fallback for unlisted
+#' keys). Shared by [resolve_channel_args()] and
+#' [resolve_interval_args()].
+#'
+#' @param x An argument value.
+#'
+#' @returns A logical scalar.
+#'
+#' @keywords internal
+is_arg_map <- function(x) {
+    if (!is.list(x) || is.data.frame(x)) {
+        return(FALSE)
+    }
+    named <- nzchar(names(x) %||% rep("", length(x)))
+    return(any(named) && sum(!named) <= 1L)
+}
+
+
+#' Warn about unmatched keys in an argument map
+#'
+#' Shared by [resolve_channel_args()] and [resolve_interval_args()]:
+#' unrecognised keys are warned about and ignored; omitted keys (only
+#' reported by callers when the map has no unnamed fallback) fall back
+#' to the argument's default.
+#'
+#' @param arg_nm Character; the argument name.
+#' @param unknown,omitted Character vectors (or `NULL`) of unrecognised
+#'   and unspecified keys.
+#' @param what Character; the key kind, `"channel"` or `"interval"`.
+#' @param match_hint Character; what valid keys must match, may contain
+#'   cli markup.
+#' @inheritParams validate_mnirs
+#'
+#' @returns `invisible(NULL)`, invoked for its warning side effects.
+#'
+#' @keywords internal
+warn_map_keys <- function(
+    arg_nm,
+    unknown,
+    omitted,
+    what,
+    match_hint,
+    env = rlang::caller_env()
+) {
+    if (length(unknown) > 0L) {
+        cli_warn(c(
+            "!" = paste0(
+                "{.arg {arg_nm}}: ", what,
+                "{?s} {.field {unknown}} not recognised."
+            ),
+            "i" = paste0(
+                "Per-", what, " named argument lists must match ",
+                match_hint, " exactly."
+            )
+        ), call = warn_call(env))
+    }
+    if (length(omitted) > 0L) {
+        cli_warn(c(
+            "i" = paste0(
+                "{.arg {arg_nm}}: ", what,
+                "{?s} {.field {omitted}} not specified."
+            )
+        ), call = warn_call(env))
+    }
+    return(invisible(NULL))
 }
 
 

@@ -290,31 +290,18 @@ analyse_monoexponential <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = list(
-            use_TD = use_TD,
-            fix = fix,
-            start_time = start_time,
-            direction = direction,
-            end_window = end_window
-        ),
+        arg_list = mget(c(
+            "use_TD", "fix", "start_time", "direction", "end_window"
+        )),
         choices = list(direction = c("auto", "positive", "negative")),
+        ## TD is only fixable where that channel fits the 4-parameter model
+        fix_params = \(.a) c("A", "B", "tau", if (.a$use_TD) "TD"),
         verbose = verbose,
         env = env
     )
     nirs_channels <- setup$nirs_channels
     time_channel <- setup$time_channel
-
-    ## validate each channel's fixed parameters against its own model:
-    ## TD is only fixable where that channel fits the 4-parameter model.
-    ## `[` assignment keeps an unfixed channel's `fix` key present but
-    ## `NULL`, so every channel serialises the same `channel_args` columns
-    per_channel <- lapply(setup$per_channel, \(.a) {
-        f <- validate_fix(
-            .a$fix, c("A", "B", "tau", if (.a$use_TD) "TD"), env = env
-        )
-        .a["fix"] <- list(if (length(f) > 0L) f else NULL)
-        .a
-    })
+    per_channel <- setup$per_channel
 
     ## NA scaffold (method columns only) for convergence failure
     na_coefs <- data.frame(
@@ -328,26 +315,6 @@ analyse_monoexponential <- function(
         MRT_fitted = NA_real_,
         HRT_fitted = NA_real_
     )
-
-    ## construct warning messages for fit failure
-    fit_failed_warning <- function(.nirs, n_params, e, retry, verbose) {
-        if (!verbose) {
-            return(invisible(NULL))
-        }
-        msg <- c(
-            "x" = "{n_params}-parameter {.fn SSmonoexponential} fit failed \\
-            for {.field {(.nirs)}} in {.field {interval_name}}.",
-            "!" = "{conditionMessage(e)}"
-        )
-        if (retry) {
-            msg <- c(
-                msg,
-                "i" = "Attempting 3-parameter {.fn SSmonoexponential} fit."
-            )
-        }
-        cli_warn(msg, call = warn_call(env))
-        return(invisible(NULL))
-    }
 
     ## method-specific fit: self-starting monoexponential via nls
     monoexponential_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
@@ -374,7 +341,10 @@ analyse_monoexponential <- function(
                 fit_data
             ),
             error = \(e) {
-                fit_failed_warning(.nirs, length(params), e, retry, verbose)
+                warn_fit_failed(
+                    quote(SSmonoexponential), e, .nirs, interval_name,
+                    length(params), retry, verbose, env
+                )
                 NULL
             }
         )
@@ -388,7 +358,10 @@ analyse_monoexponential <- function(
                     fit_data
                 ),
                 error = \(e) {
-                    fit_failed_warning(.nirs, length(params), e, FALSE, verbose)
+                    warn_fit_failed(
+                        quote(SSmonoexponential), e, .nirs, interval_name,
+                        length(params), FALSE, verbose, env
+                    )
                     NULL
                 }
             )

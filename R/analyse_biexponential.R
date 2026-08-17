@@ -541,19 +541,20 @@ analyse_biexponential <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = list(
-            use_TD = use_TD,
-            fix = fix,
-            start_time = start_time,
-            direction = direction,
-            end_window = end_window
-        ),
+        arg_list = mget(c(
+            "use_TD", "fix", "start_time", "direction", "end_window"
+        )),
         choices = list(direction = c("auto", "positive", "negative")),
+        ## TD is only fixable where that channel fits the 6-parameter model
+        fix_params = \(.a) {
+            c("A", "B1", "tau1", "B2", "tau2", if (.a$use_TD) "TD")
+        },
         verbose = verbose,
         env = env
     )
     nirs_channels <- setup$nirs_channels
     time_channel <- setup$time_channel
+    per_channel <- setup$per_channel
 
     ## a ratio of 1 or less admits tau2 == tau1, where the two components
     ## are indistinguishable and the design is singular
@@ -561,20 +562,6 @@ analyse_biexponential <- function(
         tau_ratio, 1, c(1, Inf),
         inclusive = "right", msg1 = "one-element", env = env
     )
-
-    ## validate each channel's fixed parameters against its own model:
-    ## TD is only fixable where that channel fits the 6-parameter model.
-    ## `[` assignment keeps an unfixed channel's `fix` key present but
-    ## `NULL`, so every channel serialises the same `channel_args` columns
-    per_channel <- lapply(setup$per_channel, \(.a) {
-        f <- validate_fix(
-            .a$fix,
-            c("A", "B1", "tau1", "B2", "tau2", if (.a$use_TD) "TD"),
-            env = env
-        )
-        .a["fix"] <- list(if (length(f) > 0L) f else NULL)
-        .a
-    })
 
     ## NA scaffold (method columns only) for convergence failure
     # fmt: skip
@@ -585,34 +572,6 @@ analyse_biexponential <- function(
             "excursion_time", "excursion_value"
         )
     ))
-
-    ## construct warning messages for fit failure or a fit accepted despite
-    ## non-convergence (a warning condition rather than an error)
-    fit_failed_warning <- function(.nirs, n_params, e, retry, verbose) {
-        if (!verbose) {
-            return(invisible(NULL))
-        }
-        msg <- if (inherits(e, "warning")) {
-            c(
-                "!" = "{n_params}-parameter {.fn biexponential} fit warning \\
-                for {.field {(.nirs)}} in {.field {interval_name}}:",
-                "i" = "{conditionMessage(e)}",
-                "i" = "Fit accepted. Consider a reduced \\
-                {.fn analyse_kinetics} method."
-            )
-        } else {
-            c(
-                "x" = "{n_params}-parameter {.fn biexponential} fit failed \\
-                for {.field {(.nirs)}} in {.field {interval_name}}:",
-                "!" = "{conditionMessage(e)}",
-                if (retry) {
-                    c("i" = "Attempting 5-parameter {.fn biexponential} fit.")
-                }
-            )
-        }
-        cli_warn(msg, call = warn_call(env))
-        return(invisible(NULL))
-    }
 
     ## method-specific fit: self-starting biexponential via nls
     biexp_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
@@ -638,12 +597,9 @@ analyse_biexponential <- function(
                 .a$fix,
                 tau_ratio,
                 \(e) {
-                    fit_failed_warning(
-                        .nirs,
-                        length(.params),
-                        e,
-                        .retry,
-                        verbose
+                    warn_fit_failed(
+                        quote(biexponential), e, .nirs, interval_name,
+                        length(.params), .retry, verbose, env
                     )
                 }
             )
