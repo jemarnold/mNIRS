@@ -351,7 +351,8 @@ recycle_to_length <- function(
     n,
     name = c("event", "group"),
     verbose = TRUE,
-    env = rlang::caller_env()
+    env = rlang::caller_env(),
+    arg = "values"
 ) {
     n_param <- length(param)
 
@@ -362,7 +363,7 @@ recycle_to_length <- function(
     if (n_param > n) {
         if (verbose) {
             cli_inform(c(
-                "!" = "{.arg {substitute(param)}} exceeds the number of \\
+                "!" = "{.arg {arg}} exceeds the number of \\
                 {name}s by {.val {n_param - n}}.",
                 "i" = "Extra values are ignored."
             ), call = env)
@@ -373,7 +374,7 @@ recycle_to_length <- function(
     ## n_param < n:  recycle last element forward
     if (verbose && n_param > 1L) {
         cli_inform(c(
-            "i" = "{.arg {substitute(param)}} recycled to meet \\
+            "i" = "{.arg {arg}} recycled to meet \\
             {.val {n - n_param}} unspecified {name}{qty(n - n_param)}{?s}."
         ), call = env)
     }
@@ -394,8 +395,10 @@ validate_interval_groups <- function(
     }
 
     spec <- group_intervals[[1L]][1L]
-    if (length(group_intervals) == 1L &&
-            isTRUE(spec %in% c("distinct", "ensemble"))) {
+    if (
+        length(group_intervals) == 1L &&
+            isTRUE(spec %in% c("distinct", "ensemble"))
+    ) {
         return(invisible())
     }
 
@@ -454,7 +457,8 @@ recycle_param <- function(
     n_events,
     group_intervals,
     verbose = TRUE,
-    env = rlang::caller_env()
+    env = rlang::caller_env(),
+    arg = "values"
 ) {
     ## flatten nested lists to single-depth list
     param <- if (is.list(param)) {
@@ -465,13 +469,13 @@ recycle_param <- function(
 
     ## standard recycling to events for "distinct" or "ensemble"
     if (!is.numeric(group_intervals[[1L]])) {
-        return(recycle_to_length(param, n_events, "event", verbose, env))
+        return(recycle_to_length(param, n_events, "event", verbose, env, arg))
     }
 
     ## custom grouping: recycle per group, then map to event order;
     ## ungrouped events take the last group's value
     n_groups <- length(group_intervals)
-    param <- recycle_to_length(param, n_groups, "group", verbose, env)
+    param <- recycle_to_length(param, n_groups, "group", verbose, env, arg)
     ids <- unlist(group_intervals, use.names = FALSE)
     keep <- ids <= n_events
     event_to_group <- rep(n_groups, n_events)

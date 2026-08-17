@@ -478,10 +478,15 @@ analyse_kinetics.response_time <- function(
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
     return(analyse_kinetics_intervals(
-        data, analyse_response_time, "response_time",
+        data,
+        analyse_response_time,
+        "response_time",
         mget(unlist(kinetics_dispatch[c("common", "response_time")])),
-        enquo(nirs_channels), enquo(time_channel), verbose,
-        match.call(), sys.call(-1)
+        enquo(nirs_channels),
+        enquo(time_channel),
+        verbose,
+        match.call(),
+        sys.call(-1)
     ))
 }
 
@@ -509,10 +514,15 @@ analyse_kinetics.peak_slope <- function(
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
     return(analyse_kinetics_intervals(
-        data, analyse_peak_slope, "peak_slope",
+        data,
+        analyse_peak_slope,
+        "peak_slope",
         mget(unlist(kinetics_dispatch[c("common", "peak_slope")])),
-        enquo(nirs_channels), enquo(time_channel), verbose,
-        match.call(), sys.call(-1)
+        enquo(nirs_channels),
+        enquo(time_channel),
+        verbose,
+        match.call(),
+        sys.call(-1)
     ))
 }
 
@@ -538,10 +548,15 @@ analyse_kinetics.monoexponential <- function(
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
     return(analyse_kinetics_intervals(
-        data, analyse_monoexponential, "monoexponential",
+        data,
+        analyse_monoexponential,
+        "monoexponential",
         mget(unlist(kinetics_dispatch[c("common", "monoexponential")])),
-        enquo(nirs_channels), enquo(time_channel), verbose,
-        match.call(), sys.call(-1)
+        enquo(nirs_channels),
+        enquo(time_channel),
+        verbose,
+        match.call(),
+        sys.call(-1)
     ))
 }
 
@@ -568,10 +583,15 @@ analyse_kinetics.biexponential <- function(
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
     return(analyse_kinetics_intervals(
-        data, analyse_biexponential, "biexponential",
+        data,
+        analyse_biexponential,
+        "biexponential",
         mget(unlist(kinetics_dispatch[c("common", "biexponential")])),
-        enquo(nirs_channels), enquo(time_channel), verbose,
-        match.call(), sys.call(-1)
+        enquo(nirs_channels),
+        enquo(time_channel),
+        verbose,
+        match.call(),
+        sys.call(-1)
     ))
 }
 
@@ -597,10 +617,15 @@ analyse_kinetics.sigmoidal <- function(
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
     return(analyse_kinetics_intervals(
-        data, analyse_logistic, "sigmoidal",
+        data,
+        analyse_logistic,
+        "sigmoidal",
         mget(unlist(kinetics_dispatch[c("common", "sigmoidal")])),
-        enquo(nirs_channels), enquo(time_channel), verbose,
-        match.call(), sys.call(-1)
+        enquo(nirs_channels),
+        enquo(time_channel),
+        verbose,
+        match.call(),
+        sys.call(-1)
     ))
 }
 
@@ -612,7 +637,10 @@ analyze_kinetics <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     method = c(
-        "response_time", "peak_slope", "monoexponential", "biexponential",
+        "response_time",
+        "peak_slope",
+        "monoexponential",
+        "biexponential",
         "sigmoidal"
     ),
     start_time = NULL,

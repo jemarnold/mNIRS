@@ -330,9 +330,12 @@ extract_intervals <- function(
         group_channels,
         n_events,
         group_intervals,
-        verbose
+        verbose,
+        arg = "group_channels"
     )
-    span <- recycle_param(span, n_events, group_intervals, verbose)
+    span <- recycle_param(
+        span, n_events, group_intervals, verbose, arg = "span"
+    )
 
     ## apply span and build interval spec ======================
     interval_spec <- apply_span(interval_list, t_vec, span, verbose)
