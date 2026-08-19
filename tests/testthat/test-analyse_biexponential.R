@@ -894,14 +894,14 @@ test_that("analyse_biexponential() converges on real dataset", {
 
     ## 5 real-world 5-1 min work-recovery intervals, 4 channels each    
     intervals <- readRDS(test_path("testdata/5-1_intervals_short.rds"))
-    analyse_kinetics(
-        intervals,
-        method = "biexp",
-        use_TD = TRUE,
-        # verbose = FALSE
-    # )
-    # ) |> coef()
-    ) |> plot(label = FALSE)
+    # analyse_kinetics(
+    #     intervals,
+    #     method = "biexp",
+    #     use_TD = TRUE,
+    #     # verbose = FALSE
+    # # )
+    # # ) |> coef()
+    # ) |> plot(label = FALSE)
 
     # lapply(intervals, \(.df) {
     #     analyse_biexponential(

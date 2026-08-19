@@ -84,14 +84,12 @@
 biexponential <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
     if (is.null(TD)) {
         ## 5-parameter: no time delay
-        y <- A +
-            (B1 - A) * (1 - exp(-t / tau1)) +
+        y <- A + (B1 - A) * (1 - exp(-t / tau1)) +
             (B2 - B1) * (1 - exp(-t / tau2))
     } else {
         ## 6-parameter: with time delay
         ts <- pmax(t - TD, 0)
-        y <- A +
-            (B1 - A) * (1 - exp(-ts / tau1)) +
+        y <- A + (B1 - A) * (1 - exp(-ts / tau1)) +
             (B2 - B1) * (1 - exp(-ts / tau2))
     }
     return(y)
@@ -183,7 +181,9 @@ biexp_init <- function(mCall, data, LHS, ...) {
     ## profile the amplitudes out of a grid of time constants
     grid <- biexp_grid_start(x, t, TD = TD_init)
     if (is.null(grid)) {
-        stop("No starting estimates could be resolved from the response.")
+        cli_abort(c(
+            "x" = "No starting estimates could be resolved from the response."
+        ))
     }
 
     ## user-fixed values take precedence over the grid optimum. the grid is
@@ -567,10 +567,8 @@ analyse_biexponential <- function(
     # fmt: skip
     na_coefs <- as.data.frame(setNames(
         rep(list(NA_real_), 8L),
-        c(
-            "A", "B1", "tau1", "B2", "tau2", "TD",
-            "excursion_time", "excursion_value"
-        )
+        c("A", "B1", "tau1", "B2", "tau2", "TD",
+        "excursion_time", "excursion_value")
     ))
 
     ## method-specific fit: self-starting biexponential via nls

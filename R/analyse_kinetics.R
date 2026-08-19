@@ -1,10 +1,8 @@
 #' Analyse kinetics across mNIRS channels and intervals
 #'
 #' @description
-#' Model NIRS kinetics responses for each `nirs_channel` within an *"mnirs"*
-#' data frame, a list of data frames, or a grouped data frame.
-#'
-#' Note the `method`-specific arguments below.
+#' Model oxygenation kinetics (response time course) with various parametric
+#' and non-parametric methods.
 #'
 #' @param data A data frame, a list of data frames, or a grouped data frame of
 #'   class *"mnirs"* containing time series data and metadata (see *Details*).
@@ -13,7 +11,7 @@
 #'   \describe{
 #'      \item{`"response_time"`}{Fractional (e.g. 50%, 63.2%, 90%) response
 #'      time. Additional arguments: `fraction`. See [response_time()].}
-#'      \item{`"peak_slope"`}{Peak local linear regression slope. Additional
+#'      \item{`"peak_slope"`}{Peak rolling linear regression slope. Additional
 #'      arguments: `width` or `span`, `align`, `partial`, `na.rm`. See
 #'      [peak_slope()].}
 #'      \item{`"monoexponential"`}{Monoexponential curve fit via
@@ -29,9 +27,10 @@
 #'   (*default*), retrieves `interval_times` from *"mnirs"* metadata, or falls
 #'   back to `0` or the first positive time value (see *Details*).
 #' @param end_window A numeric value in units of `time_channel` specifying the
-#'   window in which to look for the end of the kinetics fit.
-#'   `end_window = Inf` (*default*) returns the global extreme from the full
-#'   sample range (see *Details*).
+#'   window in which to look for the end of the kinetics fit; returns the 
+#'   window with no greater/lesser values within `end_window` after the first
+#'   extreme value. `end_window = Inf` (*default*) returns the global extreme
+#'   from the full sample range (see *Details*).
 #' @param ... Additional arguments passed to the underlying method function.
 #'   See *Details*.
 #' @param fraction **response_time**: A numeric value in the range
@@ -39,28 +38,29 @@
 #'   Defaults to `0.5` (50% response, i.e. half-response time).
 #' @param width **peak_slope**: An integer defining the local window in
 #'   number of samples around `idx` in which to perform the operation,
-#'   according to `align`.
+#'   according to `align`. Only one of either `width` or `span` must be defined.
 #' @param span **peak_slope**: A numeric value defining the local window
 #'   time span around `idx` in which to perform the operation, according
-#'   to `align`. In units of `time_channel`.
+#'   to `align`. In units of `time_channel`. Only one of either `width` or
+#'   `span` must be defined.
 #' @param align **peak_slope**: Window alignment as *"centre"/"center"*
 #'   (the *default*), *"left"*, or *"right"*. Where *"left"* is forward
 #'   looking, and *"right"* is backward looking from the current
-#'   sample.
+#'   sample by the `width` or `span`.
 #' @param partial **peak_slope**: Logical; default is `FALSE`, requires
 #'   local windows to have complete number of samples specified by
 #'   `width` or `span`. If `TRUE`, processes available samples within the
 #'   local window. See *Details*.
 #' @param na.rm **peak_slope**: Logical; default is `FALSE`, propagates
-#'   any `NA`s to the returned vector. If `TRUE`, ignores `NA`s and
-#'   processes available valid samples within the local window. May
-#'   return errors or warnings. (see *Details*).
+#'   any `NA`s to the returned vector and may return errors or warnings.
+#'   If `TRUE`, ignores `NA`s and processes available valid samples within
+#'   the local window. (see *Details*).
 #' @param use_TD **monoexponential, biexponential**: Logical; default is
-#'   `TRUE` to attempt to fit a model with a time-delay parameter `TD`. For
-#'   **monoexponential** this is the 4-parameter [SSmonoexponential()] model
-#'   (A, B, tau, TD); for **biexponential** the 6-parameter
-#'   [biexponential()] model (A, B1, tau1, B2, tau2, TD). If the fit fails,
-#'   or if `use_TD = FALSE`, attempts the reduced model without `TD`.
+#'   `TRUE`, attempts to fit the model with a "time-delay" parameter `TD` 
+#'   before the response onset. i.e., a 4-parameter [SSmonoexponential()] model
+#'   (A, B, tau, TD); or a 6-parameter [biexponential()] model (A, B1, tau1,
+#'   B2, tau2, TD). If `use_TD = FALSE` or the fit fails (with a warning),
+#'   attempts to fall back to a reduced model without `TD`.
 #' @param shape **sigmoidal**: Character; the 4-parameter sigmoidal shape
 #'   to fit. One of `"symmetric"` (*default*; calls [SSlogistic()]),
 #'   `"gompertz"` (early-inflection; calls [SSgompertz()]), or
@@ -69,17 +69,11 @@
 #'   named list of model parameters to hold constant during fitting, e.g.
 #'   `fix = list(A = 0)` fixes the starting amplitude at `0`. Fixed
 #'   parameters are excluded from estimation and reported at their fixed
-#'   values. Applied to every channel, or per-channel as a list of lists
-#'   keyed by channel name, e.g. `fix = list(smo2 = list(A = 0))`. See
-#'   *Details*.
+#'   values. Specify per-channel as a list of lists keyed by channel name, e.g.
+#'   `fix = list(smo2 = list(A = 0))`. See *Details*.
 #' @param tau_ratio **biexponential**: A numeric lower bound on the ratio of
-#'   the slow to the fast time constant, `tau2 / tau1`; default is `2.5`. As
-#'   `tau2` approaches `tau1` the two components become indistinguishable and
-#'   the fit is singular, so the ratio is bounded away from that limit. The
-#'   ratio is often only weakly identified and settles on this bound, in which
-#'   case it sets the separation of the fast and slow components; lower values
-#'   admit more similar time constants and larger, more strongly cancelling
-#'   amplitudes.
+#'   the slow to the fast time constant (`tau2 / tau1`) to avoid convergence
+#'   issues on indistinguishable values; default is `2.5`. See *Details*.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
 #'
@@ -102,20 +96,21 @@
 #' `start_time` should be specified as the time point separating the
 #' pre-response baseline (`time_channel <= start_time`) from the start of the
 #' response fit window (`time_channel > start_time`). For intervals extracted
-#' with [extract_intervals()], `start_time` will retrieve `interval_times`
-#' from *"mnirs"* metadata. Otherwise `start_time` defaults to `0` or the
-#' first positive time value.
+#' with [extract_intervals()], `start_time` will be retrieved from *"mnirs"*
+#' metadata. Otherwise `start_time` defaults to `0` or the first positive
+#' `time_channel` value.
+#' 
+#' All methods are fitted on time *elapsed from* `start_time`, so the
+#' returned time coefficients are relative to response onset (e.g. `t = 0`).
 #'
 #' For *"response_time"*, the baseline window before `start_time` defines the
 #' mean starting amplitude `A` directly and anchors the start of the
 #' `response_time` parameter. For *"peak_slope"*, `start_time` anchors the
-#' start of the `peak_slope_time` parameter. For *"monoexponential"*
-#' and *"sigmoidal"*, the baseline window before `start_time` anchors the
-#' starting fitted amplitude `A` and the start of the `TD` and `MRT`, or
-#' `xmid` parameters. (see respective *method* sections below).
-#'
-#' All methods are fitted on time *elapsed from* `start_time`, so the
-#' returned time coefficients are relative to response onset (e.g. `t = 0`).
+#' start of the `peak_slope_time` parameter. For *"monoexponential"*, 
+#' *"biexponential"*, and *"sigmoidal"*, the baseline window before
+#' `start_time` anchors the starting fitted amplitude `A` and the start of the
+#' `TD` and `MRT`, or `xmid` parameters. (see respective *method* sections
+#' below).
 #'
 #' The time-delay models (*"monoexponential"* and *"biexponential"* with
 #' `use_TD = TRUE`) are flat at `A` before `TD`, so the pre-onset baseline is
@@ -140,9 +135,9 @@
 #'
 #' ## Per-channel arguments
 #'
-#' Arguments apply globally to all `nirs_channels` by default. Relevant
-#' arguments can instead be supplied uniquely per-channel as a named `list()`,
-#' with names matching `nirs_channels`, e.g.:
+#' Arguments apply globally to all `nirs_channels` by default. Arguments can
+#' instead be uniquely supplied per-channel as a named `list()` with names
+#' matching `nirs_channels`, e.g.:
 #'
 #' ```r
 #' analyse_kinetics(
@@ -156,23 +151,18 @@
 #'
 #' - A non-list value applies to every channel (the *default* behaviour).
 #' - A `list()` named by `nirs_channels` applies per-channel values.
-#' - A single unnamed value in the list will be applied to unlisted channels
+#' - A single unnamed value in the list will be applied to any unlisted channels
 #'   (e.g. `span = list(10, smo2_right = 20)` gives `smo2_right` 20 and every
 #'   other channel 10). If no unnamed fallback value in the list, channels not
 #'   named in the list fall back to the argument's default.
 #' - `list()` names not matching `nirs_channels` are warned about and
 #'   ignored.
 #'
-#' `start_time`, `direction`, and `end_window` are per-channel capable for
-#' every `method`, along with the `method`-specific arguments `fraction`
-#' (*response_time*); `width`, `span`, `align`, `partial`, and `na.rm`
-#' (*peak_slope*); `use_TD` (*monoexponential*, *biexponential*); `shape`
-#' (*sigmoidal*); and `fix` (*monoexponential*, *biexponential*,
-#' *sigmoidal*).
-#'
-#' `fix` is itself a named `list()` of model parameters, so a per-channel
-#' `fix` is supplied as a `list()` of `list()`s keyed by channel name. A plain
-#' parameter list applies to every channel:
+#' `start_time`, `direction`, and `end_window` are per-channel capable, along
+#' with the `method`-specific arguments. `fix` is itself a named `list()` of
+#' model parameters, so a per-channel `fix` is supplied as a `list()` of
+#' `list()`s keyed by channel name. A plain parameter list applies to every
+#' channel:
 #'
 #' ```r
 #' ## fix `A` at 0 for every channel
@@ -201,8 +191,6 @@
 #' )
 #' ```
 #'
-#' - Channel names take precedence: a `list()` name matching
-#'   `nirs_channels` is always read as a per-channel key.
 #' - A resolved per-interval value may itself be a per-channel `list()`,
 #'   as `direction` above.
 #' - A single unnamed value in the list is the fallback for unlisted
@@ -213,9 +201,15 @@
 #' - A per-interval `fix` is a `list()` of parameter lists keyed by
 #'   interval name, e.g. `fix = list(interval_1 = list(A = 0))`; each
 #'   element may itself be a per-channel map, e.g.
-#'   `fix = list(interval_1 = list(smo2 = list(A = 0)))`.
+#'   `fix = list(interval_1 = list(smo2 = list(A = 0)))`. Triple nested
+#'   `list()`s is janky, but it works for now.
 #'
-#' `method` and `tau_ratio` are always applied globally.
+#' `tau_ratio` for *"biexponential"* is always applied globally.
+#' 
+#' `method` currently only accepts a single value applied globally to all
+#' intervals and `nirs_channels`. This is a current limitation (as of `0.7.1`)
+#' and will be improved in future updates to allow more flexible kinetics
+#' fitting.
 #'
 #' ## method = "response_time"
 #'
@@ -226,9 +220,12 @@
 #' assuming a specific mathematical shape) to estimate the response time at
 #' which a signal reaches a specified fraction of its total response amplitude
 #' relative to the baseline. e.g. *half-response time* (`fraction = 0.5`) is
-#' the time from response onset to attain 50% of the total amplitude change.
-#' `fraction = 0.632` approximates the time constant (`tau`; \eqn{\tau})
-#' parameter from a monoexponential function.
+#' the time from response onset to attain 50% of the total amplitude change
+#' and approximates the inflection point (`xmid` of a symmetrical sigmoid
+#' function). `fraction = 0.632` approximates the time constant (`tau`; 
+#' \eqn{\tau}) parameter from a monoexponential function, or the inflection
+#' point (`xmid`) of an asymmetrical left-Gompertz function. `fraction = 0.368`
+#' approximates `xmid` of a right-Gompertz function.
 #'
 #' The target response value is: `fitted = A + (B - A) * fraction`
 #'
@@ -296,18 +293,26 @@
 #'
 #' `A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))`
 #'
-#' `A` is the starting value; `B1`/`tau1` the fast asymptote and time
-#' constant; `B2`/`tau2` the slow asymptote and time constant (typically
-#' `tau2 >> tau1`). All three of `A`, `B1`, `B2` are values on the response
+#' `A` is the starting value. `B1` & `tau1` are the asymptote and time
+#' constant of the fast excursion. `B2` & `tau2` are the asymptote and time
+#' constant of the slower respone plateau as time approaches `Inf` (typically
+#' `tau2 >> tau1`). All three of `A`, `B1`, and `B2` are values on the response
 #' scale, consistent with the [monoexponential()] and sigmoidal asymptotes.
-#' `B1` is the asymptotic target of the fast excursion, `B2` is the final
-#' response *plateau* as `t` approaches infinity. The exact turning point
-#' between the fast and slow responses is reported as `excursion_value`. Set
-#' `use_TD = TRUE` (*default*) to add an optional time-delay parameter `TD`.
-#' See [biexponential()] for the model family and [SSbiexponential()] for
-#' self-start initialisation.
+#' The turning point where the slower responses becomes dominant over the fast 
+#' excursion is reported as `excursion_value`. Set `use_TD = TRUE` (*default*)
+#' to specify the time-delay parameter `TD`. See [biexponential()] for the
+#' model family and [SSbiexponential()] for self-start initialisation.
+#' 
+#' `tau_ratio` defines a numeric lower bound on the ratio of the slow to the
+#' fast time constant (*default* is `2.5`). As `tau2` approaches `tau1` the two
+#' components become indistinguishable and fit convergence can fail, so the
+#' ratio is bounded away from that limit. Lower values allow closer time
+#' constants and larger, more strongly cancelling amplitudes. Model fit is
+#' often only weakly identified and settles on this bound, in which case the
+#' weak fit may be returned with a warning.
 #'
-#' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`.
+#' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`, as
+#' above.
 #'
 #' ## method = "sigmoidal"
 #'
@@ -322,24 +327,26 @@
 #'   `A + (B - A) / (1 + exp(-4 * slope * (t - xmid) / (B - A)))`
 #' - `shape = "gompertz"` ([SSgompertz()]):
 #'   `A + (B - A) * exp(-exp(-k * (t - xmid)))` with `k = slope * e / (B - A)`.
-#'   Early-acceleration; inflection height fixed at `A + (B - A) / e`.
+#'   Early-acceleration; inflection height fixed at `A + (B - A) / e`; 36.8%
+#'   of the amplitude.
 #' - `shape = "gompertz_left"` ([SSgompertz_left()]):
 #'   `A + (B - A) * (1 - exp(-exp(k * (t - xmid))))` with
 #'   `k = slope * e / (B - A)`. Late-acceleration; inflection height fixed at
-#'   `A + (B - A) * (1 - 1/e)`.
+#'   `A + (B - A) * (1 - 1/e)`; 63.2% of the amplitude.
 #'
 #' `xmid` is the time from `start_time` to the *inflection point*; the steepest
-#' moment of the response. `slope` is the response rate `dx/dt` at the
+#' point of the response. `slope` is the response rate `dx/dt` at the
 #' inflection.
 #'
 #' A *"symmetric"* shape is the default for an unbiased fit when no
-#' obvious asymmetry is expected. *"gompertz"* growth is appropriate
-#' for fast-onset, slow-tail responses. *"gompertz_left"* for slow-onset,
-#' fast-tail responses. See [logistic()], [gompertz()], and [gompertz_left()]
-#' for the model families and [SSlogistic()], [SSgompertz()], and
-#' [SSgompertz_left()] for self-start initialisations.
+#' obvious asymmetry is expected. *"gompertz"* (right-inflection) growth is
+#' appropriate for fast-onset, slow-tail responses. *"gompertz_left"* for
+#' slow-onset, fast-tail responses. See [logistic()], [gompertz()], and
+#' [gompertz_left()] for the model families and [SSlogistic()], [SSgompertz()],
+#' and [SSgompertz_left()] for self-start initialisations.
 #'
-#' Parameters may be held constant with `fix`, e.g. `fix = list(A = 0)`.
+#' Parameters may be held constant with `fix`, e.g. `fix = list(A = 0)`, as
+#' above.
 #'
 #' @returns A formatted table of results, with individual elements accessible
 #'   as a structured list of class *"mnirs_kinetics"* containing:
