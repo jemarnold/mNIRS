@@ -37,9 +37,9 @@ rise in either direction, so identifiability rests on the time constants
 alone.
 
 The 6-parameter model is piecewise-flat in \code{TD}, so port may reach the
-optimum yet report false or singular convergence; such solutions are
-accepted when their coefficients are finite and their RSS does not exceed
-the deterministic grid seed.
+optimum yet report non-convergence; such solutions are accepted when
+their coefficients are finite and their RSS does not exceed the
+deterministic grid seed.
 
 A user-fixed \code{tau1} or \code{tau2} is substituted into the re-parameterised
 formula rather than estimated: fixing \code{tau1} drops \code{lt1} and leaves \code{lr}

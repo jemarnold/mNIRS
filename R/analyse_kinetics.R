@@ -451,6 +451,7 @@ analyse_kinetics <- function(
     na.rm = FALSE,
     use_TD = TRUE,
     shape = c("symmetric", "gompertz", "gompertz_left"),
+    tau_ratio = 2.5,
     fix = NULL
 ) {
     ## normalise method aliases before matching

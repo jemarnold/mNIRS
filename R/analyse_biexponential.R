@@ -10,7 +10,8 @@
 #' @param B1 A numeric parameter for the asymptote of the *fast* component;
 #'   the value the initial excursion heads toward at the turning point.
 #' @param tau1 A numeric parameter for the *fast* time constant (\eqn{\tau_1}),
-#'   in units of the predictor variable `t`. Dominates the initial steep fall.
+#'   in units of the predictor variable `t`. Dominates the initial steep
+#'   excursion.
 #' @param B2 A numeric parameter for the asymptote of the *slow* component;
 #'   the stable plateau the response recovers toward as `t` approaches
 #'   infinity.
@@ -36,22 +37,19 @@
 #' Clamping the shifted time at zero holds the curve at the baseline `A` until
 #' the onset of the response at `t = TD`.
 #'
-#' All three of `A`, `B1`, and `B2` are values on the response scale,
-#' consistent with the asymptote parameters of [monoexponential()] and the
-#' sigmoidal models. The fast component `B1`/`tau1` drives the steep initial
-#' response from `A` toward `B1`; the slow component `B2`/`tau2` pulls the
-#' curve on toward the plateau `B2` once the fast term saturates. An excursion
-#' response places `B1` beyond both `A` and `B2` (below for a fall-recover
-#' response, above for a rise-overshoot); the turning point is a minimum or a
-#' maximum accordingly. `B1` is the target of the fast component, *near* but
-#' not exactly the fitted turning value, because the slow component already
-#' moves during the fast phase; the exact turning point is reported by
-#' [analyse_kinetics()] as `excursion_value`. When `B1` lies between `A` and
-#' `B2` the curve is a monotone two-phase response, and when `B1 = B2` the
-#' slow term vanishes and the model reduces to the exact [monoexponential()]
-#' with asymptote `B2`.
+#' `A`, `B1`, and `B2` are all values on the response scale, consistent with
+#' the asymptote parameters of [monoexponential()] and the sigmoidal models.
+#' The fast component `B1`/`tau1` drives the steep initial response away from
+#' `A`; the slow component `B2`/`tau2` then carries the curve toward the
+#' plateau `B2`, the response value as `t` approaches infinity.
 #'
-#' The response value as `t` approaches infinity is the plateau, `B2`.
+#' An excursion response places `B1` beyond both `A` and `B2` (below for a
+#' fall-recover response, above for a rise-overshoot), so the turning point is
+#' a minimum or a maximum accordingly. `B1` is the target of the fast component
+#' and lies *near* but not exactly at the turning value; the exact turning
+#' point is reported by [analyse_kinetics()] as `excursion_value`. A `B1`
+#' between `A` and `B2` gives a monotone two-phase response, and `B1 = B2`
+#' reduces the model to a [monoexponential()] with asymptote `B2`.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -155,10 +153,8 @@ biexp_init <- function(mCall, data, LHS, ...) {
     }
     TD_init <- grid$TD
 
-    ## user-fixed values take precedence over the grid optimum. the grid is
-    ## confined to tau2 >= 2.5 * tau1, so lr starts at or above log(2.5); the
-    ## nudge keeps it strictly inside that bound for callers fitting with
-    ## algorithm = "port", which errors on a start sitting on a boundary
+    ## user-fixed values take precedence over the grid optimum. the ratio
+    ## starts strictly inside the tau2 / tau1 >= 2.5 bound of the grid
     start <- c(
         A = fixed$A %||% grid$A,
         B1 = fixed$B1 %||% grid$B1,
@@ -205,7 +201,7 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #'   time constants as `tau1 = exp(lt1)` and `tau2 = exp(lt1 + lr)`.
 #'
 #' [analyse_kinetics()] fits this model with `algorithm = "port"` and box
-#'   bounds.
+#'   bounds, including a lower bound on `lr` set by its `tau_ratio` argument.
 #'
 #' ## Fixing parameters
 #'
@@ -276,25 +272,21 @@ SSbiexponential <- selfStart(
 #' re-parameterised as `lt1 = log(tau1)` and `lr = log(tau2 / tau1)`.
 #'
 #' @details
-#' Convergence rests on `algorithm = "port"` with box bounds: the log-ratio
-#' scale expresses the `tau2 / tau1 >= tau_ratio` constraint as a simple box
-#' bound on `lr`, keeping the fit away from the degenerate `tau2 = tau1`
-#' limit where the design matrix is singular. Unbounded fits converge poorly
-#' on real NIRS data regardless of scale.
+#' The fit uses [stats::nls()] with `algorithm = "port"` and box bounds. On
+#' the log-ratio scale the `tau2 / tau1 >= tau_ratio` separation of the two
+#' components is a simple lower bound on `lr`, which holds the fit away from
+#' the degenerate `tau2 = tau1` limit. The asymptotes `A`, `B1`, and `B2` are
+#' unbounded, so identifiability rests on the time constants alone.
 #'
-#' The asymptotes `B1` and `B2` are unbounded: NIRS responses may fall or
-#' rise in either direction, so identifiability rests on the time constants
-#' alone.
-#'
-#' The 6-parameter model is piecewise-flat in `TD`, so port may reach the
-#' optimum yet report non-convergence; such solutions are accepted when
-#' their coefficients are finite and their RSS does not exceed the
-#' deterministic grid seed.
+#' A non-converged fit is accepted with a warning when its coefficients are
+#' finite and its residual sum of squares is no worse than the grid starting
+#' estimates from [biexp_grid_start()]; otherwise it is rejected and `NULL`
+#' is returned.
 #'
 #' A user-fixed `tau1` or `tau2` is substituted into the re-parameterised
 #' formula rather than estimated: fixing `tau1` drops `lt1` and leaves `lr`
 #' free about the fixed value; fixing `tau2` drops `lr` and caps `lt1` at
-#' `log(tau2 / tau_ratio)`, which enforces the ratio bound from the other side.
+#' `log(tau2 / tau_ratio)`, enforcing the ratio bound from the other side.
 #'
 #' @param x,t Numeric vectors of the response and predictor variables.
 #' @param params Character vector of parameter names in model order.
@@ -316,9 +308,7 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         NULL
     }
 
-    ## an under-determined fit is rejected before it reaches nls: the port
-    ## algorithm can iterate indefinitely on such a problem rather than
-    ## returning an error
+    ## reject an under-determined fit before it reaches nls
     n_free <- length(setdiff(params, names(fix)))
     if (length(x) <= n_free) {
         return(fail(simpleError(sprintf(
@@ -341,15 +331,13 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
     }
     TD_seed <- seed$TD
 
-    ## a fixed tau2 caps tau1 from above, so the seed is pulled inside that
-    ## cap before it is logged
+    ## a fixed tau2 caps tau1 from above; the seed is pulled inside that cap
     tau1_cap <- (fix$tau2 %||% Inf) / tau_ratio
     tau1_seed <- fix$tau1 %||% min(seed$tau1, tau1_cap / 1.01)
     tau2_seed <- fix$tau2 %||% seed$tau2
 
     ## start, lower, upper per parameter, in model order. the ratio starts
-    ## strictly inside its bound; port fails on a start value sitting exactly
-    ## on a boundary
+    ## strictly inside its lower bound
     bounds <- list(
         A = c(seed$A, -Inf, Inf),
         B1 = c(seed$B1, -Inf, Inf),
@@ -365,7 +353,7 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
 
     ## translate natural-scale params and fix to the SS log-ratio scale: a
     ## fixed tau1 becomes a constant lt1; a fixed tau2 becomes an lr
-    ## expression in lt1, which build_ss_formula() substitutes verbatim
+    ## expression in lt1
     params_ss <- unname(c(
         A = "A",
         B1 = "B1",
@@ -385,8 +373,8 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         )
     }
 
-    ## free parameters in formula order; port matches unnamed bounds
-    ## positionally, so start/lower/upper stay aligned with the formula
+    ## free parameters in formula order, keeping start/lower/upper aligned
+    ## with the positional bounds expected by port
     free <- setdiff(params_ss, names(fix_ss))
     start <- vapply(bounds[free], `[[`, numeric(1), 1L)
     lower <- vapply(bounds[free], `[[`, numeric(1), 2L)
@@ -405,13 +393,9 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         error = fail
     )
 
-    ## the TD clamp is non-smooth in TD, so port can land on the optimum yet
-    ## fail its gradient certificate ("false"/"singular" convergence) or run
-    ## out of budget. any of the four port stop codes is kept when
-    ## demonstrably good: finite coefficients with an RSS no worse than the
-    ## deterministic grid seed. all other convergence failures are rejected.
-    ## either way the port stop code is reported in prose through on_error:
-    ## a warning for a kept fit, an error otherwise
+    ## a non-converged fit is kept when demonstrably good: finite coefficients
+    ## and an RSS no worse than the grid seed. the port stop code is reported
+    ## in prose either way, as a warning for a kept fit or an error otherwise
     if (!is.null(model) && !model$convInfo$isConv) {
         port_msg <- c(
             "7" = "Singular convergence: parameters not individually identifiable.",
@@ -425,7 +409,8 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         } else {
             model$convInfo$stopMessage
         }
-        acceptable <- code %in% names(port_msg) &&
+        acceptable <- code %in%
+            names(port_msg) &&
             all(is.finite(stats::coef(model))) &&
             stats::deviance(model) <= seed$rss
         if (acceptable) {
@@ -447,9 +432,9 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
 #' data frame. See [analyse_kinetics()] for user-facing documentation.
 #'
 #' @param use_TD Logical; `TRUE` attempts to fit a 6-parameter
-#'   [biexponential()] model (A, B1, tau1, B2, tau2, TD) with a time delay.
+#'   [SSbiexponential()] model (A, B1, tau1, B2, tau2, TD) with a time delay.
 #'   If the 6-parameter fit fails, or if `use_TD = FALSE`, attempts to fit a
-#'   reduced 5-parameter [biexponential()] model (A, B1, tau1, B2, tau2).
+#'   reduced 5-parameter [SSbiexponential()] model (A, B1, tau1, B2, tau2).
 #'   The user-facing default (`TRUE`) is set by [analyse_kinetics()].
 #' @param fix An *optional* named list of model parameters (`A`, `B1`, `tau1`,
 #'   `B2`, `tau2`, `TD`) to hold constant during fitting, e.g.
@@ -460,12 +445,11 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
 #'   `use_TD = TRUE`; a fixed `TD` disables the 5-parameter fallback.
 #' @param tau_ratio A numeric lower bound on the ratio of the slow to the fast
 #'   time constant, `tau2 / tau1`; default is `2.5`. As `tau2` approaches
-#'   `tau1` the two components become indistinguishable and the fit is
-#'   singular, so the ratio is bounded away from that limit. The ratio is
-#'   often only weakly identified and settles on this bound, in which case it
-#'   sets the separation of the fast and slow components; lower values admit
-#'   more similar time constants and larger, more strongly cancelling
-#'   amplitudes.
+#'   `tau1` the two components become indistinguishable and fit convergence can
+#'   fail, so the ratio is bounded away from that limit. Lower values allow
+#'   closer time constants and larger, more strongly cancelling amplitudes.
+#'   Model fit is often only weakly identified and settles on this bound, in
+#'   which case the weak fit may be returned with a warning.
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
 #'
@@ -489,7 +473,7 @@ analyse_biexponential <- function(
     data,
     nirs_channels = NULL,
     time_channel = NULL,
-    use_TD = FALSE,
+    use_TD = TRUE,
     fix = NULL,
     tau_ratio = 2.5,
     start_time = NULL,
@@ -510,9 +494,9 @@ analyse_biexponential <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = mget(c(
-            "use_TD", "fix", "start_time", "direction", "end_window"
-        )),
+        arg_list = mget(
+            c("use_TD", "fix", "start_time", "direction", "end_window")
+        ),
         choices = list(direction = c("auto", "positive", "negative")),
         ## TD is only fixable where that channel fits the 6-parameter model
         fix_params = \(.a) {
@@ -565,8 +549,14 @@ analyse_biexponential <- function(
                 tau_ratio,
                 \(e) {
                     warn_fit_failed(
-                        quote(biexponential), e, .nirs, interval_name,
-                        length(.params), .retry, verbose, env
+                        quote(biexponential),
+                        e,
+                        .nirs,
+                        interval_name,
+                        length(.params),
+                        .retry,
+                        verbose,
+                        env
                     )
                 }
             )
@@ -596,11 +586,10 @@ analyse_biexponential <- function(
         ## TD is already elapsed from start_time, matching the fit time base
         TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL
 
-        ## interior excursion where dy/dt = 0 has a closed form, elapsed since
-        ## model onset (TD, or 0 for the 5-param model). the root needs the
-        ## fast and slow differences (A - B1) and (B2 - B1) on the same side,
-        ## i.e. B1 beyond both A and B2; a B1 between them makes the curve
-        ## monotone and the turning point sits at the onset boundary
+        ## closed-form turning point where dy/dt = 0, elapsed since model
+        ## onset (TD, or 0 for the 5-param model). a real root needs `B1`
+        ## beyond both `A` and `B2`; a `B1` between them gives a monotone
+        ## curve whose turning point sits at the onset boundary
         s <- with(pars, {
             ratio <- ((B2 - B1) / tau2) / ((A - B1) / tau1)
             root <- if (is.finite(ratio) && ratio > 0) {
@@ -611,9 +600,8 @@ analyse_biexponential <- function(
             if (is.finite(root) && root > 0) root else 0
         })
 
-        ## excursion_time reported elapsed from start_time, mirroring
-        ## MRT = TD + tau; adding TD_arg shifts the onset-relative s into the
-        ## same frame, so t - TD in biexponential() recovers s exactly
+        ## excursion_time is reported elapsed from start_time, mirroring
+        ## MRT = TD + tau, so the onset-relative root is shifted by TD
         excursion_time_val <- sum(TD_arg, s)
         excursion_value_val <- do.call(
             biexponential,
