@@ -527,9 +527,9 @@ test_that("analyse_monoexponential() falls back from 4-param to 3-param", {
     tau = 25
     TD = 0
 
-    ## short series with small TD makes 4-param hard to converge
+    ## short noisy series with small TD makes 4-param hard to converge
     data <- create_monoexp_data(
-        A = A, B = B, tau = tau, TD = TD, n = 10, noise_sd = 2, seed = 101
+        A = A, B = B, tau = tau, TD = TD, n = 10, noise_sd = 5, seed = 13
     )
 
     expect_warning(
@@ -855,9 +855,9 @@ test_that("SSmonoexponential() converges on real dataset", {
     }
 
     smo2_success <- mean(fit_3param("VL_smo2"))
-    smo2_success
+    smo2_success ## 0.89
     hhb_success <- mean(fit_3param("VL_HHb"))
-    hhb_success
+    hhb_success ## 0.88
 
     #! should be >95?
     expect_true(smo2_success >= 0.85)
@@ -876,9 +876,9 @@ test_that("SSmonoexponential() converges on real dataset", {
     }
 
     smo2_success <- mean(fit_4param("VL_smo2"))
-    smo2_success
+    smo2_success ## 0.98
     hhb_success <- mean(fit_4param("VL_HHb"))
-    hhb_success
+    hhb_success ## 0.78
 
     #! should be >95?
     expect_true(smo2_success >= 0.95)

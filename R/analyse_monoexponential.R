@@ -92,64 +92,68 @@ monoexponential <- function(t, A, B, tau, TD = NULL) {
 #' @keywords internal
 monoexp_init <- function(mCall, data, LHS, ...) {
     ## self-start parameters for nls of monoexponential fit function
-    ## uses base R `SSasymp()` initialisation approach
     tx <- stats::sortedXyData(mCall[["t"]], LHS, data)
     x <- tx[["y"]]
     t <- tx[["x"]]
-    n <- length(x)
 
-    ## user-fixed parameter values seed the remaining free estimates
+    ## user-fixed parameter values constrain the free estimates
     fixed <- list(...)$fixed %||% list()
 
     ## check if TD parameter exists in the call
     has_TD <- "TD" %in% names(mCall)
 
-    ## fit linear model to log-transformed differences from estimated asymptote
-    ## asymptotes from 1/5 response signal
-    n_asymp <- max(1, ceiling(n / 5))
-    A_init <- fixed$A %||% mean(x[seq_len(n_asymp)])
-    B_init <- fixed$B %||% mean(x[seq(n - n_asymp + 1, n)])
+    ## profile tau (and TD for the 4-parameter model) on a coarse grid
+    ## and keep the RSS-minimising start (cf. `biexp_grid_start()`).
+    ## the model is linear in A and B once tau and TD are held fixed,
+    ## so the asymptotes are solved by least squares at every grid
+    ## point. point estimates from derivative changepoints or
+    ## log-linearisation are too sensitive to noise, overshoot, and
+    ## plateau data on real NIRS signals, and can strand nls with a
+    ## singular gradient
+    span <- diff(range(t))
+    if (!is.finite(span) || span <= 0) {
+        span <- 1
+    }
+    tau_grid <- fixed$tau %||%
+        exp(seq(log(span / 100), log(span), length.out = 25L))
+    td_grid <- if (!has_TD) 0 else {
+        fixed$TD %||% seq(0, 0.5 * span, length.out = 21L)
+    }
 
-    ## estimate rate constant via linearisation (SSasymp method)
-    ## sign +ve for upward (B > A); -ve for downward (B < A).
-    ## linearised: log(sign * (B - x)) ~ log(B - A) - t/tau,
-    #! doesn't work as well on current tests as current implementation
-    # x_shifted <- sign(B_init - A_init) * (B_init - x)
-
-    ## estimate rate constant via linearisation (SSasymp method)
-    ## log(B - x) ~ log(B - A) - t/tau
-    ## use shifted x to avoid log of negative/zero
-    x_shifted <- B_init - x
-    x_pos <- x_shifted > 0
-
-    if (sum(x_pos) >= 3) {
-        x_shifted[!x_pos] <- min(x_shifted[x_pos]) / 2
-        lm_fit <- stats::lm(log(x_shifted) ~ t)
-        rate <- -coef(lm_fit)[2L]
-        tau_init <- if (is.finite(rate) && rate > 0) {
-            1 / rate
-        } else {
-            diff(range(t)) / 3
+    ## y = B + (A - B) * e, so free A and B come from simple regression
+    ## of x on e, and a single free asymptote from projection on its
+    ## basis; a degenerate grid point (e.g. all points pre-onset) yields
+    ## non-finite estimates and is discarded via infinite rss
+    solve_AB <- function(e) {
+        A <- fixed$A
+        B <- fixed$B
+        if (is.null(A) && is.null(B)) {
+            ec <- e - mean(e)
+            slope <- sum(ec * x) / sum(ec^2)
+            B <- mean(x) - slope * mean(e)
+            A <- B + slope
+        } else if (is.null(A)) {
+            A <- sum(e * (x - B * (1 - e))) / sum(e^2)
+        } else if (is.null(B)) {
+            B <- sum((1 - e) * (x - A * e)) / sum((1 - e)^2)
         }
-    } else {
-        ## fallback: tau from 63.2% rise point (sign agnostic)
-        target <- A_init + 0.632 * (B_init - A_init)
-        tau_init <- t[which.min(abs(x - target))]
-        tau_init <- max(tau_init, diff(range(t)) / 10)
+        rss <- if (is.finite(A + B)) sum((x - B - (A - B) * e)^2) else Inf
+        return(c(A = A, B = B, rss = rss))
     }
 
-    tau_init <- fixed$tau %||% max(tau_init, .Machine$double.eps)
+    grid <- expand.grid(tau = tau_grid, TD = td_grid)
+    fits <- vapply(seq_len(nrow(grid)), \(.i) {
+        solve_AB(exp(-(if (has_TD) pmax(t - grid$TD[.i], 0) else t) /
+            grid$tau[.i]))
+    }, numeric(3L))
+    best <- which.min(fits["rss", ])
 
-    if (has_TD) {
-        ## 4-parameter: estimate time delay from derivative changepoint
-        dx_dt <- abs(diff(x) / diff(t))
-        td_idx <- which.max(dx_dt)
-        TD_init <- fixed$TD %||% max(t[td_idx] - tau_init * 0.1, 0)
-        return(c(A = A_init, B = B_init, tau = tau_init, TD = TD_init))
-    } else {
-        ## 3-parameter: no time delay
-        return(c(A = A_init, B = B_init, tau = tau_init))
-    }
+    return(c(
+        A = fits[["A", best]],
+        B = fits[["B", best]],
+        tau = grid$tau[best],
+        TD = if (has_TD) grid$TD[best]
+    ))
 }
 
 
