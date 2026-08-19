@@ -12,6 +12,8 @@ kinetics_annotations(x)
 \value{
 A \code{data.frame} with columns \code{interval}, \code{nirs_channels},
 \code{start_times}, \code{xval}, \code{yval}, \code{label}, \code{yval_corner}, and \code{vjust}.
+\code{NULL} for a method with no annotation spec, in which case
+\code{\link[=plot.mnirs_kinetics]{plot.mnirs_kinetics()}} draws the fitted curve alone.
 }
 \description{
 Maps a fitted \code{mnirs_kinetics} method to its key coefficient marker
@@ -19,7 +21,8 @@ Maps a fitted \code{mnirs_kinetics} method to its key coefficient marker
 per interval, for \code{\link[=plot.mnirs_kinetics]{plot.mnirs_kinetics()}}. Marker x-coordinates are the
 resolved onset plus the method's time coefficient. Labels sit in the corner
 the fitted curve vacates: \code{yval_corner} is the top (\code{Inf}) when the signal
-falls (\code{A > B}) and the bottom (\code{-Inf}) when it rises, with \code{vjust}
-staggering stacked labels by channel rank within each interval-corner.
+falls (\code{A > B}, or \code{A > B2} for \code{"biexponential"}) and the bottom
+(\code{-Inf}) when it rises, with \code{vjust} staggering stacked labels by channel
+rank within each interval-corner.
 }
 \keyword{internal}

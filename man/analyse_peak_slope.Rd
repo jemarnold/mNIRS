@@ -60,9 +60,10 @@ is \emph{backward looking} from the current sample.}
 \emph{Details}.}
 
 \item{end_window}{A numeric value in units of \code{time_channel} specifying the
-window in which to look for the end of the kinetics fit.
-\code{end_window = Inf} (\emph{default}) returns the global extreme from the full
-sample range (see \emph{Details}).}
+window in which to look for the end of the kinetics fit; returns the
+window with no greater/lesser values within \code{end_window} after the first
+extreme value. \code{end_window = Inf} (\emph{default}) returns the global extreme
+from the full sample range (see \emph{Details}).}
 
 \item{partial}{Logical; default is \code{FALSE}, only returns values where a full
 window of valid (non-\code{NA}) samples are available. If \code{TRUE}, ignores \code{NA}

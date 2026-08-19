@@ -12,14 +12,15 @@ biexponential(t, A, B1, tau1, B2, tau2, TD = NULL)
 \item{A}{A numeric parameter for the starting value of the response
 variable (the \code{t = 0} intercept).}
 
-\item{B1}{A numeric parameter for the amplitude of the \emph{fast} component;
-the depth of the initial drop to the nadir.}
+\item{B1}{A numeric parameter for the asymptote of the \emph{fast} component;
+the value the initial excursion heads toward at the turning point.}
 
 \item{tau1}{A numeric parameter for the \emph{fast} time constant (\eqn{\tau_1}),
 in units of the predictor variable \code{t}. Dominates the initial steep fall.}
 
-\item{B2}{A numeric parameter for the amplitude of the \emph{slow} component;
-the size of the recovery from the nadir toward the plateau.}
+\item{B2}{A numeric parameter for the asymptote of the \emph{slow} component;
+the stable plateau the response recovers toward as \code{t} approaches
+infinity.}
 
 \item{tau2}{A numeric parameter for the \emph{slow} time constant (\eqn{\tau_2}),
 in units of the predictor variable \code{t}. Typically \verb{tau2 >> tau1}.}
@@ -34,8 +35,8 @@ predictor variable \code{t}.
 }
 \description{
 Calculate a 5- or 6-parameter biexponential curve: a fast component that
-drops to a rounded nadir, followed by a slow component that recovers
-toward a stable plateau.
+carries the response to a rounded turning point, followed by a slow
+component that recovers toward a stable plateau.
 }
 \details{
 This model family is fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when
@@ -44,29 +45,41 @@ wrapper \code{\link[=SSbiexponential]{SSbiexponential()}}.
 \subsection{Model equations}{
 
 5-parameter model:
-\code{A - B1 * (1 - exp(-t / tau1)) + B2 * (1 - exp(-t / tau2))}
+\code{A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))}
 
-6-parameter model (with time delay):
-\code{ifelse(t <= TD, A, A - B1 * (1 - exp(-(t - TD) / tau1)) + B2 * (1 - exp(-(t - TD) / tau2)))}
+6-parameter model (with time delay), where \code{ts = pmax(t - TD, 0)}:
+\code{A + (B1 - A) * (1 - exp(-ts / tau1)) + (B2 - B1) * (1 - exp(-ts / tau2))}
 
-The fast component \code{B1}/\code{tau1} subtracts, driving the steep initial fall to
-the nadir; the slow component \code{B2}/\code{tau2} adds, pulling the curve back up
-once the fast term saturates. The two components carry independent
-amplitudes and are not exchangeable.
+Clamping the shifted time at zero holds the curve at the baseline \code{A} until
+the onset of the response at \code{t = TD}.
 
-The response value as \code{t} approaches infinity is the \emph{plateau},
-\code{A - B1 + B2}.
+All three of \code{A}, \code{B1}, and \code{B2} are values on the response scale,
+consistent with the asymptote parameters of \code{\link[=monoexponential]{monoexponential()}} and the
+sigmoidal models. The fast component \code{B1}/\code{tau1} drives the steep initial
+response from \code{A} toward \code{B1}; the slow component \code{B2}/\code{tau2} pulls the
+curve on toward the plateau \code{B2} once the fast term saturates. An excursion
+response places \code{B1} beyond both \code{A} and \code{B2} (below for a fall-recover
+response, above for a rise-overshoot); the turning point is a minimum or a
+maximum accordingly. \code{B1} is the target of the fast component, \emph{near} but
+not exactly the fitted turning value, because the slow component already
+moves during the fast phase; the exact turning point is reported by
+\code{\link[=analyse_kinetics]{analyse_kinetics()}} as \code{excursion_value}. When \code{B1} lies between \code{A} and
+\code{B2} the curve is a monotone two-phase response, and when \code{B1 = B2} the
+slow term vanishes and the model reduces to the exact \code{\link[=monoexponential]{monoexponential()}}
+with asymptote \code{B2}.
+
+The response value as \code{t} approaches infinity is the plateau, \code{B2}.
 }
 }
 \examples{
-## create a nadir-recovery biexponential curve with random noise
+## create a biexponential excursion-recovery curve with random noise
 set.seed(1)
 t <- 0:120
-x <- biexponential(t, A = 70, B1 = 25, tau1 = 5, B2 = 15, tau2 = 40) +
+x <- biexponential(t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40) +
     rnorm(length(t), 0, 0.8)
 data <- data.frame(t, x)
 
-model <- nls(x ~ SSbiexponential(t, A, B1, tau1, B2, tau2), data = data)
+model <- nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr), data = data)
 summary(model)
 
 y <- predict(model, data)

@@ -49,9 +49,10 @@ Defaults to \code{0.5} (50\% response, i.e. half-response time).}
 \emph{Details}.}
 
 \item{end_window}{A numeric value in units of \code{time_channel} specifying the
-window in which to look for the end of the kinetics fit.
-\code{end_window = Inf} (\emph{default}) returns the global extreme from the full
-sample range (see \emph{Details}).}
+window in which to look for the end of the kinetics fit; returns the
+window with no greater/lesser values within \code{end_window} after the first
+extreme value. \code{end_window = Inf} (\emph{default}) returns the global extreme
+from the full sample range (see \emph{Details}).}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad

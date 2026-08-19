@@ -9,7 +9,8 @@ recycle_to_length(
   n,
   name = c("event", "group"),
   verbose = TRUE,
-  env = rlang::caller_env()
+  env = rlang::caller_env(),
+  arg = "values"
 )
 }
 \arguments{

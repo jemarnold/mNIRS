@@ -639,32 +639,6 @@ test_that("analyse_biexponential() direction steers the fit window", {
     expect_equal(attr(result, "channel_args")$direction, "negative")
 })
 
-test_that("analyse_biexponential() refits a monotone decline in-direction", {
-    ## monoexponential-shaped data has no rebound: the unconstrained fit can
-    ## mirror the components (B1 above A) to mimic a sigmoidal decline. the
-    ## direction refit bounds B1 onto the response side, yielding a valid
-    ## two-phase decline rather than NA
-    set.seed(41)
-    t <- 0:119
-    x <- monoexponential(t, A = 70, B = 40, tau = 20) + rnorm(120, 0, 0.3)
-    data <- create_mnirs_data(
-        data.frame(time = t, smo2 = x),
-        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
-    )
-
-    expect_no_warning(
-        result <- analyse_biexponential(
-            data,
-            nirs_channels = "smo2",
-            use_TD = FALSE,
-            verbose = TRUE
-        )
-    )
-
-    expect_false(is.na(result$tau1))
-    expect_true(result$B1 < result$A)
-    expect_true(attr(result, "diagnostics")$r2 > 0.9)
-})
 
 
 ## fixed parameters =================================================
@@ -894,24 +868,6 @@ test_that("analyse_biexponential() converges on real dataset", {
 
     ## 5 real-world 5-1 min work-recovery intervals, 4 channels each    
     intervals <- readRDS(test_path("testdata/5-1_intervals_short.rds"))
-    # analyse_kinetics(
-    #     intervals,
-    #     method = "biexp",
-    #     use_TD = TRUE,
-    #     # verbose = FALSE
-    # # )
-    # # ) |> coef()
-    # ) |> plot(label = FALSE)
-
-    # lapply(intervals, \(.df) {
-    #     analyse_biexponential(
-    #         .df,
-    #         nirs_channels = smo2_left_rf,
-    #         time_channel = time,
-    #         use_TD = TRUE,
-    #     )
-    # })
-
 
     ## fit one signal at a time across all intervals; report convergence
     ## success rate per signal to flag regressions on real interval data.

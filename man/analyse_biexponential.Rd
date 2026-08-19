@@ -10,6 +10,7 @@ analyse_biexponential(
   time_channel = NULL,
   use_TD = FALSE,
   fix = NULL,
+  tau_ratio = 2.5,
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -36,18 +37,28 @@ Must match a column name in \code{data} exactly.
 used.
 }}
 
-\item{use_TD}{Logical; default is \code{TRUE} to attempt to fit a
-6-parameter \code{\link[=SSbiexponential]{SSbiexponential()}} model (A, B1, tau1, B2, tau2, TD) with a
-time delay. If the 6-parameter fit fails, or if \code{use_TD = FALSE}, attempts
-to fit a reduced 5-parameter \code{\link[=SSbiexponential]{SSbiexponential()}} model
-(A, B1, tau1, B2, tau2).}
+\item{use_TD}{Logical; \code{TRUE} attempts to fit a 6-parameter
+\code{\link[=biexponential]{biexponential()}} model (A, B1, tau1, B2, tau2, TD) with a time delay.
+If the 6-parameter fit fails, or if \code{use_TD = FALSE}, attempts to fit a
+reduced 5-parameter \code{\link[=biexponential]{biexponential()}} model (A, B1, tau1, B2, tau2).
+The user-facing default (\code{TRUE}) is set by \code{\link[=analyse_kinetics]{analyse_kinetics()}}.}
 
 \item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B1}, \code{tau1},
 \code{B2}, \code{tau2}, \code{TD}) to hold constant during fitting, e.g.
 \code{fix = list(A = 0)}. Fixed parameters are excluded from estimation
-and reported at their fixed values. Applied globally across
-\code{nirs_channels}. \code{TD} is fixable only when \code{use_TD = TRUE} for all
-channels; a fixed \code{TD} disables the 5-parameter fallback.}
+and reported at their fixed values. Applied to every channel, or
+per-channel as a list of lists keyed by channel name, e.g.
+\code{fix = list(smo2 = list(A = 0))}. \code{TD} is fixable for channels where
+\code{use_TD = TRUE}; a fixed \code{TD} disables the 5-parameter fallback.}
+
+\item{tau_ratio}{A numeric lower bound on the ratio of the slow to the fast
+time constant, \code{tau2 / tau1}; default is \code{2.5}. As \code{tau2} approaches
+\code{tau1} the two components become indistinguishable and the fit is
+singular, so the ratio is bounded away from that limit. The ratio is
+often only weakly identified and settles on this bound, in which case it
+sets the separation of the fast and slow components; lower values admit
+more similar time constants and larger, more strongly cancelling
+amplitudes.}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
 time of response onset (effectively time = \code{0} of the response). If \code{NULL}
@@ -59,9 +70,10 @@ back to \code{0} or the first positive time value (see \emph{Details}).}
 \emph{Details}.}
 
 \item{end_window}{A numeric value in units of \code{time_channel} specifying the
-window in which to look for the end of the kinetics fit.
-\code{end_window = Inf} (\emph{default}) returns the global extreme from the full
-sample range (see \emph{Details}).}
+window in which to look for the end of the kinetics fit; returns the
+window with no greater/lesser values within \code{end_window} after the first
+extreme value. \code{end_window = Inf} (\emph{default}) returns the global extreme
+from the full sample range (see \emph{Details}).}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
@@ -76,8 +88,8 @@ than the validator.}
 }
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns
-\code{nirs_channels}, \code{A}, \code{B1}, \code{tau1}, \code{B2}, \code{tau2}, \code{TD}, \code{plateau},
-\code{nadir_time}, \code{nadir_value}. Per-channel metadata are attached as
+\code{nirs_channels}, \code{A}, \code{B1}, \code{tau1}, \code{B2}, \code{tau2}, \code{TD},
+\code{excursion_time}, \code{excursion_value}. Per-channel metadata are attached as
 attributes:
 \itemize{
 \item \code{"model"}: an \link[stats:nls]{nls} model object, or \code{NULL} for channels
@@ -93,8 +105,8 @@ recording the resolved arguments used.
 \description{
 Internal channel-level dispatch for
 \code{analyse_kinetics(method = "biexponential")}. Fits a biexponential
-nadir-recovery curve to each \code{nirs_channel} within a single \emph{"mnirs"} data
-frame. See \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing documentation.
+excursion-recovery curve to each \code{nirs_channel} within a single \emph{"mnirs"}
+data frame. See \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing documentation.
 }
 \seealso{
 \code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=biexponential]{biexponential()}}, \code{\link[=SSbiexponential]{SSbiexponential()}}

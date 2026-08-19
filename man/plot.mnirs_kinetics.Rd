@@ -10,8 +10,8 @@
 \item{x}{An \emph{"mnirs_kinetics"} object from \code{\link[=analyse_kinetics]{analyse_kinetics()}}.}
 
 \item{fitted}{Logical. Default is \code{TRUE}; overlays a dashed fitted curve for
-parametric methods (\code{"peak_slope"}, \code{"monoexponential"}, \code{"sigmoidal"}).
-\code{"response_time"} has no fitted curve.}
+parametric methods (\code{"peak_slope"}, \code{"monoexponential"},
+\code{"biexponential"}, \code{"sigmoidal"}). \code{"response_time"} has no fitted curve.}
 
 \item{markers}{Logical. Default is \code{TRUE}; draws a dotted vertical line at
 the response onset (\code{start_time}) and key coefficient points.}
@@ -34,6 +34,9 @@ coefficient(s) annotated per panel.
 Accepts some arguments in \code{...}, such as \code{label_size} passed to
 \code{\link[ggplot2:geom_text]{ggplot2::geom_text()}}. Also accepts args passed to \code{\link[=plot.mnirs]{plot.mnirs()}}, such as
 \code{points}, \code{time_labels}, \code{nrow}, \code{ncol}, or \code{scales}.
+
+A method with no annotation spec in \code{\link[=kinetics_annotations]{kinetics_annotations()}} plots the
+observed signal and fitted curve only, without markers or labels.
 }
 \examples{
 \dontshow{if (rlang::is_installed("ggplot2")) withAutoprint(\{ # examplesIf}

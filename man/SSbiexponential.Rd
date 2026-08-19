@@ -4,7 +4,7 @@
 \alias{SSbiexponential}
 \title{Self-starting biexponential model}
 \usage{
-SSbiexponential(t, A, B1, tau1, B2, tau2, TD)
+SSbiexponential(t, A, B1, lt1, B2, lr, TD)
 }
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
@@ -12,17 +12,17 @@ SSbiexponential(t, A, B1, tau1, B2, tau2, TD)
 \item{A}{A numeric parameter for the starting value of the response
 variable (the \code{t = 0} intercept).}
 
-\item{B1}{A numeric parameter for the amplitude of the \emph{fast} component;
-the depth of the initial drop to the nadir.}
+\item{B1}{A numeric parameter for the asymptote of the \emph{fast} component;
+the value the initial excursion heads toward at the turning point.}
 
-\item{tau1}{A numeric parameter for the \emph{fast} time constant (\eqn{\tau_1}),
-in units of the predictor variable \code{t}. Dominates the initial steep fall.}
+\item{lt1}{A numeric parameter for the log \emph{fast} time constant.}
 
-\item{B2}{A numeric parameter for the amplitude of the \emph{slow} component;
-the size of the recovery from the nadir toward the plateau.}
+\item{B2}{A numeric parameter for the asymptote of the \emph{slow} component;
+the stable plateau the response recovers toward as \code{t} approaches
+infinity.}
 
-\item{tau2}{A numeric parameter for the \emph{slow} time constant (\eqn{\tau_2}),
-in units of the predictor variable \code{t}. Typically \verb{tau2 >> tau1}.}
+\item{lr}{A numeric parameter for the log ratio of the \emph{slow} to the
+\emph{fast} time constant.}
 
 \item{TD}{A numeric parameter for the time delay before the onset of the
 response, in units of the predictor variable \code{t}. If \code{NULL} (\emph{default}),
@@ -34,41 +34,64 @@ predictor variable \code{t}.
 }
 \description{
 Creates initial coefficient estimates for a \code{selfStart} wrapper around
-\code{\link[=biexponential]{biexponential()}}, for use with \code{\link[stats:nls]{stats::nls()}}. Supports both the
-5-parameter form (A, B1, tau1, B2, tau2) and the 6-parameter form
-(A, B1, tau1, B2, tau2, TD); arity is inferred from the formula passed
+\code{\link[=biexponential]{biexponential()}}, for use with \code{\link[stats:nls]{stats::nls()}}. The time constants are
+estimated on the log-ratio scale, \code{lt1 = log(tau1)} and
+\code{lr = log(tau2 / tau1)}, which expresses the \code{tau2 / tau1} separation of
+the two components as a simple bound on \code{lr}. Supports both the
+5-parameter form (A, B1, lt1, B2, lr) and the 6-parameter form
+(A, B1, lt1, B2, lr, TD); arity is inferred from the formula passed
 to \code{\link[stats:nls]{stats::nls()}}.
 }
 \details{
-5-parameter model: \code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2)}
+5-parameter model: \code{x ~ SSbiexponential(t, A, B1, lt1, B2, lr)}
 
-6-parameter model: \code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, TD)}
+6-parameter model: \code{x ~ SSbiexponential(t, A, B1, lt1, B2, lr, TD)}
 
 The 5-parameter form is recommended for small samples or when no obvious
 time delay is expected, as it converges more reliably. \code{\link[stats:nls]{stats::nls()}}
 reads the free parameters from the formula right-hand side, so omitting
 \code{TD} incurs no degrees-of-freedom penalty.
+
+\code{\link[stats:coef]{stats::coef()}} returns the log-scale \code{lt1} and \code{lr}; recover the natural
+time constants as \code{tau1 = exp(lt1)} and \code{tau2 = exp(lt1 + lr)}.
+
+\code{\link[=analyse_kinetics]{analyse_kinetics()}} fits this model with \code{algorithm = "port"} and box
+bounds.
 \subsection{Fixing parameters}{
 
 Any parameter may be held constant by writing a value in place of its
-name in the formula, e.g. \code{x ~ SSbiexponential(t, A = 0, B1, tau1, B2, tau2)} fixes the baseline at \code{A = 0}. Fixed parameters are excluded from
+name in the formula, e.g. \code{x ~ SSbiexponential(t, A = 0, B1, lt1, B2, lr)} fixes the baseline at \code{A = 0}. Fixed parameters are excluded from
 estimation and are not returned by \code{\link[stats:coef]{stats::coef()}}.
 }
 }
 \examples{
-## create a nadir-recovery biexponential curve with random noise
-set.seed(1)
+## create a biexponential excursion-recovery curve with random noise
+set.seed(13)
 t <- 0:120
-x <- biexponential(t, A = 70, B1 = 25, tau1 = 5, B2 = 15, tau2 = 40) +
+x <- biexponential(t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40) +
     rnorm(length(t), 0, 0.8)
 data <- data.frame(t, x)
 
-model <- nls(x ~ SSbiexponential(t, A, B1, tau1, B2, tau2), data = data)
+model <- nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr), data = data)
 summary(model)
+
+## convert the log-scale time constants to the natural scale
+with(as.list(coef(model)), c(tau1 = exp(lt1), tau2 = exp(lt1 + lr)))
+
+## match the analyse_kinetics() fit path: port with box bounds keeping
+## tau1 within the data span and tau2 / tau1 >= 2.5
+span <- diff(range(t))
+model_port <- nls(
+    x ~ SSbiexponential(t, A, B1, lt1, B2, lr),
+    data = data,
+    algorithm = "port",
+    lower = c(-Inf, -Inf, log(span / 1000), -Inf, log(2.5))
+)
+summary(model_port)
 
 ## fix the baseline A at a known value
 model_fixed <- nls(
-    x ~ SSbiexponential(t, A = 70, B1, tau1, B2, tau2), data = data
+    x ~ SSbiexponential(t, A = 70, B1, lt1, B2, lr), data = data
 )
 summary(model_fixed)
 

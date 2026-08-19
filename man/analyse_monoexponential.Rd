@@ -44,8 +44,9 @@ fit a reduced 3-parameter \code{\link[=SSmonoexponential]{SSmonoexponential()}} 
 \item{fix}{An \emph{optional} named list of model parameters to hold
 constant during fitting, e.g. \code{fix = list(A = 0)}. Fixed parameters
 are excluded from estimation and reported at their fixed values.
-Applied globally across \code{nirs_channels}. \code{TD} is fixable only when
-\code{use_TD = TRUE} for all channels; a fixed \code{TD} disables the
+Applied to every channel, or per-channel as a list of lists keyed by
+channel name, e.g. \code{fix = list(smo2 = list(A = 0))}. \code{TD} is fixable
+for channels where \code{use_TD = TRUE}; a fixed \code{TD} disables the
 3-parameter fallback.}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
@@ -58,9 +59,10 @@ back to \code{0} or the first positive time value (see \emph{Details}).}
 \emph{Details}.}
 
 \item{end_window}{A numeric value in units of \code{time_channel} specifying the
-window in which to look for the end of the kinetics fit.
-\code{end_window = Inf} (\emph{default}) returns the global extreme from the full
-sample range (see \emph{Details}).}
+window in which to look for the end of the kinetics fit; returns the
+window with no greater/lesser values within \code{end_window} after the first
+extreme value. \code{end_window = Inf} (\emph{default}) returns the global extreme
+from the full sample range (see \emph{Details}).}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad

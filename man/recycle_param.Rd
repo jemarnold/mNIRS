@@ -9,7 +9,8 @@ recycle_param(
   n_events,
   group_intervals,
   verbose = TRUE,
-  env = rlang::caller_env()
+  env = rlang::caller_env(),
+  arg = "values"
 )
 }
 \description{

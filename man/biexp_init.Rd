@@ -23,6 +23,6 @@ model called by \code{\link[=SSbiexponential]{SSbiexponential()}}.
 }
 \description{
 \code{\link[=biexp_init]{biexp_init()}}: Returns initial values for the parameters in a \code{selfStart}
-model.
+model, with the time constants on the log-ratio scale (\code{lt1}, \code{lr}).
 }
 \keyword{internal}

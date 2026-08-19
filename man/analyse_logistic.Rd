@@ -44,8 +44,9 @@ used.
 \item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B},
 \code{xmid}, \code{slope}) to hold constant during fitting, e.g.
 \code{fix = list(A = 0)}. Fixed parameters are excluded from estimation
-and reported at their fixed values. Applied globally across
-\code{nirs_channels}.}
+and reported at their fixed values. Applied to every channel, or
+per-channel as a list of lists keyed by channel name, e.g.
+\code{fix = list(smo2 = list(A = 0))}.}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
 time of response onset (effectively time = \code{0} of the response). If \code{NULL}
@@ -57,9 +58,10 @@ back to \code{0} or the first positive time value (see \emph{Details}).}
 \emph{Details}.}
 
 \item{end_window}{A numeric value in units of \code{time_channel} specifying the
-window in which to look for the end of the kinetics fit.
-\code{end_window = Inf} (\emph{default}) returns the global extreme from the full
-sample range (see \emph{Details}).}
+window in which to look for the end of the kinetics fit; returns the
+window with no greater/lesser values within \code{end_window} after the first
+extreme value. \code{end_window = Inf} (\emph{default}) returns the global extreme
+from the full sample range (see \emph{Details}).}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad

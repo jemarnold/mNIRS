@@ -31,7 +31,9 @@ validated argument lists from \code{\link[=resolve_channel_args]{resolve_channel
 returning a list with \code{coefs} (1-row data frame of method coefficients,
 \emph{without} \code{nirs_channels}/\code{time_channel}), \code{model}, \code{fitted_data}
 (\code{window_idx}/\code{fitted}), and \code{diag} (1-row data frame from
-\code{\link[=compute_diagnostics]{compute_diagnostics()}}).}
+\code{\link[=compute_diagnostics]{compute_diagnostics()}}). \code{t_fit} is always time elapsed from
+\code{start_time}, so time coefficients need no further offset, and
+\code{window_idx} must index the original data frame rows.}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad

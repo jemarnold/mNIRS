@@ -10,6 +10,7 @@ setup_kinetics_worker(
   time_quo,
   arg_list,
   choices = list(),
+  fix_params = NULL,
   verbose = TRUE,
   env = rlang::caller_env()
 )
@@ -24,6 +25,12 @@ setup_kinetics_worker(
 
 \item{choices}{Named list of valid values for choice-type arguments,
 passed to \code{\link[=resolve_channel_args]{resolve_channel_args()}}.}
+
+\item{fix_params}{An \emph{optional} character vector of fixable model
+parameter names, or a function of a channel's resolved argument list
+returning that vector (for models whose fixable parameters depend on
+another argument, e.g. \code{use_TD}). When supplied, each channel's
+resolved \code{fix} is validated via \code{\link[=validate_fix]{validate_fix()}}.}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
@@ -43,5 +50,12 @@ validates \code{data}, resolves \code{nirs_channels} and \code{time_channel},
 broadcasts global arguments across channels via \code{\link[=resolve_channel_args]{resolve_channel_args()}},
 and validates the resolved per-channel arguments via
 \code{\link[=validate_kinetics_args]{validate_kinetics_args()}}.
+}
+\details{
+\code{fix} is itself a named list, so it is classified before resolution: a
+plain list of parameter values applies globally to every channel, while a
+list whose elements are all lists is a per-channel map keyed by channel
+name. The resolved \code{fix} is validated per channel against \code{fix_params}
+when supplied.
 }
 \keyword{internal}

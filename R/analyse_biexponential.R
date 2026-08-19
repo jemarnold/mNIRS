@@ -287,9 +287,9 @@ SSbiexponential <- selfStart(
 #' alone.
 #'
 #' The 6-parameter model is piecewise-flat in `TD`, so port may reach the
-#' optimum yet report false or singular convergence; such solutions are
-#' accepted when their coefficients are finite and their RSS does not exceed
-#' the deterministic grid seed.
+#' optimum yet report non-convergence; such solutions are accepted when
+#' their coefficients are finite and their RSS does not exceed the
+#' deterministic grid seed.
 #'
 #' A user-fixed `tau1` or `tau2` is substituted into the re-parameterised
 #' formula rather than estimated: fixing `tau1` drops `lt1` and leaves `lr`
@@ -406,11 +406,12 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
     )
 
     ## the TD clamp is non-smooth in TD, so port can land on the optimum yet
-    ## fail its gradient certificate ("false"/"singular" convergence). such a
-    ## solution is kept when demonstrably good: finite coefficients with an
-    ## RSS no worse than the deterministic grid seed. all other convergence
-    ## failures are rejected. either way the port stop code is reported in
-    ## prose through on_error: a warning for a kept fit, an error otherwise
+    ## fail its gradient certificate ("false"/"singular" convergence) or run
+    ## out of budget. any of the four port stop codes is kept when
+    ## demonstrably good: finite coefficients with an RSS no worse than the
+    ## deterministic grid seed. all other convergence failures are rejected.
+    ## either way the port stop code is reported in prose through on_error:
+    ## a warning for a kept fit, an error otherwise
     if (!is.null(model) && !model$convInfo$isConv) {
         port_msg <- c(
             "7" = "Singular convergence: parameters not individually identifiable.",
@@ -424,7 +425,7 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         } else {
             model$convInfo$stopMessage
         }
-        acceptable <- model$convInfo$stopCode %in% c(7L, 8L) &&
+        acceptable <- code %in% names(port_msg) &&
             all(is.finite(stats::coef(model))) &&
             stats::deviance(model) <= seed$rss
         if (acceptable) {

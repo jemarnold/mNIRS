@@ -37,8 +37,10 @@ fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "
 
 3-parameter model: \code{A + (B - A) * (1 - exp(-t / tau))}
 
-4-parameter model:
-\code{ifelse(t <= TD, A, A + (B - A) * (1 - exp(-(t - TD) / tau)))}
+4-parameter model: \code{A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau))}
+
+Clamping the shifted time at zero holds the curve at the baseline \code{A} until
+the onset of the response at \code{t = TD}.
 
 The rate constant \code{k} is the reciprocal of \code{tau} (\code{k = 1 / tau}) in
 reciprocal units of \code{time_channel}; i.e. \verb{sec^-1s}).
