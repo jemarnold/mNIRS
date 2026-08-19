@@ -855,13 +855,13 @@ test_that("SSmonoexponential() converges on real dataset", {
     }
 
     smo2_success <- mean(fit_3param("VL_smo2"))
-    smo2_success ## 0.89
+    smo2_success
     hhb_success <- mean(fit_3param("VL_HHb"))
-    hhb_success ## 0.88
+    hhb_success
 
     #! should be >95?
-    expect_true(smo2_success >= 0.85)
-    expect_true(hhb_success >= 0.85)
+    expect_true(smo2_success >= 0.89231)
+    expect_true(hhb_success >= 0.89231)
 
     fit_4param <- function(signal) {
         vapply(reoxy_list, \(df) {
@@ -876,13 +876,13 @@ test_that("SSmonoexponential() converges on real dataset", {
     }
 
     smo2_success <- mean(fit_4param("VL_smo2"))
-    smo2_success ## 0.98
+    smo2_success
     hhb_success <- mean(fit_4param("VL_HHb"))
-    hhb_success ## 0.78
+    hhb_success
 
     #! should be >95?
-    expect_true(smo2_success >= 0.95)
-    expect_true(hhb_success >= 0.75)
+    expect_true(smo2_success >= 1.0)
+    expect_true(hhb_success >= 0.98462)
 })
 
 

@@ -117,37 +117,6 @@ biexponential_ratio <- function(t, A, B1, lt1, B2, lr, TD = NULL) {
 }
 
 
-#' Profile the biexponential time delay by separable least squares
-#'
-#' A coarse sweep of candidate delays locates the RSS basin, then a
-#' refinement around it. [stats::nls()] polishes the value from there, so
-#' the profile only needs to be close.
-#'
-#' @param x,t Numeric vectors of the response and predictor variables.
-#' @param tau_ratio A numeric lower bound on `tau2 / tau1`.
-#' @param span Numeric range of `t`.
-#'
-#' @returns A numeric time delay seed, or `NULL` when no candidate solves.
-#'
-#' @keywords internal
-biexp_profile_TD <- function(x, t, tau_ratio, span) {
-    profile <- \(.grid) {
-        rss <- vapply(.grid, \(.td) {
-            biexp_grid_start(x, t, tau_ratio, .td)$rss %||% NA_real_
-        }, numeric(1))
-        if (all(is.na(rss))) NULL else .grid[[which.min(rss)]]
-    }
-    coarse <- seq(0, span / 3, length.out = 12L)
-    TD <- profile(coarse)
-    if (is.null(TD)) {
-        return(NULL)
-    }
-    step <- coarse[[2L]]
-    fine <- profile(seq(max(TD - step, 0), TD + step, length.out = 7L))
-    return(fine %||% TD)
-}
-
-
 #' Initiate self-starting biexponential model
 #'
 #' [biexp_init()]: Returns initial values for the parameters in a `selfStart`
@@ -174,17 +143,17 @@ biexp_init <- function(mCall, data, LHS, ...) {
     has_TD <- "TD" %in% names(mCall)
     span <- diff(range(t))
 
-    ## TD profiled by the same separable RSS sweep as the package fit path
-    TD_init <- fixed$TD %||%
-        if (has_TD) biexp_profile_TD(x, t, 2.5, span) %||% 0 else 0
-
-    ## profile the amplitudes out of a grid of time constants
-    grid <- biexp_grid_start(x, t, TD = TD_init)
+    ## profile the amplitudes out of a joint grid of time constants and
+    ## candidate delays; the RSS-minimising delay is the TD seed
+    td_grid <- fixed$TD %||%
+        if (has_TD) seq(0, span / 3, length.out = 21L) else 0
+    grid <- biexp_grid_start(x, t, TD = td_grid)
     if (is.null(grid)) {
         cli_abort(c(
             "x" = "No starting estimates could be resolved from the response."
         ))
     }
+    TD_init <- grid$TD
 
     ## user-fixed values take precedence over the grid optimum. the grid is
     ## confined to tau2 >= 2.5 * tau1, so lr starts at or above log(2.5); the
@@ -360,18 +329,17 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
         ))))
     }
 
-    seed <- biexp_grid_start(x, t, tau_ratio = tau_ratio)
+    ## joint grid over time constants and candidate delays seeds the fit;
+    ## the RSS-minimising delay is the TD seed
+    td_grid <- fix$TD %||%
+        if (has_TD) seq(0, span / 3, length.out = 21L) else 0
+    seed <- biexp_grid_start(x, t, tau_ratio, td_grid)
     if (is.null(seed)) {
         return(fail(simpleError(
             "No starting estimates could be resolved from the response."
         )))
     }
-
-    TD_seed <- fix$TD %||% 0
-    if (has_TD && is.null(fix$TD)) {
-        TD_seed <- biexp_profile_TD(x, t, tau_ratio, span) %||% 0
-        seed <- biexp_grid_start(x, t, tau_ratio, TD_seed) %||% seed
-    }
+    TD_seed <- seed$TD
 
     ## a fixed tau2 caps tau1 from above, so the seed is pulled inside that
     ## cap before it is logged

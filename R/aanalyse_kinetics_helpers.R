@@ -990,9 +990,10 @@ full_coefs <- function(model, params, fix = list()) {
 #' Grid search starting estimates for a biexponential fit
 #'
 #' Deterministic seed for [SSbiexponential()] and [fit_biexp_ratio()]. The
-#' biexponential is linear in `A`, `B1` and `B2` once `tau1` and `tau2` are
-#' held fixed, so the amplitudes are profiled out by least squares at every
-#' point of a log-spaced grid of time constants rather than searched.
+#' biexponential is linear in `A`, `B1` and `B2` once `tau1`, `tau2`, and
+#' `TD` are held fixed, so the amplitudes are profiled out by least squares
+#' at every point of a log-spaced grid of time constants crossed with the
+#' candidate delays, rather than searched (cf. [monoexp_init()]).
 #'
 #' @details
 #' The grid is confined to the ridge `tau2 >= tau_ratio * tau1`. As `tau2`
@@ -1002,9 +1003,10 @@ full_coefs <- function(model, params, fix = list()) {
 #'
 #' Grid limits scale with the span of `t`, so the seed does not depend on the
 #' time units of the data. One log-spaced grid serves both components, so the
-#' saturating basis `1 - exp(-t / tau)` is built once and its Gram matrix
-#' supplies every candidate pair: each pair is then solved in closed form from
-#' its own 3x3 sub-block, with no further pass over the data.
+#' saturating basis `1 - exp(-t / tau)` is built once per delay and its Gram
+#' matrix supplies every candidate pair: each pair is then solved in closed
+#' form from its own 3x3 sub-block, with no further pass over the data. A
+#' delay whose every pair is rank-deficient is skipped, not fatal.
 #'
 #' No ordering constraint is placed on the asymptotes `B1` or `B2` relative
 #' to `A`. NIRS responses may legitimately fall or rise in either direction,
@@ -1014,11 +1016,13 @@ full_coefs <- function(model, params, fix = list()) {
 #' @param x A numeric vector of the response variable.
 #' @param t A numeric vector of the predictor variable (time).
 #' @param tau_ratio A numeric lower bound on `tau2 / tau1`.
-#' @param TD A numeric time delay subtracted from `t` before fitting.
+#' @param TD A numeric vector of candidate time delays subtracted from `t`
+#'   before fitting; the RSS-minimising delay is kept.
 #' @param n_tau Integer resolution of the time constant grid.
 #'
 #' @returns A named list of starting estimates (`A`, `B1`, `tau1`, `B2`,
-#'   `tau2`) with the attained `rss`, or `NULL` if no grid point is usable.
+#'   `tau2`, `TD`) with the attained `rss`, or `NULL` if no grid point is
+#'   usable.
 #'
 #' @keywords internal
 biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
@@ -1027,10 +1031,7 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
         return(NULL)
     }
 
-    ## response onset is flat before TD, so the delay shifts the time base
-    t_fit <- pmax(t - TD, 0)
     taus <- exp(seq(log(span / 100), log(span * 10), length.out = n_tau))
-    basis <- vapply(taus, \(.tau) 1 - exp(-t_fit / .tau), numeric(length(t_fit)))
 
     ## candidate (tau1, tau2) pairs on the ridge
     pairs <- which(outer(taus * tau_ratio, taus, "<="), arr.ind = TRUE)
@@ -1040,57 +1041,79 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
     i <- pairs[, 1L]
     j <- pairs[, 2L]
 
-    ## normal equations for the design [1, -u_i, u_j]; the subtract/add
-    ## amplitudes are converted to the asymptote scale at return
-    gram <- crossprod(basis)
-    diag_gram <- diag(gram)
-    su <- colSums(basis)
-    xu <- as.vector(crossprod(basis, x))
-
-    a11 <- length(t_fit)
-    a12 <- -su[i]
-    a13 <- su[j]
-    a22 <- diag_gram[i]
-    a23 <- -gram[cbind(i, j)]
-    a33 <- diag_gram[j]
+    ## delay-invariant pieces of the normal equations
+    a11 <- length(t)
     v1 <- sum(x)
-    v2 <- -xu[i]
-    v3 <- xu[j]
+    xx <- sum(x^2)
 
-    ## cofactors of the symmetric 3x3 system, evaluated across all pairs at
-    ## once; a per-pair solve() would dominate the cost of the search
-    c11 <- a22 * a33 - a23^2
-    c12 <- a13 * a23 - a12 * a33
-    c13 <- a12 * a23 - a13 * a22
-    c22 <- a11 * a33 - a13^2
-    c23 <- a12 * a13 - a11 * a23
-    c33 <- a11 * a22 - a12^2
-    det_m <- a11 * c11 + a12 * c12 + a13 * c13
+    ## amplitudes solved at every (tau1, tau2) pair for one delay; the
+    ## response onset is flat before the delay, so it shifts the time base
+    solve_td <- function(.td) {
+        t_fit <- pmax(t - .td, 0)
+        basis <- vapply(
+            taus, \(.tau) 1 - exp(-t_fit / .tau), numeric(length(t_fit))
+        )
 
-    A <- (c11 * v1 + c12 * v2 + c13 * v3) / det_m
-    B1 <- (c12 * v1 + c22 * v2 + c23 * v3) / det_m
-    B2 <- (c13 * v1 + c23 * v2 + c33 * v3) / det_m
+        ## normal equations for the design [1, -u_i, u_j]; the subtract/add
+        ## amplitudes are converted to the asymptote scale at return
+        gram <- crossprod(basis)
+        diag_gram <- diag(gram)
+        su <- colSums(basis)
+        xu <- as.vector(crossprod(basis, x))
 
-    ## at the least-squares solution the residual sum of squares reduces to
-    ## x'x - b'X'x. a non-positive determinant marks a rank-deficient pair
-    rss <- sum(x^2) - (A * v1 + B1 * v2 + B2 * v3)
-    rss[!is.finite(rss) | det_m <= 0] <- NA_real_
+        a12 <- -su[i]
+        a13 <- su[j]
+        a22 <- diag_gram[i]
+        a23 <- -gram[cbind(i, j)]
+        a33 <- diag_gram[j]
+        v2 <- -xu[i]
+        v3 <- xu[j]
+
+        ## cofactors of the symmetric 3x3 system, evaluated across all pairs
+        ## at once; a per-pair solve() would dominate the cost of the search
+        c11 <- a22 * a33 - a23^2
+        c12 <- a13 * a23 - a12 * a33
+        c13 <- a12 * a23 - a13 * a22
+        c22 <- a11 * a33 - a13^2
+        c23 <- a12 * a13 - a11 * a23
+        c33 <- a11 * a22 - a12^2
+        det_m <- a11 * c11 + a12 * c12 + a13 * c13
+
+        A <- (c11 * v1 + c12 * v2 + c13 * v3) / det_m
+        B1 <- (c12 * v1 + c22 * v2 + c23 * v3) / det_m
+        B2 <- (c13 * v1 + c23 * v2 + c33 * v3) / det_m
+
+        ## at the least-squares solution the residual sum of squares reduces
+        ## to x'x - b'X'x. a non-positive determinant marks a rank-deficient
+        ## pair
+        rss <- xx - (A * v1 + B1 * v2 + B2 * v3)
+        rss[!is.finite(rss) | det_m <= 0] <- NA_real_
+        if (all(is.na(rss))) {
+            return(NULL)
+        }
+
+        ## convert the solved amplitudes to the asymptote scale of
+        ## biexponential(): B1 = A - B1_amp, B2 = B1 + B2_amp
+        best <- which.min(rss)
+        B1_best <- A[[best]] - B1[[best]]
+        return(list(
+            A = A[[best]],
+            B1 = B1_best,
+            tau1 = taus[[i[[best]]]],
+            B2 = B1_best + B2[[best]],
+            tau2 = taus[[j[[best]]]],
+            TD = .td,
+            rss = max(rss[[best]], 0)
+        ))
+    }
+
+    ## profile each candidate delay and keep the RSS-minimising seed
+    seeds <- lapply(TD, solve_td)
+    rss <- vapply(seeds, \(.s) .s$rss %||% NA_real_, numeric(1))
     if (all(is.na(rss))) {
         return(NULL)
     }
-
-    ## convert the solved amplitudes to the asymptote scale of
-    ## biexponential(): B1 = A - B1_amp, B2 = B1 + B2_amp
-    best <- which.min(rss)
-    B1_best <- A[[best]] - B1[[best]]
-    return(list(
-        A = A[[best]],
-        B1 = B1_best,
-        tau1 = taus[[i[[best]]]],
-        B2 = B1_best + B2[[best]],
-        tau2 = taus[[j[[best]]]],
-        rss = max(rss[[best]], 0)
-    ))
+    return(seeds[[which.min(rss)]])
 }
 
 

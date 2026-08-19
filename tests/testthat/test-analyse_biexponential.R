@@ -165,7 +165,7 @@ test_that("biexp_grid_start() recovers known time constants", {
 
     seed <- biexp_grid_start(x, t)
 
-    expect_named(seed, c("A", "B1", "tau1", "B2", "tau2", "rss"))
+    expect_named(seed, c("A", "B1", "tau1", "B2", "tau2", "TD", "rss"))
     ## grid resolution is coarse by design; nls polishes from the seed
     expect_true(seed$tau1 > 10 / 1.5 && seed$tau1 < 10 * 1.5)
     expect_true(seed$tau2 > 60 / 1.5 && seed$tau2 < 60 * 1.5)
