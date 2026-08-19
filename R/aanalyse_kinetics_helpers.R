@@ -1002,11 +1002,15 @@ full_coefs <- function(model, params, fix = list()) {
 #' the ridge excludes that degenerate region.
 #'
 #' Grid limits scale with the span of `t`, so the seed does not depend on the
-#' time units of the data. One log-spaced grid serves both components, so the
-#' saturating basis `1 - exp(-t / tau)` is built once per delay and its Gram
-#' matrix supplies every candidate pair: each pair is then solved in closed
-#' form from its own 3x3 sub-block, with no further pass over the data. A
-#' delay whose every pair is rank-deficient is skipped, not fatal.
+#' time units of the data. One log-spaced grid serves both components, and one
+#' exponential basis `exp(-t / tau)` serves every delay: on the active rows
+#' `t > TD` the delayed basis is a column rescaling of it, and earlier rows
+#' contribute exactly zero, so each delay's normal equations are suffix sums
+#' over the shared basis. Accumulating those sums from the largest delay down
+#' costs one Gram pass in total, rather than one per delay. Each candidate
+#' pair is then solved in closed form from its own 3x3 sub-block, with no
+#' further pass over the data. A delay whose every pair is rank-deficient is
+#' skipped, not fatal.
 #'
 #' No ordering constraint is placed on the asymptotes `B1` or `B2` relative
 #' to `A`. NIRS responses may legitimately fall or rise in either direction,
@@ -1031,6 +1035,11 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
         return(NULL)
     }
 
+    ## sorted time base, so each delay's active rows form a suffix
+    o <- order(t)
+    t <- t[o]
+    x <- x[o]
+
     taus <- exp(seq(log(span / 100), log(span * 10), length.out = n_tau))
 
     ## candidate (tau1, tau2) pairs on the ridge
@@ -1046,25 +1055,51 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
     v1 <- sum(x)
     xx <- sum(x^2)
 
-    ## amplitudes solved at every (tau1, tau2) pair for one delay; the
-    ## response onset is flat before the delay, so it shifts the time base
-    solve_td <- function(.td) {
-        t_fit <- pmax(t - .td, 0)
-        basis <- vapply(
-            taus, \(.tau) 1 - exp(-t_fit / .tau), numeric(length(t_fit))
+    ## shared exponential basis: on rows t > TD the delayed basis column is
+    ## 1 - E * exp(TD / tau), and earlier rows contribute exactly zero, so
+    ## every per-delay statistic is a suffix sum over E
+    E <- exp(-outer(t, taus, "/"))
+
+    ## suffix sums accumulate from the largest delay down, so each row
+    ## enters exactly one cross-product pass
+    td <- sort(unique(TD), decreasing = TRUE)
+    starts <- vapply(td, \(.td) sum(t <= .td) + 1L, integer(1))
+    ends <- c(a11, starts[-length(starts)] - 1L)
+    slice <- function(rows) {
+        Es <- E[rows, , drop = FALSE]
+        xs <- x[rows]
+        list(
+            cnt = length(rows),
+            se = colSums(Es),
+            sx = sum(xs),
+            sxe = as.vector(crossprod(Es, xs)),
+            see = crossprod(Es)
         )
+    }
+    slices <- Map(\(.f, .t) if (.f > .t) integer(0) else .f:.t, starts, ends)
+    stats <- Reduce(
+        \(acc, rows) Map(`+`, acc, slice(rows)),
+        slices,
+        init = slice(integer(0)),
+        accumulate = TRUE
+    )[-1L]
+
+    ## amplitudes solved at every (tau1, tau2) pair for one delay, with the
+    ## suffix Gram rescaled onto the delayed time base by s = exp(TD / tau)
+    solve_td <- function(stat, .td) {
+        s <- exp(.td / taus)
+        su <- stat$cnt - s * stat$se
+        diag_gram <- stat$cnt - 2 * s * stat$se + s^2 * diag(stat$see)
+        gram_ij <- stat$cnt - s[i] * stat$se[i] - s[j] * stat$se[j] +
+            s[i] * s[j] * stat$see[cbind(i, j)]
+        xu <- stat$sx - s * stat$sxe
 
         ## normal equations for the design [1, -u_i, u_j]; the subtract/add
         ## amplitudes are converted to the asymptote scale at return
-        gram <- crossprod(basis)
-        diag_gram <- diag(gram)
-        su <- colSums(basis)
-        xu <- as.vector(crossprod(basis, x))
-
         a12 <- -su[i]
         a13 <- su[j]
         a22 <- diag_gram[i]
-        a23 <- -gram[cbind(i, j)]
+        a23 <- -gram_ij
         a33 <- diag_gram[j]
         v2 <- -xu[i]
         v3 <- xu[j]
@@ -1108,7 +1143,7 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
     }
 
     ## profile each candidate delay and keep the RSS-minimising seed
-    seeds <- lapply(TD, solve_td)
+    seeds <- Map(solve_td, stats, td)
     rss <- vapply(seeds, \(.s) .s$rss %||% NA_real_, numeric(1))
     if (all(is.na(rss))) {
         return(NULL)

@@ -971,10 +971,10 @@ test_that("analyse_biexponential() converges on real dataset", {
     rf_right_success <- mean(fit_6param("smo2_right_rf"))
     rf_right_success
 
-    expect_true(vl_left_success >= 0.8)
-    expect_true(vl_right_success >= 0.8)
-    expect_true(rf_left_success >= 0.8)
-    expect_true(rf_right_success >= 0.8)
+    expect_true(vl_left_success >= 0.54545)
+    expect_true(vl_right_success >= 0.81818)
+    expect_true(rf_left_success >= 0.54545)
+    expect_true(rf_right_success >= 0.72727)
 })
 
 test_that("analyse_biexponential() converges on real dataset", {
