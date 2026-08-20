@@ -735,16 +735,23 @@ test_that("analyse_monoexponential() direction = 'positive' rejects falling fit"
 })
 
 test_that("enforce_direction() refits and back-transforms an inverted fit", {
-    ## genuinely rising data, but the converged coefs are inverted
-    ## (B < A): forces the sign-mismatch branch, the bounded refit
-    ## recovers the true positive response and back-transforms to
-    ## (A, B, tau) space
+    ## genuinely rising data, but the supplied model's fitted curve is
+    ## inverted (falling): forces the direction-mismatch branch, the
+    ## bounded refit recovers the true positive response and
+    ## back-transforms to (A, B, tau) space
     t <- seq(0, 59)
     x <- monoexponential(t, A = 50, B = 80, tau = 15)
-    fit_data <- data.frame(.x = x, .t = t)
+    fit_data <- create_mnirs_data(
+        data.frame(.x = x, .t = t),
+        nirs_channels = .x,
+        time_channel = .t
+    )
+    plot(fit_data)
+    ## stub model: the entry check reads only its fitted values
+    model <- list(fitted.values = monoexponential(t, A = 80, B = 50, tau = 15))
 
     result <- enforce_direction(
-        model = NULL,
+        model = model,
         coefs = c(A = 80, B = 50, tau = 15),
         fit_data = fit_data,
         direction = "positive",

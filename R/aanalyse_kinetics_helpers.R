@@ -56,16 +56,15 @@ detect_direction <- function(
     if (direction != "auto") {
         return(direction)
     }
-    if (all(!is.finite(x))) {
-        return("positive")
-    }
-
     ## order finite samples by time; baseline = median of the earliest
     ## samples, shrinking to a single sample for short vectors
     ok <- which(is.finite(x) & is.finite(t))
+    if (length(ok) == 0L) {
+        return("positive")
+    }
     x_ord <- x[ok][order(t[ok])]
     n_base <- max(1L, min(5L, length(x_ord) %/% 10L))
-    x0 <- stats::median(x_ord[seq_len(n_base)])
+    x0 <- median(x_ord[seq_len(n_base)])
 
     ## dominant excursion from baseline: (max - x0) vs (x0 - min);
     ## fallback abs magnitude comparison breaks ties, itself tied positive
@@ -1164,9 +1163,13 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
 
 #' Enforce the requested direction on a converged parametric fit
 #'
-#' Checks the sign of the fitted amplitude `B - A` (or `B_name - A`)
-#' against the requested `direction`. Satisfied fits are returned
-#' unchanged. Inverted fits are refit with amplitude `D = B - A`
+#' Checks the direction of the fitted curve within the data span,
+#' via the dominant excursion from its baseline
+#' ([detect_direction()]), against the requested `direction`. The
+#' asymptote sign `B - A` is not used directly: a weakly identified
+#' slow component can strand the asymptote far beyond the record and
+#' invert it relative to the observed response. Satisfied fits are
+#' returned unchanged. Inverted fits are refit with amplitude `D = B - A`
 #' sign-bounded via `nls(algorithm = "port")`; sigmoid models divide
 #' by `D`, so its magnitude is floored strictly above zero. An
 #' accepted refit is then re-expressed in the original
@@ -1232,9 +1235,11 @@ enforce_direction <- function(
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
-    ## keep the unconstrained fit when direction is already satisfied
+    ## keep the unconstrained fit when direction is already satisfied.
+    ## direction is judged on the fitted curve within the data span, so
+    ## an asymptote stranded beyond the record cannot invert the check
     want <- if (direction == "positive") 1 else -1
-    if (sign(coefs[[B_name]] - coefs[["A"]]) == want) {
+    if (detect_direction(stats::fitted(model), fit_data$.t) == direction) {
         return(list(model = model, coefs = coefs))
     }
 
@@ -1250,17 +1255,21 @@ enforce_direction <- function(
         return(NULL)
     }
 
-    ## shared bounded refit; both passes differ only in formula and bounds.
+    ## shared bounded refit; params unbounded except named overrides.
     ## the refit may start far from its constrained optimum, so it gets
     ## the same iteration budget as the primary fit
-    port_fit <- function(rhs, start, lower, upper) {
+    port_fit <- function(rhs, start, lower = NULL, upper = NULL) {
+        lwr <- setNames(rep(-Inf, length(start)), names(start))
+        upr <- -lwr
+        lwr[names(lower)] <- lower
+        upr[names(upper)] <- upper
         tryCatch(
             nls(
                 stats::as.formula(call("~", quote(.x), rhs)),
                 fit_data,
                 start = start,
-                lower = lower,
-                upper = upper,
+                lower = lwr,
+                upper = upr,
                 algorithm = "port",
                 control = stats::nls.control(maxiter = 500L)
             ),
@@ -1311,33 +1320,25 @@ enforce_direction <- function(
     ## overridden. A drops out when either asymptote is fixed
     A_free <- is.null(A_fixed) && is.null(B_fixed)
     start <- c(if (A_free) c(A = coefs[["A"]]), c(D = D0), extra)
-    lower <- c(
-        if (A_free) c(A = -Inf),
-        c(D = if (want > 0) D_eps else -Inf),
-        setNames(rep(-Inf, length(extra)), names(extra))
-    )
-    upper <- c(
-        if (A_free) c(A = Inf),
-        c(D = if (want > 0) Inf else -D_eps),
-        setNames(rep(Inf, length(extra)), names(extra))
-    )
-    lower[names(extra_lower)] <- extra_lower
-    upper[names(extra_upper)] <- extra_upper
+    d_bnd <- c(D = want * D_eps)
+    lower <- c(if (want > 0) d_bnd, extra_lower)
+    upper <- c(if (want < 0) d_bnd, extra_upper)
 
     refit <- port_fit(rhs, start, lower, upper)
+    if (is.null(refit)) {
+        return(direction_failed())
+    }
 
     ## a coefficient pinned at a sign-floor bound (e.g. D, slope,
     ## tau) indicates a degenerate flat fit: no genuine response in
-    ## the requested direction. `floor_params` restricts the check
-    ## where other bounds are structural rather than sign floors
-    cf <- if (is.null(refit)) NULL else coef(refit)
-    chk <- if (is.null(floor_params)) {
-        names(lower)
-    } else {
-        intersect(floor_params, names(lower))
-    }
-    floors <- abs(ifelse(is.finite(lower[chk]), lower[chk], upper[chk]))
-    if (is.null(cf) || any(is.finite(floors) & abs(cf[chk]) <= 2 * floors)) {
+    ## the requested direction. finite lower bounds take precedence;
+    ## `floor_params` restricts the check where other bounds are
+    ## structural rather than sign floors
+    cf <- coef(refit)
+    bnd <- c(lower, upper)
+    bnd <- bnd[is.finite(bnd)]
+    chk <- intersect(floor_params %||% names(cf), names(bnd))
+    if (any(abs(cf[chk]) <= 2 * abs(bnd[chk]))) {
         return(direction_failed())
     }
 
@@ -1366,21 +1367,19 @@ enforce_direction <- function(
         if (is.null(B_fixed)) setNames(unname(B_val), B_name),
         cf[setdiff(names(cf), c("A", "D"))]
     )
-    lower2 <- setNames(rep(-Inf, length(start2)), names(start2))
-    upper2 <- setNames(rep(Inf, length(start2)), names(start2))
-    lower2[names(extra_lower)] <- extra_lower
-    upper2[names(extra_upper)] <- extra_upper
-
-    refit2 <- port_fit(rhs2, start2, lower2, upper2)
+    refit2 <- port_fit(rhs2, start2, extra_lower, extra_upper)
+    if (is.null(refit2)) {
+        return(direction_failed())
+    }
 
     ## merge fixed values back into the reported coefficients; a
     ## language fix value is an expression in a free parameter and
     ## has no constant to merge. re-expression must hold the
-    ## requested sign, else the direction cannot be satisfied
+    ## requested within-span direction, else it cannot be satisfied
     fix_num <- fix[vapply(fix, is.numeric, logical(1))]
-    cf2 <- if (is.null(refit2)) NULL else coef(refit2)
+    cf2 <- coef(refit2)
     out <- c(cf2, unlist(fix_num[setdiff(names(fix_num), names(cf2))]))
-    if (is.null(cf2) || sign(out[[B_name]] - out[["A"]]) != want) {
+    if (detect_direction(stats::fitted(refit2), fit_data$.t) != direction) {
         return(direction_failed())
     }
     return(list(model = refit2, coefs = out))

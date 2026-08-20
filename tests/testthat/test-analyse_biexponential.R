@@ -249,7 +249,6 @@ create_biexp_data <- function(
 
 test_that("analyse_biexponential() returns correct structure", {
     data <- create_biexp_data()
-    # plot(data)
     result <- analyse_biexponential(
         data,
         nirs_channels = "smo2",
@@ -313,7 +312,6 @@ test_that("analyse_biexponential() uses start_time correctly", {
     start_time <- 12
     data <- create_biexp_data(noise_sd = 0.3)
     data$time <- data$time + start_time
-    # plot(data)
 
     result <- analyse_biexponential(
         data,
@@ -664,10 +662,31 @@ test_that("analyse_biexponential() direction = 'negative' matches auto on fallin
     expect_true(result_auto$B2 < result_auto$A)
 })
 
-test_that("analyse_biexponential() direction = 'positive' rejects inverted overall amplitude", {
-    ## upward excursion but plateau just below baseline: B2 - A < 0, so
-    ## a positive overall amplitude cannot be genuinely satisfied
+test_that("analyse_biexponential() direction = 'positive' accepts a within-span positive excursion", {
+    ## upward excursion but plateau just below baseline: B2 - A < 0, yet
+    ## the dominant excursion within the data span is positive, so the
+    ## unconstrained fit is kept despite the inverted asymptote sign
     data <- create_biexp_data(A = 70, B1 = 95, B2 = 69, noise_sd = 0.3)
+
+    expect_no_warning(
+        result <- analyse_biexponential(
+            data,
+            nirs_channels = "smo2",
+            use_TD = FALSE,
+            direction = "positive",
+            verbose = TRUE
+        )
+    )
+
+    expect_false(is.na(result$A))
+    expect_true(result$excursion_value > result$A)
+    expect_true(result$B2 < result$A)
+})
+
+test_that("analyse_biexponential() direction = 'positive' rejects a negative response", {
+    ## genuinely falling drop-recovery: no positive response exists
+    ## within the data span, so the bounded refit degenerates
+    data <- create_biexp_data(noise_sd = 0.3)
 
     expect_warning(
         result <- analyse_biexponential(
@@ -680,23 +699,31 @@ test_that("analyse_biexponential() direction = 'positive' rejects inverted overa
         "satisfy"
     )
 
-    ## never returns an inverted (B2 < A) fit against requested direction
+    ## never returns a within-span negative fit against requested direction
     expect_true(is.na(result$A))
     expect_true(is.na(result$B2))
     expect_true(is.na(result$tau1))
 })
 
 test_that("enforce_direction() refits an inverted biexponential on B2 - A", {
-    ## genuinely rising data, but the supplied coefs are inverted
-    ## (B2 < A): forces the sign-mismatch branch; the bounded refit
-    ## recovers the true positive response with consistent coef names
+    ## genuinely rising data, but the supplied model is the mirror-image
+    ## falling fit: forces the direction-mismatch branch; the bounded
+    ## refit recovers the true positive response with consistent coef names
     t <- seq(0, 119)
     x <- biexponential(t, A = 70, B1 = 90, tau1 = 5, B2 = 80, tau2 = 40)
     fit_data <- data.frame(.x = x, .t = t)
-    coefs <- c(A = 80, B1 = 90, lt1 = log(5), B2 = 70, lr = log(8))
+    ## inverted fit: asymptotes reflected about the baseline A, so the
+    ## seeded refit amplitude does not collapse the slow term (B2 == B1)
+    coefs <- c(A = 70, B1 = 50, lt1 = log(5), B2 = 60, lr = log(8))
+    ## stub model: the entry check reads only its fitted values
+    model <- list(
+        fitted.values = biexponential_ratio(
+            t, A = 70, B1 = 50, lt1 = log(5), B2 = 60, lr = log(8)
+        )
+    )
 
     result <- enforce_direction(
-        model = NULL,
+        model = model,
         coefs = coefs,
         fit_data = fit_data,
         direction = "positive",
@@ -721,7 +748,7 @@ test_that("enforce_direction() refits an inverted biexponential on B2 - A", {
 })
 
 test_that("analyse_biexponential() suppresses direction warning when verbose = FALSE", {
-    data <- create_biexp_data(A = 70, B1 = 95, B2 = 69, noise_sd = 0.3)
+    data <- create_biexp_data(noise_sd = 0.3)
 
     expect_no_warning(
         result <- analyse_biexponential(
@@ -736,16 +763,16 @@ test_that("analyse_biexponential() suppresses direction warning when verbose = F
 })
 
 test_that("analyse_biexponential() direction with both asymptotes fixed returns NA", {
-    ## fixed A and B2 predetermine a negative overall amplitude, which
-    ## contradicts the requested positive direction: no refit possible
-    data <- create_biexp_data(A = 70, B1 = 95, B2 = 69, noise_sd = 0.3)
+    ## falling data with both asymptotes fixed contradicts the requested
+    ## positive direction: no refit possible
+    data <- create_biexp_data(noise_sd = 0.3)
 
     expect_warning(
         result <- analyse_biexponential(
             data,
             nirs_channels = "smo2",
             use_TD = FALSE,
-            fix = list(A = 70, B2 = 69),
+            fix = list(A = 70, B2 = 60),
             direction = "positive",
             verbose = TRUE
         ),
@@ -757,7 +784,7 @@ test_that("analyse_biexponential() direction with both asymptotes fixed returns 
 })
 
 test_that("analyse_kinetics() passes direction to biexponential method", {
-    data <- create_biexp_data(A = 70, B1 = 95, B2 = 69, noise_sd = 0.3)
+    data <- create_biexp_data(noise_sd = 0.3)
 
     expect_warning(
         result <- analyse_kinetics(
