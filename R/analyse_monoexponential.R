@@ -330,45 +330,31 @@ analyse_monoexponential <- function(
         keep_rows <- function(.params) {
             if ("TD" %in% .params) rep(TRUE, length(t_fit)) else t_fit >= 0
         }
-        fit_frame <- function(.params) {
-            keep <- keep_rows(.params)
-            data.frame(.x = x_fit[keep], .t = t_fit[keep])
-        }
 
         ## attempt nls fit; a failed 4-param fit falls back to the
         ## 3-param model unless TD is user-fixed
         retry <- .a$use_TD && !"TD" %in% names(.a$fix)
-        fit_data <- fit_frame(params)
-        model <- tryCatch(
-            nls(
-                build_ss_formula(quote(SSmonoexponential), params, .a$fix),
-                fit_data
-            ),
-            error = \(e) {
-                warn_fit_failed(
-                    quote(SSmonoexponential), e, .nirs, interval_name,
-                    length(params), retry, verbose, env
-                )
-                NULL
-            }
-        )
-        if (is.null(model) && retry) {
-            params <- setdiff(params, "TD")
-            ## dropping TD narrows the window, so rebuild the fit frame
-            fit_data <- fit_frame(params)
-            model <- tryCatch(
+        attempt <- \(.params, .retry) {
+            ## dropping TD narrows the window, so subset per attempt
+            keep <- keep_rows(.params)
+            tryCatch(
                 nls(
-                    build_ss_formula(quote(SSmonoexponential), params, .a$fix),
-                    fit_data
+                    build_ss_formula(quote(SSmonoexponential), .params, .a$fix),
+                    data.frame(.x = x_fit[keep], .t = t_fit[keep])
                 ),
                 error = \(e) {
                     warn_fit_failed(
                         quote(SSmonoexponential), e, .nirs, interval_name,
-                        length(params), FALSE, verbose, env
+                        length(.params), .retry, verbose, env
                     )
                     NULL
                 }
             )
+        }
+        model <- attempt(params, retry)
+        if (is.null(model) && retry) {
+            params <- setdiff(params, "TD")
+            model <- attempt(params, FALSE)
         }
 
         if (is.null(model)) {
@@ -378,6 +364,8 @@ analyse_monoexponential <- function(
         coefs <- full_coefs(model, params, .a$fix)
 
         ## enforce direction: bounded refit on D = B - A when inverted
+        keep <- keep_rows(params)
+        fit_data <- data.frame(.x = x_fit[keep], .t = t_fit[keep])
         free_extra <- setdiff(params, c("A", "B", names(.a$fix)))
         enforced <- enforce_direction(
             model,
@@ -404,7 +392,6 @@ analyse_monoexponential <- function(
         model <- enforced$model
         coefs <- enforced$coefs
         fitted_vals <- stats::predict(model)
-        keep <- keep_rows(params)
 
         ## TD is already elapsed from start_time, matching the fit time base
         TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL

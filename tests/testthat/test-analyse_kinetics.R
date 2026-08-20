@@ -22,33 +22,41 @@ test_that("detect_direction uses custom t vector", {
     expect_equal(detect_direction(x, t), "negative")
 })
 
-test_that("detect_direction falls back appropriately", {
-    ## positive when abs(max) >= abs(min)
-    ## symmetric pulse: net slope ~ 0, max = 10, min = 0
+test_that("detect_direction detects dominant excursion from baseline", {
+    ## symmetric pulse: upward excursion dominates
     x <- c(0, 5, 10, 5, 0)
     expect_equal(detect_direction(x), "positive")
 
-    ## negative when abs(max) < abs(min)
-    ## symmetric trough: net slope ~ 0, max = 0, min = -10
+    ## symmetric trough: downward excursion dominates
     x <- c(0, -5, -10, -5, 0)
     expect_equal(detect_direction(x), "negative")
+
+    ## biexponential drop-recovery: fast fall then slow partial recovery,
+    ## rising limb occupies most of the record but primary direction is down
+    t <- 0:120
+    x <- biexponential(t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40)
+    expect_equal(detect_direction(x, t), "negative")
+
+    ## mirrored rise-decay overshoot
+    x <- biexponential(t, A = 45, B1 = 70, tau1 = 5, B2 = 55, tau2 = 40)
+    expect_equal(detect_direction(x, t), "positive")
 })
 
 test_that("detect_direction falls back to positive on magnitude tie", {
-    ## symmetric around zero: abs(max) == abs(min) => positive (>=)
-    x <- c(-5, 0, 5, 0, -5)
+    ## equal excursions and abs(max) == abs(min) => positive (>=)
+    x <- c(0, 5, 0, -5, 0)
     expect_equal(detect_direction(x), "positive")
 })
 
 test_that("detect_direction handles edge cases", {
-    ## falls back when net slope is NA
+    ## falls back when data are flat
     expect_equal(detect_direction(c(5, 5, 5, 5, 5)), "positive")
 
     ## falls back when all x are NA
     expect_equal(detect_direction(rep(NA_real_, 5)), "positive")
 
-    ## x has zero net slope, but fallback indicates negative
-    x <- c(0, 5, 10, 5, 0)
+    ## excursions tie, but fallback indicates negative
+    x <- c(0, 5, 0, -5, 0)
     fallback <- c(-1, -8, -2, -1, -3)
     expect_equal(detect_direction(x, fallback = fallback), "negative")
 })
@@ -1578,7 +1586,8 @@ test_that("analyse_kinetics.response_time respects global verbose option", {
             data,
             x,
             t,
-            method = "response_time"
+            method = "response_time",
+            direction = "negative"
         ),
         "No valid.*negative"
     )

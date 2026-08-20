@@ -128,10 +128,12 @@
 #' within the subsequent `end_window` time span. The curve fitting window
 #' extends to the end of `end_window` beyond the detected peak/trough.
 #'
-#' For *"monoexponential"* and *"sigmoidal"* methods, `direction` also
-#' constrains the sign of the fitted amplitude `B - A`, and the sigmoidal
-#' `slope`. A fit that cannot satisfy the requested direction returns `NA`
-#' coefficients with a warning.
+#' For *"monoexponential"*, *"biexponential"*, and *"sigmoidal"* methods,
+#' `direction` also constrains the sign of the fitted amplitude `B - A`, and
+#' the sigmoidal `slope`. For the *"biexponential"* method, `direction`
+#' constrains the sign of the overall fitted amplitude `B2 - A`. A fit that
+#' cannot satisfy the requested direction returns `NA` coefficients with a
+#' warning.
 #'
 #' ## Per-channel arguments
 #'
@@ -353,15 +355,13 @@
 #'
 #'   \item{`method`}{The method used, e.g. `"response_time"`.}
 #'   \item{`model`}{A named list of model objects (per interval, per
-#'       `nirs_channel`). For `"peak_slope"`, each element is an
-#'       [lm][stats::lm] object; for `"monoexponential"` and `"sigmoidal"`,
-#'       an [nls][stats::nls] object; for `"response_time"`, `NULL`. `NULL`
-#'       for channels where fitting failed. When a `direction`-bounded
-#'       refit was required, the stored model is parameterised with
-#'       amplitude `D = B - A` in place of `B`. Models are fitted on time
+#'       `nirs_channel`). For `"peak_slope"`; each element is an
+#'       [lm][stats::lm] object. For `"monoexponential"`,
+#'       `"biexponential"`, and `"sigmoidal"`; an [nls][stats::nls] object.
+#'       For `"response_time"`; `NULL`. Models are fitted on time 
 #'       *elapsed from* `start_time`, so [predict][stats::predict] expects
-#'       `.t` in those units; the offset for each interval is returned in
-#'       `interval_times$start_times`.}
+#'       `.t` in those units. The offset for each interval can be retrieved
+#'       from `interval_times$start_times`.}
 #'   \item{`coefficients`}{A [tibble][tibble::tibble-package] of coefficients
 #'       with one row per `nirs_channel` per interval, containing
 #'       method-specific parameters.}

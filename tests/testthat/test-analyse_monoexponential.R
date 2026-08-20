@@ -759,6 +759,8 @@ test_that("enforce_direction() refits and back-transforms an inverted fit", {
 
     expect_named(result, c("model", "coefs"))
     expect_named(result$coefs, c("A", "B", "tau"))
+    ## returned model re-expressed in original parameterisation, not D
+    expect_named(coef(result$model), c("A", "B", "tau"))
     ## refit satisfies the requested positive direction
     expect_gt(result$coefs[["B"]], result$coefs[["A"]])
     expect_equal(result$coefs[["A"]], 50, tolerance = 1e-3)

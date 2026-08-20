@@ -107,7 +107,7 @@ response_time <- function(
             verbose <- getOption("mnirs.verbose", default = TRUE)
         }
         ## detect direction from net trend, fallback to abs magnitude
-        direction <- detect_direction(x, t, x, direction)
+        direction <- detect_direction(x, t, direction = direction)
     }
 
     baseline_idx <- which(t <= start_time)

@@ -24,15 +24,20 @@ method_aliases <- c(
 
 #' Detect the direction of a response signal
 #'
-#' Resolves whether a signal is predominantly increasing (`"positive"`) or
-#' decreasing (`"negative"`) by computing the net slope of `x` over `t`.
-#' Used internally to disambiguate peak (maximum) from trough (minimum)
-#' detection when `direction = "auto"`.
+#' Resolves whether a signal responds upward (`"positive"`) or downward
+#' (`"negative"`) by comparing the excursions of `x` above and below its
+#' initial baseline, taken as the median of the earliest samples ordered
+#' by `t`. The dominant excursion captures the primary response direction
+#' even when a fast initial component partially recovers over most of the
+#' record (e.g. biexponential drop-recovery), where a net slope would
+#' misreport the trend. Used internally to disambiguate peak (maximum)
+#' from trough (minimum) detection when `direction = "auto"`.
 #'
 #' @param fallback A numeric vector (*defaults* to `x`) used to resolve
-#'   direction when the net slope of `x` is zero or `NA`. The absolute
-#'   maximum and minimum of `fallback` are compared; if `abs(max) >= abs(min)`,
-#'   `"positive"` is returned.
+#'   direction when the excursions above and below baseline tie (e.g.
+#'   flat or symmetric data). The absolute maximum and minimum of
+#'   `fallback` are compared; if `abs(max) >= abs(min)`, `"positive"` is
+#'   returned.
 #' @param direction A character string specifying the response direction to
 #'   detect when `"auto"` (*default*). When `"positive"` or `"negative"`
 #'   returns unchanged.
@@ -48,25 +53,28 @@ detect_direction <- function(
     direction = c("auto", "positive", "negative")
 ) {
     direction <- match.arg(direction)
-    if (direction == "auto") {
-        if (all(!is.finite(x))) {
-            return("positive")
-        }
-        net_slope <- slope(x, t, na.rm = TRUE, bypass_checks = TRUE)
-
-        direction <- if (is.na(net_slope) || net_slope == 0) {
-            ## fallback to abs magnitude comparison when net slope is zero/NA
-            max_pos <- abs(max(fallback, na.rm = TRUE))
-            min_neg <- abs(min(fallback, na.rm = TRUE))
-            if (max_pos >= min_neg) "positive" else "negative"
-        } else if (net_slope > 0) {
-            "positive"
-        } else {
-            "negative"
-        }
+    if (direction != "auto") {
+        return(direction)
+    }
+    if (all(!is.finite(x))) {
+        return("positive")
     }
 
-    return(direction)
+    ## order finite samples by time; baseline = median of the earliest
+    ## samples, shrinking to a single sample for short vectors
+    ok <- which(is.finite(x) & is.finite(t))
+    x_ord <- x[ok][order(t[ok])]
+    n_base <- max(1L, min(5L, length(x_ord) %/% 10L))
+    x0 <- stats::median(x_ord[seq_len(n_base)])
+
+    ## dominant excursion from baseline: (max - x0) vs (x0 - min);
+    ## fallback abs magnitude comparison breaks ties, itself tied positive
+    net <- max(x_ord) + min(x_ord) - 2 * x0
+    if (net == 0) {
+        net <- abs(max(fallback, na.rm = TRUE)) -
+            abs(min(fallback, na.rm = TRUE))
+    }
+    return(if (net >= 0) "positive" else "negative")
 }
 
 
@@ -88,11 +96,13 @@ detect_direction <- function(
 #' @details
 #' ## Direction detection
 #'
-#' When `direction = "auto"`, the net slope across all of `x` is computed
-#' to determine the overall trend. If positive, the function searches for
-#' a peak (maximum). If negative, it searches for a trough (minimum). When
-#' the net slope is zero or `NA`, the direction is determined by comparing
-#' `abs(max(x))` to `abs(min(x))`, with ties defaulting to `"positive"`.
+#' When `direction = "auto"`, the excursions of `x` above and below its
+#' initial baseline (the median of the earliest samples) are compared via
+#' [detect_direction()]. If the upward excursion dominates, the function
+#' searches for a peak (maximum); if the downward excursion dominates, a
+#' trough (minimum). When the excursions tie, the direction is determined
+#' by comparing `abs(max(x))` to `abs(min(x))`, with ties defaulting to
+#' `"positive"`.
 #'
 #' ## Negative time handling
 #'
@@ -155,7 +165,7 @@ find_kinetics_idx <- function(
     }
 
     ## direction detection, fallback to abs magnitude
-    direction <- detect_direction(x, t, x, direction)
+    direction <- detect_direction(x, t, direction = direction)
     extreme_fn <- if (direction == "positive") max else min
     compare_fn <- if (direction == "positive") `>=` else `<=`
     which_fn <- if (direction == "positive") which.max else which.min
@@ -1154,34 +1164,48 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
 
 #' Enforce the requested direction on a converged parametric fit
 #'
-#' Checks the sign of the fitted amplitude `B - A` against the
-#' requested `direction`. Satisfied fits are returned unchanged.
-#' Inverted fits are refit with amplitude `D = B - A` sign-bounded via
-#' `nls(algorithm = "port")`; sigmoid models divide by `D`, so its
-#' magnitude is floored strictly above zero. A refit that fails or
-#' pins any coefficient at a sign-floor bound (degenerate flat fit)
-#' warns and returns `NULL`. User-fixed parameters in `fix` are held
-#' constant in the refit: a fixed `A` or `B` is substituted into the
-#' amplitude reparameterisation; when both asymptotes are fixed the
-#' amplitude sign is predetermined, so an inverted fit cannot be
-#' refit and returns `NULL`.
+#' Checks the sign of the fitted amplitude `B - A` (or `B_name - A`)
+#' against the requested `direction`. Satisfied fits are returned
+#' unchanged. Inverted fits are refit with amplitude `D = B - A`
+#' sign-bounded via `nls(algorithm = "port")`; sigmoid models divide
+#' by `D`, so its magnitude is floored strictly above zero. An
+#' accepted refit is then re-expressed in the original
+#' parameterisation, refit from its own optimum, so the returned
+#' model reports consistent coefficient names (`A`, `B`, ...) rather
+#' than `D`. A refit that fails, pins a sign-floored coefficient
+#' (degenerate flat fit), or loses the requested sign on
+#' re-expression warns and returns `NULL`. User-fixed parameters in
+#' `fix` are held constant in the refit: a fixed `A` or `B` is
+#' substituted into the amplitude reparameterisation; when both
+#' asymptotes are fixed the amplitude sign is predetermined, so an
+#' inverted fit cannot be refit and returns `NULL`.
 #'
 #' @param model A converged [nls][stats::nls] model object.
-#' @param coefs Named numeric coefficient vector including `A`, `B`
-#'   (fixed values merged in, e.g. from [full_coefs()]).
+#' @param coefs Named numeric coefficient vector including `A` and
+#'   the `B_name` asymptote (fixed values merged in, e.g. from
+#'   [full_coefs()]).
 #' @param fit_data Data frame with columns `.x` and `.t`.
 #' @param direction Character; resolved `"positive"` or `"negative"`.
-#' @param amp_fn Symbol; exported model fn taking `(t, A, B, ...)`.
+#' @param amp_fn Symbol; exported model fn taking `t`, `A`, and the
+#'   `B_name` asymptote as named arguments.
+#' @param B_name Character; name of the asymptote coefficient whose
+#'   difference from `A` defines the directed amplitude (*default*
+#'   `"B"`; `"B2"` for the biexponential).
 #' @param extra Named numeric start values for remaining free params.
 #' @param extra_lower,extra_upper Named numeric bound overrides for
 #'   `extra` params. Sign-floor bounds should be data-scaled small
 #'   values (not `.Machine$double.eps`) so pinned-floor degeneracy is
 #'   detectable.
+#' @param floor_params Character; names of refit coefficients subject
+#'   to the pinned-floor degeneracy check. `NULL` (*default*) checks
+#'   every finite bound; restrict when other bounds are structural
+#'   (e.g. the biexponential time-constant bounds).
 #' @param fn Symbol or character; the self-start fn named in the
 #'   warning.
 #' @param .nirs Character; the channel name.
 #' @param interval_name Character; the interval label.
-#' @param fix Named list of user-fixed parameter values.
+#' @param fix Named list of user-fixed parameter values; values may
+#'   be language objects expressed in other free parameters.
 #' @inheritParams validate_mnirs
 #'
 #' @returns A named list `list(model, coefs)` with `coefs` a named
@@ -1197,8 +1221,10 @@ enforce_direction <- function(
     direction,
     amp_fn,
     extra,
+    B_name = "B",
     extra_lower = NULL,
     extra_upper = NULL,
+    floor_params = NULL,
     fn,
     .nirs,
     interval_name,
@@ -1208,7 +1234,7 @@ enforce_direction <- function(
 ) {
     ## keep the unconstrained fit when direction is already satisfied
     want <- if (direction == "positive") 1 else -1
-    if (sign(coefs[["B"]] - coefs[["A"]]) == want) {
+    if (sign(coefs[[B_name]] - coefs[["A"]]) == want) {
         return(list(model = model, coefs = coefs))
     }
 
@@ -1224,23 +1250,46 @@ enforce_direction <- function(
         return(NULL)
     }
 
+    ## shared bounded refit; both passes differ only in formula and bounds.
+    ## the refit may start far from its constrained optimum, so it gets
+    ## the same iteration budget as the primary fit
+    port_fit <- function(rhs, start, lower, upper) {
+        tryCatch(
+            nls(
+                stats::as.formula(call("~", quote(.x), rhs)),
+                fit_data,
+                start = start,
+                lower = lower,
+                upper = upper,
+                algorithm = "port",
+                control = stats::nls.control(maxiter = 500L)
+            ),
+            error = \(e) NULL
+        )
+    }
+
     ## both asymptotes fixed: amplitude sign is predetermined and
     ## contradicts the requested direction; no refit possible
     A_fixed <- fix[["A"]]
-    B_fixed <- fix[["B"]]
+    B_fixed <- fix[[B_name]]
     if (!is.null(A_fixed) && !is.null(B_fixed)) {
         return(direction_failed())
     }
 
-    ## refit start: amplitude D seeded in the requested direction
-    D0 <- want *
-        max(abs(coefs[["B"]] - coefs[["A"]]), diff(range(fit_data$.x)) * 0.1)
-    D_eps <- diff(range(fit_data$.x)) * 1e-6
+    ## refit start: amplitude D seeded in the requested direction. a
+    ## weakly identified fit can strand the asymptote far beyond the
+    ## data, so the seed magnitude is confined to the observed scale
+    x_span <- diff(range(fit_data$.x))
+    D0 <- want * min(
+        max(abs(coefs[[B_name]] - coefs[["A"]]), x_span * 0.1),
+        x_span
+    )
+    D_eps <- x_span * 1e-6
 
     ## build rhs on amplitude D = B - A, substituting any fixed
     ## asymptote: A free `amp_fn(.t, A, A + D, ...)`, B fixed
     ## `amp_fn(.t, B - D, B, ...)`. Remaining params ride as named
-    ## args: free as symbols, fixed as constants
+    ## args: free as symbols, fixed as constants or expressions
     A_expr <- if (is.null(B_fixed)) {
         A_fixed %||% quote(A)
     } else {
@@ -1248,11 +1297,14 @@ enforce_direction <- function(
     }
     B_expr <- B_fixed %||% call("+", A_expr, quote(D))
     tail_args <- c(
-        fix[setdiff(names(fix), c("A", "B"))],
+        fix[setdiff(names(fix), c("A", B_name))],
         setNames(lapply(names(extra), as.name), names(extra))
     )
-    rhs <- as.call(c(amp_fn, quote(.t), A_expr, B_expr, tail_args))
-    nls_formula <- stats::as.formula(call("~", quote(.x), rhs))
+    rhs <- as.call(c(
+        amp_fn, quote(.t),
+        setNames(list(A_expr, B_expr), c("A", B_name)),
+        tail_args
+    ))
 
     ## box bounds: D sign-constrained with strictly positive magnitude
     ## floor (sigmoid models divide by D); extras unbounded unless
@@ -1272,24 +1324,20 @@ enforce_direction <- function(
     lower[names(extra_lower)] <- extra_lower
     upper[names(extra_upper)] <- extra_upper
 
-    refit <- tryCatch(
-        nls(
-            nls_formula,
-            fit_data,
-            start = start,
-            lower = lower,
-            upper = upper,
-            algorithm = "port"
-        ),
-        error = \(e) NULL
-    )
+    refit <- port_fit(rhs, start, lower, upper)
 
-    ## any coefficient pinned at a sign-floor bound (e.g. D, slope,
+    ## a coefficient pinned at a sign-floor bound (e.g. D, slope,
     ## tau) indicates a degenerate flat fit: no genuine response in
-    ## the requested direction.
+    ## the requested direction. `floor_params` restricts the check
+    ## where other bounds are structural rather than sign floors
     cf <- if (is.null(refit)) NULL else coef(refit)
-    floors <- abs(ifelse(is.finite(lower), lower, upper))
-    if (is.null(cf) || any(is.finite(floors) & abs(cf) <= 2 * floors)) {
+    chk <- if (is.null(floor_params)) {
+        names(lower)
+    } else {
+        intersect(floor_params, names(lower))
+    }
+    floors <- abs(ifelse(is.finite(lower[chk]), lower[chk], upper[chk]))
+    if (is.null(cf) || any(is.finite(floors) & abs(cf[chk]) <= 2 * floors)) {
         return(direction_failed())
     }
 
@@ -1299,13 +1347,43 @@ enforce_direction <- function(
     } else {
         B_fixed - cf[["D"]]
     }
-    out <- c(
-        A = unname(A_val),
-        B = unname(A_val + cf[["D"]]),
-        cf[setdiff(names(cf), c("A", "D"))],
-        unlist(fix[setdiff(names(fix), c("A", "B"))])
+    B_val <- A_val + cf[["D"]]
+
+    ## re-express in the original parameterisation so the returned
+    ## model reports consistent coefficient names rather than D. the
+    ## accepted refit is an interior local minimum, so a bounded
+    ## refit started there converges in place
+    rhs2 <- as.call(c(
+        amp_fn, quote(.t),
+        setNames(
+            list(A_fixed %||% quote(A), B_fixed %||% as.name(B_name)),
+            c("A", B_name)
+        ),
+        tail_args
+    ))
+    start2 <- c(
+        if (is.null(A_fixed)) c(A = unname(A_val)),
+        if (is.null(B_fixed)) setNames(unname(B_val), B_name),
+        cf[setdiff(names(cf), c("A", "D"))]
     )
-    return(list(model = refit, coefs = out))
+    lower2 <- setNames(rep(-Inf, length(start2)), names(start2))
+    upper2 <- setNames(rep(Inf, length(start2)), names(start2))
+    lower2[names(extra_lower)] <- extra_lower
+    upper2[names(extra_upper)] <- extra_upper
+
+    refit2 <- port_fit(rhs2, start2, lower2, upper2)
+
+    ## merge fixed values back into the reported coefficients; a
+    ## language fix value is an expression in a free parameter and
+    ## has no constant to merge. re-expression must hold the
+    ## requested sign, else the direction cannot be satisfied
+    fix_num <- fix[vapply(fix, is.numeric, logical(1))]
+    cf2 <- if (is.null(refit2)) NULL else coef(refit2)
+    out <- c(cf2, unlist(fix_num[setdiff(names(fix_num), names(cf2))]))
+    if (is.null(cf2) || sign(out[[B_name]] - out[["A"]]) != want) {
+        return(direction_failed())
+    }
+    return(list(model = refit2, coefs = out))
 }
 
 

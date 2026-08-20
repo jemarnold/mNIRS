@@ -639,6 +639,140 @@ test_that("analyse_biexponential() direction steers the fit window", {
     expect_equal(attr(result, "channel_args")$direction, "negative")
 })
 
+test_that("analyse_biexponential() direction = 'negative' matches auto on falling data", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    result_auto <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        direction = "auto",
+        verbose = FALSE
+    )
+    result_neg <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        direction = "negative",
+        verbose = FALSE
+    )
+
+    ## matching direction leaves the unconstrained fit untouched
+    expect_equal(result_auto$A, result_neg$A)
+    expect_equal(result_auto$B2, result_neg$B2)
+    expect_equal(result_auto$tau1, result_neg$tau1)
+    expect_true(result_auto$B2 < result_auto$A)
+})
+
+test_that("analyse_biexponential() direction = 'positive' rejects inverted overall amplitude", {
+    ## upward excursion but plateau just below baseline: B2 - A < 0, so
+    ## a positive overall amplitude cannot be genuinely satisfied
+    data <- create_biexp_data(A = 70, B1 = 95, B2 = 69, noise_sd = 0.3)
+
+    expect_warning(
+        result <- analyse_biexponential(
+            data,
+            nirs_channels = "smo2",
+            use_TD = FALSE,
+            direction = "positive",
+            verbose = TRUE
+        ),
+        "satisfy"
+    )
+
+    ## never returns an inverted (B2 < A) fit against requested direction
+    expect_true(is.na(result$A))
+    expect_true(is.na(result$B2))
+    expect_true(is.na(result$tau1))
+})
+
+test_that("enforce_direction() refits an inverted biexponential on B2 - A", {
+    ## genuinely rising data, but the supplied coefs are inverted
+    ## (B2 < A): forces the sign-mismatch branch; the bounded refit
+    ## recovers the true positive response with consistent coef names
+    t <- seq(0, 119)
+    x <- biexponential(t, A = 70, B1 = 90, tau1 = 5, B2 = 80, tau2 = 40)
+    fit_data <- data.frame(.x = x, .t = t)
+    coefs <- c(A = 80, B1 = 90, lt1 = log(5), B2 = 70, lr = log(8))
+
+    result <- enforce_direction(
+        model = NULL,
+        coefs = coefs,
+        fit_data = fit_data,
+        direction = "positive",
+        amp_fn = quote(biexponential_ratio),
+        extra = coefs[c("B1", "lt1", "lr")],
+        B_name = "B2",
+        extra_lower = c(lt1 = log(diff(range(t)) / 1000), lr = log(2.5)),
+        floor_params = "D",
+        fn = quote(SSbiexponential),
+        .nirs = "smo2",
+        interval_name = "test",
+        verbose = FALSE
+    )
+
+    expect_named(result, c("model", "coefs"))
+    expect_named(result$coefs, c("A", "B2", "B1", "lt1", "lr"))
+    ## returned model re-expressed in original parameterisation, not D
+    expect_named(coef(result$model), c("A", "B2", "B1", "lt1", "lr"))
+    expect_gt(result$coefs[["B2"]], result$coefs[["A"]])
+    expect_equal(result$coefs[["A"]], 70, tolerance = 1e-2)
+    expect_equal(result$coefs[["B2"]], 80, tolerance = 1e-2)
+})
+
+test_that("analyse_biexponential() suppresses direction warning when verbose = FALSE", {
+    data <- create_biexp_data(A = 70, B1 = 95, B2 = 69, noise_sd = 0.3)
+
+    expect_no_warning(
+        result <- analyse_biexponential(
+            data,
+            nirs_channels = "smo2",
+            use_TD = FALSE,
+            direction = "positive",
+            verbose = FALSE
+        )
+    )
+    expect_true(is.na(result$A))
+})
+
+test_that("analyse_biexponential() direction with both asymptotes fixed returns NA", {
+    ## fixed A and B2 predetermine a negative overall amplitude, which
+    ## contradicts the requested positive direction: no refit possible
+    data <- create_biexp_data(A = 70, B1 = 95, B2 = 69, noise_sd = 0.3)
+
+    expect_warning(
+        result <- analyse_biexponential(
+            data,
+            nirs_channels = "smo2",
+            use_TD = FALSE,
+            fix = list(A = 70, B2 = 69),
+            direction = "positive",
+            verbose = TRUE
+        ),
+        "satisfy"
+    )
+
+    expect_true(is.na(result$A))
+    expect_true(is.na(result$tau1))
+})
+
+test_that("analyse_kinetics() passes direction to biexponential method", {
+    data <- create_biexp_data(A = 70, B1 = 95, B2 = 69, noise_sd = 0.3)
+
+    expect_warning(
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = "smo2",
+            method = "biexponential",
+            use_TD = FALSE,
+            direction = "positive"
+        ),
+        "satisfy"
+    )
+
+    expect_true(is.na(result$coefficients$A))
+})
+
 
 
 ## fixed parameters =================================================

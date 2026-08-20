@@ -329,7 +329,7 @@ peak_slope <- function(
         return(na_result)
     }
 
-    ## detect direction from net trend, fallbackt to abs peak slope
+    ## detect direction from dominant excursion, fallback to abs peak slope
     direction <- detect_direction(x, t, slopes, direction)
 
     ## manual direction calculation
