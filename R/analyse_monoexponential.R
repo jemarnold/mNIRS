@@ -92,7 +92,7 @@ monoexponential <- function(t, A, B, tau, TD = NULL) {
 #' @keywords internal
 monoexp_init <- function(mCall, data, LHS, ...) {
     ## self-start parameters for nls of monoexponential fit function
-    tx <- stats::sortedXyData(mCall[["t"]], LHS, data)
+    tx <- sortedXyData(mCall[["t"]], LHS, data)
     x <- tx[["y"]]
     t <- tx[["x"]]
 

@@ -1,17 +1,18 @@
 #' Biexponential function
 #'
 #' Calculate a 5- or 6-parameter biexponential curve: a fast component that
-#' carries the response to a rounded turning point, followed by a slow
-#' component that recovers toward a stable plateau.
+#' carries the response to an excursion point, followed by a slow component
+#' that recovers toward a stable plateau.
 #'
 #' @param t A numeric vector of the predictor variable (time).
 #' @param A A numeric parameter for the starting value of the response
 #'   variable (the `t = 0` intercept).
-#' @param B1 A numeric parameter for the asymptote of the *fast* component;
-#'   the value the initial excursion heads toward at the turning point.
+#' @param B1 A numeric parameter for the asymptote of the initial *fast*
+#'   component; the value the initial response approaches at the excursion
+#'   point.
 #' @param tau1 A numeric parameter for the *fast* time constant (\eqn{\tau_1}),
 #'   in units of the predictor variable `t`. Dominates the initial steep
-#'   excursion.
+#'   response.
 #' @param B2 A numeric parameter for the asymptote of the *slow* component;
 #'   the stable plateau the response recovers toward as `t` approaches
 #'   infinity.
@@ -34,22 +35,18 @@
 #' 6-parameter model (with time delay), where `ts = pmax(t - TD, 0)`:
 #'   `A + (B1 - A) * (1 - exp(-ts / tau1)) + (B2 - B1) * (1 - exp(-ts / tau2))`
 #'
-#' Clamping the shifted time at zero holds the curve at the baseline `A` until
-#' the onset of the response at `t = TD`.
-#'
-#' `A`, `B1`, and `B2` are all values on the response scale, consistent with
-#' the asymptote parameters of [monoexponential()] and the sigmoidal models.
-#' The fast component `B1`/`tau1` drives the steep initial response away from
-#' `A`; the slow component `B2`/`tau2` then carries the curve toward the
-#' plateau `B2`, the response value as `t` approaches infinity.
-#'
-#' An excursion response places `B1` beyond both `A` and `B2` (below for a
-#' fall-recover response, above for a rise-overshoot), so the turning point is
-#' a minimum or a maximum accordingly. `B1` is the target of the fast component
-#' and lies *near* but not exactly at the turning value; the exact turning
-#' point is reported by [analyse_kinetics()] as `excursion_value`. A `B1`
-#' between `A` and `B2` gives a monotone two-phase response, and `B1 = B2`
-#' reduces the model to a [monoexponential()] with asymptote `B2`.
+#' `A`, `B1`, and `B2` are all values on the response scale. The fast component
+#' `B1` & `tau1` drives the steep initial response away from `A` to the 
+#' excursion point. The slow component `B2` & `tau2` then carries the curve
+#' toward the plateau `B2` as `t` approaches infinity.
+#' 
+#' The expected response is a *fast* overshoot to a minimum or maximum at the
+#' excursion point near (but not exactly equal to) `B1`, followed by a *slow*
+#' recovery back to a stable plateau at `B2`. The exact excursion point is
+#' reported by [analyse_kinetics()] as `excursion_value` at `excursion_time`.
+#' If `B1` is between `A` and `B2`, the response curve will be monotonic but
+#' still two-phase. If `B1 = B2`, the curve reduces to a [monoexponential()]
+#' with single time constant `tau` and asymptote `B2`.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -132,7 +129,7 @@ biexponential_ratio <- function(t, A, B1, lt1, B2, lr, TD = NULL) {
 #'
 #' @keywords internal
 biexp_init <- function(mCall, data, LHS, ...) {
-    tx <- stats::sortedXyData(mCall[["t"]], LHS, data)
+    tx <- sortedXyData(mCall[["t"]], LHS, data)
     x <- tx[["y"]]
     t <- tx[["x"]]
 
@@ -202,6 +199,7 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #'
 #' [analyse_kinetics()] fits this model with `algorithm = "port"` and box
 #'   bounds, including a lower bound on `lr` set by its `tau_ratio` argument.
+#'   Resulting model parameters may differ from [SSbiexponential()].
 #'
 #' ## Fixing parameters
 #'
@@ -227,6 +225,8 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #' model <- nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr), data = data)
 #' summary(model)
 #'
+#' y <- predict(model, data)
+#'
 #' ## convert the log-scale time constants to the natural scale
 #' with(as.list(coef(model)), c(tau1 = exp(lt1), tau2 = exp(lt1 + lr)))
 #'
@@ -246,8 +246,6 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #'     x ~ SSbiexponential(t, A = 70, B1, lt1, B2, lr), data = data
 #' )
 #' summary(model_fixed)
-#'
-#' y <- predict(model, data)
 #'
 #' \donttest{
 #'     if (requireNamespace("ggplot2", quietly = TRUE)) {
@@ -542,14 +540,10 @@ analyse_biexponential <- function(
             ## dropping TD narrows the window, so subset per attempt
             keep <- keep_rows(.params)
             fit_biexp_ratio(
-                x_fit[keep],
-                t_fit[keep],
-                .params,
-                .a$fix,
-                tau_ratio,
+                x_fit[keep], t_fit[keep], .params, .a$fix, tau_ratio,
                 \(e) {
                     warn_fit_failed(
-                        quote(biexponential),
+                        quote(SSbiexponential),
                         e,
                         .nirs,
                         interval_name,

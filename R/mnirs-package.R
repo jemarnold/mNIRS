@@ -22,6 +22,7 @@
 #' @importFrom stats predict
 #' @importFrom stats rnorm
 #' @importFrom stats setNames
+#' @importFrom stats sortedXyData
 #' @importFrom tibble tibble
 ## usethis namespace: end
 NULL

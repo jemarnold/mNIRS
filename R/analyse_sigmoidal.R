@@ -197,7 +197,7 @@ gompertz_left <- function(t, A, B, xmid, slope) {
 #'
 #' @keywords internal
 logistic_init <- function(mCall, data, LHS, ...) {
-    tx <- stats::sortedXyData(mCall[["t"]], LHS, data)
+    tx <- sortedXyData(mCall[["t"]], LHS, data)
     x <- tx[["y"]]
     t <- tx[["x"]]
     n <- length(x)
@@ -287,7 +287,7 @@ logistic_init <- function(mCall, data, LHS, ...) {
 #'
 #' @keywords internal
 gompertz_init <- function(mCall, data, LHS, ...) {
-    tx <- stats::sortedXyData(mCall[["t"]], LHS, data)
+    tx <- sortedXyData(mCall[["t"]], LHS, data)
     x <- tx[["y"]]
     t <- tx[["x"]]
     n <- length(x)
