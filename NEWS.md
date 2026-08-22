@@ -1,5 +1,16 @@
 # mnirs 0.7.2
 
+* `extract_intervals()` now accepts a list of multiple `start` and/or `end` values with mixed `by_time()`, `by_label()`, `by_lap()`, or `by_sample()`. Intervals are matched by user-specified order.
+
+``` r
+## combine multiple specification types for one boundary
+extract_intervals(
+    data, 
+    start = list(by_lap(2), by_time(400)),
+    end = list(by_lap(3), by_label("10-min marker"))
+)
+```
+
 * `palette_mnirs()` now returns unnamed colours, which was disrupting use with `ggplot2::scale_colour_manual()`.
 
 ``` r

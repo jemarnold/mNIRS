@@ -28,6 +28,12 @@
 #'   - Explicit integer (e.g. `2L`) -> [by_lap()].
 #'   - Use [by_sample()] explicitly for sample indices.
 #'
+#' Multiple specification types can be combined for a single boundary with
+#' `list()` (e.g. `list(by_time(30), by_label("go"))`). Resolved
+#' boundary times are concatenated in the order supplied. Combined
+#' specifications must use the `by_` helpers directly: raw values are
+#' ignored with a warning.
+#'
 #' @returns An object of class `"mnirs_interval"` for use with the `start`
 #'   and `end` arguments of [extract_intervals()].
 #'
@@ -69,6 +75,9 @@
 #'
 #' ## multiple intervals by sample index
 #' extract_intervals(data, start = by_sample(1000, 1500))
+#'
+#' ## combine multiple specification types for one boundary
+#' extract_intervals(data, start = list(by_lap(2), by_time(400)), span = 0)
 #'
 #' @export
 by_time <- function(...) {
@@ -147,8 +156,44 @@ by_sample <- function(...) {
 #' @inheritParams validate_mnirs
 #' @keywords internal
 as_mnirs_interval <- function(x, arg = "start", env = rlang::caller_env()) {
-    if (is.null(x) || inherits(x, "mnirs_interval")) {
+    if (is.null(x) || inherits(x, c("mnirs_interval", "mnirs_interval_list"))) {
         return(x)
+    }
+    ## bare lists combine multiple by_* specs
+    if (is.list(x)) {
+        ## c() flattens spec components into a plain named list
+        if ("type" %in% names(x)) {
+            cli_abort(c(
+                "x" = "{.arg {arg}}: specifications combined with {.fn c}.",
+                "i" = "Combine multiple {.fn by_*} specifications with \\
+                {.fn list}."
+            ), call = env)
+        }
+        ## splice nested containers flat, drop NULL elements
+        specs <- unlist(lapply(x, \(.x) {
+                if (inherits(.x, "mnirs_interval_list")) {
+                    return(unclass(.x))
+                }
+                list(.x)
+            }), recursive = FALSE)
+        specs <- specs[lengths(specs) > 0L]
+        ## combined specs must use by_* directly: warn & ignore raw values
+        valid <- vapply(specs, inherits, logical(1), "mnirs_interval")
+        if (any(!valid)) {
+            cli_warn(c(
+                "!" = "{.arg {arg}}: ignoring {sum(!valid)} element{?s}.",
+                "i" = "Multiple {.arg start} and/or {.arg end} values must \\
+                be specified with {.fn by_*}."
+            ), call = warn_call(env))
+        }
+        specs <- specs[valid]
+        if (length(specs) == 0L) {
+            return(NULL)
+        }
+        if (length(specs) == 1L) {
+            return(specs[[1L]])
+        }
+        return(structure(specs, class = "mnirs_interval_list"))
     }
     ## integer before numeric — integers are also numeric in R
     if (is.integer(x)) {
@@ -242,6 +287,12 @@ find_interval_time <- function(
     position = c("first", "last"),
     env = rlang::caller_env()
 ) {
+    ## multi-spec container: resolve each spec, concatenate in supplied order
+    if (inherits(interval, "mnirs_interval_list")) {
+        return(unlist(lapply(interval, \(.x) {
+            find_interval_time(.x, t_vec, event_vec, position, env)
+        }), use.names = FALSE))
+    }
     switch(
         interval$type,
         time = interval$by_time,

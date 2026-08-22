@@ -156,7 +156,53 @@ test_that("as_mnirs_interval coerces integer to by_lap", {
 
 test_that("as_mnirs_interval errors on unsupported type", {
     expect_error(as_mnirs_interval(TRUE, "start"), "start.*must be")
-    expect_error(as_mnirs_interval(list(1), "end"), "end.*must be")
+})
+
+test_that("as_mnirs_interval combines a list of by_ specs", {
+    result <- as_mnirs_interval(list(by_time(30), by_label("go")))
+    expect_s3_class(result, "mnirs_interval_list")
+    expect_length(result, 2L)
+    expect_identical(result[[1L]], by_time(30))
+    expect_identical(result[[2L]], by_label("go"))
+})
+
+test_that("as_mnirs_interval unwraps single-spec and empty lists", {
+    ## length-1 list unwraps to the bare spec
+    expect_identical(as_mnirs_interval(list(by_time(30))), by_time(30))
+    ## empty and NULL-only lists resolve to NULL silently
+    expect_null(as_mnirs_interval(list()))
+    expect_null(as_mnirs_interval(list(NULL)))
+})
+
+test_that("as_mnirs_interval warns and ignores raw values in lists", {
+    ## all-raw list warns and returns NULL
+    expect_warning(
+        result <- as_mnirs_interval(list(30, "go"), "start"),
+        "start.*ignoring 2 elements"
+    )
+    expect_null(result)
+    ## single raw value in list warns, no specs remain
+    expect_warning(
+        result <- as_mnirs_interval(list(1), "end"),
+        "end.*ignoring 1 element"
+    )
+    expect_null(result)
+})
+
+test_that("as_mnirs_interval errors on specs combined with c()", {
+    ## c() flattens spec components into a plain named list
+    expect_error(
+        as_mnirs_interval(c(by_time(30), by_label("go")), "start"),
+        "combined with.*c.*Combine multiple.*list"
+    )
+})
+
+test_that("as_mnirs_interval flattens nested containers", {
+    inner <- as_mnirs_interval(list(by_time(1), by_label("a")))
+    result <- as_mnirs_interval(list(inner, by_lap(2)))
+    expect_s3_class(result, "mnirs_interval_list")
+    expect_length(result, 3L)
+    expect_identical(result[[3L]], by_lap(2))
 })
 
 
@@ -312,6 +358,29 @@ test_that("find_interval_time errors when lap not found", {
             position = "first"
         ),
         "No samples found for lap"
+    )
+})
+
+test_that("find_interval_time resolves multi-spec containers in spec order", {
+    t_vec <- seq(0.1, 10, by = 0.1)
+
+    ## preserves supplied spec order, not time order
+    result <- find_interval_time(
+        as_mnirs_interval(list(by_time(100), by_sample(1))), t_vec
+    )
+    expect_equal(result, c(100, t_vec[1]))
+})
+
+test_that("find_interval_time errors on no-match label within container", {
+    t_vec <- seq(0.1, 10, by = 0.1)
+    event_vec <- c(rep("", 50), "marker", rep("", 49))
+
+    expect_error(
+        find_interval_time(
+            as_mnirs_interval(list(by_time(5), by_label("missing"))),
+            t_vec, event_vec
+        ),
+        "No events detected"
     )
 })
 
@@ -1441,7 +1510,7 @@ test_that("extract_intervals validates start/end args", {
     expect_error(
         extract_intervals(
             data,
-            end = list(1),
+            end = FALSE,
             span = c(-1, 1)
         ),
         "end.*must be"
@@ -1717,6 +1786,106 @@ test_that("extract_intervals coerces raw integer to by_lap", {
     expect_equal(result[[1]]$time[1], 1.0)
     expect_equal(rev(result[[1]]$time)[1], 3.9)
     expect_equal(nrow(result[[1]]), 30)
+})
+
+test_that("extract_intervals combines multiple start specs in spec order", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+    data$event[51] <- "marker" ## time = 5.0
+
+    result <- extract_intervals(
+        data = data,
+        event_channel = "event",
+        group_intervals = "distinct",
+        start = list(by_time(3), by_label("marker")),
+        span = c(0, 1),
+        verbose = FALSE
+    )
+
+    ## intervals follow supplied spec order: time 3 first, marker (5) second
+    expect_length(result, 2)
+    expect_equal(result[[1]]$time[1], 3)
+    expect_equal(result[[2]]$time[1], 5)
+
+    ## c()-combined specs error with list() hint
+    expect_error(
+        extract_intervals(
+            data = data,
+            event_channel = "event",
+            group_intervals = "distinct",
+            start = c(by_time(3), by_label("marker")),
+            span = c(0, 1),
+            verbose = FALSE
+        ),
+        "combined with.*c.*Combine multiple.*list"
+    )
+})
+
+test_that("extract_intervals warns and ignores raw values in multi-spec", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    expect_warning(
+        result <- extract_intervals(
+            data = data,
+            group_intervals = "distinct",
+            start = list(by_time(3), 500),
+            span = c(0, 1),
+            verbose = FALSE
+        ),
+        "ignoring 1 element"
+    )
+
+    ## only the by_ spec used
+    expect_length(result, 1)
+    expect_equal(result[[1]]$time[1], 3)
+})
+
+test_that("extract_intervals multi-spec detects event_channel requirement", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+    attr(data, "event_channel") <- NULL
+    data$event <- NULL
+
+    expect_error(
+        extract_intervals(
+            data = data,
+            end = list(by_time(10), by_lap(2)),
+            span = c(0, 1),
+            verbose = FALSE
+        ),
+        "event_channel.*required"
+    )
+})
+
+test_that("extract_intervals warns on unequal multi-spec lengths", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+    data$event[51] <- "marker"
+
+    expect_warning(
+        result <- extract_intervals(
+            data = data,
+            event_channel = "event",
+            group_intervals = "distinct",
+            start = list(by_time(1), by_label("marker")),
+            end = by_time(8),
+            span = c(0, 0),
+            verbose = FALSE
+        ),
+        "Unequal lengths"
+    )
+    expect_length(result, 1)
+})
+
+test_that("extract_intervals errors when specs resolve to empty", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    expect_error(
+        extract_intervals(
+            data = data,
+            start = list(),
+            end = NULL,
+            verbose = FALSE
+        ),
+        "No interval specification"
+    )
 })
 
 test_that("extract_intervals recycles positive span scalar", {

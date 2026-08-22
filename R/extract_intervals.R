@@ -47,12 +47,14 @@
 #' @param start Specifies where intervals begin. Either raw values -- numeric
 #'   for time values, character for event labels, explicit integer (e.g. `2L`)
 #'   for lap numbers -- or created with [by_time()], [by_label()], [by_lap()],
-#'   or [by_sample()].
+#'   or [by_sample()]. Multiple specifications can be combined with
+#'   `list()` (e.g. `list(by_time(30), by_label("go"))`); see *Details*.
 #'
 #' @param end Specifies where intervals end. Either raw values -- numeric for
 #'   time values, character for event labels, explicit integer (e.g. `2L`)
 #'   for lap numbers -- or created with [by_time()], [by_label()], [by_lap()],
-#'   or [by_sample()].
+#'   or [by_sample()]. Multiple specifications can be combined with
+#'   `list()` (e.g. `list(by_time(30), by_label("go"))`); see *Details*.
 #'
 #' @param span A one- or two-element numeric vector `c(before, after)` in units
 #'   of `time_channel`, or a `list()` of such vectors. (*default*
@@ -98,6 +100,12 @@
 #'
 #' `start` and `end` can use different specification types (e.g., start by
 #' label, end by time). When lengths differ, the shorter is recycled.
+#'
+#' Multiple specification types can be combined for a single boundary with
+#' `list()` (e.g. `start = list(by_time(30), by_label("go"))`).
+#' Resolved boundary times are concatenated in the order supplied. Combined
+#' specifications must use the `by_` helpers directly: raw values are ignored
+#' with a warning.
 #'
 #' ## Time span window
 #'
@@ -279,15 +287,20 @@ extract_intervals <- function(
     if (is.null(c(start, end))) {
         cli_abort(c(
             "x" = "No interval specification provided.",
-            "i" = "Specify {.arg start} and/or {.arg end} using \\
-            {.fn by_time}, {.fn by_sample}, {.fn by_label}, or {.fn by_lap}."
+            "i" = "Multiple {.arg start} and/or {.arg end} values must be \\
+            specified with {.fn by_*}."
         ))
     }
 
     ## resolve event_channel if by_label or by_lap is used
-    uses_event_channel <- (inherits(start, "mnirs_interval") &&
-        start$type %in% c("label", "lap")) ||
-        (inherits(end, "mnirs_interval") && end$type %in% c("label", "lap"))
+    ## flatten single specs and containers to one plain spec list
+    specs <- c(
+        if (inherits(start, "mnirs_interval")) list(start) else unclass(start),
+        if (inherits(end, "mnirs_interval")) list(end) else unclass(end)
+    )
+    uses_event_channel <- any(
+        vapply(specs, `[[`, character(1), "type") %in% c("label", "lap")
+    )
 
     ## report conditions raised in handlers/lambdas from this function
     env <- environment()

@@ -261,7 +261,8 @@ by_lap(...)    # integer lap numbers (start = first sample, end = last)
 by_sample(...) # integer row indices
 ```
 
-- `start`/`end` may mix types; shorter recycled. `by_label()`/`by_lap()` need `event_channel`.
+- `by_label()`/`by_lap()` need `event_channel`.
+- `start`/`end` may accept `list()` of multiple mixed `by_*()` types (e.g. `start = list(by_time(30), by_label("go"))`); resolved times concatenated in supplied order.
 - `span = c(before, after)`: negative expands bound earlier before start, positive expands bound later after end; single value recycled by sign (`60` → `c(0, 60)`, `-60` → `c(-60, 0)`).
 - `span`/`group_channels` as `list()` per interval group; recycled as needed.
 
