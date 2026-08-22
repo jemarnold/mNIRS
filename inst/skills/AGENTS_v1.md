@@ -1,9 +1,8 @@
 # `{mnirs}` Agent Reference
 
-**v0.7.0 | R | MIT** — workflow/dependency map for muscle near-infrared
-spectroscopy (mNIRS) processing & analysis package. 
-Website: https://jemarnold.github.io/mnirs/.
-See `README.md` + vignettes for examples.
+**v0.8.0 | R (>= 4.1) | MIT** — workflow/dependency map for muscle
+near-infrared spectroscopy (mNIRS) processing & analysis package.
+Website: https://jemarnold.github.io/mnirs/
 
 Read `.xls(x)`/`.csv`/`.txt`/`.tsv` exports → resample → clean → filter → (transform)
 → extract intervals → analyse kinetics → plot.
@@ -25,7 +24,7 @@ Access metadata with `attributes(data)` or individually, eg: `attr(data, "nirs_c
 | `interval_times` | list | `list(start, end)`; set by `extract_intervals()` |
 | `interval_span` | numeric(2) | span used in `extract_intervals()` |
 
-`verbose` read from `getOption("mnirs.verbose", TRUE)` or passed explicitly.
+`verbose` logical to display/suppress warning messages, controlled globally `getOption("mnirs.verbose", TRUE)` or passed explicitly.
 
 ---
 
@@ -33,57 +32,44 @@ Access metadata with `attributes(data)` or individually, eg: `attr(data, "nirs_c
 
 ```
 read_mnirs()
-└─ plot()                              # visualise "mnirs" data at each step
-   └─ resample_mnirs()                 # regularise time grid
-      └─ replace_mnirs()               # clean invalid/outliers/NA
-         └─ filter_mnirs()             # smooth
-            ├─ shift_mnirs()           # optional: shift baseline
-            ├─ rescale_mnirs()         # optional: normalise range
-            ├─ correct_blood_volume()  # optional: blood-volume normalise
-            └─ extract_intervals()     # returns named list of "mnirs" dfs
-               └─ analyse_kinetics()   # compute response rate & time course
-                  └─ plot()            # plot "mnirs_kinetics": fit + markers
+├─ plot()                           # visualise "mnirs" data at each step
+└─ resample_mnirs()                 # up/down-sample, regularise time grid
+   └─ replace_mnirs()               # clean invalid/outliers/NA
+      └─ filter_mnirs()             # smooth
+         ├─ shift_mnirs()           # shift baseline, preserve amplitude
+         ├─ rescale_mnirs()         # normalise range, modify amplitude
+         ├─ correct_blood_volume()  # optional: normalise changes in THb
+         └─ extract_intervals()     # detect & extract list of interval dfs
+            └─ analyse_kinetics()   # compute response rate & time course
+               └─ plot()            # plot "mnirs_kinetics": fit + markers
 ```
 
-**Order:** diagram nesting = required sequence; failure modes + fixes in §5.
-`extract_intervals` → `analyse_kinetics` (or other list-wise fns) for
-multiple intervals.
-
-### Data input formats
-
-`resample_mnirs()`, `replace_mnirs()`, `filter_mnirs()`, `shift_mnirs()`,
-`rescale_mnirs()`, `extract_intervals()`, and `analyse_kinetics()` accept
-`data` as:
-
-- **single `"mnirs"` df** → processed, returned directly.
-- **list of `"mnirs"` dfs** (e.g. from `extract_intervals()`) →
-  each processed separately; returns a list.
-- **grouped df** (`dplyr::group_by()`, needs `{dplyr}`) → split per
-  group; returns a list of dfs.
-
-`extract_intervals()` on list input flattens results (§3.7).
-`plot.mnirs()` takes a list of dfs → faceted panels.
-
-### Per-channel arguments and grouping
-
-The same functions accept per-channel args as a named `list()`
-keyed by channel name:
-
-- `span = list(smo2 = 10)` — only `smo2` = 10; others fall back to default (`NULL`).
-- `span = list(hhb = 10, 5)` — one unnamed element is the fallback
-  (`hhb` = 10, others = 5).
-- Unrecognised names warned and ignored.
-
-`shift_mnirs()`/`rescale_mnirs()` group channels via `group_channels`;
-`extract_intervals()` groups intervals via `group_intervals` and per-group
-channels via `group_channels` (§3.5, §3.7).
+Failure modes + fixes in §5.
 
 ---
 
 ## 3. Function Reference
 
-Unless noted, `nirs_channels`, `time_channel`, `event_channel` default to `NULL` → retrieved from metadata. 
-Functions in §2's list accept list/grouped-df input and per-channel `list()` args.
+Data frame-level functions accept `data` as:
+
+- single df in → single df out
+- list of dfs → list, each processed separately
+- grouped df (`dplyr::group_by()`, needs `{dplyr}`) → list, one per group
+
+`extract_intervals()` flattens list input (§3.7). `plot.mnirs()` returns facet per-df.
+
+`nirs_channels`, `time_channel`, `event_channel` and other args default to `NULL` → retrieved from metadata.
+
+Most functions accept `{tidyselect}` channel names; `nirs_channels = "smo2"` or `smo2`; `time_channel = starts_with("time")`.
+
+Functions also accept per-channel args as named `list()` keyed by channel:
+
+- `span = list(smo2 = 10)` — only `smo2` = 10; others fall back to default (`NULL`)
+- `span = list(hhb = 10, 5)` — one unnamed element is the fallback (`hhb` = 10, others = 5)
+- unrecognised names warned and ignored
+
+Channel/interval grouping: `group_channels` (§3.5), `group_intervals` (§3.7).
+
 
 ### 3.1 Read
 
@@ -92,23 +78,25 @@ read_mnirs(
     file_path,
     nirs_channels = NULL,   # char vec; (required) rename: c(new = "old")
     time_channel  = NULL,   # char(1); (required) rename: c(time = "Timestamp")
-    event_channel = NULL,   # char(1); optional; rename
+    event_channel = NULL,   # char(1); optional; rename: c(lap = "col_6")
     sample_rate   = NULL,   # numeric(1) Hz; estimated if NULL
     add_timestamp = FALSE,  # add POSIXct "timestamp" column
     zero_time     = FALSE,  # rebase time[1] to 0
     keep_all      = FALSE,  # keep all columns, else only specified channels
-    verbose       = TRUE
+    verbose       = TRUE    # all functions have default verbose = TRUE
 )
 ```
 
 - Auto-detects device, header row, channel names, time column when `NULL`.
-- Date-time `time_channel` → numeric, rebased to 0.
+- Date-time `time_channel` converted → numeric, rebased to 0.
 - Warns on irregular sampling (non-monotonic, repeated, unequal).
+- Example files retrieved from `example_mnirs()`.
+- Add class *"mnirs"* & metadata to df with `create_mnirs_data()`.
 
 ```r
-example_mnirs(file = NULL)
-## files: "moxy_ramp", "moxy_intervals", "train.red", "artinis",
-##        "portamon", others in inst/extdata
+example_mnirs(file = NULL)  # NULL = list all; partial matching
+## "artinis_intervals", "moxy_intervals", "moxy_ramp",
+## "portamon-oxcap", "train.red_intervals"
 
 create_mnirs_data(data, ...)  # low-level constructor; wraps df as "mnirs"
 ## ... = named metadata (nirs_channels, time_channel, sample_rate, ...)
@@ -120,18 +108,18 @@ create_mnirs_data(data, ...)  # low-level constructor; wraps df as "mnirs"
 
 ```r
 resample_mnirs(
-    data, time_channel  = NULL,
+    data,
+    time_channel  = NULL,
     sample_rate   = NULL,         # source Hz; estimated if NULL
     resample_rate = sample_rate,  # target Hz; default = regularise to source
-    method = c("none", "linear", "locf"),
-    verbose = TRUE
+    method = c("none", "linear", "locf")
 )
 ```
 
 - `"none"`: nearest-match to original; new samples → `NA`
 - `"linear"`/`"locf"`: interpolate numeric via `stats::approx()`
 - Non-numeric cols always either `"locf"` (up-sample) or first-in-bin (down-sample)
-- `resample_rate = sample_rate`: regularise only, no rate change
+- Default `resample_rate = sample_rate`: regularise only, no rate change
 
 ---
 
@@ -146,26 +134,24 @@ replace_mnirs(
     outlier_cutoff = NULL,   # numeric(1); Hampel MAD multiplier; NULL = skip
     width          = NULL,   # integer; rolling window in samples
     span           = NULL,   # numeric; rolling window in time units
-    method = c("linear", "median", "locf", "none"),
-    verbose = TRUE
+    method = c("linear", "median", "locf", "none")
 )
 ```
 
-Processing order: invalid → outliers → missing (NA).
-`outlier_cutoff`: `3` = Pearson 3-sigma; `2` ≈ Tukey 1.5·IQR; `0` = median filter.
+- Processing order: invalid → outliers → missing (NA).
+- Recommended `outlier_cutoff`: `3` = Pearson 3-sigma; `2` ≈ Tukey 1.5·IQR.
+- `width` XOR `span`; `width` takes precedence.
 
 Vector-level:
 ```r
+## default method = "median"
 replace_invalid(x, t, invalid_values, invalid_above, invalid_below,
                 width, span, method = c("median", "none"), ...)
 replace_outliers(x, t, outlier_cutoff = 3, width, span,
                  method = c("median", "none"), ...)
-replace_missing(x, t, width, span,
-                method = c("linear", "median", "locf"), ...)
+## default method = "linear", as replace_mnirs()
+replace_missing(x, t, width, span, method = c("linear", "median", "locf"), ...)
 ```
-
-`replace_invalid()`/`replace_outliers()` default `"median"`;
-`replace_mnirs()`/`replace_missing()` default `"linear"`.
 
 ---
 
@@ -175,26 +161,24 @@ replace_missing(x, t, width, span,
 filter_mnirs(
     data, nirs_channels = NULL, time_channel = NULL,
     method = c("smooth_spline", "butterworth", "moving_average"),
-    na.rm = FALSE, verbose = TRUE, ...,
+    na.rm = FALSE, ...,
     ## method-specific args:
     spar, order, W, fc, sample_rate, type, edges, width, span, partial
 )
 ```
 
-**Aliases:** `"smooth_spline"` = `"spline"`, `"smooth spline"`,
-`"smooth-spline"`; `"butterworth"` = `"butter"`; `"moving_average"` =
-`"ma"`, `"moving average"`, `"moving-average"`.
+**Method aliases**: matching is case- and separator-insensitive; `<space>`, `-`, `_`.
 
 **Method args:**
 - **`"smooth_spline"`** (`stats::smooth.spline()`): `spar` (NULL = GCV auto); errors on NA/duplicated time.
-- **`"butterworth"`** (needs `{signal}`): `order` (default `2L`), `W`/`fc` (normalised or Hz), `sample_rate`, `type` (`"low"`/`"high"`/`"stop"`/`"pass"`), `edges` (`"rev"`/`"rep1"`/`"none"`); errors on NA.
-- **`"moving_average"`**: `width` (samples) or `span` (time units); `partial` (default `FALSE`).
+- **`"butterworth"`** (needs `{signal}`): filter `order` (default `2L`), cutoff frequency(ies) `W`/`fc` (normalised or Hz), `sample_rate`, filter `type` (`"low"`/`"high"`/`"stop"`/`"pass"`), `edges` (`"rev"`/`"rep1"`/`"none"`); errors on NA.
+- **`"moving_average"`**: rolling window in `width` (samples) XOR `span` (time units); `partial` (default `FALSE`).
 
-Vector-level:
+Vector-level (can call `stats::smooth.spline()` directly):
 ```r
 filter_moving_average(x, t, width, span, partial = FALSE, na.rm = FALSE, ...)
-filter_ma(...)     # alias for filter_moving_average()
 filter_butterworth(x, order = 2L, W, type = "low", edges = "rev", na.rm = FALSE)
+filter_ma(...) & filter_butter(...) # function aliases
 ```
 
 ---
@@ -202,37 +186,34 @@ filter_butterworth(x, order = 2L, W, type = "low", edges = "rev", na.rm = FALSE)
 ### 3.5 Transform
 
 ```r
+## moves values up/down, preserves absolute amplitude
 shift_mnirs(
     data, nirs_channels = NULL, time_channel = NULL,
-    group_channels = c("ensemble", "distinct"),
+    group_channels = c("ensemble", "distinct"), # or as custom `list()`
     to = NULL,    # numeric(1); target level (overrides `by`)
-    by = NULL,    # numeric(1); shift amount
+    by = NULL,    # numeric(1); shift amount, +/-ve
     width = NULL, # integer; window in samples
     span = NULL,  # numeric; window in time units
-    position = c("min", "max", "first"),
-    verbose = TRUE
+    position = c("min", "max", "first") # which reference value
 )
 
+## expands/contracts range
 rescale_mnirs(
     data, nirs_channels = NULL,
     group_channels = c("ensemble", "distinct"),
-    range,        # numeric(2): c(min, max)
-    verbose = TRUE
+    range         # numeric(2): c(min, max)
 )
 ```
-
-`shift_mnirs()` moves values up/down, preserves absolute amplitude; 
-`rescale_mnirs()` expands/contracts range. 
 
 **`group_channels`:**
 
 | Syntax | Behaviour |
 |---|---|
 | `"ensemble"` (default) | all channels share one reference (relative scaling preserved) |
-| `"distinct"` | each channel independent |
+| `"distinct"` | each channel independent (relative scaling lost) |
 | `list(c("A", "B"), c("C"))` | A+B share reference; C independent |
 
-Groups can be named (`list(smo2 = c("A", "B"))`); names key per-group args.
+Custom groups nameable (`list(smo2 = c("A", "B"))`); per-channel args can be keyed per-group instead.
 
 ---
 
@@ -241,18 +222,13 @@ Groups can be named (`list(smo2 = c("A", "B"))`); names key per-group args.
 ```r
 correct_blood_volume(
     data,
-    oxy_channel   = NULL,   # O2Hb/oxy[haem] column name
-    deoxy_channel = NULL,   # HHb/deoxy[haem] column name
-    total_channel = NULL,   # THb/total[haem] column name (blood-volume proxy)
-    verbose = TRUE
+    oxy_channel   = NULL,  # O2Hb/oxy[haem] column name
+    deoxy_channel = NULL,  # HHb/deoxy[haem] column name
+    total_channel = NULL   # THb/total[haem] column name (blood-volume proxy)
 )
 ```
 
-Normalises for blood-volume changes (Beever & Tripp et al, 2020) and 
-accommodates negative values (using `shift_mnirs` internals).
-Requires ≥2 of 3 channels; third derived (`total = oxy + deoxy`, etc.).
-Only specified channels corrected; Names case-sensitive, must match exactly.
-`total[haem]` → 0 definitionally after.
+Normalises blood-volume changes (Ryan et al 2012; Beever & Tripp et al, 2020). Handles negative values via `shift_mnirs`. Returns `total[haem]` → 0 definitionally.
 
 ---
 
@@ -260,27 +236,21 @@ Only specified channels corrected; Names case-sensitive, must match exactly.
 
 ```r
 extract_intervals(
-    data,                   # "mnirs" df OR list of "mnirs" dfs
-    nirs_channels = NULL, time_channel = NULL, event_channel = NULL,
+    data, nirs_channels = NULL, time_channel = NULL, event_channel = NULL,
     sample_rate = NULL,
     group_intervals = c("distinct", "ensemble"),
     group_channels = NULL,  # per-group channel selection (see below)
     start = NULL,  # by_time(numeric)/by_label(char)/by_lap(int)/by_sample(int)
     end   = NULL,  # same; NULL = window (span) around start
-    span  = list(c(-60, 60)),  # boundaries c(before, after) per interval
-    zero_time = FALSE,         # rebase time to 0 per interval
-    verbose = TRUE,
-    event_groups = deprecated()  # renamed → group_intervals (0.7.0)
+    span  = list(c(-60, 60)),    # boundaries c(before, after) per interval
+    zero_time = FALSE,           # rebase time to 0 per interval
 )
 ## returns named list of "mnirs" dfs
 ```
 
-**List input:** when `data` is a list of "mnirs" dfs, results are flattened 
-into a single-layer list. Interval names become `interval_<df>.<interval>`; 
-other names (`"ensemble"`, custom group names) suffixed `<name>_<df>`.
+Returns flattened single-layer list of named intervals; `interval_<df>.<interval>`, or from `"ensemble"`, custom-grouped suffixed `<name>_<df>`.
 
-**`group_channels`** — selects which `nirs_channels` are ensemble-averaged
-per interval group; only relevant when `group_intervals` ensemble-averages.
+**`group_channels`** (as above) — which `nirs_channels` are ensemble-averaged per interval group; only relevant when `group_intervals` ensemble-averages.
 
 **Boundary helpers:**
 
@@ -291,10 +261,10 @@ by_lap(...)    # integer lap numbers (start = first sample, end = last)
 by_sample(...) # integer row indices
 ```
 
-- Raw coercion: numeric → `by_time()`; character → `by_label()`; explicit integer (`2L`) → `by_lap()`
-- `start`/`end` may mix types; shorter recycled. `by_label()`/`by_lap()` need `event_channel`
-- `span = c(before, after)`: negative shifts start earlier, positive shifts end later; single value recycled by sign (`60` → `c(0, 60)`, `-60` → `c(-60, 0)`)
-- `span`/`group_channels` as `list()` recycled per interval group
+- `start`/`end` may mix types; shorter recycled. `by_label()`/`by_lap()` need `event_channel`.
+- `span = c(before, after)`: negative expands bound earlier before start, positive expands bound later after end; single value recycled by sign (`60` → `c(0, 60)`, `-60` → `c(-60, 0)`).
+- `span`/`group_channels` as `list()` per interval group; recycled as needed.
+
 
 **`group_intervals`:**
 
@@ -302,7 +272,7 @@ by_sample(...) # integer row indices
 |---|---|
 | `"distinct"` (default) | one df per detected interval |
 | `"ensemble"` | single ensemble-averaged df (needs regularised time grid) |
-| `list(c(1, 2), c(3, 4))` | one ensemble df per group; named lists pass names through |
+| `list(group1 = c(1, 2), c(3, 4))` | one ensemble df per group; names passed through |
 
 ---
 
@@ -310,79 +280,97 @@ by_sample(...) # integer row indices
 
 ```r
 analyse_kinetics(
-    data,           # "mnirs" df | named list of "mnirs" dfs | grouped df
-    nirs_channels = NULL, time_channel = NULL,
-    method = c("response_time", "peak_slope", "monoexponential", "sigmoidal"),
+    data, nirs_channels = NULL, time_channel = NULL,
+    method = c("response_time", "peak_slope", "monoexponential",
+               "biexponential", "sigmoidal"),
     start_time = NULL,  # fit onset (t = 0); NULL = interval_times metadata, else t[1] else 0
     direction  = c("auto", "positive", "negative"),
-    end_window = Inf,   # truncate fit after extreme; Inf = global extreme
-    verbose = TRUE, ...,
-    ## method-specific args:
-    fraction, width, span, align, partial, na.rm, use_TD, shape
+    end_window = Inf,   # truncate fit after first extreme; Inf = global extreme
+    ...,
+    ## method-specific (explicit formals, not via `...`, see below):
+    fraction = 0.5, width = NULL, span = NULL,
+    align = c("centre", "left", "right"),
+    partial = FALSE, na.rm = FALSE,
+    use_TD = TRUE, shape = c("symmetric", "gompertz", "gompertz_left"),
+    tau_ratio = 2.5, fix = NULL
 )
-## analyze_kinetics(...)  # US-spelling alias
+## analyze_kinetics(...) alias
 ```
 
-`direction` also constrains fitted-amplitude sign for
-`"monoexponential"`/`"sigmoidal"`.
+**Method aliases**: matching is case- and separator-insensitive; `<space>`, `-`, `_`. Accepts common shorthand: `hrt`, `slope`, `mrt`, `tau`, `gompertz`, `xmid`, ...
 
-**Method aliases:**
+`direction` also constrains fitted-amplitude sign for `"monoexponential"`/
+`"biexponential"`/`"sigmoidal"`, resolved per channel, returns `NA` if unsatisfiable.
 
-| Canonical | Aliases |
-|---|---|
-| `"response_time"` | `"half response time"`, `"recovery time"`, `"half recovery time"`, `"half time"`, `"HRT"` |
-| `"peak_slope"` | `"slope"` |
-| `"monoexponential"` | `"monoexp"`, `"exp"`, `"exponential"`, `"MRT"`, `"tau"` |
-| `"sigmoidal"` | `"sigmoid"`, `"logistic"`, `"gompertz"`, `"xmid"` |
-
-**Per-method args (`...`):**
+**Per-method args:**
 - **`"response_time"`**: `fraction` (default `0.5`; `0.632` ≈ MRT).
-- **`"peak_slope"`**: `width` or `span` (one required); `align` (`"centre"`/`"left"`/`"right"`); `partial`, `na.rm` (default `FALSE`).
-- **`"monoexponential"`**: `use_TD` (default `TRUE`; 4-param → 3-param fallback).
-- **`"sigmoidal"`**: `shape` (`"symmetric"` default = `SSlogistic()`; `"gompertz"` early-inflection; `"gompertz_left"` late-inflection).
+- **`"peak_slope"`**: `width` XOR `span`; `align` (`"centre"`/`"left"`/`"right"`); `partial`, `na.rm` (default `FALSE`).
+- **`"monoexponential"`**: `use_TD` (default `TRUE`; 4-param → 3-param fallback), `fix`.
+- **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `tau_ratio` (default `2.5`; lower bound on `tau2/tau1`; **always global**, never per-channel), `fix`.
+- **`"sigmoidal"`**: `shape` (`"symmetric"` default = `SSlogistic()`; `"gompertz"` early-inflection (right); `"gompertz_left"` late-inflection), `fix`.
 
-Per-channel overrides via inline named `list()` (names must match
-`nirs_channels`):
+Per-channel overrides via inline named `list()` (names must match `nirs_channels`):
 ```r
 analyse_kinetics(data, nirs_channels = c(hhb, smo2), method = "peak_slope",
     span = list(smo2 = 10), direction = list(hhb = "negative"))
 ```
 
+**`fix`** — hold params constant:
+
+```r
+fix = list(A = 0)                                  # fixed for all channels
+fix = list(smo2 = list(A = 0))                     # per channel
+fix = list(interval_1 = list(smo2 = list(A = 0)))  # per interval x channel
+```
+
+- Named list of finite numeric scalars; names must be model params; cannot fix all.
+- Fixed params excluded from estimation and from `n_params`; reported at fixed value.
+- `"monoexponential"`: `TD` fixable only when `use_TD = TRUE`, and doing so disables the 3-param fallback. Prefer `use_TD = FALSE` over `fix = list(TD = 0)`.
+
 #### `"mnirs_kinetics"` return — formatted table & list internal components
+
+- one row per channel per interval.
 
 | Element | Type | Description |
 |---|---|---|
-| `method` | character | method used |
-| `model` | named list | per-interval per-channel model objects (`lm`/`nls`/`NULL`) |
-| `coefficients` | tibble | one row per channel per interval |
-| `data` | named list | input dfs with `<channel>_fitted` cols |
+| `method` | character | canonical method used |
+| `model` | named list | per-interval per-channel model objects (`lm`/`nls`) |
+| `coefficients` | data frame | model & derived coefficients |
+| `data` | named list | input dfs with predicted `<channel>_fitted` cols |
 | `interval_times` | data frame | `interval`, `start_times` (+ `end_times` when present) |
-| `diagnostics` | data frame | fit diagnostics |
-| `channel_args` | data frame | resolved args per channel per interval |
+| `diagnostics` | data frame | fit diagnostics (AIC, BIC, RMSE, R^2, etc) |
+| `channel_args` | data frame | resolved args |
+| `warnings` | data frame | `type` = `"warning"`/`"error"` messages; empty if none. Captured regardless of `verbose` (suppresses console output only) |
 | `call` | call | matched function call |
 
 **Coefficients** (prefixed `interval`, `nirs_channels`, `time_channel`):
 
+Times are elapsed from `start_time`; `*_fitted` = predicted value at that point.
+
 | Method | Columns |
 |---|---|
-| `"response_time"` | `A` baseline mean, `B` extreme, `response_time` (elapsed from `start_time`), `response_value` (observed at response), `fitted` (target `A + (B-A)*fraction`), `idx` (response row) |
-| `"peak_slope"` | `slope` (units `x/t`), `intercept`, `fitted` (predicted value at peak), `peak_slope_time` (elapsed from `start_time`), `idx` (window-centre row) |
-| `"monoexponential"` | `A` baseline, `B` asymptote, `tau` time constant, `k` rate constant (`1/tau`), `TD` time delay, `MRT` mean response time (`TD+tau`), `HRT` half-response time (`TD+tau·ln2`), `MRT_fitted`/`HRT_fitted` (predicted value at each) |
-| `"sigmoidal"` | `A` start asymptote, `B` end asymptote, `xmid` inflection time, `slope` (`dx/dt` at `xmid`), `xmid_fitted` (predicted value at `xmid`) |
+| `"response_time"` | `A` baseline mean, `B` extreme (peak/trough) value, `response_time`, `response_value` (observed), `fitted` (target `A + (B-A)*fraction`), `idx` (sample/row number at `response_value`) |
+| `"peak_slope"` | `slope` (`x/t`), `intercept`, `fitted`, `peak_slope_time`, `idx` (sample/row number at `align` position) |
+| `"monoexponential"` | `A` baseline, `B` asymptote, `tau`, `k` (`1/tau`), `TD` delay (if `use_TD`), `MRT` (`TD+tau`), `HRT` (`TD+tau·ln2`), `MRT_fitted`, `HRT_fitted` |
+| `"biexponential"` | `A` start, `B1` & `tau1` fast component, `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `excursion_time` (turning point), `excursion_value` |
+| `"sigmoidal"` | `A` & `B` start + end asymptotes, `xmid` inflection time (only literally *"middle"* for `shape = "symmetric"`), `slope` (`dx/dt` at `xmid`), `xmid_fitted` |
 
-**Diagnostics:** `n_obs`, `r2`, `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, `bic`.
+**Diagnostics:** `n_obs`, `n_params`, `r2`, `adj_r2`, `rmse`, `snr`, `cv_rmse`,
+`aic`, `aicc`, `bic`. `n_params` = free params estimated, excluding `fix`, so
+reduced-parameter fallback fits are distinguishable. `aic`/`bic` comparable only
+within matching `n_obs` + `n_params`.
 
 **Vector-level:**
 ```r
 response_time(x, t = seq_along(x), start_time = 0, fraction = 0.5,
-    direction = c("auto", "positive", "negative"), verbose = TRUE)
+    direction = c("auto", "positive", "negative"))
 ## → A, B, response_time, response_value, fitted,
 ##   baseline_idx, response_idx, extreme_idx
 
 peak_slope(x, t = seq_along(x), width = NULL, span = NULL,
     align = c("centre", "left", "right"),
     direction = c("auto", "positive", "negative"),
-    partial = FALSE, na.rm = FALSE, verbose = TRUE)
+    partial = FALSE, na.rm = FALSE)
 ## → slope, intercept, y, t, idx, fitted, window_idx, model
 
 monoexponential(t, A, B, tau, TD = NULL)
@@ -390,52 +378,53 @@ monoexponential(t, A, B, tau, TD = NULL)
 ## 4-param: A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau))
 nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = df)   # 3- or 4-param
 
+biexponential(t, A, B1, tau1, B2, tau2, TD = NULL)
+## 5-param: A + (B1-A)*(1 - exp(-t/tau1)) + (B2-B1)*(1 - exp(-t/tau2))
+## 6-param: as above with ts = pmax(t - TD, 0) substituted for t
+nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr, TD), data = df)
+## NB self-start on log-ratio scale: lt1 = log(tau1), lr = log(tau2/tau1);
+## `lr` enforces `tau_ratio` bound. `fix` on natural-scale tau1/tau2
+## analyse_kinetics() back-converts to tau1/tau2, direct calls return log scale
+
 logistic(t, A, B, xmid, slope, asym = NULL)  # 4-param symmetric / 5-param Richards
 gompertz(t, A, B, xmid, slope)               # early-inflection
 gompertz_left(t, A, B, xmid, slope)          # late-inflection
-nls(x ~ SSlogistic(t, A, B, xmid, slope), data = df)      # 4- or 5-param (fragile)
+nls(x ~ SSlogistic(t, A, B, xmid, slope, asym), data = df) # 4- or 5-param (fragile)
 nls(x ~ SSgompertz(t, A, B, xmid, slope), data = df)
 nls(x ~ SSgompertz_left(t, A, B, xmid, slope), data = df)
 ```
 
 ---
 
-### 3.9 Plot and Print
+### 3.9 Plot
 
 ```r
+## all plot/theme fns need {ggplot2}; scales/format need {scales}
 plot.mnirs(x, points = FALSE, time_labels = FALSE, na.omit = FALSE, ...)
-## needs {ggplot2}; via plot(data); returns ggplot2 object
-## x = "mnirs" df or list of dfs (list → faceted panels)
-## na.omit = TRUE drops NA/non-finite; ... = facet_wrap args, n.breaks, breaks
+## x = "mnirs" df or list (list → faceted); na.omit = TRUE drops NA/non-finite;
+## ... = facet_wrap args, n.breaks, breaks
 
 plot.mnirs_kinetics(x, fitted = TRUE, markers = TRUE, labels = TRUE, ...)
-## needs {ggplot2}; via plot(result); returns ggplot2 object
 ## observed signal per channel, faceted by interval (builds on plot.mnirs)
-## fitted  = dashed fitted curve (parametric methods; not "response_time")
-## markers = dotted onset line + key coefficient point(s)
-## labels  = per-panel annotation of key coefficient(s)
-## ...     = label_size, others passed to plot.mnirs (points, time_labels, nrow, ncol, scales)
+## fitted = dashed curve (parametric methods; not "response_time");
+## markers = dotted onset line + key coefficient point(s);
+## labels = per-panel annotation; ... = label_size, passed to plot.mnirs()
 
-print(result)  # "mnirs_kinetics"; formatted coefficient table (max 10 rows)
-print(data)    # "mnirs"; strips class, prints tibble
 
-theme_mnirs(base_size = 14, base_family = "sans",
-            border = c("partial", "full"),
+theme_mnirs(base_size = 14, base_family = "sans", border = c("partial", "full"),
             ink = "black", paper = "white", accent = "#0080ff", ...)
-
-palette_mnirs()              # all 12 named colours
-palette_mnirs(4)             # first 4
-palette_mnirs("red", "blue") # by name
-
-scale_colour_mnirs(...)      # alias: scale_color_mnirs()
+palette_mnirs(...)      # no args = all 12; palette_mnirs(4); palette_mnirs("red", "blue")
+scale_colour_mnirs(...) # alias scale_color_mnirs()
 scale_fill_mnirs(...)
 breaks_timespan(unit = "secs", n = 5)
-format_hmmss(x)              # numeric seconds → "mm:ss" or "h:mm:ss"
+format_hmmss(x)         # numeric seconds → "mm:ss" or "h:mm:ss"
 ```
 
 ---
 
 ## 4. Dependencies
+
+`Depends: R (>= 4.1)`
 
 | Package | Role | Type | Condition |
 |---|---|---|---|
@@ -461,53 +450,42 @@ format_hmmss(x)              # numeric seconds → "mm:ss" or "h:mm:ss"
 | Constraint | Detail |
 |---|---|
 | Irregular samples warning from `read_mnirs()` | fires in pipe before downstream `resample_mnirs()`; verify output |
-| Pipeline order | `resample → replace → filter`; wrong order = wrong results |
-| `"smooth_spline"`/`"butterworth"` fail on NA | `replace_mnirs()` first or `na.rm = TRUE` |
-| `"smooth_spline"` fails on duplicated time | `resample_mnirs()` first |
-| Ensemble needs regularised samples | `group_intervals = "ensemble"` warns if irregular |
-| Per-channel `list()` args | unrecognised list names warned and ignored |
-| `monoexponential` fallback | 4-param → 3-param; `NA` coefficients on convergence failure |
-| `direction`-bounded fit | `"monoexponential"`/`"sigmoidal"` return `NA` coefficients if direction unsatisfiable |
+| Recommended pipeline order | `resample → replace → filter → ...`; different order = different results |
+| `group_intervals = "ensemble"` needs regularised time grid | `resample → extract_intervals`; warns if irregular |
+| `monoexponential`/`biexponential` convergence fallback | Weak fits (certain convergence errors) return fit with warnings |
+| `direction`-bounded fit | return `NA` coefficients if unsatisfiable; verify `biexponential` in particular |
+| `biexponential(tau_ratio = 2.5)` bound | weakly identified biexponential fits may settle on the `tau2/tau1` bound; check `warnings` + `diagnostics`, consider reduced `method` |
 
 ---
 
-## 6. Key Source Files
+## 6. Source Map
 
 | File | Contents |
 |---|---|
 | `R/read_mnirs.R` | `read_mnirs()`, `example_mnirs()`, `create_mnirs_data()` |
+| `R/read_mnirs_helpers.R` | device/header/channel detection |
 | `R/resample_mnirs.R` | `resample_mnirs()` |
 | `R/replace_mnirs.R` | `replace_mnirs()`, `replace_invalid/outliers/missing()` |
-| `R/filter_mnirs.R` | `filter_mnirs()`, `filter_moving_average()`, `filter_ma()`, `filter_butterworth()` |
-| `R/shift_mnirs.R` | `shift_mnirs()` |
-| `R/rescale_mnirs.R` | `rescale_mnirs()` |
+| `R/filter_mnirs.R` | `filter_mnirs()`, `filter_moving_average()`/`filter_ma()`, `filter_butterworth()`/`filter_butter()` |
+| `R/rolling_helpers.R` | internal: `compute_window_bounds()`, `compute_outliers()` |
+| `R/shift_mnirs.R` / `R/rescale_mnirs.R` | `shift_mnirs()` / `rescale_mnirs()` |
 | `R/correct_blood_volume.R` | `correct_blood_volume()` |
 | `R/extract_intervals.R` | `extract_intervals()` |
-| `R/extract_interval_helpers.R` | `by_time/label/lap/sample()`, boundary resolution |
+| `R/extract_interval_helpers.R` | `by_time/label/lap/sample()`; boundary resolution |
 | `R/analyse_kinetics.R` | `analyse_kinetics()`/`analyze_kinetics()` + S3 dispatch |
-| `R/analyse_kinetics_helpers.R` | channel/interval orchestration, `compute_diagnostics()` |
-| `R/analyse_peak_slope.R` | `peak_slope()`, `slope()`, `rolling_slope()` |
-| `R/analyse_monoexponential.R` | `monoexponential()`, `SSmonoexponential()` |
-| `R/analyse_sigmoidal.R` | `logistic()`, `gompertz()`, `gompertz_left()`, `SSlogistic/gompertz/gompertz_left()` |
+| `R/aanalyse_kinetics_helpers.R` | *(leading `aa` intentional — load order)* `method_aliases`, channel/interval orchestration, `detect_direction()`, `enforce_direction()`, `compute_diagnostics()`, `kinetics_warnings_df()` |
 | `R/analyse_response_time.R` | `response_time()` |
-| `R/plot.mnirs.R` | `plot.mnirs()`, `plot.mnirs_kinetics()`, `kinetics_annotations()`, `as_plot_data()`, `theme_mnirs()`, `palette_mnirs()`, scale/format fns |
+| `R/analyse_peak_slope.R` | `peak_slope()`, `rolling_slope()` |
+| `R/analyse_monoexponential.R` | `monoexponential()`, `SSmonoexponential()` |
+| `R/analyse_biexponential.R` | `biexponential()`, `SSbiexponential()`, `biexp_init()`, `biexp_fix_ss()` |
+| `R/analyse_sigmoidal.R` | `logistic()`, `gompertz()`, `gompertz_left()`, `SS*()` |
+| `R/plot.mnirs.R` | `plot.mnirs()`, `plot.mnirs_kinetics()`, `theme_mnirs()`, `palette_mnirs()`, scale/format fns |
 | `R/mnirs_methods.R` | `print.mnirs()`, `print.mnirs_kinetics()` |
 | `R/channel_args.R` | `resolve_channel_args()` — per-channel/group arg broadcast |
 | `R/as_data_list.R` | `map_mnirs_intervals()`, `as_data_list()` — list/grouped dispatch |
-| `R/validate_mnirs.R` | input validation |
-| `R/data.R` | example file descriptions |
+| `R/validate_mnirs.R` | `validate_numeric/mnirs_data/nirs_channels/time_channel/event_channel/sample_rate/width_span/x_t/start_time/fix/findInt()` |
+| `R/signif_trailing.R` | internal: `signif_trailing()`, `seq_range()` |
+| `R/data.R` / `R/mnirs-package.R` | example file docs / package-level roxygen |
 
----
-
-## 7. Developer pointers
-
-| Workflow | Location |
-|---|---|
-| Input validation | `R/validate_mnirs.R` (`validate_nirs_channels/time_channel/sample_rate/width_span/x_t/numeric/group_channels()`) |
-| Per-channel arg broadcast | `resolve_channel_args()`, `R/channel_args.R` |
-| List/grouped-df dispatch | `map_mnirs_intervals()`, `as_data_list()`, `R/as_data_list.R` |
-| Kinetics orchestration + diagnostics | `R/analyse_kinetics_helpers.R` |
-| Interval boundary resolution | `R/extract_interval_helpers.R` |
-| Read/device detection | `R/read_mnirs_helpers.R` |
-| User-facing messages | `cli_abort()`/`cli_warn()`/`cli_inform()` |
-| Roxygen2 with markdown | pkgdown config in `_pkgdown.yml` |
+User-facing messages via `cli_abort()`/`cli_warn()`/`cli_inform()`.
+Roxygen2 with markdown enabled; pkgdown config in `_pkgdown.yml`.
