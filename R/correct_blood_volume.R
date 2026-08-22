@@ -11,7 +11,10 @@
 #' @param total_channel A character string naming the `total[haem]` (total
 #'   haemoglobin and myoglobin, *THb*; proxy for blood volume) column in `data`.
 #'   Must match exactly.
+#' @inheritParams map_mnirs_intervals
 #' @inheritParams validate_mnirs
+#'
+#' @inheritSection map_mnirs_intervals Data input formats
 #'
 #' @details
 #' ## Specify NIRS component channels
@@ -53,7 +56,8 @@
 #' @returns
 #' A [tibble][tibble::tibble-package] of class *"mnirs"* with blood
 #'   volume-corrected channels written back to the specified columns, and with
-#'   metadata available with `attributes()`.
+#'   metadata available with `attributes()`. For list or grouped data frame
+#'   input, returns a named list of *"mnirs"* tibbles, one per interval.
 #'
 #' @references
 #' Beever AT, Tripp TR, Zhang J, MacInnis MJ (2020) Nirs-Derived Skeletal
@@ -92,6 +96,11 @@ correct_blood_volume <- function(
     total_channel = NULL,
     verbose = TRUE
 ) {
+    ## list or grouped input → normalise to named list, recurse per interval
+    if (inherits(data, "grouped_df") || !is.data.frame(data)) {
+        return(map_mnirs_intervals(data, match.call(), parent.frame()))
+    }
+
     ## validation =====================================================
     validate_mnirs_data(data)
     if (missing(verbose)) {
@@ -123,7 +132,8 @@ correct_blood_volume <- function(
     missing_cols <- setdiff(unlist(channels), names(data))
     if (length(missing_cols) > 0L) {
         cli_abort(c(
-            "x" = "Column{?s} {.field {missing_cols}} not found in {.arg data}.",
+            "x" = "Column{?s} {.field {missing_cols}} not found in \\
+            {.arg data}.",
             "i" = "Channel names are case-sensitive and must match exactly."
         ))
     }

@@ -434,7 +434,7 @@ format_hmmss(x)         # numeric seconds → "mm:ss" or "h:mm:ss"
 | `readxl` | XLS/XLSX | Import | |
 | `rlang` | NSE/tidy eval | Import | |
 | `stats` | models, interpolation | Import | |
-| `tibble` | `"mnirs"` class | Import | |
+| `tibble` | returned `"mnirs"` class df | Import | |
 | `tidyselect` | column selection | Import | |
 | `signal` | Butterworth | Suggests | `"butterworth"` method |
 | `ggplot2` | plotting | Suggests | `plot.mnirs()`, theme/scales |
