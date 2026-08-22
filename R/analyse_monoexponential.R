@@ -321,7 +321,7 @@ analyse_monoexponential <- function(
     )
 
     ## method-specific fit: self-starting monoexponential via nls
-    monoexponential_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
+    monoexponential_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
         params <- c("A", "B", "tau", if (.a$use_TD) "TD")
 
         ## the 4-param model is flat at `A` before `TD`, so the pre-onset
@@ -345,7 +345,7 @@ analyse_monoexponential <- function(
                 error = \(e) {
                     warn_fit_failed(
                         quote(SSmonoexponential), e, .nirs, interval_name,
-                        length(.params), .retry, verbose, env
+                        length(.params), .retry, env
                     )
                     NULL
                 }
@@ -383,7 +383,6 @@ analyse_monoexponential <- function(
             fix = .a$fix,
             .nirs = .nirs,
             interval_name = interval_name,
-            verbose = verbose,
             env = env
         )
         if (is.null(enforced)) {
@@ -431,8 +430,7 @@ analyse_monoexponential <- function(
                 t_fit[keep],
                 fitted_vals,
                 n_params = length(stats::coef(model)),
-                verbose,
-                env
+                env = env
             )
         )
     }

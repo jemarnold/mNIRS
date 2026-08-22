@@ -628,7 +628,7 @@ analyse_logistic <- function(
     )
 
     ## method-specific fit: self-starting sigmoidal via nls
-    logistic_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
+    logistic_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
         ## resolve per-channel shape and matching self-start fn
         disp <- shape_dispatch[[.a$shape]]
         ch_fn <- disp$model
@@ -643,7 +643,7 @@ analyse_logistic <- function(
             error = \(e) {
                 warn_fit_failed(
                     ch_fn, e, .nirs, interval_name,
-                    verbose = verbose, env = env
+                    env = env
                 )
                 NULL
             }
@@ -680,7 +680,6 @@ analyse_logistic <- function(
             fix = .a$fix,
             .nirs = .nirs,
             interval_name = interval_name,
-            verbose = verbose,
             env = env
         )
         if (is.null(enforced)) {
@@ -716,8 +715,7 @@ analyse_logistic <- function(
                 t_fit,
                 fitted_vals,
                 n_params = length(stats::coef(model)),
-                verbose,
-                env
+                env = env
             )
         )
     }

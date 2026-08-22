@@ -239,15 +239,17 @@ analyse_response_time <- function(
     per_channel <- setup$per_channel
 
     ## method-specific fit: fractional response time (no model fit)
-    response_time_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
+    response_time_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
         ## quote = TRUE so `env` (a defused call object for condition
         ## attribution) is passed as-is, not evaluated by do.call
         ## `t_fit` is elapsed from start_time, so the baseline splits at 0.
-        ## `.a` itself is left intact for `channel_args` reporting
+        ## `.a` itself is left intact for `channel_args` reporting.
+        ## verbose = TRUE so fit warnings always signal; the capture handler
+        ## in analyse_kinetics_channels() governs console emission
         response <- do.call(response_time, c(
             list(x = x_fit, t = t_fit),
             replace(.a, "start_time", 0),
-            list(verbose = verbose, bypass_checks = TRUE, env = env),
+            list(verbose = TRUE, bypass_checks = TRUE, env = env),
             args
         ), quote = TRUE)
 
@@ -289,7 +291,6 @@ analyse_response_time <- function(
                 t        = t_fit[1L:3L], ## placeholder
                 fitted   = c(coefs$A, coefs$fitted, coefs$B),
                 n_params = 0L, ## invalid for response time method
-                verbose  = verbose,
                 env      = env
             )
         )

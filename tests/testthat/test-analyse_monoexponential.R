@@ -760,8 +760,7 @@ test_that("enforce_direction() refits and back-transforms an inverted fit", {
         extra_lower = c(tau = diff(range(t)) * 1e-6),
         fn = quote(SSmonoexponential),
         .nirs = "smo2",
-        interval_name = "test",
-        verbose = FALSE
+        interval_name = "test"
     )
 
     expect_named(result, c("model", "coefs"))

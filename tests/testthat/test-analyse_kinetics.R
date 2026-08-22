@@ -200,7 +200,7 @@ test_that("compute_diagnostics handles zero variance in x", {
     t <- seq_along(x)
     fitted <- rep(5, 10)
 
-    result <- compute_diagnostics(x, t, fitted, verbose = FALSE)
+    result <- compute_diagnostics(x, t, fitted)
 
     expect_true(is.na(result$r2)) ## ss_tot = 0 → NA
     expect_equal(result$rmse, 0)
@@ -214,7 +214,7 @@ test_that("computes_diagnostics validates input lengths", {
     fitted <- 1:4 # wrong length
 
     expect_warning(
-        result <- compute_diagnostics(x, t, fitted, verbose = TRUE),
+        result <- compute_diagnostics(x, t, fitted),
         "x.*t.*fitted.*equal lengths"
     )
     expect_true(is.na(result$r2))
@@ -447,7 +447,9 @@ make_channels_data <- function(channels = c("ch1", "ch2")) {
     n <- 20L
     x <- c(seq(1, 10, length.out = 10L), seq(9, 1, length.out = 10L))
     df <- data.frame(time = seq_len(n))
-    for (.ch in channels) df[[.ch]] <- x
+    for (.ch in channels) {
+        df[[.ch]] <- x
+    }
     create_mnirs_data(
         df,
         nirs_channels = channels,
@@ -468,9 +470,11 @@ make_per_channel <- function(channels, ...) {
 
 ## helper: trivial fit_fn returning one coefficient per channel
 slope_fit <- function(coef_value = 1.0, time_coef = NULL) {
-    function(.nirs, x_fit, t_fit, .a, valid, verbose) {
+    function(.nirs, x_fit, t_fit, .a, valid) {
         coefs <- data.frame(slope = coef_value)
-        if (!is.null(time_coef)) coefs$peak_slope_time <- time_coef
+        if (!is.null(time_coef)) {
+            coefs$peak_slope_time <- time_coef
+        }
         list(
             coefs = coefs,
             model = structure(list(), class = "lm"),
@@ -478,9 +482,7 @@ slope_fit <- function(coef_value = 1.0, time_coef = NULL) {
                 window_idx = seq_along(x_fit),
                 fitted = x_fit
             ),
-            diag = compute_diagnostics(
-                x_fit, t_fit, x_fit, n_params = 2L, verbose = verbose
-            )
+            diag = compute_diagnostics(x_fit, t_fit, x_fit, n_params = 2L)
         )
     }
 }
@@ -608,6 +610,90 @@ test_that("analyse_kinetics_channels silent for valid coefficients", {
             per_channel, slope_fit(time_coef = 5), verbose = TRUE
         )
     )
+})
+
+test_that("analyse_kinetics_channels returns zero-row warnings when clean", {
+    channels <- "ch1"
+    data <- make_channels_data(channels)
+    per_channel <- make_per_channel(channels)
+
+    result <- analyse_kinetics_channels(
+        data, channels, "time",
+        per_channel, slope_fit(), verbose = FALSE
+    )
+
+    wrn <- attr(result, "warnings")
+    expect_s3_class(wrn, "data.frame")
+    expect_equal(nrow(wrn), 0L)
+    expect_named(wrn, c("interval", "nirs_channels", "type", "message"))
+})
+
+test_that("analyse_kinetics_channels captures fit conditions per channel", {
+    channels <- c("ch1", "ch2")
+    data <- make_channels_data(channels)
+    per_channel <- make_per_channel(channels)
+
+    ## fit errors are pre-caught in fit fns and re-signalled as classed
+    ## warnings via warn_fit_failed(); emulate that path for ch2 only
+    warn_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
+        if (.nirs == "ch2") {
+            warn_fit_failed(
+                quote(SSmonoexponential), simpleError("no convergence"),
+                .nirs, "baseline"
+            )
+        }
+        slope_fit()(.nirs, x_fit, t_fit, .a, valid)
+    }
+
+    ## verbose = FALSE: console silent, conditions still captured
+    expect_silent(
+        result <- analyse_kinetics_channels(
+            data, channels, "time",
+            per_channel, warn_fit, verbose = FALSE,
+            interval_name = "baseline"
+        )
+    )
+
+    wrn <- attr(result, "warnings")
+    expect_equal(nrow(wrn), 1L)
+    expect_equal(wrn$interval, "baseline")
+    expect_equal(wrn$nirs_channels, "ch2")
+    expect_equal(wrn$type, "error")
+    expect_match(wrn$message, "no convergence")
+
+    ## verbose = TRUE: emitted to console and captured identically
+    expect_warning(
+        result2 <- analyse_kinetics_channels(
+            data, channels, "time",
+            per_channel, warn_fit, verbose = TRUE,
+            interval_name = "baseline"
+        ),
+        "fit failed"
+    )
+    expect_equal(attr(result2, "warnings"), wrn)
+})
+
+test_that("analyse_kinetics_channels captures interval-level warnings", {
+    channels <- "ch1"
+    data <- make_channels_data(channels)
+    per_channel <- make_per_channel(channels)
+
+    ## negative time coefficient warns after the channel loop; captured
+    ## with NA channel and muffled when verbose = FALSE
+    expect_silent(
+        result <- analyse_kinetics_channels(
+            data, channels, "time",
+            per_channel, slope_fit(time_coef = -2), verbose = FALSE,
+            interval_name = "baseline"
+        )
+    )
+
+    wrn <- attr(result, "warnings")
+    expect_equal(nrow(wrn), 1L)
+    expect_equal(wrn$interval, "baseline")
+    expect_true(is.na(wrn$nirs_channels))
+    expect_equal(wrn$type, "warning")
+    expect_match(wrn$message, "Negative")
 })
 
 
@@ -869,8 +955,48 @@ test_that("build_kinetics_results returns mnirs_kinetics with correct names", {
     expect_s3_class(result, "mnirs_kinetics")
     expect_named(result, c(
         "method", "model", "coefficients", "data",
-        "interval_times", "diagnostics", "channel_args", "call"
+        "interval_times", "diagnostics", "channel_args", "warnings", "call"
     ))
+})
+
+test_that("build_kinetics_results falls back to zero-row warnings", {
+    data_list <- list(int1 = make_kinetics_data())
+    ## fixture results carry no warnings attribute
+    result_list <- list(make_kinetics_results("int1"))
+    result <- build_kinetics_results(
+        data_list, result_list,
+        method = "peak_slope",
+        call = NULL
+    )
+
+    expect_equal(nrow(result$warnings), 0L)
+    expect_named(
+        result$warnings,
+        c("interval", "nirs_channels", "type", "message")
+    )
+})
+
+test_that("build_kinetics_results flattens warnings across intervals", {
+    data_list <- list(int1 = make_kinetics_data(), int2 = make_kinetics_data())
+    r1 <- make_kinetics_results("int1")
+    r2 <- make_kinetics_results("int2")
+    attr(r1, "warnings") <- data.frame(
+        interval = "int1", nirs_channels = "ch1",
+        type = "warning", message = "msg1"
+    )
+    attr(r2, "warnings") <- data.frame(
+        interval = "int2", nirs_channels = NA_character_,
+        type = "error", message = "msg2"
+    )
+
+    result <- build_kinetics_results(
+        data_list, list(r1, r2),
+        method = "peak_slope",
+        call = NULL
+    )
+
+    expect_equal(result$warnings$interval, c("int1", "int2"))
+    expect_equal(result$warnings$type, c("warning", "error"))
 })
 
 test_that("build_kinetics_results stores method and call", {
@@ -2174,7 +2300,6 @@ test_that("print.mnirs_kinetics truncates when nrow > 10", {
         )
     }
 })
-
 
 
 ## fix_coefs() =========================================================

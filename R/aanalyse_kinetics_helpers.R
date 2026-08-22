@@ -237,8 +237,8 @@ find_kinetics_idx <- function(
 #' @param data_list Named list of original interval data frames.
 #' @param result_list List of per-interval result data frames with attributes.
 #'
-#' @returns A named list with: `coefficients`, `model`, `data`,
-#'   `interval_times`, `diagnostics`, `channel_args`.
+#' @returns A named list with: `method`, `model`, `coefficients`, `data`,
+#'   `interval_times`, `diagnostics`, `channel_args`, `warnings`, `call`.
 #' @keywords internal
 build_kinetics_results <- function(
     data_list,
@@ -255,6 +255,10 @@ build_kinetics_results <- function(
 
     channel_args <- flatten_attr("channel_args")
     diagnostics <- flatten_attr("diagnostics")
+    ## fallback keeps result dfs built without the attribute working
+    warnings <- do.call(rbind, lapply(result_list, attr, "warnings")) %||%
+        kinetics_warnings_df()
+    rownames(warnings) <- NULL
 
     ## augment `data_list` dfs with `<nirs_channels>_fitted` columns
     fitted_data_list <- Map(\(.df, .result) {
@@ -321,6 +325,7 @@ build_kinetics_results <- function(
             interval_times = it_df,
             diagnostics = diagnostics,
             channel_args = channel_args,
+            warnings = warnings,
             call = call
         ),
         class = "mnirs_kinetics"
@@ -602,7 +607,7 @@ setup_kinetics_worker <- function(
 #' @param per_channel Named list (one element per channel) of resolved and
 #'   validated argument lists from [resolve_channel_args()] and
 #'   [validate_kinetics_args()].
-#' @param fit_fn A function `(.nirs, x_fit, t_fit, .a, valid, verbose)`
+#' @param fit_fn A function `(.nirs, x_fit, t_fit, .a, valid)`
 #'   returning a list with `coefs` (1-row data frame of method coefficients,
 #'   *without* `nirs_channels`/`time_channel`), `model`, `fitted_data`
 #'   (`window_idx`/`fitted`), and `diag` (1-row data frame from
@@ -618,8 +623,9 @@ setup_kinetics_worker <- function(
 #' @returns A `data.frame` of coefficients (columns `interval`,
 #'   `nirs_channels`, `time_channel`, and method parameters), one row per
 #'   channel, with attributes `"model"` and `"fitted_data"` (named lists by
-#'   channel) and `"diagnostics"` and `"channel_args"` (data frames, one row
-#'   per channel).
+#'   channel), `"diagnostics"` and `"channel_args"` (data frames, one row
+#'   per channel), and `"warnings"` (data frame of conditions captured
+#'   during fitting, regardless of `verbose`; zero rows when none fire).
 #'
 #' @keywords internal
 analyse_kinetics_channels <- function(
@@ -635,80 +641,98 @@ analyse_kinetics_channels <- function(
 ) {
     t_vec <- data[[time_channel]]
 
-    ## per-channel fit; collect parallel pieces keyed by channel
-    fits <- setNames(
-        nm = nirs_channels,
-        lapply(nirs_channels, \(.nirs) {
-            .a <- per_channel[[.nirs]]
+    ## collect conditions signalled during fitting; fit-path emitters signal
+    ## unconditionally and this single handler governs console emission, so
+    ## capture is independent of `verbose`
+    warning_rows <- list()
+    .nirs_active <- NA_character_
+    record <- function(w) {
+        warning_rows[[length(warning_rows) + 1L]] <<- data.frame(
+            interval      = interval_name,
+            nirs_channels = .nirs_active,
+            type = if (inherits(w, "mnirs_fit_error")) "error" else "warning",
+            message = gsub("\n", " — ", cli::ansi_strip(conditionMessage(w)))
+        )
+    }
 
-            ## filter for valid finite idx before first extreme + end_window;
-            ## data columns and `end_window` are already validated upstream
-            valid <- find_kinetics_idx(
-                data[[.nirs]],
-                t_vec,
-                .a$end_window,
-                .a$direction,
-                bypass_checks = TRUE,
-                env = env
-            )
-            .a$direction <- valid$direction
-            x_fit <- data[[.nirs]][valid$idx]
-            ## fit on time elapsed from onset
-            t_fit <- t_vec[valid$idx] - (.a$start_time %||% 0)
+    result <- withCallingHandlers({
+        ## per-channel fit; collect parallel pieces keyed by channel
+        fits <- setNames(
+            nm = nirs_channels,
+            lapply(nirs_channels, \(.nirs) {
+                .nirs_active <<- .nirs
+                .a <- per_channel[[.nirs]]
 
-            ## method-specific fit; coefs/diag carry method columns only
-            fit <- fit_fn(.nirs, x_fit, t_fit, .a, valid, verbose)
+                ## filter for valid finite idx before first extreme + end_window;
+                ## data columns and `end_window` are already validated upstream
+                valid <- find_kinetics_idx(
+                    data[[.nirs]],
+                    t_vec,
+                    .a$end_window,
+                    .a$direction,
+                    bypass_checks = TRUE,
+                    env = env
+                )
+                .a$direction <- valid$direction
+                x_fit <- data[[.nirs]][valid$idx]
+                ## fit on time elapsed from onset
+                t_fit <- t_vec[valid$idx] - (.a$start_time %||% 0)
 
-            ## serialise resolved args: NULL to NA, list() to its deparse(),
-            ## dropping internal-only args, so they fit a flat data frame row
-            arg_row <- lapply(c(.a, extra_args), \(.x) {
-                if (is.null(.x)) {
-                    NA
-                } else if (is.list(.x)) {
-                    ## deparse() wraps beyond its default width, which would
-                    ## expand the single-row data frame
-                    paste(deparse(.x), collapse = "")
-                } else {
-                    .x
-                }
-            })
-            arg_row[c("verbose", "bypass_checks", "interval_name")] <- NULL
+                ## method-specific fit; coefs/diag carry method columns only
+                fit <- fit_fn(.nirs, x_fit, t_fit, .a, valid)
 
-            list(
-                coefficients = cbind(
-                    data.frame(
+                ## serialise resolved args: NULL to NA, list() to its deparse(),
+                ## dropping internal-only args, so they fit a flat data frame row
+                arg_row <- lapply(c(.a, extra_args), \(.x) {
+                    if (is.null(.x)) {
+                        NA
+                    } else if (is.list(.x)) {
+                        ## deparse() wraps beyond its default width, which would
+                        ## expand the single-row data frame
+                        paste(deparse(.x), collapse = "")
+                    } else {
+                        .x
+                    }
+                })
+                arg_row[c("verbose", "bypass_checks", "interval_name")] <- NULL
+
+                list(
+                    coefficients = cbind(
+                        data.frame(
+                            interval      = interval_name,
+                            nirs_channels = .nirs,
+                            time_channel  = time_channel
+                        ),
+                        fit$coefs
+                    ),
+                    model        = fit$model,
+                    fitted_data  = fit$fitted_data,
+                    diagnostics  = cbind(
+                        data.frame(interval = interval_name, nirs_channels = .nirs),
+                        fit$diag
+                    ),
+                    channel_args = data.frame(
                         interval      = interval_name,
                         nirs_channels = .nirs,
-                        time_channel  = time_channel
-                    ),
-                    fit$coefs
-                ),
-                model        = fit$model,
-                fitted_data  = fit$fitted_data,
-                diagnostics  = cbind(
-                    data.frame(interval = interval_name, nirs_channels = .nirs),
-                    fit$diag
-                ),
-                channel_args = data.frame(
-                    interval      = interval_name,
-                    nirs_channels = .nirs,
-                    arg_row
+                        arg_row
+                    )
                 )
-            )
-        })
-    )
+            })
+        )
 
-    ## assemble single attributed df (consumed by build_kinetics_results)
-    result <- structure(
-        do.call(rbind, lapply(fits, `[[`, "coefficients")),
-        model = lapply(fits, `[[`, "model"),
-        fitted_data = lapply(fits, `[[`, "fitted_data"),
-        diagnostics = do.call(rbind, lapply(fits, `[[`, "diagnostics")),
-        channel_args = do.call(rbind, lapply(fits, `[[`, "channel_args"))
-    )
+        ## interval-level conditions from here on
+        .nirs_active <- NA_character_
 
-    ## warn when time coefficients are negative (response before start_time)
-    if (verbose) {
+        ## assemble single attributed df (consumed by build_kinetics_results)
+        result <- structure(
+            do.call(rbind, lapply(fits, `[[`, "coefficients")),
+            model = lapply(fits, `[[`, "model"),
+            fitted_data = lapply(fits, `[[`, "fitted_data"),
+            diagnostics = do.call(rbind, lapply(fits, `[[`, "diagnostics")),
+            channel_args = do.call(rbind, lapply(fits, `[[`, "channel_args"))
+        )
+
+        ## warn when time coefficients are negative (response before start_time)
         check_cols <- intersect(
             c("TD", "tau", "tau1", "tau2", "response_time", "peak_slope_time"),
             names(result)
@@ -724,6 +748,20 @@ analyse_kinetics_channels <- function(
                 {.fn analyse_kinetics} method."
             ), call = warn_call(env))
         }
+
+        result
+    },
+    warning = \(w) {
+        record(w)
+        if (!verbose) rlang::cnd_muffle(w)
+    },
+    message = \(m) if (!verbose) rlang::cnd_muffle(m)
+    )
+
+    attr(result, "warnings") <- if (length(warning_rows) == 0L) {
+        kinetics_warnings_df()
+    } else {
+        do.call(rbind, warning_rows)
     }
 
     return(result)
@@ -865,12 +903,8 @@ warn_fit_failed <- function(
     interval_name,
     n_params = NULL,
     retry = FALSE,
-    verbose = TRUE,
     env = rlang::caller_env()
 ) {
-    if (!verbose) {
-        return(invisible(NULL))
-    }
     ## optional parameter count prefixes the model fn name
     label <- paste0(
         if (!is.null(n_params)) "{n_params}-parameter ",
@@ -894,8 +928,32 @@ warn_fit_failed <- function(
             }
         )
     }
-    cli_warn(msg, call = warn_call(env))
+    ## classed so the capture handler can distinguish caught fit errors
+    cli_warn(
+        msg,
+        class = if (!inherits(e, "warning")) "mnirs_fit_error",
+        call = warn_call(env)
+    )
     return(invisible(NULL))
+}
+
+
+#' Zero-row kinetics warnings scaffold
+#'
+#' Stable column template for captured fit conditions, so binding and the
+#' returned `warnings` element keep consistent columns when none fire.
+#'
+#' @returns A zero-row `data.frame` with columns `interval`,
+#'   `nirs_channels`, `type`, and `message`.
+#'
+#' @keywords internal
+kinetics_warnings_df <- function() {
+    return(data.frame(
+        interval      = character(),
+        nirs_channels = character(),
+        type          = character(),
+        message       = character()
+    ))
 }
 
 
@@ -1232,7 +1290,6 @@ enforce_direction <- function(
     .nirs,
     interval_name,
     fix = list(),
-    verbose = TRUE,
     env = rlang::caller_env()
 ) {
     ## keep the unconstrained fit when direction is already satisfied.
@@ -1244,14 +1301,12 @@ enforce_direction <- function(
     }
 
     direction_failed <- function() {
-        if (verbose) {
-            cli_warn(c(
-                "x" = "{.fn {as.character(fn)}} fit for \\
-                {.field {(.nirs)}} in {.field {interval_name}} could \\
-                not satisfy {.code direction = {.val {direction}}}.",
-                "i" = "Returning {.val {NA}} coefficients."
-            ), call = warn_call(env))
-        }
+        cli_warn(c(
+            "x" = "{.fn {as.character(fn)}} fit for \\
+            {.field {(.nirs)}} in {.field {interval_name}} could \\
+            not satisfy {.code direction = {.val {direction}}}.",
+            "i" = "Returning {.val {NA}} coefficients."
+        ), call = warn_call(env))
         return(NULL)
     }
 
@@ -1429,7 +1484,6 @@ compute_diagnostics <- function(
     t,
     fitted,
     n_params = 1L,
-    verbose = TRUE,
     env = rlang::caller_env()
 ) {
     n_obs <- length(fitted)
@@ -1452,13 +1506,11 @@ compute_diagnostics <- function(
     }
 
     if (length(x) != length(t) || length(x) != n_obs) {
-        if (verbose) {
-            cli_warn(c(
-                "!" = "{.arg x}, {.arg t}, and {.arg fitted} must be \\
-                {.cls numeric} vectors of equal lengths to return model \\
-                diagnostics."
-            ), call = warn_call(env))
-        }
+        cli_warn(c(
+            "!" = "{.arg x}, {.arg t}, and {.arg fitted} must be \\
+            {.cls numeric} vectors of equal lengths to return model \\
+            diagnostics."
+        ), call = warn_call(env))
         return(return_na)
     }
 

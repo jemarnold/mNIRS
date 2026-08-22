@@ -572,7 +572,7 @@ analyse_biexponential <- function(
     ))
 
     ## method-specific fit: self-starting biexponential via nls
-    biexp_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
+    biexp_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
         params <- c("A", "B1", "tau1", "B2", "tau2", if (.a$use_TD) "TD")
 
         ## the 6-param model clamps to a flat `A` before `TD`, so the
@@ -602,7 +602,6 @@ analyse_biexponential <- function(
                         interval_name,
                         length(.params),
                         .retry,
-                        verbose,
                         env
                     )
                 }
@@ -674,7 +673,6 @@ analyse_biexponential <- function(
             fix = fix_ss,
             .nirs = .nirs,
             interval_name = interval_name,
-            verbose = verbose,
             env = env
         )
         if (is.null(enforced)) {
@@ -735,8 +733,7 @@ analyse_biexponential <- function(
                 t_fit[keep],
                 fitted_vals,
                 n_params = length(stats::coef(model)),
-                verbose,
-                env
+                env = env
             )
         )
     }

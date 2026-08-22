@@ -163,14 +163,17 @@ reduce to smallest synthetic or approved fixture.
 - Kinetics generic assigns method class then S3-dispatches: `response_time`,
   `peak_slope`, `monoexponential`, `biexponential`, `sigmoidal`.
 - Parametric methods use self-starting `nls`; `fix` holds global parameters. Failed
-  convergence returns method-shaped NA coefficients plus warning when verbose.
+  convergence returns method-shaped NA coefficients plus a warning recorded in the
+  `warnings` element; `verbose` gates console emission only.
 - `start_time` defines onset/reference; `direction` selects fit window; `end_window`
   truncates after extreme. Keep elapsed vs absolute time frames explicit.
 - Biexponential `direction` affects fit window only through `find_kinetics_idx()`; it does
   not constrain component/amplitude signs.
 - `mnirs_kinetics` contains `method`, per-interval/channel `model`, `coefficients`,
   augmented `data` (`<channel>_fitted`), `interval_times`, `diagnostics`,
-  `channel_args`, and normalised `call`.
+  `channel_args`, `warnings` (fit conditions captured per interval/channel
+  regardless of `verbose`; `nirs_channels` is `NA` for interval-level rows),
+  and normalised `call`.
 
 ## Debug checklist
 

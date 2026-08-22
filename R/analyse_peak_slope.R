@@ -450,11 +450,13 @@ analyse_peak_slope <- function(
     per_channel <- setup$per_channel
 
     ## method-specific fit: peak rolling linear slope
-    peak_slope_fit <- function(.nirs, x_fit, t_fit, .a, valid, verbose) {
+    peak_slope_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
+        ## verbose = TRUE so fit warnings always signal; the capture handler
+        ## in analyse_kinetics_channels() governs console emission
         slopes <- do.call(peak_slope, c(
             list(x = x_fit, t = t_fit),
             .a,
-            list(verbose = verbose, bypass_checks = TRUE, env = env),
+            list(verbose = TRUE, bypass_checks = TRUE, env = env),
             args
         ), quote = TRUE)
 
@@ -483,7 +485,6 @@ analyse_peak_slope <- function(
                 t        = t_fit[slopes$window_idx],
                 fitted   = slopes$fitted,
                 n_params = 2L,
-                verbose  = verbose,
                 env      = env
             )
         )

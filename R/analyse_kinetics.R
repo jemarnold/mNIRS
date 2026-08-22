@@ -381,6 +381,11 @@
 #'       are fairly comparable by `aic`/`bic`.}
 #'   \item{`channel_args`}{A data frame of the resolved arguments used for
 #'       each `nirs_channel` with one row per `nirs_channel` per interval.}
+#'   \item{`warnings`}{A data frame of warning and error messages captured
+#'       during fitting, with columns `interval`, `nirs_channels` (`NA` for
+#'       interval-level warnings), `type` (`"warning"` or `"error"`), and
+#'       `message`; zero rows when none occurred. Conditions are captured
+#'       regardless of `verbose`, which controls console output only.}
 #'   \item{`call`}{The matched call.}
 #'
 #' @seealso [extract_intervals()], [response_time()], [peak_slope()],

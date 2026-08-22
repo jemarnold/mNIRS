@@ -734,8 +734,7 @@ test_that("enforce_direction() refits an inverted biexponential on B2 - A", {
         floor_params = "D",
         fn = quote(SSbiexponential),
         .nirs = "smo2",
-        interval_name = "test",
-        verbose = FALSE
+        interval_name = "test"
     )
 
     expect_named(result, c("model", "coefs"))
