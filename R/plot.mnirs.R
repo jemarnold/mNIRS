@@ -246,13 +246,15 @@ plot.mnirs_kinetics <- function(
 
     ## observed signal + facet + theme via existing plot.mnirs
     p <- plot(x$data, ...)
-    args <- list(...)
 
     ## bound frame: interval factor (when >1) + <channel>_fitted columns
     plot_data <- as_plot_data(x$data)
     nirs <- attr(plot_data, "nirs_channels")
     time_channel <- attr(plot_data, "time_channel")
     faceted <- "interval" %in% names(plot_data)
+
+    ## channels with a fitted column present in the bound frame
+    fit_ch <- nirs[paste0(nirs, "_fitted") %in% names(plot_data)]
 
     ## appearance-ordered facet levels: ggplot2 unions interval levels across
     ## layers, so any character interval column re-sorts facets alphabetically
@@ -277,11 +279,8 @@ plot.mnirs_kinetics <- function(
     ## channel colour. response_time has no curve; its points are markers.
     if (fitted && x$method != "response_time") {
         p <- p +
-            lapply(nirs, \(.ch) {
+            lapply(fit_ch, \(.ch) {
             fcol <- paste0(.ch, "_fitted")
-            if (!fcol %in% names(plot_data)) {
-                return(NULL)
-            }
             ggplot2::geom_line(
                 ggplot2::aes(y = .data[[fcol]], colour = .ch),
                 data = plot_data[is.finite(plot_data[[fcol]]), , drop = FALSE],
@@ -306,66 +305,59 @@ plot.mnirs_kinetics <- function(
 
     if (markers) {
         ## dotted onset line at the resolved start_time per interval
-        vdata <- unique(ann[intersect(
-            c("interval", "start_times"),
-            names(ann)
-        )])
         p <- p +
             ggplot2::geom_vline(
                 ggplot2::aes(xintercept = .data$start_times),
-                data = vdata,
+                data = x$interval_times,
                 linetype = "dotted",
                 colour = "grey50"
             )
-    }
 
-    if (markers && x$method == "response_time") {
-        ## response and extreme (fitted values after onset) as points
-        p <- p +
-            lapply(nirs, \(.ch) {
-            fcol <- paste0(.ch, "_fitted")
-            if (!fcol %in% names(plot_data)) {
-                return(NULL)
+        if (x$method == "response_time") {
+            ## response and extreme (fitted values after onset) as points
+            p <- p +
+                lapply(fit_ch, \(.ch) {
+                fcol <- paste0(.ch, "_fitted")
+                post <- is.finite(plot_data[[fcol]]) &
+                    plot_data[[time_channel]] > plot_data$start_times
+                key_point(
+                    ggplot2::aes(y = .data[[fcol]], colour = .ch),
+                    plot_data[post, , drop = FALSE]
+                )
+            })
+            ## baseline as a single point at the onset (start_time, A)
+            base_pts <- merge(
+                x$coefficients[c("interval", "nirs_channels", "A")],
+                x$interval_times[c("interval", "start_times")],
+                by = "interval",
+                sort = FALSE
+            )
+            if (!faceted) {
+                base_pts$interval <- NULL
             }
-            post <- is.finite(plot_data[[fcol]]) &
-                plot_data[[time_channel]] > plot_data$start_times
-            key_point(
-                ggplot2::aes(y = .data[[fcol]], colour = .ch),
-                plot_data[post, , drop = FALSE]
-            )
-        })
-        ## baseline as a single point at the onset (start_time, A)
-        base_pts <- merge(
-            x$coefficients[c("interval", "nirs_channels", "A")],
-            x$interval_times[c("interval", "start_times")],
-            by = "interval",
-            sort = FALSE
-        )
-        if (!faceted) {
-            base_pts$interval <- NULL
+            p <- p +
+                key_point(
+                    ggplot2::aes(
+                        x = .data$start_times,
+                        y = .data$A,
+                        colour = .data$nirs_channels
+                    ),
+                    base_pts,
+                    inherit.aes = FALSE
+                )
+        } else {
+            ## single key-point marker for parametric methods
+            p <- p +
+                key_point(
+                    ggplot2::aes(
+                        x = .data$xval,
+                        y = .data$yval,
+                        colour = .data$nirs_channels
+                    ),
+                    ann[is.finite(ann$xval), , drop = FALSE],
+                    inherit.aes = FALSE
+                )
         }
-        p <- p +
-            key_point(
-                ggplot2::aes(
-                    x = .data$start_times,
-                    y = .data$A,
-                    colour = .data$nirs_channels
-                ),
-                base_pts,
-                inherit.aes = FALSE
-            )
-    } else if (markers) {
-        ## single key-point marker for parametric methods
-        p <- p +
-            key_point(
-                ggplot2::aes(
-                    x = .data$xval,
-                    y = .data$yval,
-                    colour = .data$nirs_channels
-                ),
-                ann[is.finite(ann$xval), , drop = FALSE],
-                inherit.aes = FALSE
-            )
     }
 
     if (labels) {
@@ -382,7 +374,7 @@ plot.mnirs_kinetics <- function(
                 data = ann,
                 x = Inf,
                 hjust = 1.05,
-                size = args[["label_size"]] %||% 3,
+                size = list(...)[["label_size"]] %||% 3,
                 show.legend = FALSE,
                 inherit.aes = FALSE
             )
@@ -398,15 +390,14 @@ plot.mnirs_kinetics <- function(
 #' (`xval`, `yval`) and formatted `label`, one row per `nirs_channel`
 #' per interval, for [plot.mnirs_kinetics()]. Marker x-coordinates are the
 #' resolved onset plus the method's time coefficient. Labels sit in the corner
-#' the fitted curve vacates: `yval_corner` is the top (`Inf`) when the signal
-#' falls (`A > B`, or `A > B2` for `"biexponential"`) and the bottom
-#' (`-Inf`) when it rises, with `vjust` staggering stacked labels by channel
-#' rank within each interval-corner.
+#' at the panel's right edge vacated by the fitted data, judged from the
+#' coefficient direction. `vjust` staggers stacked labels by channel rank
+#' within each interval.
 #'
 #' @param x An *"mnirs_kinetics"* object from [analyse_kinetics()].
 #'
 #' @returns A `data.frame` with columns `interval`, `nirs_channels`,
-#'   `start_times`, `xval`, `yval`, `label`, `yval_corner`, and `vjust`.
+#'   `xval`, `yval`, `label`, `yval_corner`, and `vjust`.
 #'   `NULL` for a method with no annotation spec, in which case
 #'   [plot.mnirs_kinetics()] draws the fitted curve alone.
 #'
@@ -414,10 +405,7 @@ plot.mnirs_kinetics <- function(
 kinetics_annotations <- function(x) {
     ## format numbers as display strings, preserving NA
     fmt <- function(v) {
-        out <- rep("NA", length(v))
-        ok <- !is.na(v)
-        out[ok] <- signif_trailing(v[ok], 3L, "signif")
-        return(out)
+        return(ifelse(is.na(v), "NA", signif_trailing(v, 3L, "signif")))
     }
 
     ## format a label line, empty when the coefficient is missing (e.g. `TD`
@@ -438,7 +426,7 @@ kinetics_annotations <- function(x) {
         x$method,
         response_time = list(
             offset = "response_time",
-            y = NA_character_,
+            y = "fitted",
             label = sprintf("response time = %s s", fmt(coefs$response_time))
         ),
         peak_slope = list(
@@ -447,7 +435,7 @@ kinetics_annotations <- function(x) {
             label = sprintf(
                 "slope = %s\npeak slope time = %s s",
                 fmt(coefs$slope),
-                fmt(coefs$peak_slope_tim/e)
+                fmt(coefs$peak_slope_time)
             )
         ),
         monoexponential = list(
@@ -494,34 +482,30 @@ kinetics_annotations <- function(x) {
     ann <- data.frame(
         interval = coefs$interval,
         nirs_channels = coefs$nirs_channels,
-        start_times = coefs$start_times,
         xval = coefs$start_times + coefs[[spec$offset]],
-        yval = if (is.na(spec$y)) NA_real_ else coefs[[spec$y]],
+        yval = coefs[[spec$y]],
         label = spec$label,
         stringsAsFactors = FALSE
     )
 
-    ## place labels in the corner the fitted curve vacates: top-right when
-    ## the signal falls (A > B), bottom-right when it rises. biexponential
-    ## has two asymptotes, so its net trend is the plateau B2 against the
-    ## baseline. peak_slope has neither, so fall back to the local slope sign
-    rises <- if ("B1" %in% names(coefs)) {
-        coefs$B1 > coefs$A
-    } else if (all(c("A", "B") %in% names(coefs))) {
-        coefs$B > coefs$A
-    } else {
-        coefs$slope > 0
-    }
+    ## signed response direction: fitted slope sign (peak_slope, sigmoidal),
+    ## otherwise plateau minus baseline
+    dir <- coefs[["slope"]] %||%
+        ((coefs[["B2"]] %||% coefs[["B"]]) - coefs[["A"]])
+
+    ## one corner per panel: labels anchor to the right edge, so use the half
+    ## the fitted responses vacate. sign-sum majority across channels decides;
+    ## ties and all-NA fits fall back to the top corner
+    rises <- stats::ave(
+        sign(dir),
+        coefs$interval,
+        FUN = \(s) sum(s, na.rm = TRUE)
+    ) > 0
     ann$yval_corner <- ifelse(rises, -Inf, Inf)
 
-    ## stagger stacked labels by channel rank within each interval-corner,
+    ## stagger stacked labels by channel rank within each interval,
     ## growing down from the top and up from the bottom
-    rank <- stats::ave(
-        seq_len(nrow(ann)),
-        ann$interval,
-        ann$yval_corner,
-        FUN = seq_along
-    ) - 1
+    rank <- stats::ave(seq_len(nrow(ann)), ann$interval, FUN = seq_along) - 1
     ann$vjust <- ifelse(rises, -0.4 - rank * 1.4, 1.4 + rank * 1.4)
 
     return(ann)

@@ -173,7 +173,7 @@ test_that("kinetics_annotations returns expected structure", {
 
     expect_s3_class(ann, "data.frame")
     expect_named(ann, c(
-        "interval", "nirs_channels", "start_times",
+        "interval", "nirs_channels",
         "xval", "yval", "label", "yval_corner", "vjust"
     ))
     ## one row per channel per interval (2 channels x 2 intervals)
@@ -221,7 +221,7 @@ test_that("kinetics_annotations formats method-specific labels", {
     expect_match(kinetics_annotations(kin_peak_slope())$label, "^slope = ")
     expect_match(
         kinetics_annotations(kin_monoexp())$label,
-        "MRT = .+ s\ntau = "
+        "tau = .+\nMRT = .+ s$"
     )
     expect_match(
         kinetics_annotations(kin_biexp())$label,
@@ -265,11 +265,43 @@ test_that("kinetics_annotations biexponential corner follows the plateau", {
     expect_true(all(kinetics_annotations(rise)$yval_corner == -Inf))
 })
 
-test_that("kinetics_annotations peak_slope corner follows slope sign", {
-    ## peak_slope has no A/B, so trend proxy is the local slope sign
+test_that("kinetics_annotations peak_slope corner follows the slope sign", {
+    ## no asymptote to trend on, so direction comes from the fitted slope
     x <- kin_peak_slope()
     ann <- kinetics_annotations(x)
-    expect_equal(ann$yval_corner, ifelse(x$coefficients$slope > 0, -Inf, Inf))
+    expect_equal(
+        ann$yval_corner,
+        ifelse(x$coefficients$slope > 0, -Inf, Inf)
+    )
+})
+
+test_that("kinetics_annotations mixed-direction channels share one corner", {
+    ## opposite-direction channels still get a single corner per panel, with
+    ## labels staggered rather than split; a tie falls back to the top corner
+    set.seed(13)
+    t <- 0:59
+    df <- data.frame(
+        time = t,
+        up = monoexponential(t, 50, 80, 5, 5) + rnorm(60, 0, 0.5),
+        down = monoexponential(t, 80, 50, 5, 5) + rnorm(60, 0, 0.5)
+    )
+    d <- create_mnirs_data(
+        df,
+        nirs_channels = c("up", "down"),
+        time_channel = "time",
+        sample_rate = 1,
+        interval_times = 0
+    )
+    x <- analyse_kinetics(
+        d,
+        nirs_channels = c("up", "down"),
+        method = "monoexponential",
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+    ann <- kinetics_annotations(x)
+    expect_true(all(ann$yval_corner == Inf))
+    expect_equal(ann$vjust, c(1.4, 2.8))
 })
 
 test_that("kinetics_annotations staggers stacked labels by channel rank", {
