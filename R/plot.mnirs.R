@@ -444,7 +444,7 @@ kinetics_annotations <- function(x) {
             label = paste0(
                 line("TD = %s s\n", coefs$TD),
                 sprintf(
-                    "tau = %s\nMRT = %s s",
+                    "tau = %s s\nMRT = %s s",
                     fmt(coefs$tau),
                     fmt(coefs$MRT)
                 )
@@ -456,7 +456,7 @@ kinetics_annotations <- function(x) {
             label = paste0(
                 line("TD = %s s\n", coefs$TD),
                 sprintf(
-                    "excursion = %s s\ntau1 = %s\ntau2 = %s",
+                    "excursion = %s s\ntau1 = %s s\ntau2 = %s s",
                     fmt(coefs$excursion_time),
                     fmt(coefs$tau1),
                     fmt(coefs$tau2)
@@ -467,7 +467,7 @@ kinetics_annotations <- function(x) {
             offset = "xmid",
             y = "xmid_fitted",
             label = sprintf(
-                "xmid = %s s\nslope = %s",
+                "slope = %s\nxmid = %s s",
                 fmt(coefs$xmid),
                 fmt(coefs$slope)
             )

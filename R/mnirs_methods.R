@@ -85,18 +85,17 @@ print.mnirs_kinetics <- function(x, ...) {
         .x[is.na(.x)] <- "NA"
         .x
     })
+    ## display titles
+    method_labels <- c(
+        response_time = "Fractional Response Time",
+        peak_slope = "Peak Linear Response Rate",
+        monoexponential = "Monoexponential One-Phase Kinetics",
+        biexponential = "Biexponential Two-Phase Kinetics",
+        sigmoidal = "Sigmoidal Inflection Kinetics"
+    )
 
     cat("\n")
-    if (x$method == "response_time") {
-        cat("Fractional Response Time")
-    } else if (x$method == "peak_slope") {
-        cat("Peak Linear Regression Slope")
-    } else if (x$method == "monoexponential") {
-        cat("Monoexponential non-linear Regression")
-    } else if (x$method == "sigmoidal") {
-        cat("Sigmoidal non-linear Regression")
-    }
-
+    cat(method_labels[[x$method]])
     cat("\n")
     cat("    Model Coefficients:")
     cat("\n")

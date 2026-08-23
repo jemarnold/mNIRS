@@ -2445,6 +2445,33 @@ test_that("fix_coefs() falls back to parent frames for model data", {
 
 
 ## integration =======================================================
+test_that("analyse_kinetics respects end_window on extracted intervals", {
+    ## regression: absolute interval time reached find_kinetics_idx, so
+    ## end_window truncated the fitting window to the pre-onset baseline
+    ## and the monoexponential fit failed
+    data_list <- read_mnirs(
+        example_mnirs("moxy_intervals"),
+        event_channel = "Lap",
+        verbose = FALSE
+    ) |>
+        extract_intervals(
+            start = by_lap(3),
+            span = c(-60, 120),
+            verbose = FALSE
+        )
+
+    expect_no_warning(
+        result <- analyse_kinetics(
+            data_list,
+            method = "monoexp",
+            end_window = 20,
+            verbose = FALSE
+        )
+    )
+    expect_true(all(is.finite(result$coefficients$tau)))
+})
+
+
 test_that("analyse_kinetics works visually on Train.Red", {
     skip_if_not_installed("ggplot2")
     skip("visual check")
