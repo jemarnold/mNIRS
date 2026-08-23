@@ -291,6 +291,47 @@ plot.mnirs_kinetics <- function(
         })
     }
 
+    ## biexponential component overlay ========================
+    ## undocumented `biexp = TRUE`: reconstruct the two underlying
+    ## exponential terms from natural-scale coefficients, sequential
+    ## anchoring (fast A to B1, slow B1 to B2), over the same rows as
+    ## the fitted overlay
+    if (isTRUE(list(...)[["biexp"]]) && x$method == "biexponential") {
+        coefs <- x$coefficients[
+            c("interval", "nirs_channels", "A", "B1", "tau1", "B2", "tau2", "TD")
+        ]
+        p <- p +
+            lapply(fit_ch, \(.ch) {
+            fcol <- paste0(.ch, "_fitted")
+            cf <- coefs[
+                coefs$nirs_channels == .ch & is.finite(coefs$A), ,
+                drop = FALSE
+            ]
+            if (nrow(cf) == 0L) {
+                return(NULL)
+            }
+            d <- plot_data[is.finite(plot_data[[fcol]]), , drop = FALSE]
+            d <- if (faceted) {
+                merge(d, cf, by = "interval", sort = FALSE)
+            } else {
+                cbind(d, cf[setdiff(names(cf), "interval")])
+            }
+            ## TD NA marks a 5-parameter fit: onset with no time delay
+            td <- ifelse(is.finite(d$TD), d$TD, 0)
+            ts <- pmax(d[[time_channel]] - d$start_times - td, 0)
+            d$comp1 <- d$A + (d$B1 - d$A) * (1 - exp(-ts / d$tau1))
+            d$comp2 <- d$B1 + (d$B2 - d$B1) * (1 - exp(-ts / d$tau2))
+            comp_line <- \(.col) ggplot2::geom_line(
+                ggplot2::aes(y = .data[[.col]], colour = .ch),
+                data = d,
+                linetype = "dotted",
+                linewidth = 0.5,
+                show.legend = FALSE
+            )
+            list(comp_line("comp1"), comp_line("comp2"))
+        })
+    }
+
     ## per-interval-per-channel markers and labels ============
     ## methods with no annotation spec plot the fitted curve alone
     ann <- kinetics_annotations(x)
