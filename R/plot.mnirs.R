@@ -474,7 +474,7 @@ kinetics_annotations <- function(x) {
             offset = "peak_slope_time",
             y = "fitted",
             label = sprintf(
-                "slope = %s\npeak slope time = %s s",
+                "slope = %s /s\npeak slope time = %s s",
                 fmt(coefs$slope),
                 fmt(coefs$peak_slope_time)
             )
@@ -504,13 +504,26 @@ kinetics_annotations <- function(x) {
                 )
             )
         ),
+        exponential_drift = list(
+            offset = "MRT",
+            y = "MRT_fitted",
+            label = paste0(
+                line("TD = %s s\n", coefs$TD),
+                sprintf(
+                    "tau = %s s\nMRT = %s s\nslope = %s /s",
+                    fmt(coefs$tau),
+                    fmt(coefs$MRT),
+                    fmt(coefs$slope)
+                )
+            )
+        ),
         sigmoidal = list(
             offset = "xmid",
             y = "xmid_fitted",
             label = sprintf(
-                "slope = %s\nxmid = %s s",
-                fmt(coefs$xmid),
-                fmt(coefs$slope)
+                "slope = %s /s\nxmid = %s s",
+                fmt(coefs$slope),
+                fmt(coefs$xmid)
             )
         )
     )
@@ -531,8 +544,8 @@ kinetics_annotations <- function(x) {
 
     ## signed response direction: fitted slope sign (peak_slope, sigmoidal),
     ## otherwise plateau minus baseline
-    dir <- coefs[["slope"]] %||%
-        ((coefs[["B2"]] %||% coefs[["B"]]) - coefs[["A"]])
+    dir <- ((coefs[["B2"]] %||% coefs[["B"]]) - coefs[["A"]]) %||%
+        coefs[["slope"]]
 
     ## one corner per panel: labels anchor to the right edge, so use the half
     ## the fitted responses vacate. sign-sum majority across channels decides;

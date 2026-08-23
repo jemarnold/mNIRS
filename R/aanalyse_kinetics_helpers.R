@@ -17,6 +17,14 @@ method_aliases <- c(
     biexponential = "biexponential",
     biexp = "biexponential",
     double_exponential = "biexponential",
+    exponential_drift = "exponential_drift",
+    exponential_linear = "exponential_drift",
+    exp_drift = "exponential_drift",
+    exp_linear = "exponential_drift",
+    monoexp_drift = "exponential_drift",
+    monoexp_linear = "exponential_drift",
+    linear_drift = "exponential_drift",
+    drift = "exponential_drift",
     logistic = "sigmoidal",
     gompertz = "sigmoidal",
     xmid = "sigmoidal"
@@ -490,6 +498,7 @@ kinetics_dispatch <- list(
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
     monoexponential = c("use_TD", "fix"),
     biexponential = c("use_TD", "fix", "tau_ratio"),
+    exponential_drift = c("use_TD", "fix", "drift_k"),
     sigmoidal = c("shape", "fix")
 )
 

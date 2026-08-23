@@ -90,6 +90,7 @@ print.mnirs_kinetics <- function(x, ...) {
         response_time = "Fractional Response Time",
         peak_slope = "Peak Linear Response Rate",
         monoexponential = "Monoexponential One-Phase Kinetics",
+        exponential_drift = "Exponential-Linear Two-Phase Kinetics",
         biexponential = "Biexponential Two-Phase Kinetics",
         sigmoidal = "Sigmoidal Inflection Kinetics"
     )

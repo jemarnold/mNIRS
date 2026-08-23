@@ -64,8 +64,7 @@ reference:
   - analyse_kinetics
   - matches("response_time")
   - matches("slope")
-  - matches("monoexp")
-  - matches("biexp")
+  - matches("exp")
   - matches("sigmoidal")
   - matches("logistic")
   - matches("gompertz")

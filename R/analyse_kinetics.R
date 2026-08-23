@@ -19,6 +19,9 @@
 #'      [monoexponential()].}
 #'      \item{`"biexponential"`}{Biexponential (fast + slow component) curve
 #'      fit via [stats::nls()]. See [biexponential()].}
+#'      \item{`"exponential_drift"`}{Monoexponential curve with a secondary
+#'      linear drift, fit via [stats::nls()]. Additional arguments: `use_TD`,
+#'      `drift_k`. See [exponential_drift()].}
 #'      \item{`"sigmoidal"`}{Logistic or Gompertz-family curve fit via
 #'      [stats::nls()]. Additional arguments: `shape`. See [logistic()].}
 #'   }
@@ -55,7 +58,8 @@
 #'   any `NA`s to the returned vector and may return errors or warnings.
 #'   If `TRUE`, ignores `NA`s and processes available valid samples within
 #'   the local window. (see *Details*).
-#' @param use_TD **monoexponential, biexponential**: Logical; default is
+#' @param use_TD **monoexponential, biexponential, exponential_drift**:
+#'   Logical; default is
 #'   `TRUE`, attempts to fit the model with a "time-delay" parameter `TD` 
 #'   before the response onset. i.e., a 4-parameter [SSmonoexponential()] model
 #'   (A, B, tau, TD); or a 6-parameter [biexponential()] model (A, B1, tau1,
@@ -65,7 +69,8 @@
 #'   to fit. One of `"symmetric"` (*default*; calls [SSlogistic()]),
 #'   `"gompertz"` (early-inflection; calls [SSgompertz()]), or
 #'   `"gompertz_left"` (late-inflection; calls [SSgompertz_left()]).
-#' @param fix **monoexponential, biexponential, sigmoidal**: An *optional*
+#' @param fix **monoexponential, biexponential, exponential_drift,
+#'   sigmoidal**: An *optional*
 #'   named list of model parameters to hold constant during fitting, e.g.
 #'   `fix = list(A = 0)` fixes the starting amplitude at `0`. Fixed
 #'   parameters are excluded from estimation and reported at their fixed
@@ -74,6 +79,10 @@
 #' @param tau_ratio **biexponential**: A numeric lower bound on the ratio of
 #'   the slow to the fast time constant (`tau2 / tau1`) to avoid convergence
 #'   issues on indistinguishable values; default is `2.5`. See *Details*.
+#' @param drift_k **exponential_drift**: A numeric multiple of `tau` after
+#'   `TD` at which the linear drift onset is tied
+#'   (`texc = TD + drift_k * tau`; default is `3`) when the freely
+#'   fitted onset fails or converges against its bounds. See *Details*.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
 #'
@@ -128,7 +137,8 @@
 #' within the subsequent `end_window` time span. The curve fitting window
 #' extends to the end of `end_window` beyond the detected peak/trough.
 #'
-#' For *"monoexponential"*, *"biexponential"*, and *"sigmoidal"* methods,
+#' For *"monoexponential"*, *"biexponential"*, *"exponential_drift"*, and
+#' *"sigmoidal"* methods,
 #' `direction` also constrains the sign of the fitted amplitude `B - A`, and
 #' the sigmoidal `slope`. For the *"biexponential"* method, `direction`
 #' constrains the sign of the overall fitted amplitude `B2 - A`. A fit that
@@ -206,7 +216,8 @@
 #'   `fix = list(interval_1 = list(smo2 = list(A = 0)))`. Triple nested
 #'   `list()`s is janky, but it works for now.
 #'
-#' `tau_ratio` for *"biexponential"* is always applied globally.
+#' `tau_ratio` for *"biexponential"* and `drift_k` for *"exponential_drift"*
+#' are always applied globally.
 #' 
 #' `method` currently only accepts a single value applied globally to all
 #' intervals and `nirs_channels`. This is a current limitation (as of `0.7.1`)
@@ -315,6 +326,34 @@
 #'
 #' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`, as
 #' above.
+#'
+#' ## method = "exponential_drift"
+#'
+#' Aliases: `method = c("exp_linear", "exp_drift", "monoexp_drift", "drift")`.
+#'
+#' A parametric approach fitting a two-phase curve using [stats::nls()] with
+#' [SSexponential_drift()]: a pure [monoexponential()] primary response plus
+#' a secondary linear drift beginning at the excursion point `texc` near the
+#' primary asymptote.
+#'
+#' Model equation:
+#'
+#' `A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) +
+#' slope * pmax(t - texc, 0)`
+#'
+#' `A`, `B`, `tau`, `TD`, and the derived `k`, `MRT`, and `HRT` are as for
+#' *"monoexponential"*. `slope` is the linear drift rate `dx/dt` and
+#' `texc` the time at which the drift begins, both elapsed from
+#' `start_time` (the same frame as `TD` and `MRT`).
+#'
+#' The drift onset point `texc` is fitted freely within the record. If that fit
+#' fails or converges against its bounds, `texc` is instead tied to the
+#' primary phase as `texc = TD + drift_k * tau` (*default* `drift_k = 3`;
+#' ~95% of the primary amplitude) and refit with a warning. Set `use_TD = TRUE`
+#' (*default*) to include the time-delay parameter `TD`.
+#'
+#' Any parameter may be held constant with `fix`, e.g. `fix = list(texc = 60)`,
+#' as above.
 #'
 #' ## method = "sigmoidal"
 #'
@@ -441,6 +480,7 @@ analyse_kinetics <- function(
         "peak_slope",
         "monoexponential",
         "biexponential",
+        "exponential_drift",
         "sigmoidal"
     ),
     start_time = NULL,
@@ -457,6 +497,7 @@ analyse_kinetics <- function(
     use_TD = TRUE,
     shape = c("symmetric", "gompertz", "gompertz_left"),
     tau_ratio = 2.5,
+    drift_k = 3,
     fix = NULL
 ) {
     ## normalise method aliases before matching
@@ -612,6 +653,41 @@ analyse_kinetics.biexponential <- function(
 #' @rdname analyse_kinetics
 #' @usage NULL
 #' @export
+analyse_kinetics.exponential_drift <- function(
+    data,
+    nirs_channels = NULL,
+    time_channel = NULL,
+    method,
+    start_time = NULL,
+    direction = c("auto", "positive", "negative"),
+    end_window = Inf,
+    verbose = TRUE,
+    ...,
+    use_TD = TRUE,
+    drift_k = 3,
+    fix = NULL
+) {
+    ## TODO: pass additional stats::nls() args
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
+    }
+    return(analyse_kinetics_intervals(
+        data,
+        analyse_exponential_drift,
+        "exponential_drift",
+        mget(unlist(kinetics_dispatch[c("common", "exponential_drift")])),
+        enquo(nirs_channels),
+        enquo(time_channel),
+        verbose,
+        match.call(),
+        sys.call(-1)
+    ))
+}
+
+
+#' @rdname analyse_kinetics
+#' @usage NULL
+#' @export
 analyse_kinetics.sigmoidal <- function(
     data,
     nirs_channels = NULL,
@@ -654,6 +730,7 @@ analyze_kinetics <- function(
         "peak_slope",
         "monoexponential",
         "biexponential",
+        "exponential_drift",
         "sigmoidal"
     ),
     start_time = NULL,
