@@ -271,7 +271,7 @@ build_kinetics_results <- function(
         })
         names(fitted_cols) <- paste0(names(fitted_data), "_fitted")
         ## augment `<nirs_channels>_fitted` columns to df
-        augmented <- cbind(.df, as.data.frame(fitted_cols))
+        augmented <- cbind(.df, as.data.frame(fitted_cols, check.names = FALSE))
         
         ## metadata ==================================================
         metadata <- attributes(.df)
