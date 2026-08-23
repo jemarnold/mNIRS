@@ -291,14 +291,22 @@ plot.mnirs_kinetics <- function(
         })
     }
 
-    ## biexponential component overlay ========================
-    ## undocumented `biexp = TRUE`: reconstruct the two underlying
-    ## exponential terms from natural-scale coefficients, sequential
-    ## anchoring (fast A to B1, slow B1 to B2), over the same rows as
-    ## the fitted overlay
-    if (isTRUE(list(...)[["biexp"]]) && x$method == "biexponential") {
+    ## model component overlay ================================
+    ## undocumented `components = TRUE`: reconstruct the underlying model
+    ## terms from natural-scale coefficients over the same rows as the
+    ## fitted overlay. biexponential: sequential anchoring (fast A to B1,
+    ## slow B1 to B2). exponential_drift: monoexponential over the full
+    ## fit window plus the linear drift from (texc, texc_fitted)
+    comp_coefs <- switch(
+        x$method,
+        biexponential = c("A", "B1", "tau1", "B2", "tau2", "TD"),
+        exponential_drift = c(
+            "A", "B", "tau", "slope", "texc", "texc_fitted", "TD"
+        )
+    )
+    if (isTRUE(list(...)[["components"]]) && !is.null(comp_coefs)) {
         coefs <- x$coefficients[
-            c("interval", "nirs_channels", "A", "B1", "tau1", "B2", "tau2", "TD")
+            c("interval", "nirs_channels", comp_coefs)
         ]
         p <- p +
             lapply(fit_ch, \(.ch) {
@@ -316,19 +324,29 @@ plot.mnirs_kinetics <- function(
             } else {
                 cbind(d, cf[setdiff(names(cf), "interval")])
             }
-            ## TD NA marks a 5-parameter fit: onset with no time delay
+            ## TD NA marks a fit with the onset at no time delay
             td <- ifelse(is.finite(d$TD), d$TD, 0)
-            ts <- pmax(d[[time_channel]] - d$start_times - td, 0)
-            d$comp1 <- d$A + (d$B1 - d$A) * (1 - exp(-ts / d$tau1))
-            d$comp2 <- d$B1 + (d$B2 - d$B1) * (1 - exp(-ts / d$tau2))
-            comp_line <- \(.col) ggplot2::geom_line(
+            t_rel <- d[[time_channel]] - d$start_times
+            ts <- pmax(t_rel - td, 0)
+            comp_line <- \(.col, .d = d) ggplot2::geom_line(
                 ggplot2::aes(y = .data[[.col]], colour = .ch),
-                data = d,
+                data = .d,
                 linetype = "dotted",
                 linewidth = 0.5,
                 show.legend = FALSE
             )
-            list(comp_line("comp1"), comp_line("comp2"))
+            if (x$method == "biexponential") {
+                d$comp1 <- d$A + (d$B1 - d$A) * (1 - exp(-ts / d$tau1))
+                d$comp2 <- d$B1 + (d$B2 - d$B1) * (1 - exp(-ts / d$tau2))
+                return(list(comp_line("comp1"), comp_line("comp2")))
+            }
+            ## exponential_drift: primary response and post-texc drift line
+            d$comp1 <- d$A + (d$B - d$A) * (1 - exp(-ts / d$tau))
+            d$comp2 <- d$texc_fitted + d$slope * (t_rel - d$texc)
+            list(
+                comp_line("comp1"),
+                comp_line("comp2", d[t_rel >= d$texc, , drop = FALSE])
+            )
         })
     }
 
@@ -412,7 +430,7 @@ plot.mnirs_kinetics <- function(
                     colour = .data$nirs_channels,
                     vjust = .data$vjust
                 ),
-                data = ann,
+                data = ann[nzchar(ann$label), , drop = FALSE],
                 x = Inf,
                 hjust = 1.05,
                 size = list(...)[["label_size"]] %||% 3,
@@ -438,7 +456,8 @@ plot.mnirs_kinetics <- function(
 #' @param x An *"mnirs_kinetics"* object from [analyse_kinetics()].
 #'
 #' @returns A `data.frame` with columns `interval`, `nirs_channels`,
-#'   `xval`, `yval`, `label`, `yval_corner`, and `vjust`.
+#'   `xval`, `yval`, `label`, `yval_corner`, and `vjust`. Methods with
+#'   multiple key points append marker-only rows with an empty `label`.
 #'   `NULL` for a method with no annotation spec, in which case
 #'   [plot.mnirs_kinetics()] draws the fitted curve alone.
 #'
@@ -462,7 +481,9 @@ kinetics_annotations <- function(x) {
         sort = FALSE
     )
 
-    ## per-method: time offset (x), fitted value (y), and label formatter
+    ## per-method: time offsets (x), fitted values (y), and label formatter.
+    ## `offset`/`y` are parallel vectors of coefficient names; the first pair
+    ## anchors the label, later pairs add marker-only points
     spec <- switch(
         x$method,
         response_time = list(
@@ -497,7 +518,7 @@ kinetics_annotations <- function(x) {
             label = paste0(
                 line("TD = %s s\n", coefs$TD),
                 sprintf(
-                    "excursion = %s s\ntau1 = %s s\ntau2 = %s s",
+                    "texc = %s s\ntau1 = %s s\ntau2 = %s s",
                     fmt(coefs$texc),
                     fmt(coefs$tau1),
                     fmt(coefs$tau2)
@@ -505,14 +526,15 @@ kinetics_annotations <- function(x) {
             )
         ),
         exponential_drift = list(
-            offset = "MRT",
-            y = "MRT_fitted",
+            offset = c("MRT", "texc"),
+            y = c("MRT_fitted", "texc_fitted"),
             label = paste0(
                 line("TD = %s s\n", coefs$TD),
                 sprintf(
-                    "tau = %s s\nMRT = %s s\nslope = %s /s",
+                    "tau = %s s\nMRT = %s s\ntexc = %s s\nslope = %s /s",
                     fmt(coefs$tau),
                     fmt(coefs$MRT),
+                    fmt(coefs$texc),
                     fmt(coefs$slope)
                 )
             )
@@ -533,14 +555,19 @@ kinetics_annotations <- function(x) {
         return(NULL)
     }
 
-    ann <- data.frame(
-        interval = coefs$interval,
-        nirs_channels = coefs$nirs_channels,
-        xval = coefs$start_times + coefs[[spec$offset]],
-        yval = coefs[[spec$y]],
-        label = spec$label,
-        stringsAsFactors = FALSE
-    )
+    ## one marker row per channel per offset/y pair
+    marker_rows <- function(off, y) {
+        return(data.frame(
+            interval = coefs$interval,
+            nirs_channels = coefs$nirs_channels,
+            xval = coefs$start_times + coefs[[off]],
+            yval = coefs[[y]],
+            stringsAsFactors = FALSE
+        ))
+    }
+
+    ann <- marker_rows(spec$offset[[1L]], spec$y[[1L]])
+    ann$label <- spec$label
 
     ## signed response direction: fitted slope sign (peak_slope, sigmoidal),
     ## otherwise plateau minus baseline
@@ -561,6 +588,15 @@ kinetics_annotations <- function(x) {
     ## growing down from the top and up from the bottom
     rank <- stats::ave(seq_len(nrow(ann)), ann$interval, FUN = seq_along) - 1
     ann$vjust <- ifelse(rises, -0.4 - rank * 1.4, 1.4 + rank * 1.4)
+
+    ## marker-only rows for the remaining offset/y pairs: no label or corner
+    extra <- Map(marker_rows, spec$offset[-1L], spec$y[-1L])
+    if (length(extra)) {
+        extra <- do.call(rbind, c(extra, list(make.row.names = FALSE)))
+        extra[c("label", "yval_corner", "vjust")] <-
+            list("", NA_real_, NA_real_)
+        ann <- rbind(ann, extra)
+    }
 
     return(ann)
 }

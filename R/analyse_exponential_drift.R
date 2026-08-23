@@ -353,7 +353,7 @@ fit_expdrift <- function(x, t, params, fix, on_error) {
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
 #'   `nirs_channels`, `A`, `B`, `tau`, `k`, `TD`, `MRT`, `HRT`,
-#'   `MRT_fitted`, `HRT_fitted`, `slope`, `texc`. Per-channel
+#'   `MRT_fitted`, `HRT_fitted`, `slope`, `texc`, `texc_fitted`. Per-channel
 #'   metadata are attached as attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
 #'     where fitting failed.
@@ -418,9 +418,9 @@ analyse_exponential_drift <- function(
     ## NA scaffold (method columns only) for convergence failure
     # fmt: skip
     na_coefs <- as.data.frame(setNames(
-        rep(list(NA_real_), 11L),
+        rep(list(NA_real_), 12L),
         c("A", "B", "tau", "k", "TD", "MRT", "HRT",
-        "MRT_fitted", "HRT_fitted", "slope", "texc")
+        "MRT_fitted", "HRT_fitted", "slope", "texc", "texc_fitted")
     ))
 
     ## method-specific fit: self-starting exponential-drift via nls
@@ -563,9 +563,9 @@ analyse_exponential_drift <- function(
             sum(TD_arg, drift_k * coefs[["tau"]])
         }
 
-        ## predict response at MRT and HRT using the full fitted model
+        ## predict response at MRT, HRT, and texc using the full fitted model
         fitted_params <- exponential_drift(
-            t = c(MRT_val, HRT_val),
+            t = c(MRT_val, HRT_val, texc_val),
             A = coefs[["A"]],
             B = coefs[["B"]],
             tau = coefs[["tau"]],
@@ -586,7 +586,8 @@ analyse_exponential_drift <- function(
                 MRT_fitted = fitted_params[[1L]],
                 HRT_fitted = fitted_params[[2L]],
                 slope = coefs[["slope"]],
-                texc = texc_val
+                texc = texc_val,
+                texc_fitted = fitted_params[[3L]]
             ),
             model = model,
             fitted_data = data.frame(
