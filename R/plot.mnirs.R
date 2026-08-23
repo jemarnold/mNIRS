@@ -492,13 +492,13 @@ kinetics_annotations <- function(x) {
             )
         ),
         biexponential = list(
-            offset = "excursion_time",
-            y = "excursion_value",
+            offset = "texc",
+            y = "texc_fitted",
             label = paste0(
                 line("TD = %s s\n", coefs$TD),
                 sprintf(
                     "excursion = %s s\ntau1 = %s s\ntau2 = %s s",
-                    fmt(coefs$excursion_time),
+                    fmt(coefs$texc),
                     fmt(coefs$tau1),
                     fmt(coefs$tau2)
                 )

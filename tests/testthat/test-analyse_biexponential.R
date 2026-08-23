@@ -257,9 +257,8 @@ test_that("analyse_biexponential() returns correct structure", {
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
-        "interval", "nirs_channels", "time_channel",
-        "A", "B1", "tau1", "B2", "tau2", "TD",
-        "excursion_time", "excursion_value"
+        "interval", "nirs_channels", "time_channel", "A", "B1", "tau1", 
+        "B2", "tau2", "TD", "texc", "texc_fitted"
     ))
     expect_equal(nrow(result), 1L)
 
@@ -288,8 +287,8 @@ test_that("analyse_biexponential() recovers known parameters", {
     expect_true(all.equal(result$B1, B1, tolerance = 3, scale = 1))
     expect_true(all.equal(result$B2, B2, tolerance = 3, scale = 1))
     ## excursion sits inside the window, below the starting value
-    expect_true(result$excursion_time > 0)
-    expect_true(result$excursion_value < result$A)
+    expect_true(result$texc > 0)
+    expect_true(result$texc_fitted < result$A)
     ## good fit
     expect_true(attr(result, "diagnostics")$r2 > 0.9)
 })
@@ -304,7 +303,7 @@ test_that("analyse_biexponential() excursion matches the fitted curve minimum", 
 
     fitted <- attr(result, "fitted_data")$smo2$fitted
     ## closed-form excursion agrees with the numeric minimum of the fit
-    expect_true(all.equal(result$excursion_value, min(fitted), tolerance = 0.1,
+    expect_true(all.equal(result$texc_fitted, min(fitted), tolerance = 0.1,
         scale = 1))
 })
 
@@ -355,7 +354,7 @@ test_that("analyse_biexponential() returns NA for failed fit", {
 
     expect_true(is.na(result$A))
     expect_true(is.na(result$tau1))
-    expect_true(is.na(result$excursion_value))
+    expect_true(is.na(result$texc_fitted))
 })
 
 test_that("analyse_biexponential() suppresses fit-failure warning when verbose = FALSE", {
@@ -433,9 +432,9 @@ test_that("analyse_biexponential() fits a mirrored rise-overshoot response", {
     ## direction, so a mirrored response reports a genuine interior
     ## excursion: a maximum above the baseline
     fitted <- attr(result, "fitted_data")$smo2$fitted
-    expect_true(result$excursion_time > 0)
-    expect_true(result$excursion_value > result$A)
-    expect_true(all.equal(result$excursion_value, max(fitted), tolerance = 0.1,
+    expect_true(result$texc > 0)
+    expect_true(result$texc_fitted > result$A)
+    expect_true(all.equal(result$texc_fitted, max(fitted), tolerance = 0.1,
         scale = 1))
 })
 
@@ -461,8 +460,8 @@ test_that("analyse_biexponential() excursion falls back on a monotone fit", {
 
     skip_if(is.na(result$tau1), "fit did not converge")
     expect_true((result$A - result$B1) * (result$B2 - result$B1) < 0)
-    expect_equal(result$excursion_time, 0)
-    expect_equal(result$excursion_value, result$A)
+    expect_equal(result$texc, 0)
+    expect_equal(result$texc_fitted, result$A)
 })
 
 
@@ -550,8 +549,8 @@ test_that("analyse_biexponential() tau_ratio bounds the time constants", {
     expect_true(result$tau2 >= result$tau1 * 5 - 1e-6)
 })
 
-test_that("analyse_biexponential() excursion_time is elapsed from start_time", {
-    ## 6-parameter TD fit with a non-zero start_time: excursion_time must be
+test_that("analyse_biexponential() texc is elapsed from start_time", {
+    ## 6-parameter TD fit with a non-zero start_time: texc must be
     ## measured from start_time, not from the model's internal (TD) onset
     set.seed(11)
     start_time <- 20
@@ -577,17 +576,17 @@ test_that("analyse_biexponential() excursion_time is elapsed from start_time", {
     expect_named(coef(attr(result, "model")$smo2),
         c("A", "B1", "lt1", "B2", "lr", "TD"))
 
-    ## excursion_time equals the elapsed time from start_time to the fitted
+    ## texc equals the elapsed time from start_time to the fitted
     ## minimum; the old onset-relative value omits the ~TD offset
     fd <- attr(result, "fitted_data")$smo2
     t_at_min <- data$time[fd$window_idx[which.min(fd$fitted)]]
-    expect_true(all.equal(result$excursion_time, t_at_min - start_time,
+    expect_true(all.equal(result$texc, t_at_min - start_time,
         tolerance = 1.5, scale = 1))
-    expect_true(result$excursion_time > TD)
+    expect_true(result$texc > TD)
 })
 
-test_that("analyse_biexponential() excursion_value matches the fitted minimum with TD", {
-    ## origin-invariant evaluation: excursion_value must equal the fitted-curve
+test_that("analyse_biexponential() texc_fitted matches the fitted minimum with TD", {
+    ## origin-invariant evaluation: texc_fitted must equal the fitted-curve
     ## minimum even when TD and a non-zero start_time shift the time frame
     set.seed(12)
     start_time <- 20
@@ -613,9 +612,9 @@ test_that("analyse_biexponential() excursion_value matches the fitted minimum wi
 
     ## closed-form excursion agrees with the numeric minimum of the fit
     fitted <- attr(result, "fitted_data")$smo2$fitted
-    expect_true(all.equal(result$excursion_value, min(fitted), tolerance = 0.15,
+    expect_true(all.equal(result$texc_fitted, min(fitted), tolerance = 0.15,
         scale = 1))
-    expect_true(result$excursion_value < result$A)
+    expect_true(result$texc_fitted < result$A)
 })
 
 
@@ -679,7 +678,7 @@ test_that("analyse_biexponential() direction = 'positive' accepts a within-span 
     )
 
     expect_false(is.na(result$A))
-    expect_true(result$excursion_value > result$A)
+    expect_true(result$texc_fitted > result$A)
     expect_true(result$B2 < result$A)
 })
 
@@ -798,7 +797,6 @@ test_that("analyse_kinetics() passes direction to biexponential method", {
 
     expect_true(is.na(result$coefficients$A))
 })
-
 
 
 ## fixed parameters =================================================
@@ -967,7 +965,7 @@ test_that("analyse_kinetics() dispatches to the biexponential method", {
     expect_s3_class(result, "mnirs_kinetics")
     expect_equal(result$method, "biexponential")
     expect_true(all(
-        c("B1", "tau1", "B2", "tau2", "excursion_time") %in%
+        c("B1", "tau1", "B2", "tau2", "texc") %in%
             names(result$coefficients)
     ))
 })
@@ -1129,7 +1127,7 @@ test_that("analyse_biexponential() converges on real dataset", {
     ok <- !is.na(coefs$tau1)
     expect_true(all(coefs$tau2[ok] >= coefs$tau1[ok] * 2.5 - 1e-6))
     down <- ok & coefs$B1 < coefs$A & coefs$B2 > coefs$B1
-    expect_true(all(coefs$excursion_value[down] <= coefs$A[down]))
+    expect_true(all(coefs$texc_fitted[down] <= coefs$A[down]))
 
     r2 <- unlist(lapply(results, \(x) attr(x, "diagnostics")$r2))
     mean(r2, na.rm = TRUE)

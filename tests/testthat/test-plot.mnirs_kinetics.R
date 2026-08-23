@@ -197,7 +197,7 @@ test_that("kinetics_annotations xval is onset plus method offset", {
     be <- kin_biexp()
     expect_equal(
         kinetics_annotations(be)$xval,
-        be$interval_times$start_times + be$coefficients$excursion_time
+        be$interval_times$start_times + be$coefficients$texc
     )
 
     sg <- kin_sigmoidal()

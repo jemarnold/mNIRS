@@ -297,24 +297,24 @@
 #' A parametric approach fitting a self-starting biexponential
 #' excursion-recovery function to the response curve using [stats::nls()] with
 #' [SSbiexponential()]. A *fast* component (`B1`, `tau1`) drives the initial
-#' excursion to a rounded turning point; a *slow* component (`B2`, `tau2`)
-#' recovers toward a stable plateau. The turning point is reported as
-#' `excursion_time` and `excursion_value`, and is a minimum or a maximum
-#' depending on the response `direction`.
+#' response to a rounded excursion point; a *slow* component (`B2`, `tau2`)
+#' recovers toward a stable plateau. The excursion point is reported as
+#' `texc` and `texc_fitted`, and is a minimum or a maximum depending on the
+#' response `direction`.
 #'
 #' Model equation:
 #'
 #' `A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))`
 #'
 #' `A` is the starting value. `B1` & `tau1` are the asymptote and time
-#' constant of the fast excursion. `B2` & `tau2` are the asymptote and time
+#' constant of the fast response. `B2` & `tau2` are the asymptote and time
 #' constant of the slower respone plateau as time approaches `Inf` (typically
 #' `tau2 >> tau1`). All three of `A`, `B1`, and `B2` are values on the response
 #' scale, consistent with the [monoexponential()] and sigmoidal asymptotes.
-#' The turning point where the slower responses becomes dominant over the fast 
-#' excursion is reported as `excursion_value`. Set `use_TD = TRUE` (*default*)
-#' to specify the time-delay parameter `TD`. See [biexponential()] for the
-#' model family and [SSbiexponential()] for self-start initialisation.
+#' The excursion point where the slower responses becomes dominant over the
+#' fast response is reported as `texc_fitted`. Set `use_TD = TRUE`
+#' (*default*) to specify the time-delay parameter `TD`. See [biexponential()]
+#' for the model family and [SSbiexponential()] for self-start initialisation.
 #' 
 #' `tau_ratio` defines a numeric lower bound on the ratio of the slow to the
 #' fast time constant (*default* is `2.5`). As `tau2` approaches `tau1` the two

@@ -43,7 +43,7 @@
 #' The expected response is a *fast* overshoot to a minimum or maximum at the
 #' excursion point near (but not exactly equal to) `B1`, followed by a *slow*
 #' recovery back to a stable plateau at `B2`. The exact excursion point is
-#' reported by [analyse_kinetics()] as `excursion_value` at `excursion_time`.
+#' reported by [analyse_kinetics()] as `texc_fitted` at `texc`.
 #' If `B1` is between `A` and `B2`, the response curve will be monotonic but
 #' still two-phase. If `B1 = B2`, the curve reduces to a [monoexponential()]
 #' with single time constant `tau` and asymptote `B2`.
@@ -502,7 +502,7 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
 #'   `nirs_channels`, `A`, `B1`, `tau1`, `B2`, `tau2`, `TD`,
-#'   `excursion_time`, `excursion_value`. Per-channel metadata are attached as
+#'   `texc`, `texc_fitted`. Per-channel metadata are attached as
 #'   attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
 #'     where fitting failed.
@@ -567,8 +567,7 @@ analyse_biexponential <- function(
     # fmt: skip
     na_coefs <- as.data.frame(setNames(
         rep(list(NA_real_), 8L),
-        c("A", "B1", "tau1", "B2", "tau2", "TD",
-        "excursion_time", "excursion_value")
+        c("A", "B1", "tau1", "B2", "tau2", "TD", "texc", "texc_fitted")
     ))
 
     ## method-specific fit: self-starting biexponential via nls
@@ -588,21 +587,13 @@ analyse_biexponential <- function(
         attempt <- \(.params, .retry) {
             ## dropping TD narrows the window, so subset per attempt
             keep <- keep_rows(.params)
+            # fmt: skip
             fit_biexp_ratio(
-                x_fit[keep],
-                t_fit[keep],
-                .params,
-                .a$fix,
-                tau_ratio,
+                x_fit[keep], t_fit[keep], .params, .a$fix, tau_ratio,
                 \(e) {
                     warn_fit_failed(
                         quote(SSbiexponential),
-                        e,
-                        .nirs,
-                        interval_name,
-                        length(.params),
-                        .retry,
-                        env
+                        e, .nirs, interval_name, length(.params), .retry, env
                     )
                 }
             )
@@ -708,20 +699,20 @@ analyse_biexponential <- function(
             if (is.finite(root) && root > 0) root else 0
         })
 
-        ## excursion_time is reported elapsed from start_time, mirroring
+        ## excursion time (texc) is reported elapsed from start_time, mirroring
         ## MRT = TD + tau, so the onset-relative root is shifted by TD
-        excursion_time_val <- sum(TD_arg, s)
-        excursion_value_val <- do.call(
+        texc_val <- sum(TD_arg, s)
+        texc_fitted_val <- do.call(
             biexponential,
-            c(list(t = excursion_time_val), pars, list(TD = TD_arg))
+            c(list(t = texc_val), pars, list(TD = TD_arg))
         )
 
         list(
             coefs = data.frame(
                 pars,
                 TD = TD_arg %||% NA_real_,
-                excursion_time = excursion_time_val,
-                excursion_value = excursion_value_val
+                texc = texc_val,
+                texc_fitted = texc_fitted_val
             ),
             model = model,
             fitted_data = data.frame(
