@@ -102,9 +102,7 @@ plot.mnirs <- function(
 
     ## sort facets by appearance
     if ("interval" %in% names(x) && !is.factor(x[["interval"]])) {
-        x[["interval"]] <- factor(x[["interval"]],
-            levels = unique(x[["interval"]])
-        )
+        x[["interval"]] <- factor(x[["interval"]], unique(x[["interval"]]))
     }
 
     ## build base plot with axis configuration
@@ -185,7 +183,7 @@ plot.mnirs <- function(
 #' @param labels Logical. Default is `TRUE`; annotates each panel with the key
 #'   coefficient value(s) for the fitted method.
 #' @param ... Additional arguments.
-#' 
+#'
 #' @details
 #' Accepts some arguments in `...`, such as `label_size` passed to
 #' [ggplot2::geom_text()]. Also accepts args passed to [plot.mnirs()], such as
@@ -245,7 +243,6 @@ plot.mnirs_kinetics <- function(
             ...
         )
     }
-    
 
     ## observed signal + facet + theme via existing plot.mnirs
     p <- plot(x$data, ...)
@@ -309,7 +306,10 @@ plot.mnirs_kinetics <- function(
 
     if (markers) {
         ## dotted onset line at the resolved start_time per interval
-        vdata <- unique(ann[intersect(c("interval", "start_times"), names(ann))])
+        vdata <- unique(ann[intersect(
+            c("interval", "start_times"),
+            names(ann)
+        )])
         p <- p +
             ggplot2::geom_vline(
                 ggplot2::aes(xintercept = .data$start_times),
@@ -420,6 +420,12 @@ kinetics_annotations <- function(x) {
         return(out)
     }
 
+    ## format a label line, empty when the coefficient is missing (e.g. `TD`
+    ## for channels fitted without a time delay)
+    line <- function(f, v) {
+        return(ifelse(is.na(v), "", sprintf(f, fmt(v))))
+    }
+
     coefs <- merge(
         x$coefficients,
         x$interval_times[c("interval", "start_times")],
@@ -438,25 +444,35 @@ kinetics_annotations <- function(x) {
         peak_slope = list(
             offset = "peak_slope_time",
             y = "fitted",
-            label = sprintf("slope = %s", fmt(coefs$slope))
+            label = sprintf(
+                "slope = %s\npeak slope time = %s s",
+                fmt(coefs$slope),
+                fmt(coefs$peak_slope_tim/e)
+            )
         ),
         monoexponential = list(
             offset = "MRT",
             y = "MRT_fitted",
-            label = sprintf(
-                "MRT = %s s\ntau = %s",
-                fmt(coefs$MRT),
-                fmt(coefs$tau)
+            label = paste0(
+                line("TD = %s s\n", coefs$TD),
+                sprintf(
+                    "tau = %s\nMRT = %s s",
+                    fmt(coefs$tau),
+                    fmt(coefs$MRT)
+                )
             )
         ),
         biexponential = list(
             offset = "excursion_time",
             y = "excursion_value",
-            label = sprintf(
-                "excursion = %s s\ntau1 = %s\ntau2 = %s",
-                fmt(coefs$excursion_time),
-                fmt(coefs$tau1),
-                fmt(coefs$tau2)
+            label = paste0(
+                line("TD = %s s\n", coefs$TD),
+                sprintf(
+                    "excursion = %s s\ntau1 = %s\ntau2 = %s",
+                    fmt(coefs$excursion_time),
+                    fmt(coefs$tau1),
+                    fmt(coefs$tau2)
+                )
             )
         ),
         sigmoidal = list(
@@ -489,8 +505,8 @@ kinetics_annotations <- function(x) {
     ## the signal falls (A > B), bottom-right when it rises. biexponential
     ## has two asymptotes, so its net trend is the plateau B2 against the
     ## baseline. peak_slope has neither, so fall back to the local slope sign
-    rises <- if ("B2" %in% names(coefs)) {
-        coefs$B2 > coefs$A
+    rises <- if ("B1" %in% names(coefs)) {
+        coefs$B1 > coefs$A
     } else if (all(c("A", "B") %in% names(coefs))) {
         coefs$B > coefs$A
     } else {
