@@ -1,7 +1,7 @@
 #' Exponential-drift function
 #'
-#' Calculate a two-phase curve: a primary monoexponential response with a
-#' secondary linear drift beginning near the asymptote.
+#' Calculate a two-phase curve: a primary monoexponential response that
+#' hands over to a secondary linear drift near the asymptote.
 #'
 #' @param slope A numeric parameter for the linear drift rate `dx/dt`
 #'   of the secondary phase, in response units per unit of the predictor
@@ -19,17 +19,18 @@
 #' ## Model equations
 #'
 #' 5-parameter model:
-#' `A + (B - A) * (1 - exp(-t / tau)) + slope * pmax(t - texc, 0)`
+#' `A + (B - A) * (1 - exp(-pmin(t, texc) / tau)) + slope * pmax(t - texc, 0)`
 #'
 #' 6-parameter model:
-#' `A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) +
+#' `A + (B - A) * (1 - exp(-pmax(pmin(t, texc) - TD, 0) / tau)) +
 #' slope * pmax(t - texc, 0)`
 #'
 #' The primary phase is a pure [monoexponential()] response toward the
-#' asymptote `B`. The secondary phase is a linear drift of rate `slope`
-#' that is exactly zero before `texc`, so unlike [biexponential()] the
-#' two phases do not overlap from `t = 0`; the drift only perturbs the curve
-#' after the primary response is (near) complete.
+#' asymptote `B` up to `texc`, where it is held at its value there and the
+#' secondary phase takes over: a linear drift of rate `slope` continuing from
+#' that point. The phases are not additive, so unlike [biexponential()] they
+#' do not overlap; the net response after `texc` is purely linear, and the
+#' curve is continuous at `texc`.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -67,8 +68,10 @@
 #'
 #' @export
 exponential_drift <- function(t, A, B, tau, slope, texc, TD = NULL) {
-    ## primary monoexponential phase + hinge-linear secondary drift
-    return(monoexponential(t, A, B, tau, TD) + slope * pmax(t - texc, 0))
+    ## primary monoexponential phase held at its texc value, then linear drift
+    return(
+        monoexponential(pmin(t, texc), A, B, tau, TD) + slope * pmax(t - texc, 0)
+    )
 }
 
 
@@ -110,10 +113,13 @@ expdrift_init <- function(mCall, data, LHS, ...) {
     texc <- fixed$texc %||%
         max(min(sum(TD_seed, 3 * mono[["tau"]]), min(t) + 0.75 * span), 0)
 
-    ## least-squares slope of the primary-phase residuals on the hinge
-    ## basis; a degenerate (all pre-texc) basis seeds a flat drift
+    ## least-squares slope of the residuals from the texc-held primary
+    ## phase on the hinge basis; a degenerate (all pre-texc) basis seeds a
+    ## flat drift
     e <- x -
-        monoexponential(t, mono[["A"]], mono[["B"]], mono[["tau"]], TD_seed)
+        monoexponential(
+            pmin(t, texc), mono[["A"]], mono[["B"]], mono[["tau"]], TD_seed
+        )
     h <- pmax(t - texc, 0)
     slope <- fixed$slope %||% (if (sum(h^2) > 0) sum(h * e) / sum(h^2) else 0)
 

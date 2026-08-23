@@ -332,13 +332,13 @@
 #' Aliases: `method = c("exp_linear", "exp_drift", "monoexp_drift", "drift")`.
 #'
 #' A parametric approach fitting a two-phase curve using [stats::nls()] with
-#' [SSexponential_drift()]: a pure [monoexponential()] primary response plus
-#' a secondary linear drift beginning at the excursion point `texc` near the
-#' primary asymptote.
+#' [SSexponential_drift()]: a pure [monoexponential()] primary response up to
+#' the excursion point `texc` near the primary asymptote, after which a
+#' secondary linear drift takes over from the value reached at `texc`.
 #'
 #' Model equation:
 #'
-#' `A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) +
+#' `A + (B - A) * (1 - exp(-pmax(pmin(t, texc) - TD, 0) / tau)) +
 #' slope * pmax(t - texc, 0)`
 #'
 #' `A`, `B`, `tau`, `TD`, and the derived `k`, `MRT`, and `HRT` are as for
