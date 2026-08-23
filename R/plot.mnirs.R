@@ -295,9 +295,8 @@ plot.mnirs_kinetics <- function(
     ## undocumented `components = TRUE`: reconstruct the underlying model
     ## terms from natural-scale coefficients over the same rows as the
     ## fitted overlay. biexponential: sequential anchoring (fast A to B1,
-    ## slow B1 to B2). exponential_drift: the unheld monoexponential over
-    ## the full fit window, and the drift line taking over from
-    ## (texc, texc_fitted)
+    ## slow B1 to B2). exponential_drift: monoexponential over the full
+    ## fit window plus the linear drift from (texc, texc_fitted)
     comp_coefs <- switch(
         x$method,
         biexponential = c("A", "B1", "tau1", "B2", "tau2", "TD"),
@@ -341,8 +340,7 @@ plot.mnirs_kinetics <- function(
                 d$comp2 <- d$B1 + (d$B2 - d$B1) * (1 - exp(-ts / d$tau2))
                 return(list(comp_line("comp1"), comp_line("comp2")))
             }
-            ## exponential_drift: primary response continued past texc (where
-            ## the model holds it) and the post-texc drift line
+            ## exponential_drift: primary response and post-texc drift line
             d$comp1 <- d$A + (d$B - d$A) * (1 - exp(-ts / d$tau))
             d$comp2 <- d$texc_fitted + d$slope * (t_rel - d$texc)
             list(
@@ -435,7 +433,7 @@ plot.mnirs_kinetics <- function(
                 data = ann[nzchar(ann$label), , drop = FALSE],
                 x = Inf,
                 hjust = 1.05,
-                size = list(...)[["label_size"]] %||% 3,
+                size = list(...)[["label_size"]] %||% 3.5,
                 show.legend = FALSE,
                 inherit.aes = FALSE
             )
