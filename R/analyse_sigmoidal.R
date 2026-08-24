@@ -24,7 +24,7 @@
 #'
 #' The 5-parameter Richards form is exported for advanced use directly with
 #' [stats::nls()] but is not used by [analyse_kinetics()] due to convergence
-#' instability. For asymmetric responses, prefer [gompertz()] / 
+#' instability. For asymmetric responses, prefer [gompertz()] /
 #' [gompertz_left()], which are more stable.
 #'
 #' ## Model equations
@@ -43,8 +43,8 @@
 #'   * `v = -log(2) / log(asym)`
 #'
 #' Inflection is at `t = xmid` with `dx/dt = slope` and
-#'   `y(xmid) = A + (B - A) * asym` for any `asym` in `(0, 1)`. 
-#' 
+#'   `y(xmid) = A + (B - A) * asym` for any `asym` in `(0, 1)`.
+#'
 #'   * `asym = 0.5 -> v = 1` the model collapses to the 4-parameter form.
 #'   * `asym -> 0` gives an early-acceleration curve (inflection near `A`),
 #'   * `asym -> 1` gives a late-acceleration curve (inflection near `B`).
@@ -138,7 +138,7 @@ logistic <- function(t, A, B, xmid, slope, asym = NULL) {
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
 #'
-#' @seealso [analyse_kinetics()], [SSgompertz()], [SSgompertz_left()], 
+#' @seealso [analyse_kinetics()], [SSgompertz()], [SSgompertz_left()],
 #'   [logistic()]
 #'
 #' @examples
@@ -494,7 +494,7 @@ SSlogistic <- selfStart(
 #'
 #' model <- nls(x ~ SSgompertz(t, A, B, xmid, slope), data = data)
 #' summary(model)
-#' 
+#'
 #' ## fix the baseline A at a known value
 #' model_fixed <- nls(x ~ SSgompertz(t, A = 10, B, xmid, slope), data = data)
 #' summary(model_fixed)
@@ -504,7 +504,7 @@ SSlogistic <- selfStart(
 #' x2 <- gompertz_left(t, A = 10, B = 100, xmid = 30, slope = 4) +
 #'     rnorm(length(t), 0, 2)
 #' data2 <- data.frame(t, x = x2)
-#' 
+#'
 #' model_left <- nls(x ~ SSgompertz_left(t, A, B, xmid, slope), data = data2)
 #' summary(model_left)
 #'
@@ -603,9 +603,9 @@ analyse_logistic <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = mget(c(
-            "shape", "fix", "start_time", "direction", "end_window"
-        )),
+        arg_list = mget(
+            c("shape", "fix", "start_time", "direction", "end_window")
+        ),
         choices = list(
             shape = c("symmetric", "gompertz", "gompertz_left"),
             direction = c("auto", "positive", "negative")
@@ -614,18 +614,8 @@ analyse_logistic <- function(
         verbose = verbose,
         env = env
     )
-    nirs_channels <- setup$nirs_channels
-    time_channel <- setup$time_channel
-    per_channel <- setup$per_channel
-
     ## NA scaffold (method columns only) for convergence failure
-    na_coefs <- data.frame(
-        A = NA_real_,
-        B = NA_real_,
-        xmid = NA_real_,
-        slope = NA_real_,
-        xmid_fitted = NA_real_
-    )
+    na_cols <- c("A", "B", "xmid", "slope", "xmid_fitted")
 
     ## method-specific fit: self-starting sigmoidal via nls
     logistic_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
@@ -636,21 +626,14 @@ analyse_logistic <- function(
         params <- c("A", "B", "xmid", "slope")
 
         ## build nls formula with any fixed params as constants
-        nls_formula <- build_ss_formula(ch_fn, params, .a$fix)
-
         model <- tryCatch(
-            nls(nls_formula, fit_data),
+            nls(build_ss_formula(ch_fn, params, .a$fix), fit_data),
             error = \(e) {
-                warn_fit_failed(
-                    ch_fn, e, .nirs, interval_name,
-                    env = env
-                )
-                NULL
+                warn_fit_failed(ch_fn, e, .nirs, interval_name, env = env)
             }
         )
-
         if (is.null(model)) {
-            return(build_na_results(na_coefs))
+            return(build_na_results(na_cols))
         }
 
         coefs <- full_coefs(model, params, .a$fix)
@@ -666,7 +649,9 @@ analyse_logistic <- function(
             extra[["slope"]] <- want * max(abs(coefs[["slope"]]), slope_eps)
         }
         enforced <- enforce_direction(
-            model, coefs, fit_data,
+            model,
+            coefs,
+            fit_data,
             direction = .a$direction,
             amp_fn = disp$amp,
             extra = extra,
@@ -683,48 +668,38 @@ analyse_logistic <- function(
             env = env
         )
         if (is.null(enforced)) {
-            return(build_na_results(na_coefs))
+            return(build_na_results(na_cols))
         }
         model <- enforced$model
         coefs <- enforced$coefs
-        fitted_vals <- stats::predict(model)
 
-        ## xmid is already elapsed from start_time, matching the fit time base
-        xmid_offset <- coefs[["xmid"]]
-
-        ## predict response at the inflection point xmid
+        ## predict response at the inflection point xmid, which is already
+        ## elapsed from start_time, matching the fit time base
         xmid_fitted <- as.numeric(
             stats::predict(model, data.frame(.t = coefs[["xmid"]]))
         )
 
-        list(
-            coefs = data.frame(
-                A           = coefs[["A"]],
-                B           = coefs[["B"]],
-                xmid        = xmid_offset,
-                slope       = coefs[["slope"]],
+        build_fit_results(
+            data.frame(
+                A = coefs[["A"]],
+                B = coefs[["B"]],
+                xmid = coefs[["xmid"]],
+                slope = coefs[["slope"]],
                 xmid_fitted = xmid_fitted
             ),
-            model = model,
-            fitted_data = data.frame(
-                window_idx = valid$idx,
-                fitted     = fitted_vals
-            ),
-            diag = compute_diagnostics(
-                x_fit,
-                t_fit,
-                fitted_vals,
-                n_params = length(stats::coef(model)),
-                env = env
-            )
+            model,
+            x_fit,
+            t_fit,
+            valid,
+            env = env
         )
     }
 
     return(analyse_kinetics_channels(
         data,
-        nirs_channels,
-        time_channel,
-        per_channel,
+        setup$nirs_channels,
+        setup$time_channel,
+        setup$per_channel,
         logistic_fit,
         verbose,
         interval_name,

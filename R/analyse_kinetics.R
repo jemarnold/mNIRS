@@ -30,7 +30,7 @@
 #'   (*default*), retrieves `interval_times` from *"mnirs"* metadata, or falls
 #'   back to `0` or the first positive time value (see *Details*).
 #' @param end_window A numeric value in units of `time_channel` specifying the
-#'   window in which to look for the end of the kinetics fit; returns the 
+#'   window in which to look for the end of the kinetics fit; returns the
 #'   window with no greater/lesser values within `end_window` after the first
 #'   extreme value. `end_window = Inf` (*default*) returns the global extreme
 #'   from the full sample range (see *Details*).
@@ -60,7 +60,7 @@
 #'   the local window. (see *Details*).
 #' @param use_TD **monoexponential, biexponential, exponential_drift**:
 #'   Logical; default is
-#'   `TRUE`, attempts to fit the model with a "time-delay" parameter `TD` 
+#'   `TRUE`, attempts to fit the model with a "time-delay" parameter `TD`
 #'   before the response onset. i.e., a 4-parameter [SSmonoexponential()] model
 #'   (A, B, tau, TD); or a 6-parameter [biexponential()] model (A, B1, tau1,
 #'   B2, tau2, TD). If `use_TD = FALSE` or the fit fails (with a warning),
@@ -109,14 +109,14 @@
 #' with [extract_intervals()], `start_time` will be retrieved from *"mnirs"*
 #' metadata. Otherwise `start_time` defaults to `0` or the first positive
 #' `time_channel` value.
-#' 
+#'
 #' All methods are fitted on time *elapsed from* `start_time`, so the
 #' returned time coefficients are relative to response onset (e.g. `t = 0`).
 #'
 #' For *"response_time"*, the baseline window before `start_time` defines the
 #' mean starting amplitude `A` directly and anchors the start of the
 #' `response_time` parameter. For *"peak_slope"*, `start_time` anchors the
-#' start of the `peak_slope_time` parameter. For *"monoexponential"*, 
+#' start of the `peak_slope_time` parameter. For *"monoexponential"*,
 #' *"biexponential"*, and *"sigmoidal"*, the baseline window before
 #' `start_time` anchors the starting fitted amplitude `A` and the start of the
 #' `TD` and `MRT`, or `xmid` parameters. (see respective *method* sections
@@ -218,7 +218,7 @@
 #'   `list()`s is janky, but it works for now.
 #'
 #' `tau_ratio` for *"biexponential"* is always applied globally.
-#' 
+#'
 #' `method` currently only accepts a single value applied globally to all
 #' intervals and `nirs_channels`. This is a current limitation (as of `0.7.1`)
 #' and will be improved in future updates to allow more flexible kinetics
@@ -235,7 +235,7 @@
 #' relative to the baseline. e.g. *half-response time* (`fraction = 0.5`) is
 #' the time from response onset to attain 50% of the total amplitude change
 #' and approximates the inflection point (`xmid` of a symmetrical sigmoid
-#' function). `fraction = 0.632` approximates the time constant (`tau`; 
+#' function). `fraction = 0.632` approximates the time constant (`tau`;
 #' \eqn{\tau}) parameter from a monoexponential function, or the inflection
 #' point (`xmid`) of an asymmetrical left-Gompertz function. `fraction = 0.368`
 #' approximates `xmid` of a right-Gompertz function.
@@ -315,7 +315,7 @@
 #' fast response is reported as `texc_fitted`. Set `use_TD = TRUE`
 #' (*default*) to specify the time-delay parameter `TD`. See [biexponential()]
 #' for the model family and [SSbiexponential()] for self-start initialisation.
-#' 
+#'
 #' `tau_ratio` defines a numeric lower bound on the ratio of the slow to the
 #' fast time constant (*default* is `2.5`). As `tau2` approaches `tau1` the two
 #' components become indistinguishable and fit convergence can fail, so the
@@ -394,7 +394,7 @@
 #'       `nirs_channel`). For `"peak_slope"`; each element is an
 #'       [lm][stats::lm] object. For `"monoexponential"`,
 #'       `"biexponential"`, and `"sigmoidal"`; an [nls][stats::nls] object.
-#'       For `"response_time"`; `NULL`. Models are fitted on time 
+#'       For `"response_time"`; `NULL`. Models are fitted on time
 #'       *elapsed from* `start_time`, so [predict][stats::predict] expects
 #'       `.t` in those units. The offset for each interval can be retrieved
 #'       from `interval_times$start_times`.}
@@ -620,14 +620,14 @@ analyse_kinetics.biexponential <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     method,
-    use_TD = TRUE,
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
     verbose = TRUE,
     ...,
-    fix = NULL,
-    tau_ratio = 2.5
+    use_TD = TRUE,
+    tau_ratio = 2.5,
+    fix = NULL
 ) {
     ## TODO: pass additional stats::nls() args
     if (missing(verbose)) {

@@ -169,10 +169,10 @@ response_time <- function(
         B = B,
         response_time = t[response_idx] - start_time, ## real
         response_value = x[response_idx], ## real
-        fitted = response_fitted,    ## predicted
+        fitted = response_fitted, ## predicted
         baseline_idx = baseline_idx, ## all baseline samples
         response_idx = response_idx, ## mid sample
-        extreme_idx = extreme_idx    ## end sample
+        extreme_idx = extreme_idx ## end sample
     ))
 }
 
@@ -234,10 +234,6 @@ analyse_response_time <- function(
         verbose = verbose,
         env = env
     )
-    nirs_channels <- setup$nirs_channels
-    time_channel <- setup$time_channel
-    per_channel <- setup$per_channel
-
     ## method-specific fit: fractional response time (no model fit)
     response_time_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
         ## quote = TRUE so `env` (a defused call object for condition
@@ -257,12 +253,12 @@ analyse_response_time <- function(
         ## back to its original data frame row, which differs whenever
         ## non-finite samples were dropped. NA idx maps to NA
         coefs <- data.frame(
-            A              = response$A,
-            B              = response$B,
-            response_time  = response$response_time,
+            A = response$A,
+            B = response$B,
+            response_time = response$response_time,
             response_value = response$response_value,
-            fitted         = response$fitted,
-            idx            = valid$idx[response$response_idx]
+            fitted = response$fitted,
+            idx = valid$idx[response$response_idx]
         )
 
         ## bind baseline vec with `A`, and response and extreme scalars,
@@ -287,20 +283,20 @@ analyse_response_time <- function(
             model = NULL,
             fitted_data = fitted_data,
             diag = compute_diagnostics(
-                x        = x_fit[1L:3L], ## placeholder
-                t        = t_fit[1L:3L], ## placeholder
-                fitted   = c(coefs$A, coefs$fitted, coefs$B),
+                x = x_fit[1L:3L], ## placeholder
+                t = t_fit[1L:3L], ## placeholder
+                fitted = c(coefs$A, coefs$fitted, coefs$B),
                 n_params = 0L, ## invalid for response time method
-                env      = env
+                env = env
             )
         )
     }
 
     return(analyse_kinetics_channels(
         data,
-        nirs_channels,
-        time_channel,
-        per_channel,
+        setup$nirs_channels,
+        setup$time_channel,
+        setup$per_channel,
         response_time_fit,
         verbose,
         interval_name,

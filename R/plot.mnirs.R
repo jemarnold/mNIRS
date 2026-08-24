@@ -300,6 +300,7 @@ plot.mnirs_kinetics <- function(
     comp_coefs <- switch(
         x$method,
         biexponential = c("A", "B1", "tau1", "B2", "tau2", "TD"),
+        # fmt: skip
         exponential_drift = c(
             "A", "B", "tau", "slope", "texc", "texc_fitted", "TD"
         )
@@ -580,6 +581,7 @@ kinetics_annotations <- function(x) {
     ## one corner per panel: labels anchor to the right edge, so use the half
     ## the fitted responses vacate. sign-sum majority across channels decides;
     ## ties and all-NA fits fall back to the top corner
+    # fmt: skip
     rises <- stats::ave(
         sign(dir),
         coefs$interval,

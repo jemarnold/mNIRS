@@ -276,14 +276,10 @@ analyse_exponential_drift <- function(
         verbose = verbose,
         env = env
     )
-    nirs_channels <- setup$nirs_channels
-    time_channel <- setup$time_channel
-    per_channel <- setup$per_channel
-
     ## a channel omitted from a per-channel map takes the formal default.
     ## a zero multiple would start the drift at the response onset, where
     ## the drift line absorbs the primary response
-    per_channel <- lapply(per_channel, \(.a) {
+    per_channel <- lapply(setup$per_channel, \(.a) {
         tau_mult <- .a$tau_mult %||% 3
         validate_numeric(
             tau_mult, 1, c(0, Inf),
@@ -295,100 +291,66 @@ analyse_exponential_drift <- function(
 
     ## NA scaffold (method columns only) for convergence failure
     # fmt: skip
-    na_coefs <- as.data.frame(setNames(
-        rep(list(NA_real_), 13L),
-        c("A", "B", "tau", "k", "TD", "MRT", "HRT",
-        "MRT_fitted", "HRT_fitted", "slope", "tau_mult", "texc", "texc_fitted")
-    ))
+    na_cols <- c(
+        "A", "B", "tau", "k", "TD", "MRT", "HRT", "MRT_fitted", "HRT_fitted",
+        "slope", "tau_mult", "texc", "texc_fitted"
+    )
 
-    ## method-specific fit: self-starting exponential-drift via nls
+    ## method-specific fit: self-starting exponential-drift via nls; a
+    ## failed 6-param fit falls back to the 5-param model
     expdrift_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
-        params <- c("A", "B", "tau", "slope", "tau_mult", if (.a$use_TD) "TD")
-
         ## the drift onset multiple is always held constant
-        fix <- c(.a$fix, list(tau_mult = .a$tau_mult))
+        .a$fix <- c(.a$fix, list(tau_mult = .a$tau_mult))
 
-        ## the TD model is flat at `A` before `TD`, so the pre-onset
-        ## baseline anchors `A`. the reduced model has no such region and
-        ## diverges at t < 0, so it is fit from `start_time` onward
-        keep_rows <- function(.params) {
-            if ("TD" %in% .params) rep(TRUE, length(t_fit)) else t_fit >= 0
-        }
-
-        ## attempt nls fit; a failed 6-param fit falls back to the
-        ## 5-param model unless TD is user-fixed
-        retry <- .a$use_TD && !"TD" %in% names(.a$fix)
-        attempt <- \(.params, .retry) {
-            keep <- keep_rows(.params)
-            free <- setdiff(.params, names(fix))
-            report <- \(e) {
-                warn_fit_failed(
+        fit <- fit_td_fallback(
+            x_fit,
+            t_fit,
+            # fmt: skip
+            params = c(
+                "A", "B", "tau", "slope", "tau_mult", if (.a$use_TD) "TD"
+            ),
+            .a,
+            fitter = \(.data, .params, on_error) {
+                ## tau and TD are held non-negative; the hinge is non-smooth,
+                ## so port often stops short of its certificate on usable
+                ## coefficients, which are kept with a warning
+                free <- setdiff(.params, names(.a$fix))
+                lower <- c(tau = diff(range(.data$.t)) * 1e-6, TD = 0)[free]
+                lower[is.na(lower)] <- -Inf
+                formula <- build_ss_formula(
                     quote(SSexponential_drift),
-                    e,
-                    .nirs,
-                    interval_name,
-                    length(.params),
-                    .retry,
-                    env
+                    .params,
+                    .a$fix
                 )
-            }
-
-            ## tau and TD are held non-negative; the hinge is non-smooth, so
-            ## port often stops short of its certificate on usable
-            ## coefficients, which are kept with a warning
-            lower <- c(tau = diff(range(t_fit)) * 1e-6, TD = 0)[free]
-            lower[is.na(lower)] <- -Inf
-            model <- tryCatch({
-                if (sum(keep) <= length(free)) {
-                    stop(sprintf(
-                        "%d observations for %d free parameters.",
-                        sum(keep),
-                        length(free)
-                    ))
-                }
-                suppressWarnings(nls(
-                    build_ss_formula(quote(SSexponential_drift), .params, fix),
-                    data.frame(.x = x_fit[keep], .t = t_fit[keep]),
-                    algorithm = "port",
-                    lower = lower,
-                    control = stats::nls.control(warnOnly = TRUE)
-                ))
+                model <- tryCatch(
+                    suppressWarnings(nls(
+                        formula,
+                        .data,
+                        algorithm = "port",
+                        lower = lower,
+                        control = stats::nls.control(warnOnly = TRUE)
+                    )),
+                    error = on_error
+                )
+                accept_port_fit(model, on_error)
             },
-                error = \(e) {
-                    report(e)
-                    NULL
-            })
-            if (!is.null(model) && !model$convInfo$isConv) {
-                ok <- all(is.finite(stats::coef(model)))
-                report((if (ok) simpleWarning else simpleError)(
-                    model$convInfo$stopMessage
-                ))
-                if (!ok) {
-                    model <- NULL
-                }
-            }
-            model
+            fn = quote(SSexponential_drift),
+            .nirs = .nirs,
+            interval_name = interval_name,
+            env = env
+        )
+        if (is.null(fit$model)) {
+            return(build_na_results(na_cols))
         }
-        model <- attempt(params, retry)
-        if (is.null(model) && retry) {
-            params <- setdiff(params, "TD")
-            model <- attempt(params, FALSE)
-        }
-
-        if (is.null(model)) {
-            return(build_na_results(na_coefs))
-        }
-
-        coefs <- full_coefs(model, params, fix)
+        params <- fit$params
+        coefs <- full_coefs(fit$model, params, .a$fix)
 
         ## enforce direction: bounded refit on D = B - A when inverted
-        keep <- keep_rows(params)
-        fit_data <- data.frame(.x = x_fit[keep], .t = t_fit[keep])
-        free_extra <- setdiff(params, c("A", "B", names(fix)))
+        free_extra <- setdiff(params, c("A", "B", names(.a$fix)))
         enforced <- enforce_direction(
-            model,
+            fit$model,
             coefs,
-            fit_data,
+            fit$data,
             direction = .a$direction,
             amp_fn = quote(exponential_drift),
             extra = coefs[free_extra],
@@ -398,17 +360,15 @@ analyse_exponential_drift <- function(
                 c(tau = diff(range(t_fit)) * 1e-6)
             },
             fn = quote(SSexponential_drift),
-            fix = fix,
+            fix = .a$fix,
             .nirs = .nirs,
             interval_name = interval_name,
             env = env
         )
         if (is.null(enforced)) {
-            return(build_na_results(na_coefs))
+            return(build_na_results(na_cols))
         }
-        model <- enforced$model
         coefs <- enforced$coefs
-        fitted_vals <- stats::predict(model)
 
         ## TD is already elapsed from start_time, matching the fit time base
         TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL
@@ -427,8 +387,8 @@ analyse_exponential_drift <- function(
             TD = TD_arg
         )
 
-        list(
-            coefs = data.frame(
+        build_fit_results(
+            data.frame(
                 A = coefs[["A"]],
                 B = coefs[["B"]],
                 tau = coefs[["tau"]],
@@ -443,25 +403,19 @@ analyse_exponential_drift <- function(
                 texc = texc_val,
                 texc_fitted = fitted_params[[3L]]
             ),
-            model = model,
-            fitted_data = data.frame(
-                window_idx = valid$idx[keep],
-                fitted = fitted_vals
-            ),
-            diag = compute_diagnostics(
-                x_fit[keep],
-                t_fit[keep],
-                fitted_vals,
-                n_params = length(stats::coef(model)),
-                env = env
-            )
+            enforced$model,
+            x_fit,
+            t_fit,
+            valid,
+            fit$keep,
+            env
         )
     }
 
     return(analyse_kinetics_channels(
         data,
-        nirs_channels,
-        time_channel,
+        setup$nirs_channels,
+        setup$time_channel,
         per_channel,
         expdrift_fit,
         verbose,

@@ -345,7 +345,7 @@ biexp_ss_bounds <- function(span, tau_ratio, fix = list()) {
 #' A non-converged fit is accepted with a warning when its coefficients are
 #' finite and its residual sum of squares is no worse than the grid starting
 #' estimates from [biexp_grid_start()]; otherwise it is rejected and `NULL`
-#' is returned.
+#' is returned (see [accept_port_fit()]).
 #'
 #' A user-fixed `tau1` or `tau2` is substituted into the re-parameterised
 #' formula rather than estimated: fixing `tau1` drops `lt1` and leaves `lr`
@@ -357,7 +357,8 @@ biexp_ss_bounds <- function(span, tau_ratio, fix = list()) {
 #' @param fix Named list of fixed parameter values.
 #' @param tau_ratio A numeric lower bound on `tau2 / tau1`.
 #' @param on_error A function called with the [stats::nls()] error condition,
-#'   or with a warning condition when a non-converged fit is accepted.
+#'   or with a warning condition when a non-converged fit is accepted;
+#'   returns `NULL` (see [fit_td_fallback()]).
 #'
 #' @returns An [nls][stats::nls] model in ratio parameterisation, or `NULL`.
 #'
@@ -366,30 +367,13 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
     has_TD <- "TD" %in% params
     span <- diff(range(t))
 
-    ## every failure route reports its condition and yields NULL
-    fail <- \(.e) {
-        on_error(.e)
-        NULL
-    }
-
-    ## reject an under-determined fit before it reaches nls
-    n_free <- length(setdiff(params, names(fix)))
-    if (length(x) <= n_free) {
-        return(fail(simpleError(sprintf(
-            "%d observation%s for %d free parameters.",
-            length(x),
-            if (length(x) == 1L) "" else "s",
-            n_free
-        ))))
-    }
-
     ## joint grid over time constants and candidate delays seeds the fit;
     ## the RSS-minimising delay is the TD seed
     td_grid <- fix$TD %||%
         if (has_TD) seq(0, span / 3, length.out = 21L) else 0
     seed <- biexp_grid_start(x, t, tau_ratio, td_grid)
     if (is.null(seed)) {
-        return(fail(simpleError(
+        return(on_error(simpleError(
             "No starting estimates could be resolved from the response."
         )))
     }
@@ -437,37 +421,16 @@ fit_biexp_ratio <- function(x, t, params, fix, tau_ratio, on_error) {
             upper = upper,
             control = stats::nls.control(maxiter = 500L, warnOnly = TRUE)
         )),
-        error = fail
+        error = on_error
     )
 
-    ## a non-converged fit is kept when demonstrably good: finite coefficients
-    ## and an RSS no worse than the grid seed. the port stop code is reported
-    ## in prose either way, as a warning for a kept fit or an error otherwise
-    if (!is.null(model) && !model$convInfo$isConv) {
-        port_msg <- c(
-            "7" = "Singular convergence: parameters not individually identifiable.",
-            "8" = "False convergence: gradient certificate failed near a non-smooth point.",
-            "9" = "Function evaluation limit reached without convergence.",
-            "10" = "Iteration limit reached without convergence."
-        )
-        code <- as.character(model$convInfo$stopCode)
-        msg <- if (code %in% names(port_msg)) {
-            port_msg[[code]]
-        } else {
-            model$convInfo$stopMessage
-        }
-        acceptable <- code %in%
-            names(port_msg) &&
-            all(is.finite(stats::coef(model))) &&
-            stats::deviance(model) <= seed$rss
-        if (acceptable) {
-            on_error(simpleWarning(msg))
-        } else {
-            model <- fail(simpleError(msg))
-        }
-    }
-
-    return(model)
+    ## a non-converged fit is kept when demonstrably good: an RSS no worse
+    ## than the grid seed
+    return(accept_port_fit(
+        model,
+        on_error,
+        ok = stats::deviance(model) <= seed$rss
+    ))
 }
 
 
@@ -552,10 +515,6 @@ analyse_biexponential <- function(
         verbose = verbose,
         env = env
     )
-    nirs_channels <- setup$nirs_channels
-    time_channel <- setup$time_channel
-    per_channel <- setup$per_channel
-
     ## a ratio of 1 or less admits tau2 == tau1, where the two components
     ## are indistinguishable and the design is singular
     validate_numeric(
@@ -564,52 +523,34 @@ analyse_biexponential <- function(
     )
 
     ## NA scaffold (method columns only) for convergence failure
-    # fmt: skip
-    na_coefs <- as.data.frame(setNames(
-        rep(list(NA_real_), 8L),
-        c("A", "B1", "tau1", "B2", "tau2", "TD", "texc", "texc_fitted")
-    ))
+    na_cols <- c("A", "B1", "tau1", "B2", "tau2", "TD", "texc", "texc_fitted")
 
-    ## method-specific fit: self-starting biexponential via nls
+    ## method-specific fit: self-starting biexponential via nls; a failed
+    ## 6-param fit falls back to the 5-param model
     biexp_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
-        params <- c("A", "B1", "tau1", "B2", "tau2", if (.a$use_TD) "TD")
-
-        ## the 6-param model clamps to a flat `A` before `TD`, so the
-        ## pre-onset baseline anchors `A`. the 5-param model has no such
-        ## region and diverges at t < 0, so it is fit from `start_time` onward
-        keep_rows <- function(.params) {
-            if ("TD" %in% .params) rep(TRUE, length(t_fit)) else t_fit >= 0
-        }
-
-        ## attempt nls fit; a failed 6-param fit falls back to the
-        ## 5-param model unless TD is user-fixed
-        retry <- .a$use_TD && !"TD" %in% names(.a$fix)
-        attempt <- \(.params, .retry) {
-            ## dropping TD narrows the window, so subset per attempt
-            keep <- keep_rows(.params)
+        ## reads `.a$fix` at call time, so the tau2 cap below is honoured
+        fitter <- \(.data, .params, on_error) {
             # fmt: skip
             fit_biexp_ratio(
-                x_fit[keep], t_fit[keep], .params, .a$fix, tau_ratio,
-                \(e) {
-                    warn_fit_failed(
-                        quote(SSbiexponential),
-                        e, .nirs, interval_name, length(.params), .retry, env
-                    )
-                }
+                .data$.x, .data$.t, .params, .a$fix, tau_ratio, on_error
             )
         }
-        model <- attempt(params, retry)
-        if (is.null(model) && retry) {
-            params <- setdiff(params, "TD")
-            model <- attempt(params, FALSE)
+        fit <- fit_td_fallback(
+            x_fit,
+            t_fit,
+            params = c("A", "B1", "tau1", "B2", "tau2", if (.a$use_TD) "TD"),
+            .a,
+            fitter,
+            quote(SSbiexponential),
+            .nirs,
+            interval_name,
+            env
+        )
+        if (is.null(fit$model)) {
+            return(build_na_results(na_cols))
         }
-
-        if (is.null(model)) {
-            return(build_na_results(na_coefs))
-        }
-
-        keep <- keep_rows(params)
-        span <- diff(range(t_fit[keep]))
+        params <- fit$params
+        span <- diff(range(fit$data$.t))
 
         ## tau2 far beyond the record is not identifiable -- only the rate
         ## (B2 - B1) / tau2 is, so tau2 and B2 diverge together at near-
@@ -617,18 +558,30 @@ analyse_biexponential <- function(
         ## horizon cap and refit through the fixed-tau2 pathway; a failed
         ## capped refit keeps the unconstrained fit
         if (is.null(.a$fix$tau2)) {
-            tau2_fit <- (.a$fix$tau1 %||% exp(stats::coef(model)[["lt1"]])) *
-                exp(stats::coef(model)[["lr"]])
+            cf <- stats::coef(fit$model)
+            tau2_fit <- (.a$fix$tau1 %||% exp(cf[["lt1"]])) * exp(cf[["lr"]])
             if (tau2_fit > 10 * span) {
                 .a$fix$tau2 <- 10 * span
-                capped <- attempt(params, FALSE)
-                if (is.null(capped)) {
+                capped <- fit_td_fallback(
+                    x_fit,
+                    t_fit,
+                    params,
+                    .a,
+                    fitter,
+                    quote(SSbiexponential),
+                    .nirs,
+                    interval_name,
+                    env,
+                    retry = FALSE
+                )
+                if (is.null(capped$model)) {
                     .a$fix$tau2 <- NULL
                 } else {
-                    model <- capped
+                    fit <- capped
                 }
             }
         }
+        model <- fit$model
 
         ## enforce direction: bounded refit on D = B2 - A when the overall
         ## amplitude is inverted. the refit stays on the log-ratio scale
@@ -652,7 +605,7 @@ analyse_biexponential <- function(
         enforced <- enforce_direction(
             model,
             coefs_ss,
-            data.frame(.x = x_fit[keep], .t = t_fit[keep]),
+            fit$data,
             direction = .a$direction,
             amp_fn = quote(biexponential_ratio),
             extra = extra,
@@ -667,9 +620,8 @@ analyse_biexponential <- function(
             env = env
         )
         if (is.null(enforced)) {
-            return(build_na_results(na_coefs))
+            return(build_na_results(na_cols))
         }
-        model <- enforced$model
 
         ## back-convert log-ratio time constants to the natural scale; a
         ## fixed time constant has no log-scale counterpart in the coefs
@@ -677,7 +629,6 @@ analyse_biexponential <- function(
         coefs[["tau1"]] <- .a$fix$tau1 %||% exp(coefs[["lt1"]])
         coefs[["tau2"]] <- .a$fix$tau2 %||%
             (coefs[["tau1"]] * exp(coefs[["lr"]]))
-        fitted_vals <- stats::predict(model)
 
         ## model parameters in biexponential() argument order
         pars <- as.list(coefs[c("A", "B1", "tau1", "B2", "tau2")])
@@ -707,33 +658,27 @@ analyse_biexponential <- function(
             c(list(t = texc_val), pars, list(TD = TD_arg))
         )
 
-        list(
-            coefs = data.frame(
+        build_fit_results(
+            data.frame(
                 pars,
                 TD = TD_arg %||% NA_real_,
                 texc = texc_val,
                 texc_fitted = texc_fitted_val
             ),
-            model = model,
-            fitted_data = data.frame(
-                window_idx = valid$idx[keep],
-                fitted = fitted_vals
-            ),
-            diag = compute_diagnostics(
-                x_fit[keep],
-                t_fit[keep],
-                fitted_vals,
-                n_params = length(stats::coef(model)),
-                env = env
-            )
+            enforced$model,
+            x_fit,
+            t_fit,
+            valid,
+            fit$keep,
+            env
         )
     }
 
     return(analyse_kinetics_channels(
         data,
-        nirs_channels,
-        time_channel,
-        per_channel,
+        setup$nirs_channels,
+        setup$time_channel,
+        setup$per_channel,
         biexp_fit,
         verbose,
         interval_name,

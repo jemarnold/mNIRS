@@ -57,27 +57,23 @@
 #' ## start by lap
 #' extract_intervals(data, start = by_lap(2, 4), span = 0)
 #'
-#' ## introduce event_channel with "start" string
-#' data$event <- NA_character_
-#' data$event[1000] <- "start"
-#' data <- create_mnirs_data(data, event_channel = "event")
+#' ## combine multiple specification types
+#' extract_intervals(
+#'     data, 
+#'     start = list(by_lap(2), by_time(400)), 
+#'     end = by_sample(1500)
+#' )
 #'
-#' ## start by label, end by time
-#' extract_intervals(data, start = by_label("start"), end = by_time(1500))
+#' ## simulate event_channel with character label match 
+#' data$event <- NA_character_
+#' data$event[c(1000, 1001)] <- c("start", "lap.1")
+#' data <- create_mnirs_data(data, event_channel = "event")
 #'
 #' ## case-insensitive label match
 #' extract_intervals(data, start = by_label("START", ignore_case = TRUE))
 #'
 #' ## literal-string label match (regex metacharacters treated as text)
-#' data$event[1000] <- "lap.1"
-#' data <- create_mnirs_data(data, event_channel = "event")
 #' extract_intervals(data, start = by_label("lap.1", fixed = TRUE))
-#'
-#' ## multiple intervals by sample index
-#' extract_intervals(data, start = by_sample(1000, 1500))
-#'
-#' ## combine multiple specification types for one boundary
-#' extract_intervals(data, start = list(by_lap(2), by_time(400)), span = 0)
 #'
 #' @export
 by_time <- function(...) {

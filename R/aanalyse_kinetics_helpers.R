@@ -28,7 +28,7 @@ method_aliases <- c(
     logistic = "sigmoidal",
     gompertz = "sigmoidal",
     xmid = "sigmoidal"
-) 
+)
 
 #' Detect the direction of a response signal
 #'
@@ -469,7 +469,11 @@ analyse_kinetics_intervals <- function(
         error = \(e) character()
     )
     interval_args <- resolve_interval_args(
-        worker_args, names(data_list), chan_names, verbose, env
+        worker_args,
+        names(data_list),
+        chan_names,
+        verbose,
+        env
     )
 
     ## iterate over each interval
@@ -530,7 +534,7 @@ kinetics_dispatch <- list(
 #'   resolved `fix` is validated via [validate_fix()].
 #' @inheritParams validate_mnirs
 #'
-#' @returns A named list with `nirs_channels`, `time_channel`, `t_vec`, and
+#' @returns A named list with `nirs_channels`, `time_channel`, and
 #'   `per_channel`.
 #'
 #' @keywords internal
@@ -596,7 +600,6 @@ setup_kinetics_worker <- function(
     return(list(
         nirs_channels = nirs_channels,
         time_channel = time_channel,
-        t_vec = t_vec,
         per_channel = per_channel
     ))
 }
@@ -657,18 +660,19 @@ analyse_kinetics_channels <- function(
     .nirs_active <- NA_character_
     record <- function(w) {
         warning_rows[[length(warning_rows) + 1L]] <<- data.frame(
-            interval      = interval_name,
+            interval = interval_name,
             nirs_channels = .nirs_active,
             type = if (inherits(w, "mnirs_fit_error")) "error" else "warning",
-            message = gsub("\n", " — ", cli::ansi_strip(conditionMessage(w)))
+            message = gsub("\n", " - ", cli::ansi_strip(conditionMessage(w)))
         )
     }
 
-    result <- withCallingHandlers({
-        ## per-channel fit; collect parallel pieces keyed by channel
-        fits <- setNames(
-            nm = nirs_channels,
-            lapply(nirs_channels, \(.nirs) {
+    result <- withCallingHandlers(
+        {
+            ## per-channel fit; collect parallel pieces keyed by channel
+            fits <- setNames(
+                nm = nirs_channels,
+                lapply(nirs_channels, \(.nirs) {
                 .nirs_active <<- .nirs
                 .a <- per_channel[[.nirs]]
 
@@ -729,28 +733,29 @@ analyse_kinetics_channels <- function(
                     )
                 )
             })
-        )
+            )
 
-        ## interval-level conditions from here on
-        .nirs_active <- NA_character_
+            ## interval-level conditions from here on
+            .nirs_active <- NA_character_
 
-        ## assemble single attributed df (consumed by build_kinetics_results)
-        result <- structure(
-            do.call(rbind, lapply(fits, `[[`, "coefficients")),
-            model = lapply(fits, `[[`, "model"),
-            fitted_data = lapply(fits, `[[`, "fitted_data"),
-            diagnostics = do.call(rbind, lapply(fits, `[[`, "diagnostics")),
-            channel_args = do.call(rbind, lapply(fits, `[[`, "channel_args"))
-        )
+            ## assemble single attributed df (consumed by build_kinetics_results)
+            result <- structure(
+                do.call(rbind, lapply(fits, `[[`, "coefficients")),
+                model = lapply(fits, `[[`, "model"),
+                fitted_data = lapply(fits, `[[`, "fitted_data"),
+                diagnostics = do.call(rbind, lapply(fits, `[[`, "diagnostics")),
+                channel_args = do.call(rbind, lapply(fits, `[[`, "channel_args"))
+            )
 
-        ## warn when time coefficients are negative (response before start_time)
-        check_cols <- intersect(
+            ## warn when time coefficients are negative (response before start_time)
+            # fmt: skip
+            check_cols <- intersect(
             c("TD", "tau", "tau1", "tau2", "response_time", "peak_slope_time"),
             names(result)
         )
 
-        if (any(unlist(result[check_cols]) < 0, na.rm = TRUE)) {
-            cli_warn(c(
+            if (any(unlist(result[check_cols]) < 0, na.rm = TRUE)) {
+                cli_warn(c(
                 "!" = "Negative {.arg time_channel} coefficients imply the \\
                 response occurred before {.arg start_time}. This may \\
                 indicate a poorly fitted or misparameterised model.",
@@ -758,15 +763,15 @@ analyse_kinetics_channels <- function(
                 values, or consider using a different \\
                 {.fn analyse_kinetics} method."
             ), call = warn_call(env))
-        }
+            }
 
-        result
-    },
-    warning = \(w) {
-        record(w)
-        if (!verbose) rlang::cnd_muffle(w)
-    },
-    message = \(m) if (!verbose) rlang::cnd_muffle(m)
+            result
+        },
+        warning = \(w) {
+            record(w)
+            if (!verbose) rlang::cnd_muffle(w)
+        },
+        message = \(m) if (!verbose) rlang::cnd_muffle(m)
     )
 
     attr(result, "warnings") <- if (length(warning_rows) == 0L) {
@@ -860,13 +865,20 @@ validate_kinetics_args <- function(
 #' populated with `NA`/`NULL` values.
 #'
 #' @param na_coefs A template 1-row `data.frame` of `NA` method coefficients
-#'   (*without* `nirs_channels`/`time_channel`, which are added upstream).
+#'   (*without* `nirs_channels`/`time_channel`, which are added upstream),
+#'   or a character vector of their column names.
 #'
 #' @returns A named list with elements `coefs`, `model`, `fitted_data`,
 #'   and `diag`.
 #'
 #' @keywords internal
 build_na_results <- function(na_coefs) {
+    ## a character vector names the NA columns
+    if (is.character(na_coefs)) {
+        na_coefs <- as.data.frame(
+            setNames(rep(list(NA_real_), length(na_coefs)), na_coefs)
+        )
+    }
     na_diag <- data.frame(
         n_obs = 0L,
         n_params = NA_integer_,
@@ -949,6 +961,164 @@ warn_fit_failed <- function(
 }
 
 
+#' Fit a self-start model with time-delay fallback
+#'
+#' Shared attempt skeleton for the nls-based kinetics workers. The TD
+#' model is flat at `A` before `TD`, so the pre-onset baseline anchors
+#' `A`; the reduced model has no such region and diverges at `t < 0`, so
+#' it is fit from `start_time` onward. An under-determined attempt is
+#' rejected before it reaches `fitter`, and a failed TD fit falls back to
+#' the reduced model without `TD` unless `TD` is user-fixed. Every failure
+#' is reported through [warn_fit_failed()].
+#'
+#' @param x_fit,t_fit Numeric vectors of the channel fit window.
+#' @param params Character vector of parameter names in model order,
+#'   including `TD` when the channel fits the TD model.
+#' @param .a The channel's resolved argument list (`use_TD`, `fix`).
+#' @param fitter A function `(.data, .params, on_error)` fitting `.params`
+#'   to a data frame of `.x`/`.t` and returning an [nls][stats::nls] model
+#'   or `NULL`. `on_error(e)` reports the condition `e` and returns `NULL`,
+#'   so it doubles as a [tryCatch()] error handler.
+#' @param retry Logical; attempt the reduced model when the TD fit fails.
+#' @inheritParams warn_fit_failed
+#'
+#' @returns A list with `model` (or `NULL`), the `params` actually fit,
+#'   the logical row filter `keep`, and the fit `data` frame.
+#'
+#' @keywords internal
+fit_td_fallback <- function(
+    x_fit,
+    t_fit,
+    params,
+    .a,
+    fitter,
+    fn,
+    .nirs,
+    interval_name,
+    env,
+    retry = .a$use_TD && !"TD" %in% names(.a$fix)
+) {
+    attempt <- \(.params, .retry) {
+        ## dropping TD narrows the window, so subset per attempt
+        keep <- "TD" %in% .params | t_fit >= 0
+        data <- data.frame(.x = x_fit[keep], .t = t_fit[keep])
+        on_error <- \(e) {
+            warn_fit_failed(
+                fn,
+                e,
+                .nirs,
+                interval_name,
+                length(.params),
+                .retry,
+                env
+            )
+            NULL
+        }
+        n_free <- length(setdiff(.params, names(.a$fix)))
+        model <- if (nrow(data) <= n_free) {
+            on_error(simpleError(sprintf(
+                "%d observation%s for %d free parameters.",
+                nrow(data),
+                if (nrow(data) == 1L) "" else "s",
+                n_free
+            )))
+        } else {
+            fitter(data, .params, on_error)
+        }
+        list(model = model, params = .params, keep = keep, data = data)
+    }
+    fit <- attempt(params, retry)
+    if (is.null(fit$model) && retry) {
+        fit <- attempt(setdiff(params, "TD"), FALSE)
+    }
+    return(fit)
+}
+
+
+#' Accept or reject a non-converged port fit
+#'
+#' [stats::nls()] with `algorithm = "port"` and `warnOnly = TRUE` returns
+#' a model whose stop certificate failed. It is kept with a warning when
+#' `ok` holds and its coefficients are finite; otherwise it is reported as
+#' an error and dropped. The port stop code is reported in prose either
+#' way.
+#'
+#' @param model An [nls][stats::nls] model or `NULL`.
+#' @param on_error A reporting function; see [fit_td_fallback()].
+#' @param ok Logical; a further acceptance condition, e.g. an RSS no worse
+#'   than the starting estimates. Evaluated only for a non-converged fit.
+#'
+#' @returns `model` or `NULL`.
+#'
+#' @keywords internal
+accept_port_fit <- function(model, on_error, ok = TRUE) {
+    if (is.null(model) || model$convInfo$isConv) {
+        return(model)
+    }
+    port_msg <- c(
+        "7" = "Singular convergence: parameters not individually identifiable.",
+        "8" = "False convergence: gradient certificate failed near a non-smooth point.",
+        "9" = "Function evaluation limit reached without convergence.",
+        "10" = "Iteration limit reached without convergence."
+    )
+    code <- as.character(model$convInfo$stopCode)
+    known <- code %in% names(port_msg)
+    msg <- if (known) port_msg[[code]] else model$convInfo$stopMessage
+    if (known && ok && all(is.finite(stats::coef(model)))) {
+        on_error(simpleWarning(msg))
+        return(model)
+    }
+    return(on_error(simpleError(msg)))
+}
+
+
+#' Assemble a fitted channel result
+#'
+#' Counterpart of [build_na_results()] for a successful fit: the
+#' `coefs`/`model`/`fitted_data`/`diag` list expected by
+#' [analyse_kinetics_channels()], with fitted values and diagnostics
+#' derived from `model` on the rows in `keep`.
+#'
+#' @param coefs A 1-row `data.frame` of method coefficients.
+#' @param model A fitted model supporting [stats::predict()] and
+#'   [stats::coef()].
+#' @param valid The [find_kinetics_idx()] result for the channel.
+#' @param keep Logical row filter of the fit window used by `model`.
+#' @inheritParams fit_td_fallback
+#' @inheritParams validate_mnirs
+#'
+#' @returns A named list with elements `coefs`, `model`, `fitted_data`,
+#'   and `diag`.
+#'
+#' @keywords internal
+build_fit_results <- function(
+    coefs,
+    model,
+    x_fit,
+    t_fit,
+    valid,
+    keep = TRUE,
+    env = rlang::caller_env()
+) {
+    fitted_vals <- stats::predict(model)
+    return(list(
+        coefs = coefs,
+        model = model,
+        fitted_data = data.frame(
+            window_idx = valid$idx[keep],
+            fitted = fitted_vals
+        ),
+        diag = compute_diagnostics(
+            x_fit[keep],
+            t_fit[keep],
+            fitted_vals,
+            n_params = length(stats::coef(model)),
+            env = env
+        )
+    ))
+}
+
+
 #' Zero-row kinetics warnings scaffold
 #'
 #' Stable column template for captured fit conditions, so binding and the
@@ -960,10 +1130,10 @@ warn_fit_failed <- function(
 #' @keywords internal
 kinetics_warnings_df <- function() {
     return(data.frame(
-        interval      = character(),
+        interval = character(),
         nirs_channels = character(),
-        type          = character(),
-        message       = character()
+        type = character(),
+        message = character()
     ))
 }
 
@@ -1168,7 +1338,9 @@ biexp_grid_start <- function(x, t, tau_ratio = 2.5, TD = 0, n_tau = 64L) {
         s <- exp(.td / taus)
         su <- stat$cnt - s * stat$se
         diag_gram <- stat$cnt - 2 * s * stat$se + s^2 * diag(stat$see)
-        gram_ij <- stat$cnt - s[i] * stat$se[i] - s[j] * stat$se[j] +
+        gram_ij <- stat$cnt -
+            s[i] * stat$se[i] -
+            s[j] * stat$se[j] +
             s[i] * s[j] * stat$see[cbind(i, j)]
         xu <- stat$sx - s * stat$sxe
 
@@ -1355,10 +1527,8 @@ enforce_direction <- function(
     ## weakly identified fit can strand the asymptote far beyond the
     ## data, so the seed magnitude is confined to the observed scale
     x_span <- diff(range(fit_data$.x))
-    D0 <- want * min(
-        max(abs(coefs[[B_name]] - coefs[["A"]]), x_span * 0.1),
-        x_span
-    )
+    D0 <- want *
+        min(max(abs(coefs[[B_name]] - coefs[["A"]]), x_span * 0.1), x_span)
     D_eps <- x_span * 1e-6
 
     ## build rhs on amplitude D = B - A, substituting any fixed
@@ -1376,7 +1546,8 @@ enforce_direction <- function(
         setNames(lapply(names(extra), as.name), names(extra))
     )
     rhs <- as.call(c(
-        amp_fn, quote(.t),
+        amp_fn,
+        quote(.t),
         setNames(list(A_expr, B_expr), c("A", B_name)),
         tail_args
     ))
@@ -1421,7 +1592,8 @@ enforce_direction <- function(
     ## accepted refit is an interior local minimum, so a bounded
     ## refit started there converges in place
     rhs2 <- as.call(c(
-        amp_fn, quote(.t),
+        amp_fn,
+        quote(.t),
         setNames(
             list(A_fixed %||% quote(A), B_fixed %||% as.name(B_name)),
             c("A", B_name)
@@ -1469,7 +1641,7 @@ enforce_direction <- function(
 #'
 #' Squared Pearson correlation between observed and fitted values. Equals
 #'   the classic `1 - SSres / SStot` for OLS linear fits (matches
-#'   `summary(lm)$r.squared`); a bounded `[0, 1]` pseudo-R² for non-linear
+#'   `summary(lm)$r.squared`); a bounded `[0, 1]` pseudo-`R^2` for non-linear
 #'   fits such as `"monoexponential"` and `"sigmoidal"`.
 #'
 #' ## adj_r2
@@ -1532,15 +1704,15 @@ compute_diagnostics <- function(
     ss_tot <- sum((x - x_mean)^2)
     ss_fit <- sum((fitted - mean(fitted))^2)
 
-    ## R²: squared Pearson correlation; equals 1 - SSres/SStot for OLS,
-    ## bounded [0, 1] pseudo-R² for non-linear fits
+    ## R^2: squared Pearson correlation; equals 1 - SSres/SStot for OLS,
+    ## bounded [0, 1] pseudo-R^2 for non-linear fits
     r2 <- if (ss_tot == 0 || ss_fit == 0) {
         NA_real_
     } else {
         stats::cor(x, fitted)^2
     }
 
-    ## adjusted R²: penalised by n_params; valid for OLS linear models
+    ## adjusted R^2: penalised by n_params; valid for OLS linear models
     adj_r2 <- if (is.na(r2) || n_obs <= n_params) {
         NA_real_
     } else {

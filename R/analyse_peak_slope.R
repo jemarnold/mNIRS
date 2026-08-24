@@ -437,18 +437,15 @@ analyse_peak_slope <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = mget(c(
-            "start_time", "width", "span", "align",
-            "direction", "end_window", "partial", "na.rm"
-        )),
+        # fmt: skip
+        arg_list = mget(
+            c("start_time", "width", "span", "align", "direction", 
+            "end_window", "partial", "na.rm")
+        ),
         choices = list(direction = c("auto", "positive", "negative")),
         verbose = verbose,
         env = env
     )
-    nirs_channels <- setup$nirs_channels
-    time_channel <- setup$time_channel
-    per_channel <- setup$per_channel
-
     ## method-specific fit: peak rolling linear slope
     peak_slope_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
         ## verbose = TRUE so fit warnings always signal; the capture handler
@@ -467,34 +464,34 @@ analyse_peak_slope <- function(
 
         list(
             coefs = data.frame(
-                slope           = slopes$slope,
-                intercept       = slopes$intercept,
-                fitted          = slopes$y, ## predicted response value at idx
+                slope = slopes$slope,
+                intercept = slopes$intercept,
+                fitted = slopes$y, ## predicted response value at idx
                 ## already elapsed from start_time, matching the fit time base
                 peak_slope_time = slopes$t,
-                idx             = peak_idx
+                idx = peak_idx
             ),
             model = slopes$model,
             fitted_data = data.frame(
                 ## map the rolling window back into original data frame rows
                 window_idx = valid$idx[slopes$window_idx],
-                fitted     = slopes$fitted
+                fitted = slopes$fitted
             ),
             diag = compute_diagnostics(
-                x        = x_fit[slopes$window_idx],
-                t        = t_fit[slopes$window_idx],
-                fitted   = slopes$fitted,
+                x = x_fit[slopes$window_idx],
+                t = t_fit[slopes$window_idx],
+                fitted = slopes$fitted,
                 n_params = 2L,
-                env      = env
+                env = env
             )
         )
     }
 
     return(analyse_kinetics_channels(
         data,
-        nirs_channels,
-        time_channel,
-        per_channel,
+        setup$nirs_channels,
+        setup$time_channel,
+        setup$per_channel,
         peak_slope_fit,
         verbose,
         interval_name,

@@ -17,7 +17,7 @@
 #' This model family is
 #' fit by [analyse_kinetics()] when `method = "monoexponential"`, and by
 #' [stats::nls()] via the self-starting wrapper [SSmonoexponential()].
-#' 
+#'
 #' ## Model equations
 #'
 #' 3-parameter model: `A + (B - A) * (1 - exp(-t / tau))`
@@ -29,7 +29,7 @@
 #'
 #' The rate constant `k` is the reciprocal of `tau` (`k = 1 / tau`) in
 #' reciprocal units of `time_channel`; i.e. `sec^-1s`).
-#' 
+#'
 #' Common derived quantities include the mean response time `MRT = TD + tau`
 #' and the half-response time `HRT = TD + tau * log(2)`.
 #'
@@ -116,7 +116,9 @@ monoexp_init <- function(mCall, data, LHS, ...) {
     }
     tau_grid <- fixed$tau %||%
         exp(seq(log(span / 100), log(span), length.out = 25L))
-    td_grid <- if (!has_TD) 0 else {
+    td_grid <- if (!has_TD) {
+        0
+    } else {
         fixed$TD %||% seq(0, 0.5 * span, length.out = 21L)
     }
 
@@ -294,83 +296,55 @@ analyse_monoexponential <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = mget(c(
-            "use_TD", "fix", "start_time", "direction", "end_window"
-        )),
+        # fmt: skip
+        arg_list = mget(
+            c("use_TD", "fix", "start_time", "direction", "end_window")
+        ),
         choices = list(direction = c("auto", "positive", "negative")),
         ## TD is only fixable where that channel fits the 4-parameter model
         fix_params = \(.a) c("A", "B", "tau", if (.a$use_TD) "TD"),
         verbose = verbose,
         env = env
     )
-    nirs_channels <- setup$nirs_channels
-    time_channel <- setup$time_channel
-    per_channel <- setup$per_channel
-
     ## NA scaffold (method columns only) for convergence failure
-    na_coefs <- data.frame(
-        A = NA_real_,
-        B = NA_real_,
-        tau = NA_real_,
-        k = NA_real_,
-        TD = NA_real_,
-        MRT = NA_real_,
-        HRT = NA_real_,
-        MRT_fitted = NA_real_,
-        HRT_fitted = NA_real_
+    # fmt: skip
+    na_cols <- c(
+        "A", "B", "tau", "k", "TD", "MRT", "HRT", "MRT_fitted", "HRT_fitted"
     )
 
-    ## method-specific fit: self-starting monoexponential via nls
+    ## method-specific fit: self-starting monoexponential via nls; a
+    ## failed 4-param fit falls back to the 3-param model
     monoexponential_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
-        params <- c("A", "B", "tau", if (.a$use_TD) "TD")
-
-        ## the 4-param model is flat at `A` before `TD`, so the pre-onset
-        ## baseline anchors `A`. the 3-param model has no such region and
-        ## diverges at t < 0, so it is fit from `start_time` onward
-        keep_rows <- function(.params) {
-            if ("TD" %in% .params) rep(TRUE, length(t_fit)) else t_fit >= 0
+        fit <- fit_td_fallback(
+            x_fit,
+            t_fit,
+            params = c("A", "B", "tau", if (.a$use_TD) "TD"),
+            .a,
+            fitter = \(.data, .params, on_error) {
+                formula <- build_ss_formula(
+                    quote(SSmonoexponential),
+                    .params,
+                    .a$fix
+                )
+                tryCatch(nls(formula, .data), error = on_error)
+            },
+            fn = quote(SSmonoexponential),
+            .nirs = .nirs,
+            interval_name = interval_name,
+            env = env
+        )
+        if (is.null(fit$model)) {
+            return(build_na_results(na_cols))
         }
-
-        ## attempt nls fit; a failed 4-param fit falls back to the
-        ## 3-param model unless TD is user-fixed
-        retry <- .a$use_TD && !"TD" %in% names(.a$fix)
-        attempt <- \(.params, .retry) {
-            ## dropping TD narrows the window, so subset per attempt
-            keep <- keep_rows(.params)
-            tryCatch(
-                nls(
-                    build_ss_formula(quote(SSmonoexponential), .params, .a$fix),
-                    data.frame(.x = x_fit[keep], .t = t_fit[keep])
-                ),
-                error = \(e) {
-                    warn_fit_failed(
-                        quote(SSmonoexponential), e, .nirs, interval_name,
-                        length(.params), .retry, env
-                    )
-                    NULL
-                }
-            )
-        }
-        model <- attempt(params, retry)
-        if (is.null(model) && retry) {
-            params <- setdiff(params, "TD")
-            model <- attempt(params, FALSE)
-        }
-
-        if (is.null(model)) {
-            return(build_na_results(na_coefs))
-        }
-
-        coefs <- full_coefs(model, params, .a$fix)
+        params <- fit$params
+        coefs <- full_coefs(fit$model, params, .a$fix)
 
         ## enforce direction: bounded refit on D = B - A when inverted
-        keep <- keep_rows(params)
-        fit_data <- data.frame(.x = x_fit[keep], .t = t_fit[keep])
         free_extra <- setdiff(params, c("A", "B", names(.a$fix)))
         enforced <- enforce_direction(
-            model,
+            fit$model,
             coefs,
-            fit_data,
+            fit$data,
             direction = .a$direction,
             amp_fn = quote(monoexponential),
             extra = coefs[free_extra],
@@ -386,15 +360,12 @@ analyse_monoexponential <- function(
             env = env
         )
         if (is.null(enforced)) {
-            return(build_na_results(na_coefs))
+            return(build_na_results(na_cols))
         }
-        model <- enforced$model
         coefs <- enforced$coefs
-        fitted_vals <- stats::predict(model)
 
         ## TD is already elapsed from start_time, matching the fit time base
         TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL
-        TD_val <- TD_arg %||% NA_real_
         MRT_val <- sum(TD_arg, coefs[["tau"]])
         HRT_val <- sum(TD_arg, coefs[["tau"]] * log(2))
 
@@ -408,38 +379,32 @@ analyse_monoexponential <- function(
             TD = TD_arg
         )
 
-        list(
-            coefs = data.frame(
-                A          = coefs[["A"]],
-                B          = coefs[["B"]],
-                tau        = coefs[["tau"]],
-                k          = 1 / coefs[["tau"]], ## time_channel units^-1
-                TD         = TD_val,
-                MRT        = MRT_val,
-                HRT        = HRT_val,
+        build_fit_results(
+            data.frame(
+                A = coefs[["A"]],
+                B = coefs[["B"]],
+                tau = coefs[["tau"]],
+                k = 1 / coefs[["tau"]], ## time_channel units^-1
+                TD = TD_arg %||% NA_real_,
+                MRT = MRT_val,
+                HRT = HRT_val,
                 MRT_fitted = fitted_params[[1L]],
                 HRT_fitted = fitted_params[[2L]]
             ),
-            model = model,
-            fitted_data = data.frame(
-                window_idx = valid$idx[keep],
-                fitted     = fitted_vals
-            ),
-            diag = compute_diagnostics(
-                x_fit[keep],
-                t_fit[keep],
-                fitted_vals,
-                n_params = length(stats::coef(model)),
-                env = env
-            )
+            enforced$model,
+            x_fit,
+            t_fit,
+            valid,
+            fit$keep,
+            env
         )
     }
 
     return(analyse_kinetics_channels(
         data,
-        nirs_channels,
-        time_channel,
-        per_channel,
+        setup$nirs_channels,
+        setup$time_channel,
+        setup$per_channel,
         monoexponential_fit,
         verbose,
         interval_name,
