@@ -103,7 +103,7 @@ monoexp_init <- function(mCall, data, LHS, ...) {
     has_TD <- "TD" %in% names(mCall)
 
     ## profile tau (and TD for the 4-parameter model) on a coarse grid
-    ## and keep the RSS-minimising start (cf. `biexp_grid_start()`).
+    ## and keep the RSS-minimising start (cf. `biexp_init()`).
     ## the model is linear in A and B once tau and TD are held fixed,
     ## so the asymptotes are solved by least squares at every grid
     ## point. point estimates from derivative changepoints or

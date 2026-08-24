@@ -62,9 +62,9 @@
 #'   Logical; default is
 #'   `TRUE`, attempts to fit the model with a "time-delay" parameter `TD`
 #'   before the response onset. i.e., a 4-parameter [SSmonoexponential()] model
-#'   (A, B, tau, TD); or a 6-parameter [biexponential()] model (A, B1, tau1,
-#'   B2, tau2, TD). If `use_TD = FALSE` or the fit fails (with a warning),
-#'   attempts to fall back to a reduced model without `TD`.
+#'   (A, B, tau, TD); or a 7-parameter [biexponential()] model (A, B1, tau1,
+#'   B2, tau2, tau_mult, TD). If `use_TD = FALSE` or the fit fails (with a
+#'   warning), attempts to fall back to a reduced model without `TD`.
 #' @param shape **sigmoidal**: Character; the 4-parameter sigmoidal shape
 #'   to fit. One of `"symmetric"` (*default*; calls [SSlogistic()]),
 #'   `"gompertz"` (early-inflection; calls [SSgompertz()]), or
@@ -76,14 +76,14 @@
 #'   parameters are excluded from estimation and reported at their fixed
 #'   values. Specify per-channel as a list of lists keyed by channel name, e.g.
 #'   `fix = list(smo2 = list(A = 0))`. See *Details*.
-#' @param tau_ratio **biexponential**: A numeric lower bound on the ratio of
-#'   the slow to the fast time constant (`tau2 / tau1`) to avoid convergence
-#'   issues on indistinguishable values; default is `2.5`. See *Details*.
-#' @param tau_mult **exponential_drift**: A numeric multiple of `tau` after
-#'   `TD` at which the linear drift begins
-#'   (`texc = TD + tau_mult * tau`; default is `3`, ~95% of the primary
-#'   amplitude). Specify per-channel as a list keyed by channel name, e.g.
-#'   `tau_mult = list(smo2 = 2)`. See *Details*.
+#' @param tau_mult **biexponential, exponential_drift**: A numeric multiple
+#'   of the fast time constant after `TD` at which the second phase begins
+#'   (`texc = TD + tau_mult * tau1`, or `TD + tau_mult * tau`). For
+#'   *"biexponential"* the default `NULL` estimates `tau_mult` as a free
+#'   parameter bounded below by `1`; a supplied value is held constant during
+#'   fitting. For *"exponential_drift"* the default `3` (~95% of the primary
+#'   amplitude) is always held constant. Specify per-channel as a list keyed
+#'   by channel name, e.g. `tau_mult = list(smo2 = 2)`. See *Details*.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
 #'
@@ -217,8 +217,6 @@
 #'   `fix = list(interval_1 = list(smo2 = list(A = 0)))`. Triple nested
 #'   `list()`s is janky, but it works for now.
 #'
-#' `tau_ratio` for *"biexponential"* is always applied globally.
-#'
 #' `method` currently only accepts a single value applied globally to all
 #' intervals and `nirs_channels`. This is a current limitation (as of `0.7.1`)
 #' and will be improved in future updates to allow more flexible kinetics
@@ -297,32 +295,36 @@
 #' A parametric approach fitting a self-starting biexponential
 #' excursion-recovery function to the response curve using [stats::nls()] with
 #' [SSbiexponential()]. A *fast* component (`B1`, `tau1`) drives the initial
-#' response to a rounded excursion point; a *slow* component (`B2`, `tau2`)
-#' recovers toward a stable plateau. The excursion point is reported as
-#' `texc` and `texc_fitted`, and is a minimum or a maximum depending on the
-#' response `direction`.
+#' response toward the excursion point; a *slow* component (`B2`, `tau2`)
+#' begins at the excursion point `texc = TD + tau_mult * tau1` and recovers
+#' toward a stable plateau. The excursion point is reported as `texc` and
+#' `texc_fitted`.
 #'
-#' Model equation:
+#' Model equations:
 #'
-#' `A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))`
+#' - 6-parameter: `A + (B1 - A) * (1 - exp(-t / tau1)) +
+#'   (B2 - B1) * (1 - exp(-pmax(t - tau_mult * tau1, 0) / tau2))`
+#' - 7-parameter, where `ts = pmax(t - TD, 0)`:
+#'   `A + (B1 - A) * (1 - exp(-ts / tau1)) +
+#'   (B2 - B1) * (1 - exp(-pmax(ts - tau_mult * tau1, 0) / tau2))`
 #'
 #' `A` is the starting value. `B1` & `tau1` are the asymptote and time
 #' constant of the fast response. `B2` & `tau2` are the asymptote and time
-#' constant of the slower respone plateau as time approaches `Inf` (typically
+#' constant of the slower response plateau as time approaches `Inf` (typically
 #' `tau2 >> tau1`). All three of `A`, `B1`, and `B2` are values on the response
 #' scale, consistent with the [monoexponential()] and sigmoidal asymptotes.
-#' The excursion point where the slower responses becomes dominant over the
-#' fast response is reported as `texc_fitted`. Set `use_TD = TRUE`
-#' (*default*) to specify the time-delay parameter `TD`. See [biexponential()]
-#' for the model family and [SSbiexponential()] for self-start initialisation.
+#' Set `use_TD = TRUE` (*default*) to specify the time-delay parameter `TD`.
+#' See [biexponential()] for the model family and [SSbiexponential()] for
+#' self-start initialisation.
 #'
-#' `tau_ratio` defines a numeric lower bound on the ratio of the slow to the
-#' fast time constant (*default* is `2.5`). As `tau2` approaches `tau1` the two
-#' components become indistinguishable and fit convergence can fail, so the
-#' ratio is bounded away from that limit. Lower values allow closer time
-#' constants and larger, more strongly cancelling amplitudes. Model fit is
-#' often only weakly identified and settles on this bound, in which case the
-#' weak fit may be returned with a warning.
+#' `tau_mult` sets the slow-phase onset in multiples of `tau1` after `TD`.
+#' The default `NULL` estimates it freely, bounded below by `1` so the slow
+#' phase begins no earlier than one fast time constant, and above so the
+#' onset stays inside the record. A supplied value is held constant and
+#' silently takes precedence over a `fix = list(tau_mult = )` entry. The slow
+#' time constant `tau2` is capped at ten times the record span: a slow tail
+#' far beyond the record identifies only its rate, not `tau2` and `B2`
+#' separately.
 #'
 #' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`, as
 #' above.
@@ -493,8 +495,7 @@ analyse_kinetics <- function(
     na.rm = FALSE,
     use_TD = TRUE,
     shape = c("symmetric", "gompertz", "gompertz_left"),
-    tau_ratio = 2.5,
-    tau_mult = 3,
+    tau_mult = NULL,
     fix = NULL
 ) {
     ## normalise method aliases before matching
@@ -626,7 +627,7 @@ analyse_kinetics.biexponential <- function(
     verbose = TRUE,
     ...,
     use_TD = TRUE,
-    tau_ratio = 2.5,
+    tau_mult = NULL,
     fix = NULL
 ) {
     ## TODO: pass additional stats::nls() args

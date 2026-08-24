@@ -62,11 +62,11 @@ make_biexp <- function(A = 70, B1 = 45, B2 = 60, channels = "smo2", n = 121) {
     set.seed(1)
     t <- seq(0, n - 1, length.out = n)
     df <- setNames(
-        data.frame(t, biexponential(t, A, B1, 5, B2, 40) + rnorm(n, 0, 0.5)),
+        data.frame(t, biexponential(t, A, B1, 5, B2, 40, 2) + rnorm(n, 0, 0.5)),
         c("time", channels[1])
     )
     for (ch in channels[-1]) {
-        df[[ch]] <- biexponential(t, A + 5, B1 + 5, 5, B2 + 5, 40) +
+        df[[ch]] <- biexponential(t, A + 5, B1 + 5, 5, B2 + 5, 40, 2) +
             rnorm(n, 0, 0.5)
     }
     create_mnirs_data(
@@ -265,7 +265,7 @@ test_that("kinetics_annotations formats method-specific labels", {
     )
     expect_match(
         kinetics_annotations(kin_biexp())$label,
-        "texc = .+ s\ntau1 = .+\ntau2 = "
+        "tau1 = .+\ntexc = .+ s\ntau2 = "
     )
     expect_match(
         kinetics_annotations(kin_sigmoidal())$label,
@@ -341,7 +341,7 @@ test_that("kinetics_annotations mixed-direction channels share one corner", {
     )
     ann <- kinetics_annotations(x)
     expect_true(all(ann$yval_corner == Inf))
-    expect_equal(ann$vjust, c(1.4, 2.8))
+    expect_equal(ann$vjust, c(1.2, 2.4))
 })
 
 test_that("kinetics_annotations staggers stacked labels by channel rank", {
@@ -349,7 +349,7 @@ test_that("kinetics_annotations staggers stacked labels by channel rank", {
     x <- kin_monoexp(channels = c("smo2_left", "smo2_right"))
     ann <- kinetics_annotations(x)
     expect_equal(length(unique(ann$vjust)), 2L)
-    expect_equal(ann$vjust, c(-0.4, -1.8))
+    expect_equal(ann$vjust, c(-0.2, -1.4))
 })
 
 test_that("kinetics_annotations formats NA coefficients as 'NA'", {

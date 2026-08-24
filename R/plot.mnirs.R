@@ -113,11 +113,11 @@ plot.mnirs <- function(
         ggplot2::scale_x_continuous(
             breaks = x_breaks,
             labels = x_labels,
-            expand = ggplot2::expansion(mult = 0.01)
+            expand = ggplot2::expansion(mult = 0.03)
         ) +
         ggplot2::scale_y_continuous(
             breaks = y_breaks,
-            expand = ggplot2::expansion(mult = 0.01)
+            expand = ggplot2::expansion(mult = 0.03)
         ) +
         scale_colour_mnirs(
             name = NULL,
@@ -299,7 +299,7 @@ plot.mnirs_kinetics <- function(
     ## fit window plus the linear drift from (texc, texc_fitted)
     comp_coefs <- switch(
         x$method,
-        biexponential = c("A", "B1", "tau1", "B2", "tau2", "TD"),
+        biexponential = c("A", "B1", "tau1", "B2", "tau2", "tau_mult", "TD"),
         # fmt: skip
         exponential_drift = c(
             "A", "B", "tau", "slope", "texc", "texc_fitted", "TD"
@@ -338,7 +338,8 @@ plot.mnirs_kinetics <- function(
             )
             if (x$method == "biexponential") {
                 d$comp1 <- d$A + (d$B1 - d$A) * (1 - exp(-ts / d$tau1))
-                d$comp2 <- d$B1 + (d$B2 - d$B1) * (1 - exp(-ts / d$tau2))
+                d$comp2 <- d$B1 + (d$B2 - d$B1) *
+                    (1 - exp(-pmax(ts - d$tau_mult * d$tau1, 0) / d$tau2))
                 return(list(comp_line("comp1"), comp_line("comp2")))
             }
             ## exponential_drift: primary response and post-texc drift line
@@ -519,9 +520,9 @@ kinetics_annotations <- function(x) {
             label = paste0(
                 line("TD = %s s\n", coefs$TD),
                 sprintf(
-                    "texc = %s s\ntau1 = %s s\ntau2 = %s s",
-                    fmt(coefs$texc),
+                    "tau1 = %s s\ntexc = %s s\ntau2 = %s s",
                     fmt(coefs$tau1),
+                    fmt(coefs$texc),
                     fmt(coefs$tau2)
                 )
             )
@@ -592,7 +593,7 @@ kinetics_annotations <- function(x) {
     ## stagger stacked labels by channel rank within each interval,
     ## growing down from the top and up from the bottom
     rank <- stats::ave(seq_len(nrow(ann)), ann$interval, FUN = seq_along) - 1
-    ann$vjust <- ifelse(rises, -0.4 - rank * 1.4, 1.4 + rank * 1.4)
+    ann$vjust <- ifelse(rises, -0.2 - rank * 1.2, 1.2 + rank * 1.2)
 
     ## marker-only rows for the remaining offset/y pairs: no label or corner
     extra <- Map(marker_rows, spec$offset[-1L], spec$y[-1L])
