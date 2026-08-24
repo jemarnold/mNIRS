@@ -21,7 +21,7 @@
 #'      fit via [stats::nls()]. See [biexponential()].}
 #'      \item{`"exponential_drift"`}{Monoexponential curve with a secondary
 #'      linear drift, fit via [stats::nls()]. Additional arguments: `use_TD`,
-#'      `drift_k`. See [exponential_drift()].}
+#'      `tau_mult`. See [exponential_drift()].}
 #'      \item{`"sigmoidal"`}{Logistic or Gompertz-family curve fit via
 #'      [stats::nls()]. Additional arguments: `shape`. See [logistic()].}
 #'   }
@@ -79,10 +79,11 @@
 #' @param tau_ratio **biexponential**: A numeric lower bound on the ratio of
 #'   the slow to the fast time constant (`tau2 / tau1`) to avoid convergence
 #'   issues on indistinguishable values; default is `2.5`. See *Details*.
-#' @param drift_k **exponential_drift**: A numeric multiple of `tau` after
-#'   `TD` at which the linear drift onset is tied
-#'   (`texc = TD + drift_k * tau`; default is `3`) when the freely
-#'   fitted onset fails or converges against its bounds. See *Details*.
+#' @param tau_mult **exponential_drift**: A numeric multiple of `tau` after
+#'   `TD` at which the linear drift begins
+#'   (`texc = TD + tau_mult * tau`; default is `3`, ~95% of the primary
+#'   amplitude). Specify per-channel as a list keyed by channel name, e.g.
+#'   `tau_mult = list(smo2 = 2)`. See *Details*.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
 #'
@@ -216,8 +217,7 @@
 #'   `fix = list(interval_1 = list(smo2 = list(A = 0)))`. Triple nested
 #'   `list()`s is janky, but it works for now.
 #'
-#' `tau_ratio` for *"biexponential"* and `drift_k` for *"exponential_drift"*
-#' are always applied globally.
+#' `tau_ratio` for *"biexponential"* is always applied globally.
 #' 
 #' `method` currently only accepts a single value applied globally to all
 #' intervals and `nirs_channels`. This is a current limitation (as of `0.7.1`)
@@ -339,21 +339,18 @@
 #' Model equation:
 #'
 #' `A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) +
-#' slope * pmax(t - texc, 0)`
+#' slope * pmax(t - TD - tau_mult * tau, 0)`
 #'
 #' `A`, `B`, `tau`, `TD`, and the derived `k`, `MRT`, and `HRT` are as for
-#' *"monoexponential"*. `slope` is the linear drift rate `dx/dt` and
-#' `texc` the time at which the drift begins, both elapsed from
-#' `start_time` (the same frame as `TD` and `MRT`).
+#' *"monoexponential"*. `slope` is the linear drift rate `dx/dt`. The drift
+#' onset is not fitted: it is held at `tau_mult` multiples of `tau` after
+#' `TD` (*default* `3`; ~95% of the primary amplitude) and reported as the
+#' excursion point `texc = TD + tau_mult * tau` elapsed from `start_time`
+#' (the same frame as `TD` and `MRT`). Set `use_TD = TRUE` (*default*) to
+#' include the time-delay parameter `TD`.
 #'
-#' The drift onset point `texc` is fitted freely within the record. If that fit
-#' fails or converges against its bounds, `texc` is instead tied to the
-#' primary phase as `texc = TD + drift_k * tau` (*default* `drift_k = 3`;
-#' ~95% of the primary amplitude) and refit with a warning. Set `use_TD = TRUE`
-#' (*default*) to include the time-delay parameter `TD`.
-#'
-#' Any parameter may be held constant with `fix`, e.g. `fix = list(texc = 60)`,
-#' as above.
+#' `A`, `B`, `tau`, `slope`, and `TD` may be held constant with `fix`, as
+#' above.
 #'
 #' ## method = "sigmoidal"
 #'
@@ -497,7 +494,7 @@ analyse_kinetics <- function(
     use_TD = TRUE,
     shape = c("symmetric", "gompertz", "gompertz_left"),
     tau_ratio = 2.5,
-    drift_k = 3,
+    tau_mult = 3,
     fix = NULL
 ) {
     ## normalise method aliases before matching
@@ -664,7 +661,7 @@ analyse_kinetics.exponential_drift <- function(
     verbose = TRUE,
     ...,
     use_TD = TRUE,
-    drift_k = 3,
+    tau_mult = 3,
     fix = NULL
 ) {
     ## TODO: pass additional stats::nls() args

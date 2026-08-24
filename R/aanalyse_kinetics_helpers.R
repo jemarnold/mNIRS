@@ -498,7 +498,7 @@ kinetics_dispatch <- list(
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
     monoexponential = c("use_TD", "fix"),
     biexponential = c("use_TD", "fix", "tau_ratio"),
-    exponential_drift = c("use_TD", "fix", "drift_k"),
+    exponential_drift = c("use_TD", "fix", "tau_mult"),
     sigmoidal = c("shape", "fix")
 )
 

@@ -1973,6 +1973,143 @@ test_that("analyse_kinetics.monoexponential names only the failing interval", {
     expect_no_match(msg, "good")
 })
 
+## analyse_kinetics.exponential_drift ==================================
+## helper: create exponential-drift test data with known parameters; the
+## drift starts at texc = TD + tau_mult * tau = 37
+create_expdrift_data <- function(
+    A = 70,
+    B = 40,
+    tau = 8,
+    slope = 0.2,
+    tau_mult = 4,
+    TD = 5,
+    n = 120,
+    sample_rate = 1,
+    noise_sd = 0.3,
+    channels = "smo2",
+    seed = 42
+) {
+    set.seed(seed)
+    t <- seq(0, (n - 1) / sample_rate, length.out = n)
+    x <- exponential_drift(t, A, B, tau, slope, tau_mult, TD) +
+        rnorm(n, 0, noise_sd)
+
+    df <- setNames(
+        data.frame(t, x),
+        c("time", channels[1])
+    )
+    if (length(channels) > 1) {
+        for (ch in channels[-1]) {
+            df[[ch]] <- exponential_drift(
+                t, A + 5, B + 5, tau, slope, tau_mult, TD
+            ) +
+                rnorm(n, 0, noise_sd)
+        }
+    }
+
+    create_mnirs_data(
+        df,
+        nirs_channels = channels,
+        time_channel = "time",
+        sample_rate = sample_rate
+    )
+}
+
+
+test_that("analyse_kinetics.exponential_drift dispatches to the method", {
+    data <- create_expdrift_data(slope = 0.1)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "exponential_drift",
+        verbose = TRUE
+    )
+    
+    expect_s3_class(result, "mnirs_kinetics")
+    expect_equal(result$method, "exponential_drift")
+    expect_true(all(
+        c("tau", "MRT", "slope", "tau_mult", "texc", "texc_fitted") %in%
+            names(result$coefficients)
+    ))
+    expect_named(
+        coef(result$model[[1L]]$smo2),
+        c("A", "B", "tau", "slope", "TD")
+    )
+})
+
+test_that("analyse_kinetics.exponential_drift dispatches multiple channels", {
+    nirs_channels <- c("smo2_left", "smo2_right")
+    data <- create_expdrift_data(channels = nirs_channels)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = nirs_channels,
+        method = "exponential_drift",
+        verbose = FALSE
+    )
+
+    expect_equal(nrow(result$coefficients), 2L)
+    expect_equal(result$coefficients$nirs_channels, nirs_channels)
+    expect_named(
+        result$data[[1]],
+        c("time", nirs_channels, paste0(nirs_channels, "_fitted"))
+    )
+})
+
+test_that("analyse_kinetics.exponential_drift dispatches via method aliases", {
+    data <- create_expdrift_data()
+    aliases <- c(
+        "exp_drift", "exp linear", "monoexp-drift", "drift",
+        "exponential_linear"
+    )
+
+    for (alias in aliases) {
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = "smo2",
+            method = alias,
+            verbose = FALSE
+        )
+        expect_equal(result$method, "exponential_drift")
+    }
+})
+
+test_that("analyse_kinetics.exponential_drift passes use_TD and fix", {
+    data <- create_expdrift_data(TD = 0)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "exponential_drift",
+        use_TD = FALSE,
+        fix = list(A = 70)
+    )
+
+    expect_equal(result$coefficients$A, 70)
+    expect_true(is.na(result$coefficients$TD))
+    expect_named(
+        coef(result$model[[1L]]$smo2), c("B", "tau", "slope")
+    )
+})
+
+test_that("analyse_kinetics.exponential_drift passes tau_mult", {
+    data <- create_expdrift_data()
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "exponential_drift",
+        tau_mult = 2,
+        verbose = FALSE
+    )
+
+    coefs <- result$coefficients
+    expect_false("tau_mult" %in% names(coef(result$model[[1L]]$smo2)))
+    expect_equal(coefs$tau_mult, 2)
+    expect_equal(coefs$texc, coefs$TD + 2 * coefs$tau)
+})
+
 ## analyse_kinetics.sigmoidal ============================================
 ## helper: create sigmoidal test data with known parameters
 create_sigmoidal_data <- function(
@@ -2138,7 +2275,7 @@ test_that("print.mnirs_kinetics shows peak_slope header", {
         method = "peak_slope"
     )
     output <- capture.output(print(x))
-    expect_true(any(grepl("Peak Linear Regression Slope", output)))
+    expect_true(any(grepl("Peak Linear Response Rate", output)))
 })
 
 test_that("print.mnirs_kinetics shows monoexponential header", {
@@ -2147,7 +2284,7 @@ test_that("print.mnirs_kinetics shows monoexponential header", {
         method = "monoexponential"
     )
     output <- capture.output(print(x))
-    expect_true(any(grepl("Monoexponential non-linear Regression", output)))
+    expect_true(any(grepl("Monoexponential One-Phase Kinetics", output)))
 })
 
 test_that("print.mnirs_kinetics shows sigmoidal header", {
@@ -2156,7 +2293,16 @@ test_that("print.mnirs_kinetics shows sigmoidal header", {
         method = "sigmoidal"
     )
     output <- capture.output(print(x))
-    expect_true(any(grepl("Sigmoidal non-linear Regression", output)))
+    expect_true(any(grepl("Sigmoidal Inflection Kinetics", output)))
+})
+
+test_that("print.mnirs_kinetics shows exponential_drift header", {
+    x <- make_print_kinetics(
+        data.frame(interval = "int1", nirs_channels = "smo2", slope = 0.05),
+        method = "exponential_drift"
+    )
+    output <- capture.output(print(x))
+    expect_true(any(grepl("Exponential-Linear Two-Phase Kinetics", output)))
 })
 
 test_that("print.mnirs_kinetics shows response_time header", {
