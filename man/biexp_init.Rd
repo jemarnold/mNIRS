@@ -14,8 +14,8 @@ biexp_init(mCall, data, LHS, ...)
 \item{LHS}{The left-hand side expression of the model formula.}
 
 \item{...}{Additional arguments, including \code{fixed}, a named list of
-user-fixed parameter values from \code{\link[=init_fixed]{init_fixed()}} used to seed the
-remaining free estimates.}
+user-fixed parameter values from \code{\link[=init_fixed]{init_fixed()}} used to narrow the
+grids.}
 }
 \value{
 \code{\link[=biexp_init]{biexp_init()}}: Initial starting estimates for parameters in the
@@ -23,6 +23,6 @@ model called by \code{\link[=SSbiexponential]{SSbiexponential()}}.
 }
 \description{
 \code{\link[=biexp_init]{biexp_init()}}: Returns initial values for the parameters in a \code{selfStart}
-model, with the time constants on the log-ratio scale (\code{lt1}, \code{lr}).
+model.
 }
 \keyword{internal}

@@ -635,8 +635,8 @@ test_that("analyse_biexponential() direction = 'positive' rejects a negative res
     expect_true(is.na(result$tau1))
 })
 
-test_that("enforce_direction() refits an inverted biexponential on B2 - A", {
-    ## genuinely rising data, but the supplied model is the mirror-image
+test_that("enforce_direction() refits an inverted biexponential on B1 - A", {
+    ## genuinely rising data, but the supplied coefs are the mirror-image
     ## falling fit: forces the direction-mismatch branch; the bounded
     ## refit recovers the true positive response with consistent coef names
     t <- seq(0, 119)
@@ -645,40 +645,29 @@ test_that("enforce_direction() refits an inverted biexponential on B2 - A", {
         t, A = 70, B1 = 90, tau1 = 5, B2 = 80, tau2 = 40, tau_mult = 2
     )
     fit_data <- data.frame(.x = x, .t = t)
-    ## inverted fit: asymptotes reflected about the baseline A, so the
-    ## seeded refit amplitude does not collapse the slow term (B2 == B1)
+    ## inverted fit: asymptotes reflected about the baseline A
     coefs <- c(A = 70, B1 = 50, tau1 = 5, B2 = 60, tau2 = 40, tau_mult = 2)
-    ## stub model: the entry check reads only its fitted values
-    model <- list(
-        fitted.values = biexponential(
-            t, A = 70, B1 = 50, tau1 = 5, B2 = 60, tau2 = 40, tau_mult = 2
-        )
-    )
 
     result <- enforce_direction(
-        model = model,
+        model = NULL,
         coefs = coefs,
         fit_data = fit_data,
         direction = "positive",
         amp_fn = quote(biexponential),
-        extra = coefs[c("B1", "tau1", "tau2", "tau_mult")],
-        B_name = "B2",
-        mirror = "B1",
-        extra_lower = c(tau1 = span * 1e-6, tau2 = span * 1e-6, tau_mult = 1),
-        extra_upper = c(tau2 = 10 * span),
+        lower = c(tau1 = span * 1e-6, tau2 = span * 1e-6, tau_mult = 1),
+        upper = c(tau2 = 10 * span),
         floor_params = c("D", "tau1", "tau2"),
-        fn = quote(SSbiexponential),
         .nirs = "smo2",
         interval_name = "test"
     )
 
     expect_named(result, c("model", "coefs"))
-    expect_named(result$coefs, c("A", "B2", "B1", "tau1", "tau2", "tau_mult"))
+    expect_named(result$coefs, c("A", "B1", "tau1", "B2", "tau2", "tau_mult"))
     ## returned model re-expressed in original parameterisation, not D
     expect_named(
-        coef(result$model), c("A", "B2", "B1", "tau1", "tau2", "tau_mult")
+        coef(result$model), c("A", "B1", "tau1", "B2", "tau2", "tau_mult")
     )
-    expect_gt(result$coefs[["B2"]], result$coefs[["A"]])
+    expect_gt(result$coefs[["B1"]], result$coefs[["A"]])
     expect_true(
         all.equal(result$coefs[["A"]], 70, tolerance = 1e-2, scale = 1)
     )
@@ -698,11 +687,6 @@ test_that("enforce_direction() accepts a PORT false-convergence stall", {
     )
     fit_data <- data.frame(.x = x, .t = t)
     coefs <- c(A = 70, B1 = 50, tau1 = 5, B2 = 60, tau2 = 40, tau_mult = 2)
-    model <- list(
-        fitted.values = biexponential(
-            t, A = 70, B1 = 50, tau1 = 5, B2 = 60, tau2 = 40, tau_mult = 2
-        )
-    )
 
     ## every refit reports a stall; without `warnOnly` nls would error
     local_mocked_bindings(
@@ -717,18 +701,14 @@ test_that("enforce_direction() accepts a PORT false-convergence stall", {
     )
 
     result <- enforce_direction(
-        model = model,
+        model = NULL,
         coefs = coefs,
         fit_data = fit_data,
         direction = "positive",
         amp_fn = quote(biexponential),
-        extra = coefs[c("B1", "tau1", "tau2", "tau_mult")],
-        B_name = "B2",
-        mirror = "B1",
-        extra_lower = c(tau1 = span * 1e-6, tau2 = span * 1e-6, tau_mult = 1),
-        extra_upper = c(tau2 = 10 * span),
+        lower = c(tau1 = span * 1e-6, tau2 = span * 1e-6, tau_mult = 1),
+        upper = c(tau2 = 10 * span),
         floor_params = c("D", "tau1", "tau2"),
-        fn = quote(SSbiexponential),
         .nirs = "smo2",
         interval_name = "test"
     )

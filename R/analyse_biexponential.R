@@ -462,17 +462,18 @@ analyse_biexponential <- function(
         coefs <- full_coefs(fit$model, params, .a$fix)
         span <- diff(range(fit$data$.t))
 
-        ## enforce direction: bounded refit on D = B2 - A when inverted.
-        ## the fit bounds are carried over; tau_mult >= 1 and TD >= 0 are
-        ## structural, so only D and the tau floors mark a degenerate fit
-        free_extra <- setdiff(params, c("A", "B2", names(.a$fix)))
-        lower_all <- c(
+        ## enforce direction: bounded refit on the fast-phase amplitude
+        ## D = B1 - A when inverted. the fit bounds are carried over;
+        ## tau_mult >= 1 and TD >= 0 are structural, so only D and the
+        ## tau floors mark a degenerate fit
+        free <- setdiff(params, names(.a$fix))
+        lower <- c(
             tau1 = span * 1e-6,
             tau2 = span * 1e-6,
             tau_mult = 1,
             TD = 0
         )
-        upper_all <- c(
+        upper <- c(
             tau2 = 10 * span,
             tau_mult = max(span / coefs[["tau1"]], 1)
         )
@@ -482,13 +483,9 @@ analyse_biexponential <- function(
             fit$data,
             direction = .a$direction,
             amp_fn = quote(biexponential),
-            extra = coefs[free_extra],
-            B_name = "B2",
-            mirror = "B1",
-            extra_lower = lower_all[intersect(names(lower_all), free_extra)],
-            extra_upper = upper_all[intersect(names(upper_all), free_extra)],
+            lower = lower[intersect(names(lower), free)],
+            upper = upper[intersect(names(upper), free)],
             floor_params = c("D", "tau1", "tau2"),
-            fn = quote(SSbiexponential),
             fix = .a$fix,
             .nirs = .nirs,
             interval_name = interval_name,

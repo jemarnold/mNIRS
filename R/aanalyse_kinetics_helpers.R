@@ -946,6 +946,7 @@ warn_fit_failed <- function(
             "x" = paste0(label, " fit failed", where),
             "!" = "{conditionMessage(e)}",
             if (retry) {
+                # fmt: skip
                 c("i" = "Attempting {n_params - 1L}-parameter \\
                 {.fn {as.character(fn)}} fit.")
             }
@@ -1237,55 +1238,41 @@ full_coefs <- function(model, params, fix = list()) {
 
 #' Enforce the requested direction on a converged parametric fit
 #'
-#' Checks the direction of the fitted curve within the data span,
-#' via the dominant excursion from its baseline
-#' ([detect_direction()]), against the requested `direction`. The
-#' asymptote sign `B - A` is not used directly: a weakly identified
-#' slow component can strand the asymptote far beyond the record and
-#' invert it relative to the observed response. Satisfied fits are
-#' returned unchanged. Inverted fits are refit with amplitude `D = B - A`
-#' sign-bounded via `nls(algorithm = "port")`; sigmoid models divide
-#' by `D`, so its magnitude is floored strictly above zero. An
-#' accepted refit is then re-expressed in the original
-#' parameterisation, refit from its own optimum, so the returned
-#' model reports consistent coefficient names (`A`, `B`, ...) rather
-#' than `D`. A refit that fails, pins a sign-floored coefficient
-#' (degenerate flat fit), or loses the requested sign on
-#' re-expression warns and returns `NULL`. User-fixed parameters in
-#' `fix` are held constant in the refit: a fixed `A` or `B` is
-#' substituted into the amplitude reparameterisation; when both
-#' asymptotes are fixed the amplitude sign is predetermined, so an
-#' inverted fit cannot be refit and returns `NULL`.
+#' Direction is the sign of the primary amplitude `D = B - A` (`B1 - A`
+#' for the biexponential), where the primary asymptote follows `A` in
+#' model parameter order. A fit is satisfied when `D` and every free
+#' parameter lie inside the refit box (`D` sign-constrained; `lower`/
+#' `upper` for the rest, e.g. a sigmoid slope sign floor) and is
+#' returned unchanged. Otherwise the model is refit on `D` via
+#' `nls(algorithm = "port")` with `D` sign-bounded and its magnitude
+#' floored strictly above zero (sigmoid models divide by `D`), then
+#' re-expressed in the original parameterisation from that optimum so
+#' the returned model reports consistent coefficient names. A refit
+#' that fails, pins a sign-floored coefficient (degenerate flat fit),
+#' or loses the requested sign on re-expression warns and returns
+#' `NULL`. Parameters in `fix` are held constant: a fixed `A` or `B` is
+#' substituted into the amplitude reparameterisation; with both fixed
+#' the amplitude sign is predetermined and no refit is possible.
 #'
 #' @param model A converged [nls][stats::nls] model object.
-#' @param coefs Named numeric coefficient vector including `A` and
-#'   the `B_name` asymptote (fixed values merged in, e.g. from
-#'   [full_coefs()]).
+#' @param coefs Named numeric coefficient vector in model parameter
+#'   order with fixed values merged in (see [full_coefs()]).
 #' @param fit_data Data frame with columns `.x` and `.t`.
 #' @param direction Character; resolved `"positive"` or `"negative"`.
-#' @param amp_fn Symbol; exported model fn taking `t`, `A`, and the
-#'   `B_name` asymptote as named arguments.
-#' @param B_name Character; name of the asymptote coefficient whose
-#'   difference from `A` defines the directed amplitude (*default*
-#'   `"B"`; `"B2"` for the biexponential).
-#' @param extra Named numeric start values for remaining free params.
-#' @param mirror Character; names of `extra` params that are
-#'   intermediate asymptotes (e.g. the biexponential `B1`), seeded on
-#'   the requested side of `A` so the refit does not start inverted.
-#' @param extra_lower,extra_upper Named numeric bound overrides for
-#'   `extra` params. Sign-floor bounds should be data-scaled small
-#'   values (not `.Machine$double.eps`) so pinned-floor degeneracy is
-#'   detectable.
+#' @param amp_fn Symbol; exported model fn taking `t` and the model
+#'   parameters as named arguments. The self-start fn named in the
+#'   warning is `SS<amp_fn>`.
+#' @param lower,upper Named numeric bounds for free parameters other
+#'   than the asymptotes. Sign-floor bounds should be data-scaled
+#'   small values (not `.Machine$double.eps`) so pinned-floor
+#'   degeneracy is detectable.
 #' @param floor_params Character; names of refit coefficients subject
 #'   to the pinned-floor degeneracy check. `NULL` (*default*) checks
 #'   every finite bound; restrict when other bounds are structural
 #'   (e.g. the biexponential time-constant bounds).
-#' @param fn Symbol or character; the self-start fn named in the
-#'   warning.
+#' @param fix Named list of user-fixed parameter values.
 #' @param .nirs Character; the channel name.
 #' @param interval_name Character; the interval label.
-#' @param fix Named list of user-fixed parameter values; values may
-#'   be language objects expressed in other free parameters.
 #' @inheritParams validate_mnirs
 #'
 #' @returns A named list `list(model, coefs)` with `coefs` a named
@@ -1300,54 +1287,71 @@ enforce_direction <- function(
     fit_data,
     direction,
     amp_fn,
-    extra,
-    B_name = "B",
-    mirror = NULL,
-    extra_lower = NULL,
-    extra_upper = NULL,
+    lower = NULL,
+    upper = NULL,
     floor_params = NULL,
-    fn,
+    fix = list(),
     .nirs,
     interval_name,
-    fix = list(),
     env = rlang::caller_env()
 ) {
-    ## keep the unconstrained fit when direction is already satisfied.
-    ## direction is judged on the fitted curve within the data span, so
-    ## an asymptote stranded beyond the record cannot invert the check
+    ## the primary asymptote follows A in model parameter order (B, or
+    ## B1 for the biexponential); direction is the sign of D = B - A
+    B_name <- names(coefs)[2]
     want <- if (direction == "positive") 1 else -1
-    if (detect_direction(stats::fitted(model), fit_data$.t) == direction) {
+    x_span <- diff(range(fit_data$.x))
+    extra <- coefs[setdiff(names(coefs), c("A", B_name, names(fix)))]
+
+    ## refit box: D sign-constrained with a strictly positive magnitude
+    ## floor (sigmoid models divide by D); other params unbounded
+    ## unless overridden
+    lwr <- setNames(rep(-Inf, 2 + length(extra)), c("A", "D", names(extra)))
+    upr <- -lwr
+    lwr[["D"]] <- if (want > 0) x_span * 1e-6 else -Inf
+    upr[["D"]] <- if (want < 0) -x_span * 1e-6 else Inf
+    lwr[names(lower)] <- lower
+    upr[names(upper)] <- upper
+
+    ## keep the fit when its coefficients already sit inside the box
+    cf0 <- c(D = coefs[[B_name]] - coefs[["A"]], extra)
+    if (all(cf0 >= lwr[names(cf0)] & cf0 <= upr[names(cf0)])) {
         return(list(model = model, coefs = coefs))
     }
 
-    direction_failed <- function() {
+    fail <- \() {
+        fn <- paste0("SS", as.character(amp_fn))
         cli_warn(c(
-            "x" = "{.fn {as.character(fn)}} fit for \\
-            {.field {(.nirs)}} in {.field {interval_name}} could \\
-            not satisfy {.code direction = {.val {direction}}}.",
+            "x" = "{.fn {fn}} fit for {.field {(.nirs)}} in \\
+            {.field {interval_name}} could not satisfy \\
+            {.code direction = {.val {direction}}}.",
             "i" = "Returning {.val {NA}} coefficients."
         ), call = warn_call(env))
         return(NULL)
     }
 
-    ## shared bounded refit; params unbounded except named overrides.
-    ## the refit may start far from its constrained optimum, so it gets
-    ## the same iteration budget as the primary fit
-    port_fit <- function(rhs, start, lower = NULL, upper = NULL) {
-        lwr <- setNames(rep(-Inf, length(start)), names(start))
-        upr <- -lwr
-        lwr[names(lower)] <- lower
-        upr[names(upper)] <- upper
-        ## non-smooth models (biexponential onset kink) can stall PORT
-        ## with false convergence; a finite-coefficient stall is accepted
-        ## as in the primary fit
+    ## both asymptotes fixed: amplitude sign is predetermined; no refit
+    A_fix <- fix[["A"]]
+    B_fix <- fix[[B_name]]
+    if (!is.null(A_fix) && !is.null(B_fix)) {
+        return(fail())
+    }
+
+    ## bounded refit on `start`, boxed by name. the start may be far
+    ## from its constrained optimum, so it gets the same iteration
+    ## budget as the primary fit; a finite-coefficient PORT stall
+    ## (non-smooth onset kink) is accepted as in the primary fit
+    port_fit <- \(rhs, start) {
+        l <- lwr[names(start)]
+        u <- upr[names(start)]
+        l[is.na(l)] <- -Inf
+        u[is.na(u)] <- Inf
         model <- tryCatch(
             suppressWarnings(nls(
                 stats::as.formula(call("~", quote(.x), rhs)),
                 fit_data,
                 start = start,
-                lower = lwr,
-                upper = upr,
+                lower = l,
+                upper = u,
                 algorithm = "port",
                 control = stats::nls.control(maxiter = 500L, warnOnly = TRUE)
             )),
@@ -1356,115 +1360,71 @@ enforce_direction <- function(
         return(accept_port_fit(model, \(e) NULL))
     }
 
-    ## both asymptotes fixed: amplitude sign is predetermined and
-    ## contradicts the requested direction; no refit possible
-    A_fixed <- fix[["A"]]
-    B_fixed <- fix[[B_name]]
-    if (!is.null(A_fixed) && !is.null(B_fixed)) {
-        return(direction_failed())
+    ## model rhs on the asymptote expressions; other params ride as
+    ## named args, fixed as constants and free as symbols
+    rhs <- \(A_expr, B_expr) {
+        as.call(c(
+            amp_fn,
+            quote(.t),
+            setNames(list(A_expr, B_expr), c("A", B_name)),
+            fix[setdiff(names(fix), c("A", B_name))],
+            lapply(setNames(nm = names(extra)), as.name)
+        ))
     }
 
-    ## refit start: amplitude D seeded in the requested direction. a
-    ## weakly identified fit can strand the asymptote far beyond the
-    ## data, so the seed magnitude is confined to the observed scale
-    x_span <- diff(range(fit_data$.x))
-    D0 <- want *
-        min(max(abs(coefs[[B_name]] - coefs[["A"]]), x_span * 0.1), x_span)
-    D_eps <- x_span * 1e-6
+    ## seeds: D in the requested direction, confined to the observed
+    ## scale so a stranded asymptote cannot seed a runaway; params
+    ## outside the box (e.g. an inverted slope) are mirrored into it
+    D0 <- want * min(max(abs(cf0[["D"]]), x_span * 0.1), x_span)
+    ex_l <- lwr[names(extra)]
+    ex_u <- upr[names(extra)]
+    bad <- extra < ex_l | extra > ex_u
+    extra[bad] <- pmin(pmax(-extra[bad], ex_l[bad]), ex_u[bad])
 
-    ## intermediate asymptotes seeded on the requested side of A; an
-    ## inverted seed drags the refit into a degenerate tau-floor basin
-    m <- intersect(mirror, names(extra))
-    extra[m] <- coefs[["A"]] + want * abs(extra[m] - coefs[["A"]])
-
-    ## build rhs on amplitude D = B - A, substituting any fixed
-    ## asymptote: A free `amp_fn(.t, A, A + D, ...)`, B fixed
-    ## `amp_fn(.t, B - D, B, ...)`. Remaining params ride as named
-    ## args: free as symbols, fixed as constants or expressions
-    A_expr <- if (is.null(B_fixed)) {
-        A_fixed %||% quote(A)
+    ## refit on amplitude D, substituting a fixed asymptote: A free
+    ## `amp_fn(.t, A, A + D, ...)`, B fixed `amp_fn(.t, B - D, B, ...)`
+    A_expr <- if (is.null(B_fix)) {
+        A_fix %||% quote(A)
     } else {
-        call("-", B_fixed, quote(D))
+        call("-", B_fix, quote(D))
     }
-    B_expr <- B_fixed %||% call("+", A_expr, quote(D))
-    tail_args <- c(
-        fix[setdiff(names(fix), c("A", B_name))],
-        setNames(lapply(names(extra), as.name), names(extra))
+    A_free <- is.null(A_fix) && is.null(B_fix)
+    refit <- port_fit(
+        rhs(A_expr, B_fix %||% call("+", A_expr, quote(D))),
+        c(if (A_free) c(A = coefs[["A"]]), D = D0, extra)
     )
-    rhs <- as.call(c(
-        amp_fn,
-        quote(.t),
-        setNames(list(A_expr, B_expr), c("A", B_name)),
-        tail_args
-    ))
-
-    ## box bounds: D sign-constrained with strictly positive magnitude
-    ## floor (sigmoid models divide by D); extras unbounded unless
-    ## overridden. A drops out when either asymptote is fixed
-    A_free <- is.null(A_fixed) && is.null(B_fixed)
-    start <- c(if (A_free) c(A = coefs[["A"]]), c(D = D0), extra)
-    d_bnd <- c(D = want * D_eps)
-    lower <- c(if (want > 0) d_bnd, extra_lower)
-    upper <- c(if (want < 0) d_bnd, extra_upper)
-
-    refit <- port_fit(rhs, start, lower, upper)
     if (is.null(refit)) {
-        return(direction_failed())
+        return(fail())
     }
 
-    ## a coefficient pinned at a sign-floor bound (e.g. D, slope,
-    ## tau) indicates a degenerate flat fit: no genuine response in
-    ## the requested direction. finite lower bounds take precedence;
-    ## `floor_params` restricts the check where other bounds are
-    ## structural rather than sign floors
+    ## a coefficient pinned at a sign floor (D, slope, tau) marks a
+    ## degenerate flat fit: no genuine response in the requested
+    ## direction. `floor_params` excludes structural bounds
     cf <- coef(refit)
-    bnd <- c(lower, upper)
+    bnd <- c(lwr, upr)
     bnd <- bnd[is.finite(bnd)]
     chk <- intersect(floor_params %||% names(cf), names(bnd))
     if (any(abs(cf[chk]) <= 2 * abs(bnd[chk]))) {
-        return(direction_failed())
+        return(fail())
     }
 
-    ## back-transform to full (A, B, ...) space including fixed values
-    A_val <- if (is.null(B_fixed)) {
-        A_fixed %||% cf[["A"]]
-    } else {
-        B_fixed - cf[["D"]]
-    }
-    B_val <- A_val + cf[["D"]]
-
-    ## re-express in the original parameterisation so the returned
-    ## model reports consistent coefficient names rather than D. the
-    ## accepted refit is an interior local minimum, so a bounded
-    ## refit started there converges in place
-    rhs2 <- as.call(c(
-        amp_fn,
-        quote(.t),
-        setNames(
-            list(A_fixed %||% quote(A), B_fixed %||% as.name(B_name)),
-            c("A", B_name)
-        ),
-        tail_args
-    ))
-    start2 <- c(
-        if (is.null(A_fixed)) c(A = unname(A_val)),
-        if (is.null(B_fixed)) setNames(unname(B_val), B_name),
-        cf[setdiff(names(cf), c("A", "D"))]
+    ## re-express in the original parameterisation from the interior
+    ## optimum, so the returned model reports (A, B, ...) rather than D
+    A_val <- if (is.null(B_fix)) A_fix %||% cf[["A"]] else B_fix - cf[["D"]]
+    refit2 <- port_fit(
+        rhs(A_fix %||% quote(A), B_fix %||% as.name(B_name)),
+        c(
+            if (is.null(A_fix)) c(A = A_val),
+            if (is.null(B_fix)) setNames(A_val + cf[["D"]], B_name),
+            cf[names(extra)]
+        )
     )
-    refit2 <- port_fit(rhs2, start2, extra_lower, extra_upper)
     if (is.null(refit2)) {
-        return(direction_failed())
+        return(fail())
     }
-
-    ## merge fixed values back into the reported coefficients; a
-    ## language fix value is an expression in a free parameter and
-    ## has no constant to merge. re-expression must hold the
-    ## requested within-span direction, else it cannot be satisfied
-    fix_num <- fix[vapply(fix, is.numeric, logical(1))]
-    cf2 <- coef(refit2)
-    out <- c(cf2, unlist(fix_num[setdiff(names(fix_num), names(cf2))]))
-    if (detect_direction(stats::fitted(refit2), fit_data$.t) != direction) {
-        return(direction_failed())
+    out <- full_coefs(refit2, names(coefs), fix)
+    if (want * (out[[B_name]] - out[["A"]]) <= 0) {
+        return(fail())
     }
     return(list(model = refit2, coefs = out))
 }

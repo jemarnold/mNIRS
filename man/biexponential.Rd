@@ -4,7 +4,7 @@
 \alias{biexponential}
 \title{Biexponential function}
 \usage{
-biexponential(t, A, B1, tau1, B2, tau2, TD = NULL)
+biexponential(t, A, B1, tau1, B2, tau2, tau_mult, TD = NULL)
 }
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
@@ -27,18 +27,23 @@ infinity.}
 \item{tau2}{A numeric parameter for the \emph{slow} time constant (\eqn{\tau_2}),
 in units of the predictor variable \code{t}. Typically \verb{tau2 >> tau1}.}
 
+\item{tau_mult}{A numeric multiple of \code{tau1} after \code{TD} at which the slow
+component begins: excursion point; \code{texc = TD + tau_mult * tau1}
+(\code{TD = 0} when absent).}
+
 \item{TD}{A numeric parameter for the time delay before the onset of the
 response, in units of the predictor variable \code{t}. If \code{NULL} (\emph{default}),
-a 5-parameter model without time delay is used.}
+a 6-parameter model without time delay is used.}
 }
 \value{
 A numeric vector of predicted values the same length as the
 predictor variable \code{t}.
 }
 \description{
-Calculate a 5- or 6-parameter biexponential curve: a fast component that
-carries the response to an excursion point, followed by a slow component
-that recovers toward a stable plateau.
+Calculate a two-phase curve: a fast monoexponential response toward \code{B1},
+followed by a slow component that begins at the excursion point
+\code{texc = TD + tau_mult * tau1} and carries the response toward a stable
+plateau at \code{B2}.
 }
 \details{
 This model family is fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when
@@ -46,35 +51,42 @@ This model family is fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} 
 wrapper \code{\link[=SSbiexponential]{SSbiexponential()}}.
 \subsection{Model equations}{
 
-5-parameter model:
-\code{A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))}
+6-parameter model:
+\code{A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-pmax(t - tau_mult * tau1, 0) / tau2))}
 
-6-parameter model (with time delay), where \code{ts = pmax(t - TD, 0)}:
-\code{A + (B1 - A) * (1 - exp(-ts / tau1)) + (B2 - B1) * (1 - exp(-ts / tau2))}
+7-parameter model (with time delay), where \code{ts = pmax(t - TD, 0)}:
+\code{A + (B1 - A) * (1 - exp(-ts / tau1)) + (B2 - B1) * (1 - exp(-pmax(ts - tau_mult * tau1, 0) / tau2))}
 
-\code{A}, \code{B1}, and \code{B2} are all values on the response scale. The fast component
-\code{B1} & \code{tau1} drives the steep initial response away from \code{A} to the
-excursion point. The slow component \code{B2} & \code{tau2} then carries the curve
-toward the plateau \code{B2} as \code{t} approaches infinity.
+\code{A}, \code{B1}, and \code{B2} are all values on the response scale. The fast
+component is a \code{\link[=monoexponential]{monoexponential()}} response from \code{A} toward \code{B1}. The slow
+component is exactly zero before the excursion point
+\code{texc = TD + tau_mult * tau1}, then follows its own exponential clock with
+amplitude \code{B2 - B1} toward the plateau \code{B2}. The curve is continuous but
+not differentiable at the excursion point.
 
-The expected response is a \emph{fast} overshoot to a minimum or maximum at the
-excursion point near (but not exactly equal to) \code{B1}, followed by a \emph{slow}
-recovery back to a stable plateau at \code{B2}. The exact excursion point is
-reported by \code{\link[=analyse_kinetics]{analyse_kinetics()}} as \code{texc_fitted} at \code{texc}.
-If \code{B1} is between \code{A} and \code{B2}, the response curve will be monotonic but
-still two-phase. If \code{B1 = B2}, the curve reduces to a \code{\link[=monoexponential]{monoexponential()}}
-with single time constant \code{tau} and asymptote \code{B2}.
+The expected response is a \emph{fast} overshoot toward a minimum or maximum
+near \code{B1}, followed by a \emph{slow} recovery back to a stable plateau at \code{B2}.
+If \code{B1} is between \code{A} and \code{B2}, the response curve is monotonic but still
+two-phase. If \code{B1 = B2}, the curve reduces to a \code{\link[=monoexponential]{monoexponential()}} with
+single time constant \code{tau1} and asymptote \code{B2}.
 }
 }
 \examples{
 ## create a biexponential excursion-recovery curve with random noise
 set.seed(1)
 t <- 0:120
-x <- biexponential(t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40) +
-    rnorm(length(t), 0, 0.8)
+x <- biexponential(
+    t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40, tau_mult = 2
+) + rnorm(length(t), 0, 0.8)
 data <- data.frame(t, x)
 
-model <- nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr), data = data)
+model <- nls(
+    x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult),
+    data = data,
+    algorithm = "port",
+    lower = c(-Inf, -Inf, 0, -Inf, 0, 1),
+    control = nls.control(warnOnly = TRUE)
+)
 summary(model)
 
 y <- predict(model, data)
@@ -90,5 +102,6 @@ y <- predict(model, data)
 
 }
 \seealso{
-\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=SSbiexponential]{SSbiexponential()}}, \code{\link[=monoexponential]{monoexponential()}}
+\code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=SSbiexponential]{SSbiexponential()}}, \code{\link[=monoexponential]{monoexponential()}},
+\code{\link[=exponential_drift]{exponential_drift()}}
 }

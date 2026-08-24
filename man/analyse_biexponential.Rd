@@ -9,8 +9,8 @@ analyse_biexponential(
   nirs_channels = NULL,
   time_channel = NULL,
   use_TD = TRUE,
+  tau_mult = NULL,
   fix = NULL,
-  tau_ratio = 2.5,
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -37,27 +37,29 @@ Must match a column name in \code{data} exactly.
 used.
 }}
 
-\item{use_TD}{Logical; \code{TRUE} attempts to fit a 6-parameter
-\code{\link[=SSbiexponential]{SSbiexponential()}} model (A, B1, tau1, B2, tau2, TD) with a time delay.
-If the 6-parameter fit fails, or if \code{use_TD = FALSE}, attempts to fit a
-reduced 5-parameter \code{\link[=SSbiexponential]{SSbiexponential()}} model (A, B1, tau1, B2, tau2).
-The user-facing default (\code{TRUE}) is set by \code{\link[=analyse_kinetics]{analyse_kinetics()}}.}
+\item{use_TD}{Logical; \code{TRUE} attempts to fit a 7-parameter
+\code{\link[=SSbiexponential]{SSbiexponential()}} model (A, B1, tau1, B2, tau2, tau_mult, TD) with a
+time delay. If the 7-parameter fit fails, or if \code{use_TD = FALSE},
+attempts to fit a reduced 6-parameter \code{\link[=SSbiexponential]{SSbiexponential()}} model without
+\code{TD}.}
 
-\item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B1}, \code{tau1},
-\code{B2}, \code{tau2}, \code{TD}) to hold constant during fitting, e.g.
-\code{fix = list(A = 0)}. Fixed parameters are excluded from estimation
-and reported at their fixed values. Applied to every channel, or
-per-channel as a list of lists keyed by channel name, e.g.
+\item{tau_mult}{An \emph{optional} numeric multiple of \code{tau1} after \code{TD} at
+which the slow component onset is held
+(\code{texc = TD + tau_mult * tau1}). If \code{NULL} (\emph{default}), \code{tau_mult} is a
+free parameter estimated from the data, bounded below by \code{1} so the
+slow phase begins no earlier than one fast time constant. A supplied
+value is held constant during fitting and silently takes precedence
+over a \code{fix = list(tau_mult = )} entry. Applied to every channel, or
+per-channel as a list keyed by channel name, e.g.
+\code{tau_mult = list(smo2 = 2)}.}
+
+\item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B1},
+\code{tau1}, \code{B2}, \code{tau2}, \code{tau_mult}, \code{TD}) to hold constant during
+fitting, e.g. \code{fix = list(A = 0)}. Fixed parameters are excluded from
+estimation and reported at their fixed values. Applied to every
+channel, or per-channel as a list of lists keyed by channel name, e.g.
 \code{fix = list(smo2 = list(A = 0))}. \code{TD} is fixable for channels where
-\code{use_TD = TRUE}; a fixed \code{TD} disables the 5-parameter fallback.}
-
-\item{tau_ratio}{A numeric lower bound on the ratio of the slow to the fast
-time constant, \code{tau2 / tau1}; default is \code{2.5}. As \code{tau2} approaches
-\code{tau1} the two components become indistinguishable and fit convergence can
-fail, so the ratio is bounded away from that limit. Lower values allow
-closer time constants and larger, more strongly cancelling amplitudes.
-Model fit is often only weakly identified and settles on this bound, in
-which case the weak fit may be returned with a warning.}
+\code{use_TD = TRUE}; a fixed \code{TD} disables the 6-parameter fallback.}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
 time of response onset (effectively time = \code{0} of the response). If \code{NULL}
@@ -87,7 +89,7 @@ than the validator.}
 }
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns
-\code{nirs_channels}, \code{A}, \code{B1}, \code{tau1}, \code{B2}, \code{tau2}, \code{TD},
+\code{nirs_channels}, \code{A}, \code{B1}, \code{tau1}, \code{B2}, \code{tau2}, \code{tau_mult}, \code{TD},
 \code{texc}, \code{texc_fitted}. Per-channel metadata are attached as
 attributes:
 \itemize{

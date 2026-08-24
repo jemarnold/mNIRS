@@ -346,20 +346,17 @@ analyse_exponential_drift <- function(
         coefs <- full_coefs(fit$model, params, .a$fix)
 
         ## enforce direction: bounded refit on D = B - A when inverted
-        free_extra <- setdiff(params, c("A", "B", names(.a$fix)))
         enforced <- enforce_direction(
             fit$model,
             coefs,
             fit$data,
             direction = .a$direction,
             amp_fn = quote(exponential_drift),
-            extra = coefs[free_extra],
             ## data-scaled tau floor: tau pinned here is a degenerate
             ## step fit, not a genuine response
-            extra_lower = if ("tau" %in% free_extra) {
+            lower = if (!"tau" %in% names(.a$fix)) {
                 c(tau = diff(range(t_fit)) * 1e-6)
             },
-            fn = quote(SSexponential_drift),
             fix = .a$fix,
             .nirs = .nirs,
             interval_name = interval_name,

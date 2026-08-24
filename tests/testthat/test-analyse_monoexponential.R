@@ -747,18 +747,14 @@ test_that("enforce_direction() refits and back-transforms an inverted fit", {
         time_channel = .t
     )
     plot(fit_data)
-    ## stub model: the entry check reads only its fitted values
-    model <- list(fitted.values = monoexponential(t, A = 80, B = 50, tau = 15))
-
+    ## the inverted coefs alone trigger the refit; `model` is not read
     result <- enforce_direction(
-        model = model,
+        model = NULL,
         coefs = c(A = 80, B = 50, tau = 15),
         fit_data = fit_data,
         direction = "positive",
         amp_fn = quote(monoexponential),
-        extra = c(tau = 15),
-        extra_lower = c(tau = diff(range(t)) * 1e-6),
-        fn = quote(SSmonoexponential),
+        lower = c(tau = diff(range(t)) * 1e-6),
         .nirs = "smo2",
         interval_name = "test"
     )

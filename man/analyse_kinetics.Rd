@@ -30,8 +30,7 @@ analyse_kinetics(
   na.rm = FALSE,
   use_TD = TRUE,
   shape = c("symmetric", "gompertz", "gompertz_left"),
-  tau_ratio = 2.5,
-  tau_mult = 3,
+  tau_mult = NULL,
   fix = NULL
 )
 
@@ -140,24 +139,23 @@ the local window. (see \emph{Details}).}
 Logical; default is
 \code{TRUE}, attempts to fit the model with a "time-delay" parameter \code{TD}
 before the response onset. i.e., a 4-parameter \code{\link[=SSmonoexponential]{SSmonoexponential()}} model
-(A, B, tau, TD); or a 6-parameter \code{\link[=biexponential]{biexponential()}} model (A, B1, tau1,
-B2, tau2, TD). If \code{use_TD = FALSE} or the fit fails (with a warning),
-attempts to fall back to a reduced model without \code{TD}.}
+(A, B, tau, TD); or a 7-parameter \code{\link[=biexponential]{biexponential()}} model (A, B1, tau1,
+B2, tau2, tau_mult, TD). If \code{use_TD = FALSE} or the fit fails (with a
+warning), attempts to fall back to a reduced model without \code{TD}.}
 
 \item{shape}{\strong{sigmoidal}: Character; the 4-parameter sigmoidal shape
 to fit. One of \code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic]{SSlogistic()}}),
 \code{"gompertz"} (early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or
 \code{"gompertz_left"} (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
 
-\item{tau_ratio}{\strong{biexponential}: A numeric lower bound on the ratio of
-the slow to the fast time constant (\code{tau2 / tau1}) to avoid convergence
-issues on indistinguishable values; default is \code{2.5}. See \emph{Details}.}
-
-\item{tau_mult}{\strong{exponential_drift}: A numeric multiple of \code{tau} after
-\code{TD} at which the linear drift begins
-(\code{texc = TD + tau_mult * tau}; default is \code{3}, ~95\% of the primary
-amplitude). Specify per-channel as a list keyed by channel name, e.g.
-\code{tau_mult = list(smo2 = 2)}. See \emph{Details}.}
+\item{tau_mult}{\strong{biexponential, exponential_drift}: A numeric multiple
+of the fast time constant after \code{TD} at which the second phase begins
+(\code{texc = TD + tau_mult * tau1}, or \code{TD + tau_mult * tau}). For
+\emph{"biexponential"} the default \code{NULL} estimates \code{tau_mult} as a free
+parameter bounded below by \code{1}; a supplied value is held constant during
+fitting. For \emph{"exponential_drift"} the default \code{3} (~95\% of the primary
+amplitude) is always held constant. Specify per-channel as a list keyed
+by channel name, e.g. \code{tau_mult = list(smo2 = 2)}. See \emph{Details}.}
 
 \item{fix}{\strong{monoexponential, biexponential, exponential_drift,
 sigmoidal}: An \emph{optional}
@@ -344,8 +342,6 @@ element may itself be a per-channel map, e.g.
 \code{list()}s is janky, but it works for now.
 }
 
-\code{tau_ratio} for \emph{"biexponential"} is always applied globally.
-
 \code{method} currently only accepts a single value applied globally to all
 intervals and \code{nirs_channels}. This is a current limitation (as of \verb{0.7.1})
 and will be improved in future updates to allow more flexible kinetics
@@ -429,32 +425,35 @@ Aliases: \code{method = c("biexp", "double exponential")}.
 A parametric approach fitting a self-starting biexponential
 excursion-recovery function to the response curve using \code{\link[stats:nls]{stats::nls()}} with
 \code{\link[=SSbiexponential]{SSbiexponential()}}. A \emph{fast} component (\code{B1}, \code{tau1}) drives the initial
-response to a rounded excursion point; a \emph{slow} component (\code{B2}, \code{tau2})
-recovers toward a stable plateau. The excursion point is reported as
-\code{texc} and \code{texc_fitted}, and is a minimum or a maximum depending on the
-response \code{direction}.
+response toward the excursion point; a \emph{slow} component (\code{B2}, \code{tau2})
+begins at the excursion point \code{texc = TD + tau_mult * tau1} and recovers
+toward a stable plateau. The excursion point is reported as \code{texc} and
+\code{texc_fitted}.
 
-Model equation:
-
-\code{A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))}
+Model equations:
+\itemize{
+\item 6-parameter: \code{A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-pmax(t - tau_mult * tau1, 0) / tau2))}
+\item 7-parameter, where \code{ts = pmax(t - TD, 0)}:
+\code{A + (B1 - A) * (1 - exp(-ts / tau1)) + (B2 - B1) * (1 - exp(-pmax(ts - tau_mult * tau1, 0) / tau2))}
+}
 
 \code{A} is the starting value. \code{B1} & \code{tau1} are the asymptote and time
 constant of the fast response. \code{B2} & \code{tau2} are the asymptote and time
-constant of the slower respone plateau as time approaches \code{Inf} (typically
+constant of the slower response plateau as time approaches \code{Inf} (typically
 \verb{tau2 >> tau1}). All three of \code{A}, \code{B1}, and \code{B2} are values on the response
 scale, consistent with the \code{\link[=monoexponential]{monoexponential()}} and sigmoidal asymptotes.
-The excursion point where the slower responses becomes dominant over the
-fast response is reported as \code{texc_fitted}. Set \code{use_TD = TRUE}
-(\emph{default}) to specify the time-delay parameter \code{TD}. See \code{\link[=biexponential]{biexponential()}}
-for the model family and \code{\link[=SSbiexponential]{SSbiexponential()}} for self-start initialisation.
+Set \code{use_TD = TRUE} (\emph{default}) to specify the time-delay parameter \code{TD}.
+See \code{\link[=biexponential]{biexponential()}} for the model family and \code{\link[=SSbiexponential]{SSbiexponential()}} for
+self-start initialisation.
 
-\code{tau_ratio} defines a numeric lower bound on the ratio of the slow to the
-fast time constant (\emph{default} is \code{2.5}). As \code{tau2} approaches \code{tau1} the two
-components become indistinguishable and fit convergence can fail, so the
-ratio is bounded away from that limit. Lower values allow closer time
-constants and larger, more strongly cancelling amplitudes. Model fit is
-often only weakly identified and settles on this bound, in which case the
-weak fit may be returned with a warning.
+\code{tau_mult} sets the slow-phase onset in multiples of \code{tau1} after \code{TD}.
+The default \code{NULL} estimates it freely, bounded below by \code{1} so the slow
+phase begins no earlier than one fast time constant, and above so the
+onset stays inside the record. A supplied value is held constant and
+silently takes precedence over a \code{fix = list(tau_mult = )} entry. The slow
+time constant \code{tau2} is capped at ten times the record span: a slow tail
+far beyond the record identifies only its rate, not \code{tau2} and \code{B2}
+separately.
 
 Any parameter may be held constant with \code{fix}, e.g. \code{fix = list(A = 0)}, as
 above.

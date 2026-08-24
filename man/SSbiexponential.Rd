@@ -4,7 +4,7 @@
 \alias{SSbiexponential}
 \title{Self-starting biexponential model}
 \usage{
-SSbiexponential(t, A, B1, lt1, B2, lr, TD)
+SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult, TD)
 }
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
@@ -16,18 +16,24 @@ variable (the \code{t = 0} intercept).}
 component; the value the initial response approaches at the excursion
 point.}
 
-\item{lt1}{A numeric parameter for the log \emph{fast} time constant.}
+\item{tau1}{A numeric parameter for the \emph{fast} time constant (\eqn{\tau_1}),
+in units of the predictor variable \code{t}. Dominates the initial steep
+response.}
 
 \item{B2}{A numeric parameter for the asymptote of the \emph{slow} component;
 the stable plateau the response recovers toward as \code{t} approaches
 infinity.}
 
-\item{lr}{A numeric parameter for the log ratio of the \emph{slow} to the
-\emph{fast} time constant.}
+\item{tau2}{A numeric parameter for the \emph{slow} time constant (\eqn{\tau_2}),
+in units of the predictor variable \code{t}. Typically \verb{tau2 >> tau1}.}
+
+\item{tau_mult}{A numeric multiple of \code{tau1} after \code{TD} at which the slow
+component begins: excursion point; \code{texc = TD + tau_mult * tau1}
+(\code{TD = 0} when absent).}
 
 \item{TD}{A numeric parameter for the time delay before the onset of the
 response, in units of the predictor variable \code{t}. If \code{NULL} (\emph{default}),
-a 5-parameter model without time delay is used.}
+a 6-parameter model without time delay is used.}
 }
 \value{
 A numeric vector of predicted values the same length as the
@@ -35,34 +41,33 @@ predictor variable \code{t}.
 }
 \description{
 Creates initial coefficient estimates for a \code{selfStart} wrapper around
-\code{\link[=biexponential]{biexponential()}}, for use with \code{\link[stats:nls]{stats::nls()}}. The time constants are
-estimated on the log-ratio scale, \code{lt1 = log(tau1)} and
-\code{lr = log(tau2 / tau1)}, which expresses the \code{tau2 / tau1} separation of
-the two components as a simple bound on \code{lr}. Supports both the
-5-parameter form (A, B1, lt1, B2, lr) and the 6-parameter form
-(A, B1, lt1, B2, lr, TD); arity is inferred from the formula passed
+\code{\link[=biexponential]{biexponential()}}, for use with \code{\link[stats:nls]{stats::nls()}}. Supports both the
+6-parameter form (A, B1, tau1, B2, tau2, tau_mult) and the 7-parameter
+form adding a time delay TD; arity is inferred from the formula passed
 to \code{\link[stats:nls]{stats::nls()}}.
 }
 \details{
-5-parameter model: \code{x ~ SSbiexponential(t, A, B1, lt1, B2, lr)}
+6-parameter model:
+\code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult)}
 
-6-parameter model: \code{x ~ SSbiexponential(t, A, B1, lt1, B2, lr, TD)}
+7-parameter model:
+\code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult, TD)}
 
-The 5-parameter form is recommended for small samples or when no obvious
+The hinge at \code{texc = TD + tau_mult * tau1} is not differentiable, so
+\code{algorithm = "port"} with the time constants bounded non-negative,
+\code{tau_mult >= 1}, and \code{control = nls.control(warnOnly = TRUE)} is
+recommended.
+
+The 6-parameter form is recommended for small samples or when no obvious
 time delay is expected, as it converges more reliably. \code{\link[stats:nls]{stats::nls()}}
 reads the free parameters from the formula right-hand side, so omitting
 \code{TD} incurs no degrees-of-freedom penalty.
-
-\code{\link[stats:coef]{stats::coef()}} returns the log-scale \code{lt1} and \code{lr}; recover the natural
-time constants as \code{tau1 = exp(lt1)} and \code{tau2 = exp(lt1 + lr)}.
-
-\code{\link[=analyse_kinetics]{analyse_kinetics()}} fits this model with \code{algorithm = "port"} and box
-bounds, including a lower bound on \code{lr} set by its \code{tau_ratio} argument.
-Resulting model parameters may differ from \code{\link[=SSbiexponential]{SSbiexponential()}}.
 \subsection{Fixing parameters}{
 
 Any parameter may be held constant by writing a value in place of its
-name in the formula, e.g. \code{x ~ SSbiexponential(t, A = 0, B1, lt1, B2, lr)} fixes the baseline at \code{A = 0}. Fixed parameters are excluded from
+name in the formula, e.g.
+\code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult = 2)}
+holds the slow onset at \code{2 * tau1}. Fixed parameters are excluded from
 estimation and are not returned by \code{\link[stats:coef]{stats::coef()}}.
 }
 }
@@ -70,46 +75,32 @@ estimation and are not returned by \code{\link[stats:coef]{stats::coef()}}.
 ## create a biexponential excursion-recovery curve with random noise
 set.seed(13)
 t <- 0:120
-x <- biexponential(t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40) +
-    rnorm(length(t), 0, 0.8)
+x <- biexponential(
+    t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40, tau_mult = 2
+) + rnorm(length(t), 0, 0.8)
 data <- data.frame(t, x)
 
-model <- nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr), data = data)
-summary(model)
-
-y <- predict(model, data)
-
-## convert the log-scale time constants to the natural scale
-with(as.list(coef(model)), c(tau1 = exp(lt1), tau2 = exp(lt1 + lr)))
-
-## match the analyse_kinetics() fit path: port with box bounds keeping
-## tau1 within the data span and tau2 / tau1 >= 2.5
-span <- diff(range(t))
-model_port <- nls(
-    x ~ SSbiexponential(t, A, B1, lt1, B2, lr),
+model <- nls(
+    x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult),
     data = data,
     algorithm = "port",
-    lower = c(-Inf, -Inf, log(span / 1000), -Inf, log(2.5))
+    lower = c(-Inf, -Inf, 0, -Inf, 0, 1),
+    control = nls.control(warnOnly = TRUE)
 )
-summary(model_port)
+summary(model)
 
-## fix the baseline A at a known value
+## fix the slow onset at 2 tau1
 model_fixed <- nls(
-    x ~ SSbiexponential(t, A = 70, B1, lt1, B2, lr), data = data
+    x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult = 2),
+    data = data,
+    algorithm = "port",
+    lower = c(-Inf, -Inf, 0, -Inf, 0),
+    control = nls.control(warnOnly = TRUE)
 )
 summary(model_fixed)
-
-\donttest{
-    if (requireNamespace("ggplot2", quietly = TRUE)) {
-        ggplot2::ggplot(data, ggplot2::aes(t, x)) +
-            theme_mnirs() +
-            ggplot2::geom_point() +
-            ggplot2::geom_line(ggplot2::aes(y = y))
-    }
-}
 
 }
 \seealso{
 \code{\link[=biexponential]{biexponential()}}, \code{\link[stats:nls]{stats::nls()}}, \code{\link[stats:selfStart]{stats::selfStart()}},
-\code{\link[=SSmonoexponential]{SSmonoexponential()}}
+\code{\link[=SSmonoexponential]{SSmonoexponential()}}, \code{\link[=SSexponential_drift]{SSexponential_drift()}}
 }

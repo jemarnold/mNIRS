@@ -638,30 +638,24 @@ analyse_logistic <- function(
 
         coefs <- full_coefs(model, params, .a$fix)
 
-        ## enforce direction: bounded refit on D = B - A and slope sign
+        ## enforce direction: bounded refit on D = B - A and slope sign.
         ## data-scaled slope floor: slope pinned here is a degenerate
         ## flat fit, not a genuine response
         want <- if (.a$direction == "positive") 1 else -1
         slope_eps <- diff(range(x_fit)) / diff(range(t_fit)) * 1e-6
-        free_extra <- setdiff(params, c("A", "B", names(.a$fix)))
-        extra <- coefs[free_extra]
-        if ("slope" %in% free_extra) {
-            extra[["slope"]] <- want * max(abs(coefs[["slope"]]), slope_eps)
-        }
+        slope_free <- !"slope" %in% names(.a$fix)
         enforced <- enforce_direction(
             model,
             coefs,
             fit_data,
             direction = .a$direction,
             amp_fn = disp$amp,
-            extra = extra,
-            extra_lower = if ("slope" %in% free_extra) {
+            lower = if (slope_free) {
                 c(slope = if (want > 0) slope_eps else -Inf)
             },
-            extra_upper = if ("slope" %in% free_extra) {
+            upper = if (slope_free) {
                 c(slope = if (want > 0) Inf else -slope_eps)
             },
-            fn = ch_fn,
             fix = .a$fix,
             .nirs = .nirs,
             interval_name = interval_name,
