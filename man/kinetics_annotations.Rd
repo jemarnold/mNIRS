@@ -11,7 +11,8 @@ kinetics_annotations(x)
 }
 \value{
 A \code{data.frame} with columns \code{interval}, \code{nirs_channels},
-\code{start_times}, \code{xval}, \code{yval}, \code{label}, \code{yval_corner}, and \code{vjust}.
+\code{xval}, \code{yval}, \code{label}, \code{yval_corner}, and \code{vjust}. Methods with
+multiple key points append marker-only rows with an empty \code{label}.
 \code{NULL} for a method with no annotation spec, in which case
 \code{\link[=plot.mnirs_kinetics]{plot.mnirs_kinetics()}} draws the fitted curve alone.
 }
@@ -20,9 +21,8 @@ Maps a fitted \code{mnirs_kinetics} method to its key coefficient marker
 (\code{xval}, \code{yval}) and formatted \code{label}, one row per \code{nirs_channel}
 per interval, for \code{\link[=plot.mnirs_kinetics]{plot.mnirs_kinetics()}}. Marker x-coordinates are the
 resolved onset plus the method's time coefficient. Labels sit in the corner
-the fitted curve vacates: \code{yval_corner} is the top (\code{Inf}) when the signal
-falls (\code{A > B}, or \code{A > B2} for \code{"biexponential"}) and the bottom
-(\code{-Inf}) when it rises, with \code{vjust} staggering stacked labels by channel
-rank within each interval-corner.
+at the panel's right edge vacated by the fitted data, judged from the
+coefficient direction. \code{vjust} staggers stacked labels by channel rank
+within each interval.
 }
 \keyword{internal}

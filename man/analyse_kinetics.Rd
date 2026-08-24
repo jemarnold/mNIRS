@@ -6,6 +6,7 @@
 \alias{analyse_kinetics.peak_slope}
 \alias{analyse_kinetics.monoexponential}
 \alias{analyse_kinetics.biexponential}
+\alias{analyse_kinetics.exponential_drift}
 \alias{analyse_kinetics.sigmoidal}
 \alias{analyze_kinetics}
 \title{Analyse kinetics across mNIRS channels and intervals}
@@ -15,7 +16,7 @@ analyse_kinetics(
   nirs_channels = NULL,
   time_channel = NULL,
   method = c("response_time", "peak_slope", "monoexponential", "biexponential",
-    "sigmoidal"),
+    "exponential_drift", "sigmoidal"),
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -29,6 +30,8 @@ analyse_kinetics(
   na.rm = FALSE,
   use_TD = TRUE,
   shape = c("symmetric", "gompertz", "gompertz_left"),
+  tau_ratio = 2.5,
+  tau_mult = 3,
   fix = NULL
 )
 
@@ -37,7 +40,7 @@ analyze_kinetics(
   nirs_channels = NULL,
   time_channel = NULL,
   method = c("response_time", "peak_slope", "monoexponential", "biexponential",
-    "sigmoidal"),
+    "exponential_drift", "sigmoidal"),
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -76,6 +79,9 @@ arguments: \code{width} or \code{span}, \code{align}, \code{partial}, \code{na.r
 \code{\link[=monoexponential]{monoexponential()}}.}
 \item{\code{"biexponential"}}{Biexponential (fast + slow component) curve
 fit via \code{\link[stats:nls]{stats::nls()}}. See \code{\link[=biexponential]{biexponential()}}.}
+\item{\code{"exponential_drift"}}{Monoexponential curve with a secondary
+linear drift, fit via \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_TD},
+\code{tau_mult}. See \code{\link[=exponential_drift]{exponential_drift()}}.}
 \item{\code{"sigmoidal"}}{Logistic or Gompertz-family curve fit via
 \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{shape}. See \code{\link[=logistic]{logistic()}}.}
 }}
@@ -130,7 +136,8 @@ any \code{NA}s to the returned vector and may return errors or warnings.
 If \code{TRUE}, ignores \code{NA}s and processes available valid samples within
 the local window. (see \emph{Details}).}
 
-\item{use_TD}{\strong{monoexponential, biexponential}: Logical; default is
+\item{use_TD}{\strong{monoexponential, biexponential, exponential_drift}:
+Logical; default is
 \code{TRUE}, attempts to fit the model with a "time-delay" parameter \code{TD}
 before the response onset. i.e., a 4-parameter \code{\link[=SSmonoexponential]{SSmonoexponential()}} model
 (A, B, tau, TD); or a 6-parameter \code{\link[=biexponential]{biexponential()}} model (A, B1, tau1,
@@ -142,16 +149,23 @@ to fit. One of \code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic
 \code{"gompertz"} (early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or
 \code{"gompertz_left"} (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
 
-\item{fix}{\strong{monoexponential, biexponential, sigmoidal}: An \emph{optional}
+\item{tau_ratio}{\strong{biexponential}: A numeric lower bound on the ratio of
+the slow to the fast time constant (\code{tau2 / tau1}) to avoid convergence
+issues on indistinguishable values; default is \code{2.5}. See \emph{Details}.}
+
+\item{tau_mult}{\strong{exponential_drift}: A numeric multiple of \code{tau} after
+\code{TD} at which the linear drift begins
+(\code{texc = TD + tau_mult * tau}; default is \code{3}, ~95\% of the primary
+amplitude). Specify per-channel as a list keyed by channel name, e.g.
+\code{tau_mult = list(smo2 = 2)}. See \emph{Details}.}
+
+\item{fix}{\strong{monoexponential, biexponential, exponential_drift,
+sigmoidal}: An \emph{optional}
 named list of model parameters to hold constant during fitting, e.g.
 \code{fix = list(A = 0)} fixes the starting amplitude at \code{0}. Fixed
 parameters are excluded from estimation and reported at their fixed
 values. Specify per-channel as a list of lists keyed by channel name, e.g.
 \code{fix = list(smo2 = list(A = 0))}. See \emph{Details}.}
-
-\item{tau_ratio}{\strong{biexponential}: A numeric lower bound on the ratio of
-the slow to the fast time constant (\code{tau2 / tau1}) to avoid convergence
-issues on indistinguishable values; default is \code{2.5}. See \emph{Details}.}
 }
 \value{
 A formatted table of results, with individual elements accessible
@@ -159,15 +173,13 @@ as a structured list of class \emph{"mnirs_kinetics"} containing:
 
 \item{\code{method}}{The method used, e.g. \code{"response_time"}.}
 \item{\code{model}}{A named list of model objects (per interval, per
-\code{nirs_channel}). For \code{"peak_slope"}, each element is an
-\link[stats:lm]{lm} object; for \code{"monoexponential"} and \code{"sigmoidal"},
-an \link[stats:nls]{nls} object; for \code{"response_time"}, \code{NULL}. \code{NULL}
-for channels where fitting failed. When a \code{direction}-bounded
-refit was required, the stored model is parameterised with
-amplitude \code{D = B - A} in place of \code{B}. Models are fitted on time
+\code{nirs_channel}). For \code{"peak_slope"}; each element is an
+\link[stats:lm]{lm} object. For \code{"monoexponential"},
+\code{"biexponential"}, and \code{"sigmoidal"}; an \link[stats:nls]{nls} object.
+For \code{"response_time"}; \code{NULL}. Models are fitted on time
 \emph{elapsed from} \code{start_time}, so \link[stats:predict]{predict} expects
-\code{.t} in those units; the offset for each interval is returned in
-\code{interval_times$start_times}.}
+\code{.t} in those units. The offset for each interval can be retrieved
+from \code{interval_times$start_times}.}
 \item{\code{coefficients}}{A \link[tibble:tibble-package]{tibble} of coefficients
 with one row per \code{nirs_channel} per interval, containing
 method-specific parameters.}
@@ -187,6 +199,11 @@ from a full one. Only model fits sharing an \code{n_obs} and \code{n_params}
 are fairly comparable by \code{aic}/\code{bic}.}
 \item{\code{channel_args}}{A data frame of the resolved arguments used for
 each \code{nirs_channel} with one row per \code{nirs_channel} per interval.}
+\item{\code{warnings}}{A data frame of warning and error messages captured
+during fitting, with columns \code{interval}, \code{nirs_channels} (\code{NA} for
+interval-level warnings), \code{type} (\code{"warning"} or \code{"error"}), and
+\code{message}; zero rows when none occurred. Conditions are captured
+regardless of \code{verbose}, which controls console output only.}
 \item{\code{call}}{The matched call.}
 }
 \description{
@@ -247,10 +264,13 @@ or trough value (depending on direction) that has no greater/lesser values
 within the subsequent \code{end_window} time span. The curve fitting window
 extends to the end of \code{end_window} beyond the detected peak/trough.
 
-For \emph{"monoexponential"} and \emph{"sigmoidal"} methods, \code{direction} also
-constrains the sign of the fitted amplitude \code{B - A}, and the sigmoidal
-\code{slope}. A fit that cannot satisfy the requested direction returns \code{NA}
-coefficients with a warning.
+For \emph{"monoexponential"}, \emph{"biexponential"}, \emph{"exponential_drift"}, and
+\emph{"sigmoidal"} methods,
+\code{direction} also constrains the sign of the fitted amplitude \code{B - A}, and
+the sigmoidal \code{slope}. For the \emph{"biexponential"} method, \code{direction}
+constrains the sign of the overall fitted amplitude \code{B2 - A}. A fit that
+cannot satisfy the requested direction returns \code{NA} coefficients with a
+warning.
 }
 
 \subsection{Per-channel arguments}{
@@ -409,24 +429,24 @@ Aliases: \code{method = c("biexp", "double exponential")}.
 A parametric approach fitting a self-starting biexponential
 excursion-recovery function to the response curve using \code{\link[stats:nls]{stats::nls()}} with
 \code{\link[=SSbiexponential]{SSbiexponential()}}. A \emph{fast} component (\code{B1}, \code{tau1}) drives the initial
-excursion to a rounded turning point; a \emph{slow} component (\code{B2}, \code{tau2})
-recovers toward a stable plateau. The turning point is reported as
-\code{excursion_time} and \code{excursion_value}, and is a minimum or a maximum
-depending on the response \code{direction}.
+response to a rounded excursion point; a \emph{slow} component (\code{B2}, \code{tau2})
+recovers toward a stable plateau. The excursion point is reported as
+\code{texc} and \code{texc_fitted}, and is a minimum or a maximum depending on the
+response \code{direction}.
 
 Model equation:
 
 \code{A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))}
 
 \code{A} is the starting value. \code{B1} & \code{tau1} are the asymptote and time
-constant of the fast excursion. \code{B2} & \code{tau2} are the asymptote and time
+constant of the fast response. \code{B2} & \code{tau2} are the asymptote and time
 constant of the slower respone plateau as time approaches \code{Inf} (typically
 \verb{tau2 >> tau1}). All three of \code{A}, \code{B1}, and \code{B2} are values on the response
 scale, consistent with the \code{\link[=monoexponential]{monoexponential()}} and sigmoidal asymptotes.
-The turning point where the slower responses becomes dominant over the fast
-excursion is reported as \code{excursion_value}. Set \code{use_TD = TRUE} (\emph{default})
-to specify the time-delay parameter \code{TD}. See \code{\link[=biexponential]{biexponential()}} for the
-model family and \code{\link[=SSbiexponential]{SSbiexponential()}} for self-start initialisation.
+The excursion point where the slower responses becomes dominant over the
+fast response is reported as \code{texc_fitted}. Set \code{use_TD = TRUE}
+(\emph{default}) to specify the time-delay parameter \code{TD}. See \code{\link[=biexponential]{biexponential()}}
+for the model family and \code{\link[=SSbiexponential]{SSbiexponential()}} for self-start initialisation.
 
 \code{tau_ratio} defines a numeric lower bound on the ratio of the slow to the
 fast time constant (\emph{default} is \code{2.5}). As \code{tau2} approaches \code{tau1} the two
@@ -437,6 +457,31 @@ often only weakly identified and settles on this bound, in which case the
 weak fit may be returned with a warning.
 
 Any parameter may be held constant with \code{fix}, e.g. \code{fix = list(A = 0)}, as
+above.
+}
+
+\subsection{method = "exponential_drift"}{
+
+Aliases: \code{method = c("exp_linear", "exp_drift", "monoexp_drift", "drift")}.
+
+A parametric approach fitting a two-phase curve using \code{\link[stats:nls]{stats::nls()}} with
+\code{\link[=SSexponential_drift]{SSexponential_drift()}}: a pure \code{\link[=monoexponential]{monoexponential()}} primary response plus
+a secondary linear drift beginning at the excursion point \code{texc} near the
+primary asymptote.
+
+Model equation:
+
+\code{A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) + slope * pmax(t - TD - tau_mult * tau, 0)}
+
+\code{A}, \code{B}, \code{tau}, \code{TD}, and the derived \code{k}, \code{MRT}, and \code{HRT} are as for
+\emph{"monoexponential"}. \code{slope} is the linear drift rate \code{dx/dt}. The drift
+onset is not fitted: it is held at \code{tau_mult} multiples of \code{tau} after
+\code{TD} (\emph{default} \code{3}; ~95\% of the primary amplitude) and reported as the
+excursion point \code{texc = TD + tau_mult * tau} elapsed from \code{start_time}
+(the same frame as \code{TD} and \code{MRT}). Set \code{use_TD = TRUE} (\emph{default}) to
+include the time-delay parameter \code{TD}.
+
+\code{A}, \code{B}, \code{tau}, \code{slope}, and \code{TD} may be held constant with \code{fix}, as
 above.
 }
 

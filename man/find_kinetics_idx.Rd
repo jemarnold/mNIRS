@@ -55,11 +55,13 @@ indices of all finite observations up to \code{end_window} past that extreme.
 \details{
 \subsection{Direction detection}{
 
-When \code{direction = "auto"}, the net slope across all of \code{x} is computed
-to determine the overall trend. If positive, the function searches for
-a peak (maximum). If negative, it searches for a trough (minimum). When
-the net slope is zero or \code{NA}, the direction is determined by comparing
-\code{abs(max(x))} to \code{abs(min(x))}, with ties defaulting to \code{"positive"}.
+When \code{direction = "auto"}, the excursions of \code{x} above and below its
+initial baseline (the median of the earliest samples) are compared via
+\code{\link[=detect_direction]{detect_direction()}}. If the upward excursion dominates, the function
+searches for a peak (maximum); if the downward excursion dominates, a
+trough (minimum). When the excursions tie, the direction is determined
+by comparing \code{abs(max(x))} to \code{abs(min(x))}, with ties defaulting to
+\code{"positive"}.
 }
 
 \subsection{Negative time handling}{

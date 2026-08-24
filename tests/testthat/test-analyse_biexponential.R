@@ -347,7 +347,8 @@ test_that("analyse_biexponential() returns NA for failed fit", {
     expect_warning(
         result <- analyse_biexponential(
             custom_name,
-            nirs_channels = "smo2"
+            nirs_channels = "smo2",
+            use_TD = FALSE
         ),
         "fit failed for.*smo2.*custom_name"
     )
@@ -549,6 +550,31 @@ test_that("analyse_biexponential() tau_ratio bounds the time constants", {
     expect_true(result$tau2 >= result$tau1 * 5 - 1e-6)
 })
 
+test_that("analyse_biexponential() caps a runaway tau2 at 10x the span", {
+    ## fast excursion plus pure linear drift: the slow phase has no
+    ## curvature, so tau2 and B2 diverge together
+    set.seed(42)
+    t <- 0:59
+    x <- 70 - 25 * (1 - exp(-t / 5)) + 0.2 * t + rnorm(60, 0, 0.5)
+    data <- create_mnirs_data(
+        data.frame(time = t, smo2 = x),
+        nirs_channels = "smo2",
+        time_channel = "time",
+        sample_rate = 1
+    )
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        use_TD = FALSE,
+        verbose = TRUE
+    )
+
+    expect_equal(result$tau2, 10 * diff(range(t)))
+})
+
+
+
 test_that("analyse_biexponential() texc is elapsed from start_time", {
     ## 6-parameter TD fit with a non-zero start_time: texc must be
     ## measured from start_time, not from the model's internal (TD) onset
@@ -604,7 +630,8 @@ test_that("analyse_biexponential() texc_fitted matches the fitted minimum with T
         data,
         nirs_channels = "smo2",
         start_time = start_time,
-        use_TD = TRUE
+        use_TD = TRUE,
+        verbose = FALSE
     )
 
     expect_named(coef(attr(result, "model")$smo2),
@@ -855,6 +882,27 @@ test_that("analyse_biexponential() fix holds tau2 constant", {
     expect_named(coef(attr(result, "model")$smo2), c("A", "B1", "lt1", "B2"))
     ## a fixed tau2 caps tau1 at tau2 / tau_ratio from the other side
     expect_true(result$tau1 <= 50 / 2.5 + 1e-6)
+})
+
+test_that("analyse_biexponential() caps a runaway tau2 at the horizon", {
+    ## fast dip onto a linear ramp: the slow limb has no finite time
+    ## constant, so tau2 diverges up the flat (B2 - B1) / tau2 ridge
+    set.seed(42)
+    t <- 0:59
+    x <- 70 - 25 * exp(-t / 5) + 0.15 * t + rnorm(60, 0, 0.3)
+    data <- create_mnirs_data(
+        data.frame(time = t, smo2 = x),
+        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+    )
+
+    result <- suppressWarnings(analyse_biexponential(
+        data, nirs_channels = "smo2", use_TD = FALSE, verbose = FALSE
+    ))
+
+    ## profiled at the cap rather than left to diverge
+    expect_equal(result$tau2, 10 * diff(range(t)))
+    ## the capped refit drops `lr`, so the fixed-tau2 pathway was taken
+    expect_named(coef(attr(result, "model")$smo2), c("A", "B1", "lt1", "B2"))
 })
 
 test_that("analyse_biexponential() fix holds TD constant", {

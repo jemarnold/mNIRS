@@ -8,7 +8,8 @@ build_na_results(na_coefs)
 }
 \arguments{
 \item{na_coefs}{A template 1-row \code{data.frame} of \code{NA} method coefficients
-(\emph{without} \code{nirs_channels}/\code{time_channel}, which are added upstream).}
+(\emph{without} \code{nirs_channels}/\code{time_channel}, which are added upstream),
+or a character vector of their column names.}
 }
 \value{
 A named list with elements \code{coefs}, \code{model}, \code{fitted_data},

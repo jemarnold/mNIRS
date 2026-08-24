@@ -16,7 +16,8 @@ fit_biexp_ratio(x, t, params, fix, tau_ratio, on_error)
 \item{tau_ratio}{A numeric lower bound on \code{tau2 / tau1}.}
 
 \item{on_error}{A function called with the \code{\link[stats:nls]{stats::nls()}} error condition,
-or with a warning condition when a non-converged fit is accepted.}
+or with a warning condition when a non-converged fit is accepted;
+returns \code{NULL} (see \code{\link[=fit_td_fallback]{fit_td_fallback()}}).}
 }
 \value{
 An \link[stats:nls]{nls} model in ratio parameterisation, or \code{NULL}.
@@ -26,24 +27,20 @@ An \link[stats:nls]{nls} model in ratio parameterisation, or \code{NULL}.
 re-parameterised as \code{lt1 = log(tau1)} and \code{lr = log(tau2 / tau1)}.
 }
 \details{
-Convergence rests on \code{algorithm = "port"} with box bounds: the log-ratio
-scale expresses the \code{tau2 / tau1 >= tau_ratio} constraint as a simple box
-bound on \code{lr}, keeping the fit away from the degenerate \code{tau2 = tau1}
-limit where the design matrix is singular. Unbounded fits converge poorly
-on real NIRS data regardless of scale.
+The fit uses \code{\link[stats:nls]{stats::nls()}} with \code{algorithm = "port"} and box bounds. On
+the log-ratio scale the \code{tau2 / tau1 >= tau_ratio} separation of the two
+components is a simple lower bound on \code{lr}, which holds the fit away from
+the degenerate \code{tau2 = tau1} limit. The asymptotes \code{A}, \code{B1}, and \code{B2} are
+unbounded, so identifiability rests on the time constants alone.
 
-The asymptotes \code{B1} and \code{B2} are unbounded: NIRS responses may fall or
-rise in either direction, so identifiability rests on the time constants
-alone.
-
-The 6-parameter model is piecewise-flat in \code{TD}, so port may reach the
-optimum yet report non-convergence; such solutions are accepted when
-their coefficients are finite and their RSS does not exceed the
-deterministic grid seed.
+A non-converged fit is accepted with a warning when its coefficients are
+finite and its residual sum of squares is no worse than the grid starting
+estimates from \code{\link[=biexp_grid_start]{biexp_grid_start()}}; otherwise it is rejected and \code{NULL}
+is returned (see \code{\link[=accept_port_fit]{accept_port_fit()}}).
 
 A user-fixed \code{tau1} or \code{tau2} is substituted into the re-parameterised
 formula rather than estimated: fixing \code{tau1} drops \code{lt1} and leaves \code{lr}
 free about the fixed value; fixing \code{tau2} drops \code{lr} and caps \code{lt1} at
-\code{log(tau2 / tau_ratio)}, which enforces the ratio bound from the other side.
+\code{log(tau2 / tau_ratio)}, enforcing the ratio bound from the other side.
 }
 \keyword{internal}

@@ -41,7 +41,7 @@ errors and warnings as coming from the user-facing function rather
 than the validator.}
 }
 \value{
-A named list with \code{nirs_channels}, \code{time_channel}, \code{t_vec}, and
+A named list with \code{nirs_channels}, \code{time_channel}, and
 \code{per_channel}.
 }
 \description{

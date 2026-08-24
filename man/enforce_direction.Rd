@@ -11,34 +11,46 @@ enforce_direction(
   direction,
   amp_fn,
   extra,
+  B_name = "B",
   extra_lower = NULL,
   extra_upper = NULL,
+  floor_params = NULL,
   fn,
   .nirs,
   interval_name,
   fix = list(),
-  verbose = TRUE,
   env = rlang::caller_env()
 )
 }
 \arguments{
 \item{model}{A converged \link[stats:nls]{nls} model object.}
 
-\item{coefs}{Named numeric coefficient vector including \code{A}, \code{B}
-(fixed values merged in, e.g. from \code{\link[=full_coefs]{full_coefs()}}).}
+\item{coefs}{Named numeric coefficient vector including \code{A} and
+the \code{B_name} asymptote (fixed values merged in, e.g. from
+\code{\link[=full_coefs]{full_coefs()}}).}
 
 \item{fit_data}{Data frame with columns \code{.x} and \code{.t}.}
 
 \item{direction}{Character; resolved \code{"positive"} or \code{"negative"}.}
 
-\item{amp_fn}{Symbol; exported model fn taking \verb{(t, A, B, ...)}.}
+\item{amp_fn}{Symbol; exported model fn taking \code{t}, \code{A}, and the
+\code{B_name} asymptote as named arguments.}
 
 \item{extra}{Named numeric start values for remaining free params.}
+
+\item{B_name}{Character; name of the asymptote coefficient whose
+difference from \code{A} defines the directed amplitude (\emph{default}
+\code{"B"}; \code{"B2"} for the biexponential).}
 
 \item{extra_lower, extra_upper}{Named numeric bound overrides for
 \code{extra} params. Sign-floor bounds should be data-scaled small
 values (not \code{.Machine$double.eps}) so pinned-floor degeneracy is
 detectable.}
+
+\item{floor_params}{Character; names of refit coefficients subject
+to the pinned-floor degeneracy check. \code{NULL} (\emph{default}) checks
+every finite bound; restrict when other bounds are structural
+(e.g. the biexponential time-constant bounds).}
 
 \item{fn}{Symbol or character; the self-start fn named in the
 warning.}
@@ -47,11 +59,8 @@ warning.}
 
 \item{interval_name}{Character; the interval label.}
 
-\item{fix}{Named list of user-fixed parameter values.}
-
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{fix}{Named list of user-fixed parameter values; values may
+be language objects expressed in other free parameters.}
 
 \item{env}{The calling environment or a defused call, used to report
 errors and warnings as coming from the user-facing function rather
@@ -64,16 +73,24 @@ numeric vector in \verb{(A, B, ...)} space including fixed values, or
 \code{\link[=build_na_results]{build_na_results()}}).
 }
 \description{
-Checks the sign of the fitted amplitude \code{B - A} against the
-requested \code{direction}. Satisfied fits are returned unchanged.
-Inverted fits are refit with amplitude \code{D = B - A} sign-bounded via
-\code{nls(algorithm = "port")}; sigmoid models divide by \code{D}, so its
-magnitude is floored strictly above zero. A refit that fails or
-pins any coefficient at a sign-floor bound (degenerate flat fit)
-warns and returns \code{NULL}. User-fixed parameters in \code{fix} are held
-constant in the refit: a fixed \code{A} or \code{B} is substituted into the
-amplitude reparameterisation; when both asymptotes are fixed the
-amplitude sign is predetermined, so an inverted fit cannot be
-refit and returns \code{NULL}.
+Checks the direction of the fitted curve within the data span,
+via the dominant excursion from its baseline
+(\code{\link[=detect_direction]{detect_direction()}}), against the requested \code{direction}. The
+asymptote sign \code{B - A} is not used directly: a weakly identified
+slow component can strand the asymptote far beyond the record and
+invert it relative to the observed response. Satisfied fits are
+returned unchanged. Inverted fits are refit with amplitude \code{D = B - A}
+sign-bounded via \code{nls(algorithm = "port")}; sigmoid models divide
+by \code{D}, so its magnitude is floored strictly above zero. An
+accepted refit is then re-expressed in the original
+parameterisation, refit from its own optimum, so the returned
+model reports consistent coefficient names (\code{A}, \code{B}, ...) rather
+than \code{D}. A refit that fails, pins a sign-floored coefficient
+(degenerate flat fit), or loses the requested sign on
+re-expression warns and returns \code{NULL}. User-fixed parameters in
+\code{fix} are held constant in the refit: a fixed \code{A} or \code{B} is
+substituted into the amplitude reparameterisation; when both
+asymptotes are fixed the amplitude sign is predetermined, so an
+inverted fit cannot be refit and returns \code{NULL}.
 }
 \keyword{internal}

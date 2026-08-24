@@ -12,11 +12,13 @@ biexponential(t, A, B1, tau1, B2, tau2, TD = NULL)
 \item{A}{A numeric parameter for the starting value of the response
 variable (the \code{t = 0} intercept).}
 
-\item{B1}{A numeric parameter for the asymptote of the \emph{fast} component;
-the value the initial excursion heads toward at the turning point.}
+\item{B1}{A numeric parameter for the asymptote of the initial \emph{fast}
+component; the value the initial response approaches at the excursion
+point.}
 
 \item{tau1}{A numeric parameter for the \emph{fast} time constant (\eqn{\tau_1}),
-in units of the predictor variable \code{t}. Dominates the initial steep fall.}
+in units of the predictor variable \code{t}. Dominates the initial steep
+response.}
 
 \item{B2}{A numeric parameter for the asymptote of the \emph{slow} component;
 the stable plateau the response recovers toward as \code{t} approaches
@@ -35,8 +37,8 @@ predictor variable \code{t}.
 }
 \description{
 Calculate a 5- or 6-parameter biexponential curve: a fast component that
-carries the response to a rounded turning point, followed by a slow
-component that recovers toward a stable plateau.
+carries the response to an excursion point, followed by a slow component
+that recovers toward a stable plateau.
 }
 \details{
 This model family is fit by \code{\link[=analyse_kinetics]{analyse_kinetics()}} when
@@ -50,25 +52,18 @@ wrapper \code{\link[=SSbiexponential]{SSbiexponential()}}.
 6-parameter model (with time delay), where \code{ts = pmax(t - TD, 0)}:
 \code{A + (B1 - A) * (1 - exp(-ts / tau1)) + (B2 - B1) * (1 - exp(-ts / tau2))}
 
-Clamping the shifted time at zero holds the curve at the baseline \code{A} until
-the onset of the response at \code{t = TD}.
+\code{A}, \code{B1}, and \code{B2} are all values on the response scale. The fast component
+\code{B1} & \code{tau1} drives the steep initial response away from \code{A} to the
+excursion point. The slow component \code{B2} & \code{tau2} then carries the curve
+toward the plateau \code{B2} as \code{t} approaches infinity.
 
-All three of \code{A}, \code{B1}, and \code{B2} are values on the response scale,
-consistent with the asymptote parameters of \code{\link[=monoexponential]{monoexponential()}} and the
-sigmoidal models. The fast component \code{B1}/\code{tau1} drives the steep initial
-response from \code{A} toward \code{B1}; the slow component \code{B2}/\code{tau2} pulls the
-curve on toward the plateau \code{B2} once the fast term saturates. An excursion
-response places \code{B1} beyond both \code{A} and \code{B2} (below for a fall-recover
-response, above for a rise-overshoot); the turning point is a minimum or a
-maximum accordingly. \code{B1} is the target of the fast component, \emph{near} but
-not exactly the fitted turning value, because the slow component already
-moves during the fast phase; the exact turning point is reported by
-\code{\link[=analyse_kinetics]{analyse_kinetics()}} as \code{excursion_value}. When \code{B1} lies between \code{A} and
-\code{B2} the curve is a monotone two-phase response, and when \code{B1 = B2} the
-slow term vanishes and the model reduces to the exact \code{\link[=monoexponential]{monoexponential()}}
-with asymptote \code{B2}.
-
-The response value as \code{t} approaches infinity is the plateau, \code{B2}.
+The expected response is a \emph{fast} overshoot to a minimum or maximum at the
+excursion point near (but not exactly equal to) \code{B1}, followed by a \emph{slow}
+recovery back to a stable plateau at \code{B2}. The exact excursion point is
+reported by \code{\link[=analyse_kinetics]{analyse_kinetics()}} as \code{texc_fitted} at \code{texc}.
+If \code{B1} is between \code{A} and \code{B2}, the response curve will be monotonic but
+still two-phase. If \code{B1 = B2}, the curve reduces to a \code{\link[=monoexponential]{monoexponential()}}
+with single time constant \code{tau} and asymptote \code{B2}.
 }
 }
 \examples{

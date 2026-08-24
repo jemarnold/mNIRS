@@ -11,7 +11,6 @@ warn_fit_failed(
   interval_name,
   n_params = NULL,
   retry = FALSE,
-  verbose = TRUE,
   env = rlang::caller_env()
 )
 }
@@ -28,10 +27,6 @@ warn_fit_failed(
 name.}
 
 \item{retry}{Logical; hint that the reduced model fit is attempted next.}
-
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{env}{The calling environment or a defused call, used to report
 errors and warnings as coming from the user-facing function rather

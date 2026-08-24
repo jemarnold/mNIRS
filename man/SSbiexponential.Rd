@@ -12,8 +12,9 @@ SSbiexponential(t, A, B1, lt1, B2, lr, TD)
 \item{A}{A numeric parameter for the starting value of the response
 variable (the \code{t = 0} intercept).}
 
-\item{B1}{A numeric parameter for the asymptote of the \emph{fast} component;
-the value the initial excursion heads toward at the turning point.}
+\item{B1}{A numeric parameter for the asymptote of the initial \emph{fast}
+component; the value the initial response approaches at the excursion
+point.}
 
 \item{lt1}{A numeric parameter for the log \emph{fast} time constant.}
 
@@ -56,7 +57,8 @@ reads the free parameters from the formula right-hand side, so omitting
 time constants as \code{tau1 = exp(lt1)} and \code{tau2 = exp(lt1 + lr)}.
 
 \code{\link[=analyse_kinetics]{analyse_kinetics()}} fits this model with \code{algorithm = "port"} and box
-bounds.
+bounds, including a lower bound on \code{lr} set by its \code{tau_ratio} argument.
+Resulting model parameters may differ from \code{\link[=SSbiexponential]{SSbiexponential()}}.
 \subsection{Fixing parameters}{
 
 Any parameter may be held constant by writing a value in place of its
@@ -74,6 +76,8 @@ data <- data.frame(t, x)
 
 model <- nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr), data = data)
 summary(model)
+
+y <- predict(model, data)
 
 ## convert the log-scale time constants to the natural scale
 with(as.list(coef(model)), c(tau1 = exp(lt1), tau2 = exp(lt1 + lr)))
@@ -94,8 +98,6 @@ model_fixed <- nls(
     x ~ SSbiexponential(t, A = 70, B1, lt1, B2, lr), data = data
 )
 summary(model_fixed)
-
-y <- predict(model, data)
 
 \donttest{
     if (requireNamespace("ggplot2", quietly = TRUE)) {

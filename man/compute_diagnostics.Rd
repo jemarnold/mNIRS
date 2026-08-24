@@ -4,14 +4,7 @@
 \alias{compute_diagnostics}
 \title{Compute model diagnostics}
 \usage{
-compute_diagnostics(
-  x,
-  t,
-  fitted,
-  n_params = 1L,
-  verbose = TRUE,
-  env = rlang::caller_env()
-)
+compute_diagnostics(x, t, fitted, n_params = 1L, env = rlang::caller_env())
 }
 \arguments{
 \item{x}{A numeric vector of the response variable.}
@@ -26,10 +19,6 @@ model (default \code{1L}). For linear models pass the number of regression
 coefficients (e.g. \code{2L} for \code{lm(x ~ t)}). For non-linear models
 (\code{"monoexponential"}, \code{"sigmoidal"}), pass the number of free parameters
 fit by the solver.}
-
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{env}{The calling environment or a defused call, used to report
 errors and warnings as coming from the user-facing function rather
@@ -47,7 +36,7 @@ Compute model diagnostics
 
 Squared Pearson correlation between observed and fitted values. Equals
 the classic \code{1 - SSres / SStot} for OLS linear fits (matches
-\code{summary(lm)$r.squared}); a bounded \verb{[0, 1]} pseudo-R² for non-linear
+\code{summary(lm)$r.squared}); a bounded \verb{[0, 1]} pseudo-\code{R^2} for non-linear
 fits such as \code{"monoexponential"} and \code{"sigmoidal"}.
 }
 

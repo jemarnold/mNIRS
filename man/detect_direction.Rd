@@ -18,9 +18,10 @@ detect_direction(
 Default is \code{seq_along(x)}.}
 
 \item{fallback}{A numeric vector (\emph{defaults} to \code{x}) used to resolve
-direction when the net slope of \code{x} is zero or \code{NA}. The absolute
-maximum and minimum of \code{fallback} are compared; if \code{abs(max) >= abs(min)},
-\code{"positive"} is returned.}
+direction when the excursions above and below baseline tie (e.g.
+flat or symmetric data). The absolute maximum and minimum of
+\code{fallback} are compared; if \code{abs(max) >= abs(min)}, \code{"positive"} is
+returned.}
 
 \item{direction}{A character string specifying the response direction to
 detect when \code{"auto"} (\emph{default}). When \code{"positive"} or \code{"negative"}
@@ -30,9 +31,13 @@ returns unchanged.}
 A character string: \code{"positive"} or \code{"negative"}.
 }
 \description{
-Resolves whether a signal is predominantly increasing (\code{"positive"}) or
-decreasing (\code{"negative"}) by computing the net slope of \code{x} over \code{t}.
-Used internally to disambiguate peak (maximum) from trough (minimum)
-detection when \code{direction = "auto"}.
+Resolves whether a signal responds upward (\code{"positive"}) or downward
+(\code{"negative"}) by comparing the excursions of \code{x} above and below its
+initial baseline, taken as the median of the earliest samples ordered
+by \code{t}. The dominant excursion captures the primary response direction
+even when a fast initial component partially recovers over most of the
+record (e.g. biexponential drop-recovery), where a net slope would
+misreport the trend. Used internally to disambiguate peak (maximum)
+from trough (minimum) detection when \code{direction = "auto"}.
 }
 \keyword{internal}

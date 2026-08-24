@@ -77,12 +77,14 @@ occurs.
 \item{start}{Specifies where intervals begin. Either raw values -- numeric
 for time values, character for event labels, explicit integer (e.g. \code{2L})
 for lap numbers -- or created with \code{\link[=by_time]{by_time()}}, \code{\link[=by_label]{by_label()}}, \code{\link[=by_lap]{by_lap()}},
-or \code{\link[=by_sample]{by_sample()}}.}
+or \code{\link[=by_sample]{by_sample()}}. Multiple specifications can be combined with
+\code{list()} (e.g. \code{list(by_time(30), by_label("go"))}); see \emph{Details}.}
 
 \item{end}{Specifies where intervals end. Either raw values -- numeric for
 time values, character for event labels, explicit integer (e.g. \code{2L})
 for lap numbers -- or created with \code{\link[=by_time]{by_time()}}, \code{\link[=by_label]{by_label()}}, \code{\link[=by_lap]{by_lap()}},
-or \code{\link[=by_sample]{by_sample()}}.}
+or \code{\link[=by_sample]{by_sample()}}. Multiple specifications can be combined with
+\code{list()} (e.g. \code{list(by_time(30), by_label("go"))}); see \emph{Details}.}
 
 \item{span}{A one- or two-element numeric vector \code{c(before, after)} in units
 of \code{time_channel}, or a \code{list()} of such vectors. (\emph{default}
@@ -147,6 +149,12 @@ Raw values supplied to \code{start}/\code{end} are auto-coerced:
 
 \code{start} and \code{end} can use different specification types (e.g., start by
 label, end by time). When lengths differ, the shorter is recycled.
+
+Multiple specification types can be combined for a single boundary with
+\code{list()} (e.g. \code{start = list(by_time(30), by_label("go"))}).
+Resolved boundary times are concatenated in the order supplied. Combined
+specifications must use the \code{by_} helpers directly: raw values are ignored
+with a warning.
 }
 
 \subsection{Time span window}{

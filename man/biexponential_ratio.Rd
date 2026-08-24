@@ -12,8 +12,9 @@ biexponential_ratio(t, A, B1, lt1, B2, lr, TD = NULL)
 \item{A}{A numeric parameter for the starting value of the response
 variable (the \code{t = 0} intercept).}
 
-\item{B1}{A numeric parameter for the asymptote of the \emph{fast} component;
-the value the initial excursion heads toward at the turning point.}
+\item{B1}{A numeric parameter for the asymptote of the initial \emph{fast}
+component; the value the initial response approaches at the excursion
+point.}
 
 \item{lt1}{A numeric parameter for the log \emph{fast} time constant.}
 

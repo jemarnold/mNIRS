@@ -98,6 +98,27 @@ make_sigmoidal <- function(channels = "smo2", n = 60) {
     )
 }
 
+## monoexponential plus linear drift from texc = tau_mult * tau = 32 (per
+## create_expdrift_data); no TD so the onset sits at t = 0
+make_expdrift <- function(channels = "smo2", n = 120) {
+    set.seed(42)
+    t <- seq(0, n - 1, length.out = n)
+    df <- setNames(
+        data.frame(t, exponential_drift(t, 70, 40, 8, 0.2, 4) + rnorm(n, 0, 0.3)),
+        c("time", channels[1])
+    )
+    for (ch in channels[-1]) {
+        df[[ch]] <- exponential_drift(t, 75, 45, 8, 0.2, 4) + rnorm(n, 0, 0.3)
+    }
+    create_mnirs_data(
+        df,
+        nirs_channels = channels,
+        time_channel = "time",
+        sample_rate = 1,
+        interval_times = 0
+    )
+}
+
 ## wrap single data frame or a 2-element list for faceted vs single panels
 as_input <- function(d, faceted) if (faceted) list(A = d, B = d) else d
 
@@ -157,9 +178,28 @@ kin_sigmoidal <- function(channels = "smo2", faceted = FALSE) {
     )
 }
 
+kin_expdrift <- function(channels = "smo2", faceted = FALSE) {
+    analyse_kinetics(
+        as_input(make_expdrift(channels), faceted),
+        nirs_channels = channels,
+        method = "exponential_drift",
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+}
+
 ## geom class of each plot layer, e.g. "GeomLine", "GeomPoint"
 layer_geoms <- function(p) {
     vapply(p$layers, \(l) class(l$geom)[[1L]], character(1))
+}
+
+## dotted line layers drawn by `components = TRUE` (vline is not GeomLine)
+comp_layers <- function(p) {
+    Filter(
+        \(l) inherits(l$geom, "GeomLine") &&
+            identical(l$aes_params$linetype, "dotted"),
+        p$layers
+    )
 }
 
 
@@ -327,6 +367,27 @@ test_that("kinetics_annotations formats NA coefficients as 'NA'", {
     expect_match(ann$label, "tau = NA")
 })
 
+test_that("kinetics_annotations appends marker-only rows for extra key points", {
+    ## exponential_drift: labelled MRT row plus a texc marker per channel
+    x <- kin_expdrift(channels = c("smo2_left", "smo2_right"))
+    ann <- kinetics_annotations(x)
+    expect_equal(nrow(ann), 4L)
+
+    extra <- ann[!nzchar(ann$label), ]
+    expect_equal(extra$nirs_channels, x$coefficients$nirs_channels)
+    expect_equal(
+        extra$xval,
+        x$interval_times$start_times + x$coefficients$texc
+    )
+    expect_equal(extra$yval, x$coefficients$texc_fitted)
+    ## no label anchor: corner and stagger are NA
+    expect_true(all(is.na(extra$yval_corner)))
+    expect_true(all(is.na(extra$vjust)))
+
+    ## single key-point methods add no marker-only rows
+    expect_true(all(nzchar(kinetics_annotations(kin_monoexp())$label)))
+})
+
 
 ## plot.mnirs_kinetics() =================================================
 test_that("plot.mnirs_kinetics returns a ggplot and renders for each method", {
@@ -430,4 +491,73 @@ test_that("plot.mnirs_kinetics sets label size", {
     p <- plot(kin_peak_slope(), label_size = 5)
     text_layer <- p$layers[[which(layer_geoms(p) == "GeomText")[1L]]]
     expect_equal(text_layer$aes_params$size, 5)
+})
+
+
+## components overlay ====================================================
+test_that("components overlays the biexponential model terms", {
+    x <- kin_biexp()
+    p <- plot(x, components = TRUE, markers = FALSE, labels = FALSE)
+    comps <- comp_layers(p)
+    expect_length(comps, 2L)
+
+    ## fast (A -> B1) and slow (B1 -> B2) terms sum to the fitted curve
+    d <- comps[[1L]]$data
+    expect_equal(d$comp1 + d$comp2 - d$B1, d$smo2_fitted, tolerance = 1e-6)
+
+    ## omitted by default
+    expect_length(comp_layers(plot(x, markers = FALSE, labels = FALSE)), 0L)
+})
+
+test_that("components draws the exponential_drift drift line from texc", {
+    x <- kin_expdrift()
+    p <- plot(x, components = TRUE, markers = FALSE, labels = FALSE)
+    comps <- comp_layers(p)
+    expect_length(comps, 2L)
+
+    ## monoexponential term spans the full fit window
+    d1 <- comps[[1L]]$data
+    expect_equal(nrow(d1), sum(is.finite(x$data[[1]]$smo2_fitted)))
+
+    ## drift term restricted to t >= texc, linear at the fitted slope
+    d2 <- comps[[2L]]$data
+    expect_lt(nrow(d2), nrow(d1))
+    expect_true(all(d2$time - d2$start_times >= d2$texc))
+    expect_equal(diff(d2$comp2), rep(d2$slope[[1L]], nrow(d2) - 1L))
+})
+
+test_that("components draws per channel and per facet", {
+    x <- kin_biexp(channels = c("smo2_left", "smo2_right"), faceted = TRUE)
+    p <- plot(x, components = TRUE, markers = FALSE, labels = FALSE)
+    comps <- comp_layers(p)
+    ## two terms per channel
+    expect_length(comps, 4L)
+    ## overlay rows carry the interval for facet placement
+    expect_true("interval" %in% names(comps[[1L]]$data))
+    expect_no_error(ggplot2::ggplot_build(p))
+})
+
+test_that("components is ignored for methods without a component spec", {
+    x <- kin_monoexp()
+    expect_length(comp_layers(plot(x, components = TRUE)), 0L)
+    expect_equal(
+        length(plot(x, components = TRUE)$layers),
+        length(plot(x)$layers)
+    )
+})
+
+test_that("components skips channels with a failed fit", {
+    ## direction mismatch fails the fit -> NA coefficients
+    x <- suppressWarnings(analyse_kinetics(
+        make_biexp(),
+        nirs_channels = "smo2",
+        method = "biexponential",
+        use_TD = FALSE,
+        direction = "positive",
+        verbose = FALSE
+    ))
+    expect_true(is.na(x$coefficients$A))
+    p <- plot(x, components = TRUE, markers = FALSE, labels = FALSE)
+    expect_length(comp_layers(p), 0L)
+    expect_no_error(ggplot2::ggplot_build(p))
 })

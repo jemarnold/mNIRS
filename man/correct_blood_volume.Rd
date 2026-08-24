@@ -13,8 +13,9 @@ correct_blood_volume(
 )
 }
 \arguments{
-\item{data}{A data frame of class \emph{"mnirs"} containing time series data and
-metadata.}
+\item{data}{A data frame of class \emph{"mnirs"} containing time series data
+and metadata, a list of data frames, or a grouped data frame (see
+\emph{Details}).}
 
 \item{oxy_channel}{A character string naming the \code{oxy[haem]} (oxygenated
 haemoglobin and myoglobin, \emph{O2Hb}) column in \code{data}. Must match exactly.}
@@ -34,7 +35,8 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 \value{
 A \link[tibble:tibble-package]{tibble} of class \emph{"mnirs"} with blood
 volume-corrected channels written back to the specified columns, and with
-metadata available with \code{attributes()}.
+metadata available with \code{attributes()}. For list or grouped data frame
+input, returns a named list of \emph{"mnirs"} tibbles, one per interval.
 }
 \description{
 Normalises mNIRS channels for the effects of blood volume changes, following
@@ -80,6 +82,20 @@ After correction, \code{total[haem]} is zero (blood volume changes are
 normalised).
 }
 }
+\section{Data input formats}{
+
+
+\emph{{mnirs}} processing functions accept \code{data} in multiple formats:
+\itemize{
+\item A \strong{single \emph{"mnirs"} data frame} is processed and returned directly.
+\item A \strong{list of \emph{"mnirs"} data frames}: each interval is processed
+separately and returned as a named list.
+\item A \strong{grouped \emph{"mnirs"} data frame}, e.g. with \code{dplyr::group_by()}: the
+data frame is split by grouping levels and each group is processed as
+a separate interval, returned as a named list.
+}
+}
+
 \examples{
 data <- read_mnirs(
     file_path = example_mnirs("artinis"),

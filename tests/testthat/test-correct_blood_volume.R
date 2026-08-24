@@ -295,6 +295,66 @@ test_that("metadata nirs_channels reflects specified channels only", {
     expect_equal(attr(result, "nirs_channels"), c("oxy", "total"))
 })
 
+## multi-interval input ================================================
+test_that("correct_blood_volume processes a named list of data frames", {
+    make_mnirs <- \(df) {
+        create_mnirs_data(
+            df,
+            nirs_channels = c("oxy", "deoxy", "total"),
+            time_channel = "time"
+        )
+    }
+    data_list <- list(a = make_mnirs(make_df()), b = make_mnirs(make_df()))
+
+    result <- correct_blood_volume(
+        data_list,
+        oxy_channel   = "oxy",
+        deoxy_channel = "deoxy",
+        total_channel = "total",
+        verbose       = FALSE
+    )
+
+    expect_type(result, "list")
+    expect_named(result, c("a", "b"))
+    expect_s3_class(result$a, "mnirs")
+    ## each interval corrected independently
+    expect_equal(result$a$oxy, c(0, 1/7, -23/35, -173/210))
+    expect_equal(result$b$deoxy, c(0, -1/7, 23/35, 173/210))
+    expect_equal(result$a$total, rep(0, 4L))
+})
+
+
+test_that("correct_blood_volume processes grouped data frames", {
+    skip_if_not_installed("dplyr")
+
+    df <- create_mnirs_data(
+        data.frame(
+            time  = rep(1:4, 2),
+            oxy   = rep(c(2, 5, 6, 7), 2),
+            deoxy = rep(c(1, 2, 4, 5), 2),
+            total = rep(c(3, 7, 10, 12), 2),
+            group = rep(c("A", "B"), each = 4)
+        ),
+        nirs_channels = c("oxy", "deoxy", "total"),
+        time_channel = "time"
+    )
+    grouped_df <- dplyr::group_by(df, group)
+
+    result <- correct_blood_volume(
+        grouped_df,
+        oxy_channel   = "oxy",
+        deoxy_channel = "deoxy",
+        total_channel = "total",
+        verbose       = FALSE
+    )
+
+    expect_named(result, c("A", "B"))
+    expect_s3_class(result$A, "mnirs")
+    expect_equal(result$A$oxy, c(0, 1/7, -23/35, -173/210))
+    expect_equal(result$B$deoxy, c(0, -1/7, 23/35, 173/210))
+})
+
+
 ## integration ==============================================
 test_that("correct_blood_volume preserves metadata", {
     data <- read_mnirs(
