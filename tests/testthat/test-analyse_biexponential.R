@@ -663,6 +663,7 @@ test_that("enforce_direction() refits an inverted biexponential on B2 - A", {
         amp_fn = quote(biexponential),
         extra = coefs[c("B1", "tau1", "tau2", "tau_mult")],
         B_name = "B2",
+        mirror = "B1",
         extra_lower = c(tau1 = span * 1e-6, tau2 = span * 1e-6, tau_mult = 1),
         extra_upper = c(tau2 = 10 * span),
         floor_params = c("D", "tau1", "tau2"),
@@ -672,16 +673,74 @@ test_that("enforce_direction() refits an inverted biexponential on B2 - A", {
     )
 
     expect_named(result, c("model", "coefs"))
-    expect_named(
-        result$coefs, c("A", "B2", "B1", "tau1", "tau2", "tau_mult")
-    )
+    expect_named(result$coefs, c("A", "B2", "B1", "tau1", "tau2", "tau_mult"))
     ## returned model re-expressed in original parameterisation, not D
     expect_named(
         coef(result$model), c("A", "B2", "B1", "tau1", "tau2", "tau_mult")
     )
     expect_gt(result$coefs[["B2"]], result$coefs[["A"]])
-    expect_equal(result$coefs[["A"]], 70, tolerance = 1e-2)
-    expect_equal(result$coefs[["B2"]], 80, tolerance = 1e-2)
+    expect_true(
+        all.equal(result$coefs[["A"]], 70, tolerance = 1e-2, scale = 1)
+    )
+    expect_true(
+        all.equal(result$coefs[["B2"]], 80, tolerance = 1e-2, scale = 1)
+    )
+})
+
+test_that("enforce_direction() accepts a PORT false-convergence stall", {
+    ## the biexponential onset kink can stall PORT with false convergence
+    ## (8) at an otherwise good optimum; a finite-coefficient stall must
+    ## be accepted rather than failing the direction refit
+    t <- seq(0, 119)
+    span <- diff(range(t))
+    x <- biexponential(
+        t, A = 70, B1 = 90, tau1 = 5, B2 = 80, tau2 = 40, tau_mult = 2
+    )
+    fit_data <- data.frame(.x = x, .t = t)
+    coefs <- c(A = 70, B1 = 50, tau1 = 5, B2 = 60, tau2 = 40, tau_mult = 2)
+    model <- list(
+        fitted.values = biexponential(
+            t, A = 70, B1 = 50, tau1 = 5, B2 = 60, tau2 = 40, tau_mult = 2
+        )
+    )
+
+    ## every refit reports a stall; without `warnOnly` nls would error
+    local_mocked_bindings(
+        nls = function(...) {
+            m <- stats::nls(...)
+            m$convInfo$isConv <- FALSE
+            m$convInfo$stopCode <- 8L
+            m$convInfo$stopMessage <- "false convergence (8)"
+            m
+        },
+        .package = "mnirs"
+    )
+
+    result <- enforce_direction(
+        model = model,
+        coefs = coefs,
+        fit_data = fit_data,
+        direction = "positive",
+        amp_fn = quote(biexponential),
+        extra = coefs[c("B1", "tau1", "tau2", "tau_mult")],
+        B_name = "B2",
+        mirror = "B1",
+        extra_lower = c(tau1 = span * 1e-6, tau2 = span * 1e-6, tau_mult = 1),
+        extra_upper = c(tau2 = 10 * span),
+        floor_params = c("D", "tau1", "tau2"),
+        fn = quote(SSbiexponential),
+        .nirs = "smo2",
+        interval_name = "test"
+    )
+
+    expect_named(result, c("model", "coefs"))
+    expect_false(result$model$convInfo$isConv)
+    expect_true(
+        all.equal(result$coefs[["A"]], 70, tolerance = 1e-2, scale = 1)
+    )
+    expect_true(
+        all.equal(result$coefs[["B2"]], 80, tolerance = 1e-2, scale = 1)
+    )
 })
 
 test_that("analyse_biexponential() suppresses direction warning when verbose = FALSE", {

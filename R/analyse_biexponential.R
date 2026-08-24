@@ -373,8 +373,8 @@ analyse_biexponential <- function(
     ## NA scaffold (method columns only) for convergence failure
     # fmt: skip
     na_cols <- c(
-        "A", "B1", "tau1", "B2", "tau2", "tau_mult", "TD",
-        "texc", "texc_fitted"
+        "A", "B1", "tau1", "B2", "tau2", "tau_mult", 
+        "TD", "texc", "texc_fitted"
     )
 
     ## method-specific fit: self-starting biexponential via nls; a failed
@@ -387,11 +387,7 @@ analyse_biexponential <- function(
         fitter <- \(.data, .params, on_error) {
             free <- setdiff(.params, names(.a$fix))
             span <- diff(range(.data$.t))
-            formula <- build_ss_formula(
-                quote(SSbiexponential),
-                .params,
-                .a$fix
-            )
+            formula <- build_ss_formula(quote(SSbiexponential), .params, .a$fix)
 
             ## explicit getInitial so the tau_mult cap can be derived
             ## from the tau1 seed before the bounds are fixed
@@ -425,10 +421,7 @@ analyse_biexponential <- function(
 
             ## seed clamped inside the bounds; a fixed tau1 can nudge the
             ## grid seed past the tau_mult cap
-            start <- pmin(
-                pmax(start, lower[names(start)]),
-                upper[names(start)]
-            )
+            start <- pmin(pmax(start, lower[names(start)]), upper[names(start)])
 
             model <- tryCatch(
                 suppressWarnings(nls(
@@ -453,8 +446,7 @@ analyse_biexponential <- function(
             t_fit,
             # fmt: skip
             params = c(
-                "A", "B1", "tau1", "B2", "tau2", "tau_mult",
-                if (.a$use_TD) "TD"
+                "A", "B1", "tau1", "B2", "tau2", "tau_mult", if (.a$use_TD) "TD"
             ),
             .a,
             fitter,
@@ -492,6 +484,7 @@ analyse_biexponential <- function(
             amp_fn = quote(biexponential),
             extra = coefs[free_extra],
             B_name = "B2",
+            mirror = "B1",
             extra_lower = lower_all[intersect(names(lower_all), free_extra)],
             extra_upper = upper_all[intersect(names(upper_all), free_extra)],
             floor_params = c("D", "tau1", "tau2"),

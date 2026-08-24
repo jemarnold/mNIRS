@@ -1269,6 +1269,9 @@ full_coefs <- function(model, params, fix = list()) {
 #'   difference from `A` defines the directed amplitude (*default*
 #'   `"B"`; `"B2"` for the biexponential).
 #' @param extra Named numeric start values for remaining free params.
+#' @param mirror Character; names of `extra` params that are
+#'   intermediate asymptotes (e.g. the biexponential `B1`), seeded on
+#'   the requested side of `A` so the refit does not start inverted.
 #' @param extra_lower,extra_upper Named numeric bound overrides for
 #'   `extra` params. Sign-floor bounds should be data-scaled small
 #'   values (not `.Machine$double.eps`) so pinned-floor degeneracy is
@@ -1299,6 +1302,7 @@ enforce_direction <- function(
     amp_fn,
     extra,
     B_name = "B",
+    mirror = NULL,
     extra_lower = NULL,
     extra_upper = NULL,
     floor_params = NULL,
@@ -1334,18 +1338,22 @@ enforce_direction <- function(
         upr <- -lwr
         lwr[names(lower)] <- lower
         upr[names(upper)] <- upper
-        tryCatch(
-            nls(
+        ## non-smooth models (biexponential onset kink) can stall PORT
+        ## with false convergence; a finite-coefficient stall is accepted
+        ## as in the primary fit
+        model <- tryCatch(
+            suppressWarnings(nls(
                 stats::as.formula(call("~", quote(.x), rhs)),
                 fit_data,
                 start = start,
                 lower = lwr,
                 upper = upr,
                 algorithm = "port",
-                control = stats::nls.control(maxiter = 500L)
-            ),
+                control = stats::nls.control(maxiter = 500L, warnOnly = TRUE)
+            )),
             error = \(e) NULL
         )
+        return(accept_port_fit(model, \(e) NULL))
     }
 
     ## both asymptotes fixed: amplitude sign is predetermined and
@@ -1363,6 +1371,11 @@ enforce_direction <- function(
     D0 <- want *
         min(max(abs(coefs[[B_name]] - coefs[["A"]]), x_span * 0.1), x_span)
     D_eps <- x_span * 1e-6
+
+    ## intermediate asymptotes seeded on the requested side of A; an
+    ## inverted seed drags the refit into a degenerate tau-floor basin
+    m <- intersect(mirror, names(extra))
+    extra[m] <- coefs[["A"]] + want * abs(extra[m] - coefs[["A"]])
 
     ## build rhs on amplitude D = B - A, substituting any fixed
     ## asymptote: A free `amp_fn(.t, A, A + D, ...)`, B fixed
