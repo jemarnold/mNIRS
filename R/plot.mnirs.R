@@ -571,8 +571,11 @@ kinetics_annotations <- function(x) {
 
     ## signed response direction: fitted slope sign (peak_slope, sigmoidal),
     ## otherwise plateau minus baseline
-    dir <- ((coefs[["B2"]] %||% coefs[["B"]]) - coefs[["A"]]) %||%
+    dir <- if (is.null(coefs[["A"]])) {
         coefs[["slope"]]
+    } else {
+        (coefs[["B2"]] %||% coefs[["B"]]) - coefs[["A"]]
+    }
 
     ## one corner per panel: labels anchor to the right edge, so use the half
     ## the fitted responses vacate. sign-sum majority across channels decides;

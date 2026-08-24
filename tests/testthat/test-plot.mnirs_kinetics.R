@@ -225,18 +225,18 @@ test_that("kinetics_annotations formats method-specific labels", {
     )
     expect_match(
         kinetics_annotations(kin_biexp())$label,
-        "excursion = .+ s\ntau1 = .+\ntau2 = "
+        "texc = .+ s\ntau1 = .+\ntau2 = "
     )
     expect_match(
         kinetics_annotations(kin_sigmoidal())$label,
-        "xmid = .+ s\nslope = "
+        "slope = .+ /s\nxmid = .+ s"
     )
 })
 
 test_that("kinetics_annotations biexponential marks the fitted excursion", {
     x <- kin_biexp()
     ann <- kinetics_annotations(x)
-    expect_equal(ann$yval, x$coefficients$excursion_value)
+    expect_equal(ann$yval, x$coefficients$texc_fitted)
     ## excursion sits below the baseline for a downward response
     expect_true(all(ann$yval < x$coefficients$A))
 })
