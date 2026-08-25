@@ -162,12 +162,14 @@ test_that("SSbiexponential() fixes A at a constant", {
     ) + rnorm(length(t), 0, 0.5)
     data <- data.frame(t, x)
 
-    model <- nls(
-        x ~ SSbiexponential(t, A = 0, B1, tau1, B2, tau2, tau_mult),
-        data = data,
-        algorithm = "port",
-        lower = c(-Inf, 0, -Inf, 0, 1),
-        control = nls.control(warnOnly = TRUE)
+    suppressWarnings(
+        model <- nls(
+            x ~ SSbiexponential(t, A = 0, B1, tau1, B2, tau2, tau_mult),
+            data = data,
+            algorithm = "port",
+            lower = c(-Inf, 0, -Inf, 0, 1),
+            control = nls.control(warnOnly = TRUE)
+        )
     )
 
     expect_named(coef(model), c("B1", "tau1", "B2", "tau2", "tau_mult"))
@@ -244,7 +246,7 @@ test_that("analyse_biexponential() returns correct structure", {
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
-        "interval", "nirs_channels", "time_channel", "A", "B1", "tau1",
+        "interval", "nirs_channels", "A", "B1", "tau1",
         "B2", "tau2", "tau_mult", "TD", "texc", "texc_fitted"
     ))
     expect_equal(nrow(result), 1L)

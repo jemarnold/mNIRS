@@ -344,7 +344,7 @@ fix = list(interval_1 = list(smo2 = list(A = 0)))  # per interval x channel
 | `warnings` | data frame | `type` = `"warning"`/`"error"` messages; empty if none. Captured regardless of `verbose` (suppresses console output only) |
 | `call` | call | matched function call |
 
-**Coefficients** (prefixed `interval`, `nirs_channels`, `time_channel`):
+**Coefficients** (prefixed `interval`, `nirs_channels`, `start_time`):
 
 Times are elapsed from `start_time`; `*_fitted` = predicted value at that point.
 

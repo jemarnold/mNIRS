@@ -212,8 +212,8 @@ test_that("analyse_response_time returns correct structure", {
     expect_s3_class(result, "data.frame")
     expect_equal(nrow(result), 2L)
     expect_named(result, c(
-        "interval", "nirs_channels", "time_channel",
-        "A", "B", "response_time", "response_value", "fitted", "idx"
+        "interval", "nirs_channels", "A", "B", "response_time", 
+        "response_value", "fitted", "idx"
     ))
 
     expect_type(result$nirs_channels, "character")

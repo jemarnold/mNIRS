@@ -828,8 +828,7 @@ test_that("analyse_logistic() returns correct structure", {
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
-        "interval", "nirs_channels", "time_channel",
-        "A", "B", "xmid", "slope", "xmid_fitted"
+        "interval", "nirs_channels", "A", "B", "xmid", "slope", "xmid_fitted"
     ))
     expect_equal(nrow(result), 1L)
 

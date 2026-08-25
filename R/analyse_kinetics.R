@@ -400,9 +400,10 @@
 #'       *elapsed from* `start_time`, so [predict][stats::predict] expects
 #'       `.t` in those units. The offset for each interval can be retrieved
 #'       from `interval_times$start_times`.}
-#'   \item{`coefficients`}{A [tibble][tibble::tibble-package] of coefficients
-#'       with one row per `nirs_channel` per interval, containing
-#'       method-specific parameters.}
+#'   \item{`coefficients`}{A data frame of coefficients with one row per
+#'       `nirs_channel` per interval, containing `interval`, `nirs_channels`,
+#'       the resolved `start_time` (the fit onset from which time coefficients
+#'       are elapsed), and method-specific parameters.}
 #'   \item{`data`}{A list of the original input data frames augmented with a
 #'       `*_fitted` column of fitted values for each processed `nirs_channel`.}
 #'   \item{`interval_times`}{A data frame with one row per interval and

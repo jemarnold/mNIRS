@@ -387,19 +387,16 @@ plot.mnirs_kinetics <- function(
                 )
             })
             ## baseline as a single point at the onset (start_time, A)
-            base_pts <- merge(
-                x$coefficients[c("interval", "nirs_channels", "A")],
-                x$interval_times[c("interval", "start_times")],
-                by = "interval",
-                sort = FALSE
-            )
+            base_pts <- x$coefficients[
+                c("interval", "nirs_channels", "start_time", "A")
+            ]
             if (!faceted) {
                 base_pts$interval <- NULL
             }
             p <- p +
                 key_point(
                     ggplot2::aes(
-                        x = .data$start_times,
+                        x = .data$start_time,
                         y = .data$A,
                         colour = .data$nirs_channels
                     ),
@@ -476,12 +473,7 @@ kinetics_annotations <- function(x) {
         return(ifelse(is.na(v), "", sprintf(f, fmt(v))))
     }
 
-    coefs <- merge(
-        x$coefficients,
-        x$interval_times[c("interval", "start_times")],
-        by = "interval",
-        sort = FALSE
-    )
+    coefs <- x$coefficients
 
     ## per-method: time offsets (x), fitted values (y), and label formatter.
     ## `offset`/`y` are parallel vectors of coefficient names; the first pair
@@ -562,7 +554,7 @@ kinetics_annotations <- function(x) {
         return(data.frame(
             interval = coefs$interval,
             nirs_channels = coefs$nirs_channels,
-            xval = coefs$start_times + coefs[[off]],
+            xval = coefs$start_time + coefs[[off]],
             yval = coefs[[y]],
             stringsAsFactors = FALSE
         ))

@@ -254,64 +254,57 @@ build_kinetics_results <- function(
     method,
     call
 ) {
-    ## bind channel-level attr dfs; each already carries `interval` col[1]
-    flatten_attr <- function(attr_name) {
-        df <- do.call(rbind, lapply(result_list, attr, attr_name))
+    ## bind channel-level attr dfs across intervals; each carries `interval`
+    ## col[1]. result dfs built without `warnings` fall back to zero rows
+    bind_attr <- function(attr_name) {
+        df <- do.call(rbind, lapply(result_list, attr, attr_name)) %||%
+            kinetics_warnings_df()
         rownames(df) <- NULL
         return(df)
     }
+    channel_args <- bind_attr("channel_args")
 
-    channel_args <- flatten_attr("channel_args")
-    diagnostics <- flatten_attr("diagnostics")
-    ## fallback keeps result dfs built without the attribute working
-    warnings <- do.call(rbind, lapply(result_list, attr, "warnings")) %||%
-        kinetics_warnings_df()
-    rownames(warnings) <- NULL
+    ## combine scalar coefficients; `interval` to col[1] and the resolved
+    ## fit onset `start_time` (rows align with `channel_args`) after
+    ## `nirs_channels`
+    coefs <- do.call(rbind, result_list)
+    coefs$start_time <- channel_args$start_time
+    lead_cols <- c("interval", "nirs_channels", "start_time")
+    coefs <- coefs[, c(lead_cols, setdiff(names(coefs), lead_cols))]
+    rownames(coefs) <- NULL
 
-    ## augment `data_list` dfs with `<nirs_channels>_fitted` columns
+    ## start_times: resolved fit onset (user value > interval_times metadata
+    ## > first time), uniform across channels within an interval;
+    ## end_times sourced from interval_times metadata when any is present
+    interval_times_df <- data.frame(
+        interval = names(data_list),
+        start_times = coefs$start_time[!duplicated(coefs$interval)]
+    )
+    end_times <- vapply(data_list, \(.df) {
+        unlist(attr(.df, "interval_times"))[2L] %||% NA_real_
+    }, numeric(1), USE.NAMES = FALSE)
+    if (!all(is.na(end_times))) {
+        interval_times_df$end_times <- end_times
+    }
+
+    ## augment `data_list` dfs with `<nirs_channels>_fitted` columns,
+    ## carrying the original metadata forward
     fitted_data_list <- Map(\(.df, .result) {
-        ## extract fitted columns from "fitted_data" per `nirs_channel`
         fitted_data <- attr(.result, "fitted_data")
         fitted_cols <- lapply(fitted_data, \(.pred) {
-            fitted_vec <- rep(NA_real_, nrow(.df))
-            fitted_vec[.pred$window_idx] <- .pred$fitted
-            fitted_vec
+            replace(rep(NA_real_, nrow(.df)), .pred$window_idx, .pred$fitted)
         })
         names(fitted_cols) <- paste0(names(fitted_data), "_fitted")
-        ## augment `<nirs_channels>_fitted` columns to df
-        augmented <- cbind(.df, as.data.frame(fitted_cols, check.names = FALSE))
-        
-        ## metadata ==================================================
         metadata <- attributes(.df)
         metadata$nirs_channels <- unique(.result$nirs_channels)
-        metadata$time_channel <- unique(.result$time_channel)
-        create_mnirs_data(augmented, metadata)
-    }, data_list, result_list)
-
-    ## start_times: the resolved fit onset (user value > interval_times
-    ## metadata > first time), uniform across channels within an interval
-    it_df <- data.frame(
-        interval = names(data_list),
-        start_times = vapply(result_list, \(.r) {
-            attr(.r, "channel_args")$start_time[[1L]]
-        }, numeric(1), USE.NAMES = FALSE)
-    )
-    ## end_times sourced from interval_times metadata when any is present
-    it_meta <- lapply(data_list, \(.df) {
-        it <- attr(.df, "interval_times")
-        if (is.null(it)) NA_real_ else unlist(it)
-    })
-    if (any(lengths(it_meta) >= 2L)) {
-        it_df$end_times <- vapply(
-            it_meta, `[`, numeric(1), 2L, USE.NAMES = FALSE
+        metadata$time_channel <- attr(.result, "time_channel")
+        create_mnirs_data(
+            cbind(.df, as.data.frame(fitted_cols, check.names = FALSE)),
+            metadata
         )
-    }
+    }, data_list, result_list)
     ## add `class = "mnirs"` for `plot.mnirs`
     class(fitted_data_list) <- c("mnirs", class(fitted_data_list))
-
-    ## extract per-interval model lists (named by nirs_channel)
-    model_list <- lapply(result_list, attr, "model")
-    names(model_list) <- names(data_list)
 
     ## normalise call: function name to generic, method to canonical form
     call[[1L]] <- quote(analyse_kinetics)
@@ -319,21 +312,19 @@ build_kinetics_results <- function(
         call$method <- method
     }
 
-    ## combine scalar coefficients & relocate interval col to col[1]
-    coefs <- do.call(rbind, result_list)
-    coefs <- coefs[, c("interval", setdiff(names(coefs), "interval"))]
-    rownames(coefs) <- NULL
-
     return(structure(
         list(
             method = method,
-            model = model_list,
+            model = setNames(
+                lapply(result_list, attr, "model"),
+                names(data_list)
+            ),
             coefficients = coefs,
             data = fitted_data_list,
-            interval_times = it_df,
-            diagnostics = diagnostics,
+            interval_times = interval_times_df,
+            diagnostics = bind_attr("diagnostics"),
             channel_args = channel_args,
-            warnings = warnings,
+            warnings = bind_attr("warnings"),
             call = call
         ),
         class = "mnirs_kinetics"
@@ -621,7 +612,7 @@ setup_kinetics_worker <- function(
 #'   [validate_kinetics_args()].
 #' @param fit_fn A function `(.nirs, x_fit, t_fit, .a, valid)`
 #'   returning a list with `coefs` (1-row data frame of method coefficients,
-#'   *without* `nirs_channels`/`time_channel`), `model`, `fitted_data`
+#'   *without* `interval`/`nirs_channels`), `model`, `fitted_data`
 #'   (`window_idx`/`fitted`), and `diag` (1-row data frame from
 #'   [compute_diagnostics()]). `t_fit` is always time elapsed from
 #'   `start_time`, so time coefficients need no further offset, and
@@ -633,11 +624,12 @@ setup_kinetics_worker <- function(
 #' @inheritParams validate_mnirs
 #'
 #' @returns A `data.frame` of coefficients (columns `interval`,
-#'   `nirs_channels`, `time_channel`, and method parameters), one row per
-#'   channel, with attributes `"model"` and `"fitted_data"` (named lists by
-#'   channel), `"diagnostics"` and `"channel_args"` (data frames, one row
-#'   per channel), and `"warnings"` (data frame of conditions captured
-#'   during fitting, regardless of `verbose`; zero rows when none fire).
+#'   `nirs_channels`, and method parameters), one row per channel, with
+#'   attributes `"time_channel"` (the resolved time column name), `"model"`
+#'   and `"fitted_data"` (named lists by channel), `"diagnostics"` and
+#'   `"channel_args"` (data frames, one row per channel), and `"warnings"`
+#'   (data frame of conditions captured during fitting, regardless of
+#'   `verbose`; zero rows when none fire).
 #'
 #' @keywords internal
 analyse_kinetics_channels <- function(
@@ -676,7 +668,7 @@ analyse_kinetics_channels <- function(
                 .nirs_active <<- .nirs
                 .a <- per_channel[[.nirs]]
 
-                ## filter for valid finite idx before first extreme + end_window;
+                ## filter valid finite idx before first extreme + end_window;
                 ## data columns and `end_window` are already validated upstream.
                 ## fit on time elapsed from onset so extreme detection and
                 ## end_window truncation ignore pre-onset baseline (t < 0)
@@ -697,7 +689,7 @@ analyse_kinetics_channels <- function(
                 fit <- fit_fn(.nirs, x_fit, t_fit, .a, valid)
 
                 ## serialise resolved args: NULL to NA, list() to its deparse(),
-                ## dropping internal-only args, so they fit a flat data frame row
+                ## dropping internal-only args, so they fit a flat df row
                 arg_row <- lapply(c(.a, extra_args), \(.x) {
                     if (is.null(.x)) {
                         NA
@@ -714,20 +706,22 @@ analyse_kinetics_channels <- function(
                 list(
                     coefficients = cbind(
                         data.frame(
-                            interval      = interval_name,
-                            nirs_channels = .nirs,
-                            time_channel  = time_channel
+                            interval = interval_name,
+                            nirs_channels = .nirs
                         ),
                         fit$coefs
                     ),
-                    model        = fit$model,
-                    fitted_data  = fit$fitted_data,
-                    diagnostics  = cbind(
-                        data.frame(interval = interval_name, nirs_channels = .nirs),
+                    model = fit$model,
+                    fitted_data = fit$fitted_data,
+                    diagnostics = cbind(
+                        data.frame(
+                            interval = interval_name,
+                            nirs_channels = .nirs
+                        ),
                         fit$diag
                     ),
                     channel_args = data.frame(
-                        interval      = interval_name,
+                        interval = interval_name,
                         nirs_channels = .nirs,
                         arg_row
                     )
@@ -738,16 +732,20 @@ analyse_kinetics_channels <- function(
             ## interval-level conditions from here on
             .nirs_active <- NA_character_
 
-            ## assemble single attributed df (consumed by build_kinetics_results)
+            ## assemble single attributed df (consumed build_kinetics_results)
             result <- structure(
                 do.call(rbind, lapply(fits, `[[`, "coefficients")),
+                time_channel = time_channel,
                 model = lapply(fits, `[[`, "model"),
                 fitted_data = lapply(fits, `[[`, "fitted_data"),
                 diagnostics = do.call(rbind, lapply(fits, `[[`, "diagnostics")),
-                channel_args = do.call(rbind, lapply(fits, `[[`, "channel_args"))
+                channel_args = do.call(
+                    rbind, lapply(fits, `[[`, "channel_args")
+                )
             )
 
-            ## warn when time coefficients are negative (response before start_time)
+            ## warn when time coefficients are negative
+            ## (response before start_time)
             # fmt: skip
             check_cols <- intersect(
             c("TD", "tau", "tau1", "tau2", "response_time", "peak_slope_time"),
@@ -865,7 +863,7 @@ validate_kinetics_args <- function(
 #' populated with `NA`/`NULL` values.
 #'
 #' @param na_coefs A template 1-row `data.frame` of `NA` method coefficients
-#'   (*without* `nirs_channels`/`time_channel`, which are added upstream),
+#'   (*without* `interval`/`nirs_channels`, which are added upstream),
 #'   or a character vector of their column names.
 #'
 #' @returns A named list with elements `coefs`, `model`, `fitted_data`,

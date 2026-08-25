@@ -118,9 +118,8 @@ test_that("analyse_exponential_drift() returns correct structure and recovers pa
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
-        "interval", "nirs_channels", "time_channel", "A", "B", "tau", "k",
-        "TD", "MRT", "HRT", "MRT_fitted", "HRT_fitted", "slope", "tau_mult",
-        "texc", "texc_fitted"
+        "interval", "nirs_channels", "A", "B", "tau", "k", "TD", "MRT", "HRT", 
+        "MRT_fitted", "HRT_fitted", "slope", "tau_mult", "texc", "texc_fitted"
     ))
     expect_equal(nrow(result), 1L)
 
@@ -202,9 +201,12 @@ test_that("analyse_exponential_drift() falls back and then fails on too few obse
     ## too few observations for either model
     custom_name <- create_expdrift_data(n = 3, noise_sd = 0.1)
     expect_warning(
-        result <- analyse_exponential_drift(custom_name, nirs_channels = "smo2"),
-        "fit failed for.*smo2.*custom_name"
-    )
+        result <- analyse_exponential_drift(custom_name, "smo2"),
+        "fit failed for.*smo2.*custom_name.*3 observations for 5 free"
+    ) |>
+        expect_warning(
+            "fit failed for.*smo2.*custom_name.*3 observations for 4 free"
+        )
     expect_true(all(is.na(result[c("A", "tau", "slope", "texc_fitted")])))
     expect_null(attr(result, "model")$smo2)
 })

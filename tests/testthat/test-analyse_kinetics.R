@@ -504,7 +504,7 @@ test_that("analyse_kinetics_channels combines channels correctly", {
     ## coefficient rows are combined, one per channel
     expect_equal(nrow(result), 2L)
     expect_equal(result$nirs_channels, channels)
-    expect_equal(result$time_channel, c("time", "time"))
+    expect_equal(attr(result, "time_channel"), "time")
 
     ## TODO model preserved as ...
     ## model preserved as named list
@@ -915,10 +915,10 @@ make_kinetics_results <- function(
     ## this df immitates output of analyse_peak_slope / analyse_monoexponential
     df <- data.frame(
         nirs_channels = rep(channels, 1L),
-        time_channel = "time",
         slope = seq_len(length(channels)) * 0.5,
         interval = interval
     )
+    attr(df, "time_channel") <- "time"
     attr(df, "fitted_data") <- setNames(
         lapply(channels, \(.ch) {
             data.frame(
@@ -1784,6 +1784,7 @@ test_that("analyse_kinetics.peak_slope respects global verbose option", {
             data,
             nirs_channels = "smo2_left",
             method = "peak_slope",
+            direction = "negative",
             width = 5,
             span = 1
         ),
@@ -1797,6 +1798,7 @@ test_that("analyse_kinetics.peak_slope respects global verbose option", {
             data,
             nirs_channels = "smo2_left",
             method = "peak_slope",
+            direction = "negative",
             width = 5,
             span = 1
         )
@@ -2330,20 +2332,6 @@ test_that("print.mnirs_kinetics always shows Model Coefficients label", {
             info = paste("method =", m)
         )
     }
-})
-
-test_that("print.mnirs_kinetics drops time_channel column from display", {
-    x <- make_print_kinetics(
-        data.frame(
-            interval = "int1",
-            nirs_channels = "smo2",
-            time_channel = "time",
-            slope = 1.5
-        )
-    )
-    output <- capture.output(print(x))
-    expect_false(any(grepl("time_channel", output)))
-    expect_true(any(grepl("slope", output)))
 })
 
 test_that("print.mnirs_kinetics drops 'fitted$' columns from display", {
