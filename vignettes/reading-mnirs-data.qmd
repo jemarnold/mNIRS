@@ -97,6 +97,8 @@ A few example data files are included in the *`mnirs`* package. File paths can b
 
     Optionally, a channel can be specified which indicates character *event* labels or integer *lap* values in the data table.\
 \
+For *Artinis Oxysoft* exports, which number their data table columns, channel names are read automatically from the file *Legend* metadata: named traces become `nirs_channels` (non-alphanumeric characters replaced with underscores, e.g. `Rx1_Tx1_O2Hb`), the *(Sample number)* column becomes `sample` (with a `time` column derived from the export sample rate), the *(Event)* column becomes `event`, and a trailing un-numbered event label column becomes `labels`. Explicit channel arguments override this detection.\
+\
 These channel names are used to detect the data table within the file, and must match exactly with text strings in the file on the same row. We can rename these channels when reading data by specifying a named character vector: 
 
 ```{r}

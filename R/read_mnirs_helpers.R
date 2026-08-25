@@ -78,7 +78,7 @@ read_file <- function(file_path, env = rlang::caller_env()) {
 #' @keywords internal
 device_patterns <- list(
     Artinis = list(
-        ## keep `time_channel = NULL` to force `detect_time_channel` message
+        ## channels resolved from the legend block by `parse_oxysoft_legend()`
         ## also requires matching "oxysoft" string
         time_channel = NULL,
         pattern = "^(\\d+ )+(\\d+|NA) ?$",
@@ -142,6 +142,79 @@ detect_mnirs_device <- function(data) {
 }
 
 
+#' Parse channel names from the Oxysoft "Legend" metadata block
+#'
+#' Legend rows above the numeric header row map column ids to trace names.
+#' Returns named channel mappings `c(new_name = "original_col")`, or `NULL`
+#' when the legend is missing or malformed.
+#' @param data A raw character data frame from `read_file()`.
+#' @param header_row Integer row index of the numeric data table header.
+#' @keywords internal
+parse_oxysoft_legend <- function(data, header_row) {
+    ## legend entries occupy the first two columns above the header row
+    col1 <- trimws(as.character(data[[1L]][seq_len(header_row - 1L)]))
+    legend_row <- which(col1 == "Legend")[1L]
+    if (is.na(legend_row) || legend_row + 1L > header_row - 1L) {
+        return(NULL)
+    }
+
+    ## entry rows: first consecutive run of integer ids after the legend row,
+    ## skipping the "Column / Trace (Measurement)" title row
+    ids <- suppressWarnings(as.integer(col1))
+    candidates <- seq(legend_row + 1L, header_row - 1L)
+    runs <- rle(!is.na(ids[candidates]))
+    run <- which(runs$values)[1L]
+    if (is.na(run)) {
+        return(NULL)
+    }
+    entry_rows <- candidates[
+        sum(runs$lengths[seq_len(run - 1L)]) + seq_len(runs$lengths[run])
+    ]
+
+    cols <- as.character(ids[entry_rows])
+    traces <- trimws(as.character(data[[2L]][entry_rows]))
+
+    ## legend must be complete and its ids present in the header row
+    header_cells <- trimws(as.character(data[header_row, ]))
+    if (any(is_empty(traces)) || !all(cols %in% header_cells)) {
+        return(NULL)
+    }
+
+    ## build mapping, NULL when no ids match
+    named_map <- \(.ids, .names) {
+        if (length(.ids) == 0L) {
+            return(NULL)
+        }
+        return(setNames(.ids, rep_len(.names, length(.ids))))
+    }
+
+    ## classify traces: parenthesised entries are metadata columns
+    paren <- grepl("^\\(.*\\)$", traces)
+    time_id <- cols[traces == "(Sample number)"]
+    event_id <- cols[traces == "(Event)"]
+    extra <- paren & !cols %in% c(time_id, event_id)
+
+    ## unnumbered trailing columns hold event label text; blank header cells
+    ## become `col_<idx>` downstream via `rename_duplicates()`
+    label_idx <- which(
+        is_empty(header_cells) & seq_along(header_cells) > max(ids[entry_rows])
+    )
+
+    return(list(
+        time_channel = named_map(time_id, "sample"),
+        nirs_channels = named_map(
+            cols[!paren],
+            sanitise_channel_names(traces[!paren])
+        ),
+        event_channel = named_map(event_id, "event"),
+        extra_channels = c(
+            named_map(cols[extra], sanitise_channel_names(traces[extra])),
+            named_map(paste0("col_", label_idx, recycle0 = TRUE), "labels")
+        )
+    ))
+}
+
+
 #' Detect known channels for a device
 #' @inheritParams validate_mnirs
 #' @keywords internal
@@ -151,29 +224,67 @@ detect_device_channels <- function(
     nirs_device = NULL,
     nirs_channels = NULL,
     time_channel = NULL,
+    event_channel = NULL,
     keep_all = FALSE,
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
+    ## artinis oxysoft: resolve channel names from the legend metadata block
+    if (identical(nirs_device, "Artinis")) {
+        legend <- parse_oxysoft_legend(data, header_row) %||%
+            list(time_channel = c(sample = "1"))
+
+        ## drop auto entries for columns the user has already claimed
+        user_cols <- as.character(c(nirs_channels, time_channel, event_channel))
+        legend <- lapply(legend, \(.x) {
+            .x <- .x[!.x %in% user_cols]
+            if (length(.x) > 0L) .x
+        })
+
+        ch_list <- list(
+            ## user-specified channels always take priority
+            time_channel = time_channel %||% legend$time_channel,
+            nirs_channels = nirs_channels %||% legend$nirs_channels,
+            event_channel = event_channel %||% legend$event_channel,
+            extra_channels = legend$extra_channels,
+            ## return all cols to view potential channels when auto-detected
+            keep_all = if (is.null(nirs_channels)) TRUE else keep_all
+        )
+
+        if (is.null(ch_list$nirs_channels)) {
+            cli_abort(c(
+                "x" = "{.arg nirs_channels} cannot be determined automatically.",
+                "i" = "Define {.arg nirs_channels} explicitly."
+            ), call = env)
+        }
+
+        if (verbose && is.null(nirs_channels)) {
+            cli_inform(c(
+                "!" = "{.val Artinis} Oxysoft file format detected. \\
+                {.arg nirs_channels} set to \\
+                {.field {names(ch_list$nirs_channels)}}.",
+                "i" = "Override by specifying {.arg nirs_channels} explicitly."
+            ), call = env)
+        }
+
+        return(ch_list)
+    }
+
     ## user-specified channels always take priority
     if (!is.null(nirs_channels)) {
         return(list(
             ## if `time_channel = NULL` defined at `detect_time_channel`
             time_channel = time_channel,
             nirs_channels = nirs_channels,
+            event_channel = event_channel,
+            extra_channels = NULL,
             keep_all = keep_all
         ))
     }
 
     ## scan header row for cols starting with "SmO2" ignore case, ignore NA
     header <- Filter(Negate(is_empty), as.character(data[header_row, ]))
-
-    nirs_channels <- if (identical(nirs_device, "Artinis")) {
-        ## Artinis Oxysoft exports use numeric channel ids, not "SmO2"
-        header[startsWith(header, "2")]
-    } else {
-        header[startsWith(toupper(header), "SMO2")]
-    }
+    nirs_channels <- header[startsWith(toupper(header), "SMO2")]
 
     ## drop redundant unfiltered Train.Red, and Averaged Moxy channels
     nirs_channels <- nirs_channels[
@@ -195,6 +306,8 @@ detect_device_channels <- function(
         time_channel = time_channel %||%
             device_patterns[[nirs_device]]$time_channel,
         nirs_channels = nirs_channels,
+        event_channel = event_channel,
+        extra_channels = NULL,
         keep_all = TRUE ## return all cols to view potential nirs_channels
     )
 
@@ -291,23 +404,11 @@ extract_start_timestamp <- function(file_header) {
 detect_time_channel <- function(
     data,
     time_channel = NULL,
-    nirs_device = NULL,
     verbose = TRUE,
     env = rlang::caller_env()
 ) {
     if (!is.null(time_channel)) {
         return(time_channel)
-    }
-
-    ## return default sample column for Artinis Oxysoft
-    ## when `nirs_channels` defined but `time_channel = NULL`
-    if (!is.null(nirs_device) && nirs_device == "Artinis") {
-        if (verbose) {
-            cli_inform(c(
-                "!" = "Oxysoft {.val sample} column detected."
-            ), call = env)
-        }
-        return(c(sample = "1"))
     }
 
     col_names <- names(data)
@@ -355,6 +456,15 @@ is_empty <- function(x) {
 }
 
 
+#' Sanitise legend trace names to syntactic column names
+#' @keywords internal
+sanitise_channel_names <- function(x) {
+    ## collapse non-alphanumeric runs to "_", trim edges
+    x <- gsub("[^[:alnum:]]+", "_", x)
+    return(gsub("^_+|_+$", "", x))
+}
+
+
 #' Rename duplicate strings in a vector with `make.unique()`
 #' @keywords internal
 rename_duplicates <- function(x) {
@@ -382,6 +492,8 @@ name_channels <- function(x) {
 
 #' Select data table columns and rename from channels, handling duplicates
 #' @inheritParams validate_mnirs
+#' @param extra_channels Optional named mappings for non-channel columns
+#'   (e.g. Oxysoft `labels`), renamed and kept but not stored as metadata.
 #' @keywords internal
 select_rename_data <- function(
     data,
@@ -390,13 +502,15 @@ select_rename_data <- function(
     event_channel = NULL,
     keep_all = FALSE,
     verbose = TRUE,
+    extra_channels = NULL,
     env = rlang::caller_env()
 ) {
     ## ensure all channel inputs are named (name = original_col_name)
     ch_list <- list(
         time_channel = time_channel,
         event_channel = event_channel,
-        nirs_channels = nirs_channels
+        nirs_channels = nirs_channels,
+        extra_channels = extra_channels
     ) |>
         lapply(\(.x) if (is.null(.x)) .x else name_channels(.x))
 

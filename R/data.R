@@ -143,10 +143,11 @@ NULL
 #'     \item{Column 5}{Unmarked event label (character).}
 #'   }
 #'
-#'   Channel mapping for [read_mnirs()]:
+#'   Channels are detected automatically from the file legend, or can be
+#'   specified explicitly for [read_mnirs()]:
 #'   - `nirs_channels = c(O2Hb = 2, HHb = 3)`
 #'   - `time_channel = c(sample = 1)`
-#'   - `event_channel = c(event = 4, label = "col_5")`
+#'   - `event_channel = c(event = 4, label = )`
 #'   - `interval_times = list(start = c(158, 999, 1750) end = c(493, 1333, 1961))` two intervals and post-exercise occlusion
 #'
 #' @source Artinis Medical Systems. Oxymon MKIII, exported via Oxysoft desktop
@@ -182,7 +183,9 @@ NULL
 #'     \item{Column 6}{Unmarked event label (character).}
 #'   }
 #'
-#'   Channel mapping for [read_mnirs()]:
+#'   Channels are detected automatically from the file legend (the unmarked
+#'   label column is named `"labels"`), or can be specified explicitly for
+#'   [read_mnirs()]:
 #'   - `nirs_channels = c(THb = 2, HHb = 3, O2Hb = 4)`
 #'   - `time_channel = c(sample = 1)`
 #'   - `event_channel = c(event = 5, label = "col_6")`

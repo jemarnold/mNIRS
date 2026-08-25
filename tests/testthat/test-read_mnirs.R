@@ -357,24 +357,63 @@ test_that("detect_device_channels() matches SmO2 case-insensitively", {
     expect_equal(result$nirs_channels, c("smo2 raw", "SMO2_LIVE"))
 })
 
-test_that("detect_device_channels() returns '2' for Artinis without scanning", {
-    ## Artinis uses numeric channel id — no SmO2 column needed in data
+test_that("detect_device_channels() parses Artinis legend block", {
+    ## Artinis names channels in the legend block, not the header row
+    data <- data.frame(
+        V1 = c("OxySoft export of", "Legend", "Column", "1", "2", "3", "4", NA, "1"),
+        V2 = c(NA, NA, "Trace (Measurement)", "(Sample number)",
+               "VL O2Hb", "VL HHb", "(Event)", NA, "2"),
+        V3 = c(rep(NA, 8), "3"),
+        V4 = c(rep(NA, 8), "4"),
+        V5 = NA_character_,
+        stringsAsFactors = FALSE
+    )
+
+    result <- detect_device_channels(
+        data,
+        header_row = 9L,
+        nirs_device = "Artinis",
+        nirs_channels = NULL,
+        verbose = FALSE
+    )
+
+    expect_equal(result$nirs_channels, c(VL_O2Hb = "2", VL_HHb = "3"))
+    expect_equal(result$time_channel, c(sample = "1"))
+    expect_equal(result$event_channel, c(event = "4"))
+    ## unnumbered trailing column mapped to "labels"
+    expect_equal(result$extra_channels, c(labels = "col_5"))
+    expect_true(result$keep_all)
+})
+
+test_that("detect_device_channels() Artinis falls back without legend", {
     data <- data.frame(
         V1 = c("1", "2", "3"),
         V2 = c("4", "5", "6"),
         stringsAsFactors = FALSE
     )
 
+    ## no legend: time defaults to sample = "1", nirs cannot be resolved
+    expect_error(
+        detect_device_channels(
+            data,
+            header_row = 2L,
+            nirs_device = "Artinis",
+            nirs_channels = NULL,
+            verbose = FALSE
+        ),
+        "cannot be determined"
+    )
+
     result <- detect_device_channels(
         data,
         header_row = 2L,
         nirs_device = "Artinis",
-        nirs_channels = NULL,
+        nirs_channels = c(O2Hb = "2"),
         verbose = FALSE
     )
 
-    expect_equal(result$nirs_channels, "2")
-    expect_null(result$time_channel)
+    expect_equal(result$nirs_channels, c(O2Hb = "2"))
+    expect_equal(result$time_channel, c(sample = "1"))
 })
 
 test_that("detect_device_channels() detects SmO2 for unknown device", {
@@ -539,6 +578,82 @@ test_that("detect_device_channels() returns appropriate keep_all", {
     )
 
     expect_false(result$keep_all)
+})
+
+
+## parse_oxysoft_legend() ==============================================
+test_that("sanitise_channel_names() collapses non-alphanumerics", {
+    expect_equal(sanitise_channel_names("VL O2Hb"), "VL_O2Hb")
+    expect_equal(sanitise_channel_names("Rx1 - Tx1 tHb"), "Rx1_Tx1_tHb")
+    expect_equal(sanitise_channel_names("(TSI)"), "TSI")
+    expect_equal(sanitise_channel_names("  a  b  "), "a_b")
+    expect_equal(sanitise_channel_names("***"), "")
+})
+
+test_that("parse_oxysoft_legend() parses full legend with labels column", {
+    data <- data.frame(
+        V1 = c("Legend", "Column", "1", "2", "3", "4", "5", NA, "1"),
+        V2 = c(NA, "Trace (Measurement)", "(Sample number)", "Rx1 - Tx1 tHb",
+               "Rx1 - Tx1 O2Hb", "(TSI)", "(Event)", NA, "2"),
+        V3 = c(rep(NA, 8), "3"),
+        V4 = c(rep(NA, 8), "4"),
+        V5 = c(rep(NA, 8), "5"),
+        V6 = NA_character_,
+        stringsAsFactors = FALSE
+    )
+
+    result <- parse_oxysoft_legend(data, header_row = 9L)
+
+    expect_equal(result$time_channel, c(sample = "1"))
+    expect_equal(
+        result$nirs_channels,
+        c(Rx1_Tx1_tHb = "2", Rx1_Tx1_O2Hb = "3")
+    )
+    expect_equal(result$event_channel, c(event = "5"))
+    ## unknown parenthesised trace kept, unnumbered trailing col -> labels
+    expect_equal(result$extra_channels, c(TSI = "4", labels = "col_6"))
+})
+
+test_that("parse_oxysoft_legend() omits labels without trailing column", {
+    data <- data.frame(
+        V1 = c("Legend", "Column", "1", "2", "3", NA, "1"),
+        V2 = c(NA, "Trace (Measurement)", "(Sample number)", "O2Hb",
+               "(Event)", NA, "2"),
+        V3 = c(rep(NA, 6), "3"),
+        stringsAsFactors = FALSE
+    )
+
+    result <- parse_oxysoft_legend(data, header_row = 7L)
+
+    expect_equal(result$nirs_channels, c(O2Hb = "2"))
+    expect_equal(result$event_channel, c(event = "3"))
+    expect_null(result$extra_channels)
+})
+
+test_that("parse_oxysoft_legend() returns NULL when legend missing or malformed", {
+    ## no legend row
+    data <- data.frame(
+        V1 = c("meta", "1"),
+        V2 = c("meta", "2"),
+        stringsAsFactors = FALSE
+    )
+    expect_null(parse_oxysoft_legend(data, header_row = 2L))
+
+    ## empty trace name
+    data <- data.frame(
+        V1 = c("Legend", "Column", "1", "2", "1"),
+        V2 = c(NA, "Trace (Measurement)", "(Sample number)", NA, "2"),
+        stringsAsFactors = FALSE
+    )
+    expect_null(parse_oxysoft_legend(data, header_row = 5L))
+
+    ## legend ids not present in the header row
+    data <- data.frame(
+        V1 = c("Legend", "Column", "1", "2", "A"),
+        V2 = c(NA, "Trace (Measurement)", "(Sample number)", "O2Hb", "B"),
+        stringsAsFactors = FALSE
+    )
+    expect_null(parse_oxysoft_legend(data, header_row = 5L))
 })
 
 
@@ -1636,7 +1751,6 @@ test_that("parse_time_channel() returns local time zonel", {
         time_channel <- detect_time_channel(
             data,
             time_channel,
-            nirs_device,
             verbose = FALSE
         )
 
@@ -1729,7 +1843,8 @@ test_that("parse_sample_rate handles Artinis device", {
     expect_equal(result$sample_rate, 10)
     expect_true("time" %in% names(result$data))
     expect_equal(result$time_channel, "time")
-    expect_equal(ncol(result$data), 4)
+    ## includes auto-detected "event" column from the legend
+    expect_equal(ncol(result$data), 5)
     expect_equal(result$data$time, data$sample / 10)
 })
 
@@ -1944,13 +2059,14 @@ test_that("read_mnirs auto-detects Artinis channels when nirs_channels = NULL", 
         ),
         "Artinis.*detected"
     ) |>
-        expect_message("Oxysoft.*sample.*column") |> 
         expect_message("Oxysoft.*sample_rate.*10")
 
     expect_s3_class(df, "mnirs")
     expect_equal(attr(df, "nirs_device"), "Artinis")
-    expect_equal(attr(df, "nirs_channels"), "2")
+    expect_equal(attr(df, "nirs_channels"), c("VL_O2Hb", "VL_HHb"))
     expect_equal(attr(df, "time_channel"), "time")
+    expect_equal(attr(df, "event_channel"), "event")
+    expect_true(all(c("sample", "time", "VL_O2Hb", "VL_HHb", "event") %in% names(df)))
 })
 
 test_that("read_mnirs keep_all = FALSE returns only specified columns by default", {
@@ -2341,9 +2457,11 @@ test_that("read_mnirs oxysoft works", {
 
     expect_s3_class(df, "mnirs")
     expect_s3_class(df, "data.frame")
+    ## "event" auto-detected from the legend
     expect_true(all(
-        c("time", "HHb", "O2Hb") %in% names(df)
+        c("time", "HHb", "O2Hb", "event") %in% names(df)
     ))
+    expect_equal(attr(df, "event_channel"), "event")
     expect_equal(class(df$time), "numeric")
     expect_gte(df$time[1], 0)
     expect_equal(df$sample[1:10] / 10, df$time[1:10])
@@ -2384,7 +2502,7 @@ test_that("read_mnirs Oxysoft Portamon works", {
         c("sample", "time", "event", "thb", "hhb", "o2hb") %in% names(df)
     ))
 
-    ## auto detect channels
+    ## auto detect channels from the legend
     df2 <- read_mnirs(
         file_path,
         nirs_channels = NULL,
@@ -2393,8 +2511,15 @@ test_that("read_mnirs Oxysoft Portamon works", {
     )
 
     expect_true(all(
-        c("sample", "time", "2", "3", "4", "5", "col_6") %in% names(df2)
+        c("sample", "time", "Rx1_Tx1_tHb", "Rx1_Tx1_HHb", "Rx1_Tx1_O2Hb",
+          "event", "labels") %in% names(df2)
     ))
+    expect_equal(
+        attr(df2, "nirs_channels"),
+        c("Rx1_Tx1_tHb", "Rx1_Tx1_HHb", "Rx1_Tx1_O2Hb")
+    )
+    expect_equal(attr(df2, "event_channel"), "event")
+    expect_true("Occlusion" %in% df2$labels)
 
     for (d in list(df, df2)) {
         expect_s3_class(d, "mnirs")
@@ -2454,9 +2579,8 @@ test_that("read_mnirs Oxysoft edge case channel names", {
             time_channel = NULL,
             verbose = TRUE
         ),
-        "Oxysoft.*sample"
-    ) |>
-        expect_message("Oxysoft.*sample_rate.*10")
+        "Oxysoft.*sample_rate.*10"
+    )
 
     ## detected as "sample" then updated to "time" automatically
     expect_equal(attr(df, "time_channel"), "time")

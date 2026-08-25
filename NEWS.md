@@ -1,5 +1,7 @@
 # mnirs 0.7.2
 
+* `read_mnirs()` now reads channel names automatically from the *Legend* metadata block of *Artinis Oxysoft* exports. Named traces are set as `nirs_channels` (non-alphanumeric characters replaced with underscores, e.g. *"Rx1_Tx1_O2Hb"*), *"(Sample number)"* becomes *"sample"* with a derived *"time"* column, *"(Event)"* becomes *"event"* and is set as `event_channel`, and the trailing un-numbered event label column becomes *"labels"* (previously e.g. *"col_6"*, which had to be identified manually). Explicit channel arguments override the automatic detection.
+
 * `extract_intervals()` now accepts a list of multiple `start` and/or `end` values with mixed `by_time()`, `by_label()`, `by_lap()`, or `by_sample()`. Intervals are matched by user-specified order.
 
 ``` r

@@ -63,8 +63,24 @@
 #'   appear and renamed with unique strings.
 #' - Columns without a header name in the source file will be renamed to
 #'   `col_*`, where `*` is the numeric column number in which they appear in
-#'   the file (e.g. `col_6`). This applies to *Artinis Oxysoft* event label
-#'   columns, which do not have a column header and must be identified manually.
+#'   the file (e.g. `col_6`).
+#'
+#' ## Artinis Oxysoft exports
+#' *Artinis Oxysoft* exports number their data table columns and record channel
+#' names in a "Legend" metadata block, which `read_mnirs()` parses to name
+#' columns automatically:
+#'
+#' - Trace names become column names, with non-alphanumeric characters
+#'   replaced by underscores (e.g. `"Rx1 - Tx1 O2Hb"` becomes `Rx1_Tx1_O2Hb`).
+#'   All named traces are set as `nirs_channels`.
+#' - The `"(Sample number)"` column is renamed `sample`, and a `time` column
+#'   in seconds is derived from the export sample rate (see *Time parsing*).
+#' - The `"(Event)"` column is renamed `event` and set as `event_channel`.
+#' - A trailing un-numbered column containing event label text is renamed
+#'   `labels`, or dropped when empty.
+#'
+#' Explicit `nirs_channels`, `time_channel`, and `event_channel` arguments
+#' override the automatic detection.
 #'
 #' ## Renaming channels
 #' A named character vector can be specified to rename `nirs_channels`,
@@ -148,11 +164,14 @@ read_mnirs <- function(
         nirs_device,
         nirs_channels,
         time_channel,
+        event_channel,
         keep_all,
         verbose
     )
     nirs_channels <- channels$nirs_channels
     time_channel <- channels$time_channel
+    event_channel <- channels$event_channel
+    extra_channels <- channels$extra_channels
     keep_all <- channels$keep_all ## TRUE when `nirs_channels` unspecified
 
     ## extract the data_table, and name by header row
@@ -164,7 +183,6 @@ read_mnirs <- function(
     time_channel <- detect_time_channel(
         data,
         time_channel,
-        nirs_device,
         verbose
     )
 
@@ -176,7 +194,8 @@ read_mnirs <- function(
         time_channel,
         event_channel,
         keep_all,
-        verbose
+        verbose,
+        extra_channels
     )
     data <- renamed_list$data
     nirs_renamed <- renamed_list$nirs_channel
@@ -185,6 +204,11 @@ read_mnirs <- function(
 
     ## remove empty (NA) columns and rows
     data <- remove_empty_rows_cols(data)
+    ## drop dangling metadata if an empty auto-detected event col was removed
+    event_renamed <- intersect(event_renamed, names(data))
+    if (length(event_renamed) == 0L) {
+        event_renamed <- NULL
+    }
     ## convert char decimal "," to "." and convert column types
     data <- convert_type(
         data,
