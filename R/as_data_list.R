@@ -19,7 +19,7 @@ as_data_list <- function(data, env = rlang::caller_env()) {
                 "i" = "Check the object returned from {.fn analyse_kinetics}."
             ), call = env)
         }
-        chan <- factor(coefs$nirs_channels, levels = unique(coefs$nirs_channels))
+        chan <- factor(coefs$nirs_channels, unique(coefs$nirs_channels))
         return(lapply(split(coefs, chan), `rownames<-`, NULL))
     }
 

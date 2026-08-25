@@ -30,6 +30,26 @@ method_aliases <- c(
     xmid = "sigmoidal"
 )
 
+
+## canonical method -> method-specific worker arg names.
+kinetics_dispatch <- list(
+    common = c("start_time", "direction", "end_window"),
+    response_time = c("fraction"),
+    peak_slope = c("width", "span", "align", "partial", "na.rm"),
+    monoexponential = c("use_TD", "fix"),
+    biexponential = c("use_TD", "tau_mult", "fix"),
+    exponential_drift = c("use_TD", "tau_mult", "fix"),
+    sigmoidal = c("shape", "fix")
+)
+
+
+## coefficients reported as time points elapsed from `start_time`
+# fmt: skip
+kinetics_time_coefs <- c(
+    "response_time", "peak_slope_time", "TD", "MRT", "HRT", "texc", "xmid"
+)
+
+
 #' Detect the direction of a response signal
 #'
 #' Resolves whether a signal responds upward (`"positive"`) or downward
@@ -453,18 +473,33 @@ analyse_kinetics_intervals <- function(
     ## normalise input to named list of data frames
     data_list <- as_data_list(data, env = env)
 
+    ## recursive coef input: time-point coefs are elapsed from each interval's
+    ## onset, so shift the chosen `time_channel` to absolute time
+    if (inherits(data, "mnirs_kinetics")) {
+        tc <- validate_time_channel(time_quo, data_list[[1L]], env = env)
+        if (tc %in% kinetics_time_coefs) {
+            data_list <- lapply(data_list, \(.df) {
+                .df[[tc]] <- .df[[tc]] + .df$start_time
+                .df
+            })
+            if (verbose) {
+                cli_inform(c(
+                    "i" = "{.arg time_channel} = {.val {tc}} converted to \\
+                    absolute time from {.field start_time}."
+                ), call = env)
+            }
+        }
+    }
+
     ## resolve channel names for interval-map classification only; genuine
     ## channel errors surface later in the worker with proper context
     chan_names <- tryCatch(
         validate_nirs_channels(nirs_quo, data_list[[1L]], env),
         error = \(e) character()
     )
+    # fmt: skip
     interval_args <- resolve_interval_args(
-        worker_args,
-        names(data_list),
-        chan_names,
-        verbose,
-        env
+        worker_args, names(data_list), chan_names, verbose, env
     )
 
     ## iterate over each interval
@@ -484,18 +519,6 @@ analyse_kinetics_intervals <- function(
     ## collate and return mnirs_kinetics object
     return(build_kinetics_results(data_list, result_list, method, call))
 }
-
-
-## canonical method -> method-specific worker arg names.
-kinetics_dispatch <- list(
-    common = c("start_time", "direction", "end_window"),
-    response_time = c("fraction"),
-    peak_slope = c("width", "span", "align", "partial", "na.rm"),
-    monoexponential = c("use_TD", "fix"),
-    biexponential = c("use_TD", "tau_mult", "fix"),
-    exponential_drift = c("use_TD", "tau_mult", "fix"),
-    sigmoidal = c("shape", "fix")
-)
 
 
 #' Shared validation prologue for `analyse_<method>()` workers

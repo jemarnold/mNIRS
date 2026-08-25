@@ -5,7 +5,9 @@
 #' and non-parametric methods.
 #'
 #' @param data A data frame, a list of data frames, or a grouped data frame of
-#'   class *"mnirs"* containing time series data and metadata (see *Details*).
+#'   class *"mnirs"* containing time series data and metadata, or an
+#'   *"mnirs_kinetics"* result for recursive analysis of its coefficients
+#'   (see *Details*).
 #' @param method A character string specifying the kinetics analysis method.
 #'   Additional arguments must be specified for each method. See *Details*.
 #'   \describe{
@@ -97,6 +99,9 @@
 #' - A **grouped *"mnirs"* data frame**, e.g. with `dplyr::group_by()`: the
 #'   data frame is split by grouping levels and each group is processed as a
 #'   separate interval.
+#' - An ***"mnirs_kinetics"* result**: `coefficients` are split by channel
+#'   into one data frame per channel, with a row per interval (see
+#'   *Recursive analysis*).
 #'
 #' Specified `nirs_channels` (or channels retrieved from *"mnirs"* metadata)
 #' will be analysed and results returned as a formatted table.
@@ -387,6 +392,20 @@
 #'
 #' Parameters may be held constant with `fix`, e.g. `fix = list(A = 0)`, as
 #' above.
+#'
+#' ## Recursive analysis
+#'
+#' An *"mnirs_kinetics"* result may be passed back as `data` to analyse how
+#' coefficients change across intervals, e.g.
+#' `analyse_kinetics(result, nirs_channels = tau, time_channel = start_time,
+#' method = "peak_slope")`. `nirs_channels` and `time_channel` must name
+#' coefficient columns explicitly; no metadata defaults are applied.
+#'
+#' Time-point coefficients (`response_time`, `peak_slope_time`, `TD`, `MRT`,
+#' `HRT`, `texc`, `xmid`) are elapsed from each interval's `start_time`. When
+#' one of these is given as `time_channel`, `start_time` is added row-wise so
+#' the analysis runs on absolute time. `start_time` itself and duration
+#' coefficients (e.g. `tau`) are unchanged.
 #'
 #' @returns A formatted table of results, with individual elements accessible
 #'   as a structured list of class *"mnirs_kinetics"* containing:

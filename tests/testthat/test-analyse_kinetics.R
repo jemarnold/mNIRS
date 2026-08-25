@@ -1398,6 +1398,45 @@ test_that("analyse_kinetics works with data formats", {
 })
 
 
+test_that("analyse_kinetics offsets time-point coefs by start_time recursively", {
+    coefs <- data.frame(
+        interval = c("a", "b", "c", "d"),
+        nirs_channels = "ch1",
+        start_time = c(0, 100, 200, 300),
+        TD = c(5, 6, 7, 8),
+        tau = c(10, 12, 11, 13)
+    )
+    kinetics <- structure(list(coefficients = coefs), class = "mnirs_kinetics")
+    recurse <- function(nirs, time, verbose = FALSE) {
+        rlang::inject(analyse_kinetics(
+            kinetics,
+            nirs_channels = !!nirs,
+            time_channel = !!time,
+            method = "peak_slope",
+            width = 2,
+            verbose = verbose
+        ))
+    }
+
+    ## time-point coef as time_channel: shifted to absolute time in `data`
+    result <- recurse("tau", "TD")
+    expect_equal(result$data$ch1$TD, coefs$TD + coefs$start_time)
+    expect_equal(result$data$ch1$tau, coefs$tau)
+
+    ## `start_time` itself and duration coefs are used unchanged
+    result <- recurse("tau", "start_time")
+    expect_equal(result$data$ch1$start_time, coefs$start_time)
+    expect_equal(result$data$ch1$TD, coefs$TD)
+
+    result <- recurse("TD", "tau")
+    expect_equal(result$data$ch1$tau, coefs$tau)
+    expect_equal(result$data$ch1$TD, coefs$TD)
+
+    ## inform message fires
+    expect_message(recurse("tau", "TD", verbose = TRUE), "absolute time")
+})
+
+
 test_that("analyse_kinetics errors on invalid method", {
     data <- create_kinetics_data()
 
