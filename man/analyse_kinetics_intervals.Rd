@@ -11,6 +11,8 @@ analyse_kinetics_intervals(
   worker_args,
   nirs_quo,
   time_quo,
+  group_intervals,
+  zero_time,
   verbose,
   call,
   env
@@ -30,6 +32,13 @@ to \code{worker}.}
 \item{nirs_quo, time_quo}{Quosures of the caller's \code{nirs_channels}
 and \code{time_channel} arguments, captured in the method frame.}
 
+\item{group_intervals}{\code{"ensemble"} or a \code{list()} of sample index
+vectors; see \code{\link[=split_kinetics_groups]{split_kinetics_groups()}}.}
+
+\item{zero_time}{Logical; if \code{TRUE}, rebases each interval's
+\code{time_channel} to start from zero, shifting \code{interval_times} metadata
+by the same offset.}
+
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
 global default can be set via \code{options(mnirs.verbose = FALSE)}.}
@@ -44,8 +53,8 @@ An \emph{"mnirs_kinetics"} object from
 }
 \description{
 Shared skeleton for \verb{analyse_kinetics.*} methods: normalises \code{data}
-to a named list of interval data frames, calls the method worker
-once per interval, and collates results via
-\code{\link[=build_kinetics_results]{build_kinetics_results()}}.
+to a named list of interval data frames, splits sample groups via
+\code{\link[=split_kinetics_groups]{split_kinetics_groups()}}, calls the method worker once per interval,
+and collates results via \code{\link[=build_kinetics_results]{build_kinetics_results()}}.
 }
 \keyword{internal}

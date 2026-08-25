@@ -15,6 +15,9 @@ errors and warnings as coming from the user-facing function rather
 than the validator.}
 }
 \description{
-Coerce \code{data} input to a named list of data frames
+Accepts a single or grouped data frame, a list of data frames, or an
+\emph{"mnirs_kinetics"} object, whose \code{coefficients} are split by
+\code{nirs_channels} into one data frame per channel (a row per interval) for
+recursive analysis of coefficients.
 }
 \keyword{internal}

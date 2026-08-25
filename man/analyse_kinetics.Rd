@@ -20,6 +20,8 @@ analyse_kinetics(
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
+  group_intervals = "ensemble",
+  zero_time = FALSE,
   verbose = TRUE,
   ...,
   fraction = 0.5,
@@ -43,13 +45,17 @@ analyze_kinetics(
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
+  group_intervals = "ensemble",
+  zero_time = FALSE,
   verbose = TRUE,
   ...
 )
 }
 \arguments{
 \item{data}{A data frame, a list of data frames, or a grouped data frame of
-class \emph{"mnirs"} containing time series data and metadata (see \emph{Details}).}
+class \emph{"mnirs"} containing time series data and metadata, or an
+\emph{"mnirs_kinetics"} result for recursive analysis of its coefficients
+(see \emph{Details}).}
 
 \item{nirs_channels}{A character vector giving the names of mNIRS columns to
 operate on. Must match column names in \code{data} exactly.
@@ -99,6 +105,19 @@ window in which to look for the end of the kinetics fit; returns the
 window with no greater/lesser values within \code{end_window} after the first
 extreme value. \code{end_window = Inf} (\emph{default}) returns the global extreme
 from the full sample range (see \emph{Details}).}
+
+\item{group_intervals}{Either \code{"ensemble"} (\emph{default}) to analyse all
+samples of each data frame together, or a non-empty \code{list()} of
+integer-valued numeric vectors of sample (row) numbers, each analysed as
+a separate interval, e.g. \code{list(trial1 = 1:12, trial2 = 13:24)}. List
+names become interval names (\verb{interval_<n>} when unnamed). Indices must
+be between \code{1} and the number of rows (see \emph{Details}).}
+
+\item{zero_time}{Logical. Default is \code{FALSE}. If \code{TRUE}, re-calculates
+numeric \code{time_channel} values to start from zero within each interval,
+i.e. each data frame or each \code{group_intervals} sample group. Any
+\code{interval_times} metadata is shifted by the same offset so \code{start_time}
+retrieved from metadata stays aligned.}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
@@ -178,9 +197,10 @@ For \code{"response_time"}; \code{NULL}. Models are fitted on time
 \emph{elapsed from} \code{start_time}, so \link[stats:predict]{predict} expects
 \code{.t} in those units. The offset for each interval can be retrieved
 from \code{interval_times$start_times}.}
-\item{\code{coefficients}}{A \link[tibble:tibble-package]{tibble} of coefficients
-with one row per \code{nirs_channel} per interval, containing
-method-specific parameters.}
+\item{\code{coefficients}}{A data frame of coefficients with one row per
+\code{nirs_channel} per interval, containing \code{interval}, \code{nirs_channels},
+the resolved \code{start_time} (the fit onset from which time coefficients
+are elapsed), and method-specific parameters.}
 \item{\code{data}}{A list of the original input data frames augmented with a
 \verb{*_fitted} column of fitted values for each processed \code{nirs_channel}.}
 \item{\code{interval_times}}{A data frame with one row per interval and
@@ -218,10 +238,43 @@ and non-parametric methods.
 \item A \strong{grouped \emph{"mnirs"} data frame}, e.g. with \code{dplyr::group_by()}: the
 data frame is split by grouping levels and each group is processed as a
 separate interval.
+\item An \strong{\emph{"mnirs_kinetics"} result}: \code{coefficients} are split by channel
+into one data frame per channel, with a row per interval (see
+\emph{Recursive analysis}).
 }
 
 Specified \code{nirs_channels} (or channels retrieved from \emph{"mnirs"} metadata)
 will be analysed and results returned as a formatted table.
+}
+
+\subsection{Grouping samples with group_intervals}{
+
+\code{group_intervals = "ensemble"} (the \emph{default}) analyses every sample of
+each data frame together as one interval. A \code{list()} of sample (row)
+numbers instead splits each data frame into one interval per group, e.g.
+for a 24-row data frame:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{analyse_kinetics(
+    data,
+    method = "monoexponential",
+    group_intervals = list(trial1 = 1:12, trial2 = 13:24)
+)
+}\if{html}{\out{</div>}}
+\itemize{
+\item List names become interval names; unnamed groups are \verb{interval_<n>}.
+\item The same grouping is applied to every data frame of a multi-interval
+input, with interval names suffixed \verb{<group>_<df>} (e.g.
+\code{trial1_smo2} for an \emph{"mnirs_kinetics"} input split by channel).
+\item Samples in no group are excluded from analysis (with a message).
+Samples in more than one group are warned about but allowed.
+\item Row-grouped intervals no longer correspond to their
+\code{\link[=extract_intervals]{extract_intervals()}} \code{interval_times} metadata, which is dropped, so
+\code{start_time} falls back to the first non-negative \code{time_channel} value
+unless supplied (optionally per-interval, keyed by group name).
+\item \code{zero_time = TRUE} rebases each group's \code{time_channel} to its first
+sample, so \code{start_time} then defaults to \code{0}.
+\item Per-interval arguments key by the group names (see below).
+}
 }
 
 \subsection{Response \strong{start_time} and the baseline window}{
@@ -518,6 +571,32 @@ and \code{\link[=SSgompertz_left]{SSgompertz_left()}} for self-start initialisat
 
 Parameters may be held constant with \code{fix}, e.g. \code{fix = list(A = 0)}, as
 above.
+}
+
+\subsection{Recursive analysis}{
+
+An \emph{"mnirs_kinetics"} result may be passed back as \code{data} to analyse how
+coefficients change across intervals, e.g.
+\code{analyse_kinetics(result, nirs_channels = tau, time_channel = start_time, method = "peak_slope")}. \code{nirs_channels} and \code{time_channel} must name
+coefficient columns explicitly; no metadata defaults are applied.
+
+Time-point coefficients (\code{response_time}, \code{peak_slope_time}, \code{TD}, \code{MRT},
+\code{HRT}, \code{texc}, \code{xmid}) are elapsed from each interval's \code{start_time}. When
+one of these is given as \code{time_channel}, \code{start_time} is added row-wise so
+the analysis runs on absolute time. \code{start_time} itself and duration
+coefficients (e.g. \code{tau}) are unchanged.
+
+Coefficient rows from separate trials can be analysed separately with
+\code{group_intervals}, e.g. 24 occlusion slopes from two trials:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{analyse_kinetics(
+    result,
+    nirs_channels = slope,
+    time_channel = peak_slope_time,
+    method = "monoexponential",
+    group_intervals = list(trial1 = 1:12, trial2 = 13:24)
+)
+}\if{html}{\out{</div>}}
 }
 }
 \examples{

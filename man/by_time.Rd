@@ -81,12 +81,12 @@ extract_intervals(data, start = by_lap(2, 4), span = 0)
 
 ## combine multiple specification types
 extract_intervals(
-    data, 
-    start = list(by_lap(2), by_time(400)), 
+    data,
+    start = list(by_lap(2), by_time(400)),
     end = by_sample(1500)
 )
 
-## simulate event_channel with character label match 
+## simulate event_channel with character label match
 data$event <- NA_character_
 data$event[c(1000, 1001)] <- c("start", "lap.1")
 data <- create_mnirs_data(data, event_channel = "event")

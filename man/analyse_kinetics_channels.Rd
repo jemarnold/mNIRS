@@ -29,7 +29,7 @@ validated argument lists from \code{\link[=resolve_channel_args]{resolve_channel
 
 \item{fit_fn}{A function \verb{(.nirs, x_fit, t_fit, .a, valid)}
 returning a list with \code{coefs} (1-row data frame of method coefficients,
-\emph{without} \code{nirs_channels}/\code{time_channel}), \code{model}, \code{fitted_data}
+\emph{without} \code{interval}/\code{nirs_channels}), \code{model}, \code{fitted_data}
 (\code{window_idx}/\code{fitted}), and \code{diag} (1-row data frame from
 \code{\link[=compute_diagnostics]{compute_diagnostics()}}). \code{t_fit} is always time elapsed from
 \code{start_time}, so time coefficients need no further offset, and
@@ -51,11 +51,12 @@ than the validator.}
 }
 \value{
 A \code{data.frame} of coefficients (columns \code{interval},
-\code{nirs_channels}, \code{time_channel}, and method parameters), one row per
-channel, with attributes \code{"model"} and \code{"fitted_data"} (named lists by
-channel), \code{"diagnostics"} and \code{"channel_args"} (data frames, one row
-per channel), and \code{"warnings"} (data frame of conditions captured
-during fitting, regardless of \code{verbose}; zero rows when none fire).
+\code{nirs_channels}, and method parameters), one row per channel, with
+attributes \code{"time_channel"} (the resolved time column name), \code{"model"}
+and \code{"fitted_data"} (named lists by channel), \code{"diagnostics"} and
+\code{"channel_args"} (data frames, one row per channel), and \code{"warnings"}
+(data frame of conditions captured during fitting, regardless of
+\code{verbose}; zero rows when none fire).
 }
 \description{
 Shared per-channel skeleton for all \code{analyse_kinetics()} methods. Resolves

@@ -26,7 +26,7 @@ than the validator.}
 }
 \value{
 A 1-row \code{data.frame} with columns \code{n_obs}, \code{n_params}, \code{r2},
-\code{adj_r2}, \code{rmse}, \code{snr}, \code{cv_rmse}, \code{aic}, \code{aicc}, and \code{bic}.
+\code{adj_r2}, \code{rmse}, \code{cv_rmse}, \code{snr}, \code{aic}, \code{aicc}, and \code{bic}.
 }
 \description{
 Compute model diagnostics
