@@ -74,6 +74,7 @@ print.mnirs_kinetics <- function(x, ...) {
     drop_start_time <- isTRUE(all(coefs$start_time == 0))
     drop_cols <- c(
         if (drop_start_time) "start_time",
+        "tau_mult",
         grep("fitted$", names(coefs), value = TRUE)
     )
     coefs <- coefs[, !names(coefs) %in% drop_cols, drop = FALSE]
