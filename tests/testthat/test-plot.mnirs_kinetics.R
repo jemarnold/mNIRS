@@ -341,7 +341,7 @@ test_that("kinetics_annotations mixed-direction channels share one corner", {
     )
     ann <- kinetics_annotations(x)
     expect_true(all(ann$yval_corner == Inf))
-    expect_equal(ann$vjust, c(1.2, 2.4))
+    expect_equal(ann$vjust, c(1.1, 2.2))
 })
 
 test_that("kinetics_annotations staggers stacked labels by channel rank", {
@@ -349,7 +349,7 @@ test_that("kinetics_annotations staggers stacked labels by channel rank", {
     x <- kin_monoexp(channels = c("smo2_left", "smo2_right"))
     ann <- kinetics_annotations(x)
     expect_equal(length(unique(ann$vjust)), 2L)
-    expect_equal(ann$vjust, c(-0.2, -1.4))
+    expect_equal(ann$vjust, c(-0.1, -1.2))
 })
 
 test_that("kinetics_annotations formats NA coefficients as 'NA'", {
@@ -503,7 +503,13 @@ test_that("components overlays the biexponential model terms", {
 
     ## fast (A -> B1) and slow (B1 -> B2) terms sum to the fitted curve
     d <- comps[[1L]]$data
-    expect_equal(d$comp1 + d$comp2 - d$B1, d$smo2_fitted, tolerance = 1e-6)
+    fitted <- x$data[[1L]]$smo2_fitted
+    expect_true(all.equal(
+        d$comp1 + d$comp2 - x$coefficients$B1,
+        fitted[is.finite(fitted)],
+        tolerance = 1e-6,
+        scale = 1
+    ))
 
     ## omitted by default
     expect_length(comp_layers(plot(x, markers = FALSE, labels = FALSE)), 0L)
@@ -519,11 +525,30 @@ test_that("components draws the exponential_drift drift line from texc", {
     d1 <- comps[[1L]]$data
     expect_equal(nrow(d1), sum(is.finite(x$data[[1]]$smo2_fitted)))
 
-    ## drift term restricted to t >= texc, linear at the fitted slope
+    # drift term restricted to t >= texc, linear at the fitted slope
     d2 <- comps[[2L]]$data
     expect_lt(nrow(d2), nrow(d1))
-    expect_true(all(d2$time - d2$start_times >= d2$texc))
-    expect_equal(diff(d2$comp2), rep(d2$slope[[1L]], nrow(d2) - 1L))
+    t_rel <- d2$time - x$interval_times$start_times[[1L]]
+    expect_true(all(t_rel >= x$coefficients$texc))
+    expect_equal(diff(d2$comp2), rep(x$coefficients$slope, nrow(d2) - 1L))
+})
+
+test_that("components tolerates channels named after coefficients", {
+    ## a channel named `slope` collides with an exponential_drift
+    ## coefficient; overlay frame must not join coefficient columns
+    single <- kin_expdrift(channels = "slope")
+    p1 <- plot(single, components = TRUE, markers = FALSE, labels = FALSE)
+    expect_length(comp_layers(p1), 2L)
+    expect_no_error(ggplot2::ggplot_build(p1))
+
+    ## drift line reflects the fitted slope, not the data channel
+    d2 <- comp_layers(p1)[[2L]]$data
+    expect_equal(diff(d2$comp2), rep(single$coefficients$slope, nrow(d2) - 1L))
+
+    faceted <- kin_expdrift(channels = "slope", faceted = TRUE)
+    p2 <- plot(faceted, components = TRUE, markers = FALSE, labels = FALSE)
+    expect_length(comp_layers(p2), 2L)
+    expect_no_error(ggplot2::ggplot_build(p2))
 })
 
 test_that("components draws per channel and per facet", {

@@ -141,7 +141,7 @@ plot.mnirs <- function(
         c(
             list(ggplot2::geom_line(ch_aes, data = ch_data)),
             if (points) {
-                list(ggplot2::geom_point(ch_aes, data = ch_data, size = 3))
+                list(ggplot2::geom_point(ch_aes, data = ch_data, size = 2))
             }
         )
     })
@@ -292,62 +292,53 @@ plot.mnirs_kinetics <- function(
     }
 
     ## model component overlay ================================
-    ## undocumented `components = TRUE`: reconstruct the underlying model
-    ## terms from natural-scale coefficients over the same rows as the
-    ## fitted overlay. biexponential: sequential anchoring (fast A to B1,
-    ## slow B1 to B2). exponential_drift: monoexponential over the full
-    ## fit window plus the linear drift from (texc, texc_fitted)
-    comp_coefs <- switch(
-        x$method,
-        biexponential = c("A", "B1", "tau1", "B2", "tau2", "tau_mult", "TD"),
-        # fmt: skip
-        exponential_drift = c(
-            "A", "B", "tau", "slope", "texc", "texc_fitted", "TD"
-        )
-    )
-    if (isTRUE(list(...)[["components"]]) && !is.null(comp_coefs)) {
-        coefs <- x$coefficients[
-            c("interval", "nirs_channels", comp_coefs)
-        ]
+    ## undocumented `components = TRUE`: reconstruct the model terms from
+    ## natural-scale coefficients over the fitted rows. comp1 is the
+    ## primary monoexponential; comp2 is the secondary term clocked from
+    ## texc: the biexponential slow phase (B1 to B2), or the
+    ## exponential_drift linear drift from (texc, texc_fitted)
+    comp_methods <- c("biexponential", "exponential_drift")
+    if (isTRUE(list(...)[["components"]]) && x$method %in% comp_methods) {
         p <- p +
             lapply(fit_ch, \(.ch) {
             fcol <- paste0(.ch, "_fitted")
-            cf <- coefs[
-                coefs$nirs_channels == .ch & is.finite(coefs$A), ,
-                drop = FALSE
-            ]
-            if (nrow(cf) == 0L) {
+            d <- plot_data[is.finite(plot_data[[fcol]]), , drop = FALSE]
+            if (nrow(d) == 0L) {
                 return(NULL)
             }
-            d <- plot_data[is.finite(plot_data[[fcol]]), , drop = FALSE]
-            d <- if (faceted) {
-                merge(d, cf, by = "interval", sort = FALSE)
+            ## coefficient row aligned to each fitted row; overlay frame
+            ## holds only time, interval, and component columns, so user
+            ## channel names can never collide with coefficient names
+            cf <- x$coefficients[x$coefficients$nirs_channels == .ch, ]
+            co <- cf[if (faceted) match(d$interval, cf$interval) else 1L, ]
+            t_rel <- d[[time_channel]] - co$start_time
+            ## TD NA marks a fit with no time delay; those fits only keep
+            ## rows from the onset, so TD = 0 is equivalent
+            TD <- ifelse(is.finite(co$TD), co$TD, 0)
+            cd <- d[c(time_channel, if (faceted) "interval")]
+            if (x$method == "biexponential") {
+                cd$comp1 <- monoexponential(t_rel, co$A, co$B1, co$tau1, TD)
+                cd$comp2 <-
+                    monoexponential(t_rel, co$B1, co$B2, co$tau2, co$texc)
             } else {
-                cbind(d, cf[setdiff(names(cf), "interval")])
+                cd$comp1 <- monoexponential(t_rel, co$A, co$B, co$tau, TD)
+                cd$comp2 <- ifelse(
+                    t_rel >= co$texc,
+                    co$texc_fitted + co$slope * (t_rel - co$texc),
+                    NA_real_
+                )
             }
-            ## TD NA marks a fit with the onset at no time delay
-            td <- ifelse(is.finite(d$TD), d$TD, 0)
-            t_rel <- d[[time_channel]] - d$start_times
-            ts <- pmax(t_rel - td, 0)
-            comp_line <- \(.col, .d = d) ggplot2::geom_line(
+
+            comp_line <- \(.col, .d = cd) ggplot2::geom_line(
                 ggplot2::aes(y = .data[[.col]], colour = .ch),
                 data = .d,
                 linetype = "dotted",
                 linewidth = 0.5,
                 show.legend = FALSE
             )
-            if (x$method == "biexponential") {
-                d$comp1 <- d$A + (d$B1 - d$A) * (1 - exp(-ts / d$tau1))
-                d$comp2 <- d$B1 + (d$B2 - d$B1) *
-                    (1 - exp(-pmax(ts - d$tau_mult * d$tau1, 0) / d$tau2))
-                return(list(comp_line("comp1"), comp_line("comp2")))
-            }
-            ## exponential_drift: primary response and post-texc drift line
-            d$comp1 <- d$A + (d$B - d$A) * (1 - exp(-ts / d$tau))
-            d$comp2 <- d$texc_fitted + d$slope * (t_rel - d$texc)
             list(
                 comp_line("comp1"),
-                comp_line("comp2", d[t_rel >= d$texc, , drop = FALSE])
+                comp_line("comp2", cd[is.finite(cd$comp2), , drop = FALSE])
             )
         })
     }
@@ -582,10 +573,12 @@ kinetics_annotations <- function(x) {
     ) > 0
     ann$yval_corner <- ifelse(rises, -Inf, Inf)
 
-    ## stagger stacked labels by channel rank within each interval,
-    ## growing down from the top and up from the bottom
-    rank <- stats::ave(seq_len(nrow(ann)), ann$interval, FUN = seq_along) - 1
-    ann$vjust <- ifelse(rises, -0.2 - rank * 1.2, 1.2 + rank * 1.2)
+    ## stack labels inward from the corner, 0.2 lines apart. `vjust` is in
+    ## label heights, so convert line offsets by each label's line count
+    nlines <- nchar(gsub("[^\n]", "", ann$label)) + 1L
+    offset <- stats::ave(nlines + 0.2, ann$interval, FUN = \(n) cumsum(n) - n)
+    gap <- (offset + 0.2) / nlines
+    ann$vjust <- ifelse(rises, -gap, 1 + gap)
 
     ## marker-only rows for the remaining offset/y pairs: no label or corner
     extra <- Map(marker_rows, spec$offset[-1L], spec$y[-1L])
