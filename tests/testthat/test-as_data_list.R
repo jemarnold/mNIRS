@@ -31,6 +31,33 @@ test_that("as_data_list() wraps a single data frame in a length-1 list", {
     expect_equal(result[[1]], data)
 })
 
+test_that("as_data_list() splits mnirs_kinetics coefficients by channel", {
+    coefs <- data.frame(
+        interval = rep(c("a", "b"), each = 2),
+        nirs_channels = rep(c("ch2", "ch1"), 2),
+        start_time = rep(c(0, 100), each = 2),
+        tau = 1:4
+    )
+    kinetics <- structure(list(coefficients = coefs), class = "mnirs_kinetics")
+    result <- as_data_list(kinetics)
+
+    ## channel order of appearance is kept; each df holds a row per interval
+    expect_type(result, "list")
+    expect_named(result, c("ch2", "ch1"))
+    for (.ch in names(result)) {
+        expect_equal(nrow(result[[.ch]]), 2)
+        expect_equal(rownames(result[[.ch]]), c("1", "2"))
+        expect_true(all(result[[.ch]]$nirs_channels == .ch))
+        expect_equal(result[[.ch]]$interval, c("a", "b"))
+    }
+    expect_equal(result$ch1$tau, c(2, 4))
+})
+
+test_that("as_data_list() errors when mnirs_kinetics has no coefficients", {
+    kinetics <- structure(list(method = "peak_slope"), class = "mnirs_kinetics")
+    expect_error(as_data_list(kinetics), "coefficients")
+})
+
 
 ## map_mnirs_intervals() ==============================================
 test_that("map_mnirs_intervals() returns a list of class 'mnirs'", {

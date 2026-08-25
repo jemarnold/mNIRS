@@ -1,7 +1,28 @@
 #' Coerce `data` input to a named list of data frames
+#'
+#' Accepts a single or grouped data frame, a list of data frames, or an
+#' *"mnirs_kinetics"* object, whose `coefficients` are split by
+#' `nirs_channels` into one data frame per channel (a row per interval) for
+#' recursive analysis of coefficients.
+#'
 #' @inheritParams validate_mnirs
 #' @keywords internal
 as_data_list <- function(data, env = rlang::caller_env()) {
+    ## kinetics result → split coefficients by channel, one df per channel
+    ## with a row per interval, for recursive analysis of coefficients
+    if (inherits(data, "mnirs_kinetics")) {
+        coefs <- data$coefficients
+        if (!is.data.frame(coefs)) {
+            cli_abort(c(
+                "x" = "{.cls mnirs_kinetics} input must contain a \\
+                {.field coefficients} data frame.",
+                "i" = "Check the object returned from {.fn analyse_kinetics}."
+            ), call = env)
+        }
+        chan <- factor(coefs$nirs_channels, levels = unique(coefs$nirs_channels))
+        return(lapply(split(coefs, chan), `rownames<-`, NULL))
+    }
+
     ## grouped data frame → split by groups
     if (inherits(data, "grouped_df")) {
         if (!requireNamespace("dplyr", quietly = TRUE)) {
@@ -42,8 +63,8 @@ as_data_list <- function(data, env = rlang::caller_env()) {
     ## list of data frames — validate
     if (!is.list(data) || !all(vapply(data, is.data.frame, logical(1)))) {
         cli_abort(
-            "{.arg data} must be a list of data frames, or a single grouped \\
-            or ungrouped data frame.",
+            "{.arg data} must be a list of data frames, a single grouped \\
+            or ungrouped data frame, or an {.cls mnirs_kinetics} object.",
             call = env
         )
     }
