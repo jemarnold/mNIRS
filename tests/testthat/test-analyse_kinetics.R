@@ -1443,6 +1443,55 @@ test_that("analyse_kinetics group_intervals splits rows into named intervals", {
     expect_equal(attr(result$data$trial1, "sample_rate"), 10)
 })
 
+test_that("analyse_kinetics zero_time rebases each group_intervals group", {
+    data <- create_kinetics_data(n = 24)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2_left",
+        method = "peak_slope",
+        group_intervals = list(trial1 = 1:12, trial2 = 13:24),
+        zero_time = TRUE,
+        width = 3,
+        verbose = FALSE
+    )
+
+    expect_equal(result$data$trial2$time, data$time[13:24] - data$time[13])
+    expect_equal(result$interval_times$start_times, c(0, 0))
+})
+
+test_that("analyse_kinetics zero_time shifts ensemble interval_times metadata", {
+    t <- seq(-2, 8, by = 0.1)
+    df <- create_mnirs_data(
+        data.frame(time = t + 100, smo2 = 50 + 10 * (1 - exp(-pmax(t, 0)))),
+        nirs_channels = "smo2",
+        time_channel = "time",
+        sample_rate = 10,
+        interval_times = c(100, 108)
+    )
+
+    original <- analyse_kinetics(df, method = "response_time", verbose = FALSE)
+    rebased <- analyse_kinetics(
+        df,
+        method = "response_time",
+        zero_time = TRUE,
+        verbose = TRUE
+    )
+
+    ## default leaves original time frame
+    expect_equal(original$data[[1]]$time[1], 98)
+    expect_equal(original$interval_times$start_times, 100)
+
+    ## rebased time starts at 0; metadata start/end shift by the same offset
+    expect_equal(rebased$data[[1]]$time[1], 0)
+    expect_equal(rebased$interval_times$start_times, 2)
+    expect_equal(rebased$interval_times$end_times, 10)
+    expect_equal(
+        rebased$coefficients$response_time,
+        original$coefficients$response_time
+    )
+})
+
 test_that("analyse_kinetics group_intervals names unnamed groups interval_<n>", {
     data <- create_kinetics_data(n = 24)
 

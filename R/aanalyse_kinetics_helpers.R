@@ -538,6 +538,9 @@ split_kinetics_groups <- function(
 #'   and `time_channel` arguments, captured in the method frame.
 #' @param group_intervals `"ensemble"` or a `list()` of sample index
 #'   vectors; see [split_kinetics_groups()].
+#' @param zero_time Logical; if `TRUE`, rebases each interval's
+#'   `time_channel` to start from zero, shifting `interval_times` metadata
+#'   by the same offset.
 #' @param call The matched call from the user-facing method.
 #' @param env The call recorded for condition reporting.
 #' @inheritParams validate_mnirs
@@ -554,6 +557,7 @@ analyse_kinetics_intervals <- function(
     nirs_quo,
     time_quo,
     group_intervals,
+    zero_time,
     verbose,
     call,
     env
@@ -582,6 +586,23 @@ analyse_kinetics_intervals <- function(
     ## split sample groups after the time conversion so group names key
     ## the per-interval args below
     data_list <- split_kinetics_groups(data_list, group_intervals, verbose, env)
+
+    ## rebase each interval to its first time sample; interval_times metadata
+    ## (vector, or list for ensembles) shifts by the same offset so the
+    ## `start_time` fallback stays aligned
+    if (zero_time) {
+        tc <- validate_time_channel(time_quo, data_list[[1L]], env = env)
+        data_list <- lapply(data_list, \(.df) {
+            t0 <- min(.df[[tc]], na.rm = TRUE)
+            it <- attr(.df, "interval_times")
+            attr(.df, "interval_times") <- if (is.list(it)) {
+                lapply(it, `-`, t0)
+            } else if (!is.null(it)) {
+                it - t0
+            }
+            zero_offset_data(.df, tc, t0)
+        })
+    }
 
     ## resolve channel names for interval-map classification only; genuine
     ## channel errors surface later in the worker with proper context

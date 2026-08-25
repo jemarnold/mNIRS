@@ -287,6 +287,7 @@ analyse_kinetics(
     start_time = NULL,  # fit onset (t = 0); NULL = interval_times metadata, else t[1] else 0
     direction  = c("auto", "positive", "negative"),
     group_intervals = "ensemble",  # or list() of row numbers (see below)
+    zero_time = FALSE,  # rebase time to 0 per interval/group; shifts interval_times
     end_window = Inf,   # truncate fit after first extreme; Inf = global extreme
     ...,
     ## method-specific (explicit formals, not via `...`, see below):

@@ -42,6 +42,11 @@
 #'   a separate interval, e.g. `list(trial1 = 1:12, trial2 = 13:24)`. List
 #'   names become interval names (`interval_<n>` when unnamed). Indices must
 #'   be between `1` and the number of rows (see *Details*).
+#' @param zero_time Logical. Default is `FALSE`. If `TRUE`, re-calculates
+#'   numeric `time_channel` values to start from zero within each interval,
+#'   i.e. each data frame or each `group_intervals` sample group. Any
+#'   `interval_times` metadata is shifted by the same offset so `start_time`
+#'   retrieved from metadata stays aligned.
 #' @param ... Additional arguments passed to the underlying method function.
 #'   See *Details*.
 #' @param fraction **response_time**: A numeric value in the range
@@ -137,6 +142,8 @@
 #'   [extract_intervals()] `interval_times` metadata, which is dropped, so
 #'   `start_time` falls back to the first non-negative `time_channel` value
 #'   unless supplied (optionally per-interval, keyed by group name).
+#' - `zero_time = TRUE` rebases each group's `time_channel` to its first
+#'   sample, so `start_time` then defaults to `0`.
 #' - Per-interval arguments key by the group names (see below).
 #'
 #' ## Response **start_time** and the baseline window
@@ -552,6 +559,7 @@ analyse_kinetics <- function(
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
     group_intervals = "ensemble",
+    zero_time = FALSE,
     verbose = TRUE,
     ...,
     fraction = 0.5,
@@ -590,6 +598,7 @@ analyse_kinetics.response_time <- function(
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
     group_intervals = "ensemble",
+    zero_time = FALSE,
     verbose = TRUE,
     ...,
     fraction = 0.5
@@ -605,6 +614,7 @@ analyse_kinetics.response_time <- function(
         enquo(nirs_channels),
         enquo(time_channel),
         group_intervals,
+        zero_time,
         verbose,
         match.call(),
         sys.call(-1)
@@ -624,6 +634,7 @@ analyse_kinetics.peak_slope <- function(
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
     group_intervals = "ensemble",
+    zero_time = FALSE,
     verbose = TRUE,
     ...,
     width = NULL,
@@ -643,6 +654,7 @@ analyse_kinetics.peak_slope <- function(
         enquo(nirs_channels),
         enquo(time_channel),
         group_intervals,
+        zero_time,
         verbose,
         match.call(),
         sys.call(-1)
@@ -662,6 +674,7 @@ analyse_kinetics.monoexponential <- function(
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
     group_intervals = "ensemble",
+    zero_time = FALSE,
     verbose = TRUE,
     ...,
     use_TD = TRUE,
@@ -679,6 +692,7 @@ analyse_kinetics.monoexponential <- function(
         enquo(nirs_channels),
         enquo(time_channel),
         group_intervals,
+        zero_time,
         verbose,
         match.call(),
         sys.call(-1)
@@ -698,6 +712,7 @@ analyse_kinetics.biexponential <- function(
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
     group_intervals = "ensemble",
+    zero_time = FALSE,
     verbose = TRUE,
     ...,
     use_TD = TRUE,
@@ -716,6 +731,7 @@ analyse_kinetics.biexponential <- function(
         enquo(nirs_channels),
         enquo(time_channel),
         group_intervals,
+        zero_time,
         verbose,
         match.call(),
         sys.call(-1)
@@ -735,6 +751,7 @@ analyse_kinetics.exponential_drift <- function(
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
     group_intervals = "ensemble",
+    zero_time = FALSE,
     verbose = TRUE,
     ...,
     use_TD = TRUE,
@@ -753,6 +770,7 @@ analyse_kinetics.exponential_drift <- function(
         enquo(nirs_channels),
         enquo(time_channel),
         group_intervals,
+        zero_time,
         verbose,
         match.call(),
         sys.call(-1)
@@ -772,6 +790,7 @@ analyse_kinetics.sigmoidal <- function(
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
     group_intervals = "ensemble",
+    zero_time = FALSE,
     verbose = TRUE,
     ...,
     shape = c("symmetric", "gompertz", "gompertz_left"),
@@ -789,6 +808,7 @@ analyse_kinetics.sigmoidal <- function(
         enquo(nirs_channels),
         enquo(time_channel),
         group_intervals,
+        zero_time,
         verbose,
         match.call(),
         sys.call(-1)
@@ -814,6 +834,7 @@ analyze_kinetics <- function(
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
     group_intervals = "ensemble",
+    zero_time = FALSE,
     verbose = TRUE,
     ...
 ) {
