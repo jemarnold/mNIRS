@@ -1398,6 +1398,254 @@ test_that("analyse_kinetics works with data formats", {
 })
 
 
+## group_intervals ====================================================
+test_that("analyse_kinetics group_intervals = 'ensemble' matches default", {
+    data <- create_kinetics_data(n = 24)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2_left",
+        method = "peak_slope",
+        width = 3,
+        verbose = FALSE
+    )
+    result_ens <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2_left",
+        method = "peak_slope",
+        group_intervals = "ensemble",
+        width = 3,
+        verbose = FALSE
+    )
+
+    expect_equal(result_ens$coefficients, result$coefficients)
+    expect_equal(result_ens$data, result$data)
+})
+
+test_that("analyse_kinetics group_intervals splits rows into named intervals", {
+    data <- create_kinetics_data(n = 24)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = c("smo2_left", "smo2_right"),
+        method = "peak_slope",
+        group_intervals = list(trial1 = 1:12, trial2 = 13:24),
+        width = 3,
+        verbose = FALSE
+    )
+
+    expect_equal(unique(result$coefficients$interval), c("trial1", "trial2"))
+    expect_equal(nrow(result$coefficients), 4L)
+    expect_named(result$data, c("trial1", "trial2"))
+    expect_equal(nrow(result$data$trial1), 12L)
+    expect_equal(result$data$trial2$time, data$time[13:24])
+    expect_s3_class(result$data$trial1, "mnirs")
+    expect_equal(attr(result$data$trial1, "sample_rate"), 10)
+})
+
+test_that("analyse_kinetics group_intervals names unnamed groups interval_<n>", {
+    data <- create_kinetics_data(n = 24)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2_left",
+        method = "peak_slope",
+        group_intervals = list(1:12, 13:24),
+        width = 3,
+        verbose = FALSE
+    )
+    expect_equal(result$coefficients$interval, c("interval_1", "interval_2"))
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2_left",
+        method = "peak_slope",
+        group_intervals = list(1:12, late = 13:24),
+        width = 3,
+        verbose = FALSE
+    )
+    expect_equal(result$coefficients$interval, c("interval_1", "late"))
+})
+
+test_that("analyse_kinetics group_intervals suffixes <group>_<df> for lists", {
+    df1 <- create_kinetics_data(n = 24)
+    df2 <- create_kinetics_data(n = 24)
+
+    result <- analyse_kinetics(
+        list(A = df1, B = df2),
+        nirs_channels = "smo2_left",
+        method = "peak_slope",
+        group_intervals = list(trial1 = 1:12, trial2 = 13:24),
+        width = 3,
+        verbose = FALSE
+    )
+
+    expect_equal(
+        result$coefficients$interval,
+        c("trial1_A", "trial2_A", "trial1_B", "trial2_B")
+    )
+    expect_named(result$data, c("trial1_A", "trial2_A", "trial1_B", "trial2_B"))
+})
+
+test_that("analyse_kinetics group_intervals splits recursive kinetics input", {
+    coefs <- data.frame(
+        interval = paste0("interval_", 1:24),
+        nirs_channels = rep(c("ch1", "ch2"), each = 24),
+        start_time = rep(seq(0, by = 100, length.out = 24), 2),
+        TD = rep(5 + sin(1:24), 2),
+        tau = rep(10 + cos(1:24), 2)
+    )
+    kinetics <- structure(list(coefficients = coefs), class = "mnirs_kinetics")
+
+    result <- analyse_kinetics(
+        kinetics,
+        nirs_channels = "tau",
+        time_channel = "TD",
+        method = "peak_slope",
+        group_intervals = list(trial1 = 1:12, trial2 = 13:24),
+        width = 3,
+        verbose = FALSE
+    )
+
+    expect_equal(
+        result$coefficients$interval,
+        c("trial1_ch1", "trial2_ch1", "trial1_ch2", "trial2_ch2")
+    )
+    expect_equal(nrow(result$data$trial2_ch1), 12L)
+    ## time-point coef still shifted to absolute time before splitting
+    expect_equal(
+        result$data$trial2_ch1$TD,
+        coefs$TD[13:24] + coefs$start_time[13:24]
+    )
+})
+
+test_that("analyse_kinetics group_intervals drops uncovered rows with message", {
+    data <- create_kinetics_data(n = 24)
+
+    expect_message(
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = "smo2_left",
+            method = "peak_slope",
+            group_intervals = list(a = 1:10, b = 13:24),
+            width = 3
+        ),
+        "not specified"
+    )
+    expect_equal(nrow(result$data$a), 10L)
+    expect_equal(sum(vapply(result$data, nrow, integer(1))), 22L)
+
+    expect_no_message(analyse_kinetics(
+        data,
+        nirs_channels = "smo2_left",
+        method = "peak_slope",
+        group_intervals = list(a = 1:10, b = 13:24),
+        width = 3,
+        verbose = FALSE
+    ))
+})
+
+test_that("analyse_kinetics group_intervals warns on overlapping rows", {
+    data <- create_kinetics_data(n = 24)
+
+    expect_warning(
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = "smo2_left",
+            method = "peak_slope",
+            group_intervals = list(a = 1:14, b = 11:24),
+            width = 3
+        ),
+        "Duplicates"
+    )
+    expect_equal(nrow(result$data$a), 14L)
+    expect_equal(nrow(result$data$b), 14L)
+
+    expect_no_warning(analyse_kinetics(
+        data,
+        nirs_channels = "smo2_left",
+        method = "peak_slope",
+        group_intervals = list(a = 1:14, b = 11:24),
+        width = 3,
+        verbose = FALSE
+    ))
+})
+
+test_that("analyse_kinetics group_intervals validates input", {
+    data <- create_kinetics_data(n = 24)
+    run <- function(group_intervals) {
+        analyse_kinetics(
+            data,
+            nirs_channels = "smo2_left",
+            method = "peak_slope",
+            group_intervals = group_intervals,
+            width = 3,
+            verbose = FALSE
+        )
+    }
+
+    expect_error(run("distinct"), "must be")
+    expect_error(run(list(1:30)), "out-of-range")
+    expect_error(run(list(a = integer())), "empty group")
+    expect_error(run(list(c(1.5, 2))), "missing integer")
+})
+
+test_that("analyse_kinetics per-interval args key by group_intervals names", {
+    data <- create_kinetics_data(n = 24)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2_left",
+        method = "peak_slope",
+        group_intervals = list(trial1 = 1:12, trial2 = 13:24),
+        width = list(trial1 = 3, trial2 = 5),
+        verbose = FALSE
+    )
+
+    ca <- result$channel_args
+    expect_equal(ca$width[ca$interval == "trial1"], 3)
+    expect_equal(ca$width[ca$interval == "trial2"], 5)
+    diag <- result$diagnostics
+    expect_equal(diag$n_obs[diag$interval == "trial1"], 3L)
+    expect_equal(diag$n_obs[diag$interval == "trial2"], 5L)
+})
+
+test_that("analyse_kinetics group_intervals drops interval_times metadata", {
+    data <- create_kinetics_data(n = 24)
+    ## onset metadata inside the second group only
+    attr(data, "interval_times") <- data$time[20]
+
+    expect_no_warning(
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = "smo2_left",
+            method = "peak_slope",
+            group_intervals = list(trial1 = 1:12, trial2 = 13:24),
+            width = 3
+        )
+    )
+    expect_null(attr(result$data$trial1, "interval_times"))
+    ## start_time falls back to first non-negative time of each group
+    expect_equal(result$interval_times$start_times, data$time[c(1, 13)])
+    expect_false("end_times" %in% names(result$interval_times))
+})
+
+test_that("analyze_kinetics forwards group_intervals", {
+    data <- create_kinetics_data(n = 24)
+
+    result <- analyze_kinetics(
+        data,
+        nirs_channels = "smo2_left",
+        method = "peak_slope",
+        group_intervals = list(trial1 = 1:12, trial2 = 13:24),
+        width = 3,
+        verbose = FALSE
+    )
+
+    expect_equal(result$coefficients$interval, c("trial1", "trial2"))
+})
+
+
 test_that("analyse_kinetics offsets time-point coefs by start_time recursively", {
     coefs <- data.frame(
         interval = c("a", "b", "c", "d"),

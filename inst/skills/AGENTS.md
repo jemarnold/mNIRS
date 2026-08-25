@@ -286,6 +286,7 @@ analyse_kinetics(
                "biexponential", "sigmoidal"),
     start_time = NULL,  # fit onset (t = 0); NULL = interval_times metadata, else t[1] else 0
     direction  = c("auto", "positive", "negative"),
+    group_intervals = "ensemble",  # or list() of row numbers (see below)
     end_window = Inf,   # truncate fit after first extreme; Inf = global extreme
     ...,
     ## method-specific (explicit formals, not via `...`, see below):
@@ -315,6 +316,17 @@ Per-channel overrides via inline named `list()` (names must match `nirs_channels
 analyse_kinetics(data, nirs_channels = c(hhb, smo2), method = "peak_slope",
     span = list(smo2 = 10), direction = list(hhb = "negative"))
 ```
+
+**`group_intervals`** (row grouping; no `"distinct"`):
+
+| Syntax | Behaviour |
+|---|---|
+| `"ensemble"` (default) | all rows of each df analysed together |
+| `list(trial1 = 1:12, trial2 = 13:24)` | each row group a separate interval; unnamed -> `interval_<n>`; multi-df input suffixed `<group>_<df>` |
+
+Rows in no group dropped (message); overlapping rows warned. Per-interval args key by group names.
+Main use: recursive analysis of `"mnirs_kinetics"` coefs across trials, e.g.
+`analyse_kinetics(result, nirs_channels = slope, time_channel = peak_slope_time, method = "monoexp", group_intervals = list(trial1 = 1:12, trial2 = 13:24))`.
 
 **`fix`** — hold params constant:
 

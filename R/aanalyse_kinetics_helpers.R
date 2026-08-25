@@ -437,12 +437,96 @@ resolve_interval_args <- function(
 }
 
 
+#' Split interval data frames into sample groups
+#'
+#' Applies the `group_intervals` argument of [analyse_kinetics()] to a
+#' named list of data frames. `"ensemble"` returns `data_list` unchanged;
+#' a `list()` of sample (row) indices subsets every data frame into one
+#' interval per group. Samples in no group are dropped and samples in
+#' several groups are warned about. Group names become interval names
+#' (`interval_<n>` when unnamed), suffixed `<group>_<df>` when
+#' `data_list` holds more than one data frame. Row-subset intervals no
+#' longer correspond to their `interval_times`/`interval_span` metadata,
+#' so those attributes are dropped.
+#'
+#' @param data_list Named list of data frames from [as_data_list()].
+#' @param group_intervals `"ensemble"` or a `list()` of integer-valued
+#'   sample index vectors; see [analyse_kinetics()].
+#' @inheritParams validate_mnirs
+#'
+#' @returns A named list of data frames, one per group per data frame.
+#'
+#' @keywords internal
+split_kinetics_groups <- function(
+    data_list,
+    group_intervals,
+    verbose = TRUE,
+    env = rlang::caller_env()
+) {
+    if (identical(group_intervals, "ensemble")) {
+        return(data_list)
+    }
+    if (!is.list(group_intervals)) {
+        cli_abort(c(
+            "x" = "{.arg group_intervals} must be {.val ensemble} or a \\
+            {.cls list} of sample indices.",
+            "i" = "e.g. {.code group_intervals = list(trial1 = 1:12, \\
+            trial2 = 13:24)}."
+        ), call = env)
+    }
+    ## the same groups apply to every df, so validate against the shortest
+    n_samples <- min(vapply(data_list, nrow, integer(1)))
+    validate_interval_groups(group_intervals, n_samples, env)
+
+    ids <- unlist(group_intervals, use.names = FALSE)
+    nms <- names(group_intervals) %||% character(length(group_intervals))
+    unnamed <- !nzchar(nms)
+    nms[unnamed] <- paste0("interval_", which(unnamed))
+
+    if (verbose) {
+        n_drop <- n_samples - length(unique(ids))
+        if (n_drop > 0L) {
+            cli_inform(c(
+                "i" = "{n_drop} sample{?s} not specified by \\
+                {.arg group_intervals} excluded from analysis."
+            ), call = env)
+        }
+        dupes <- unique(ids[duplicated(ids)])
+        if (length(dupes) > 0L) {
+            cli_warn(c(
+                "!" = "Duplicates detected of {qty(length(dupes))} \\
+                sample{?s} {.field {dupes}} across {.arg group_intervals}.",
+                "i" = "Re-specify {.arg group_intervals} to remove duplicates."
+            ), call = warn_call(env))
+        }
+    }
+
+    ## row-subset each df per group; interval boundary metadata no longer
+    ## describes the subset, so only channel/device metadata carries over
+    single <- length(data_list) == 1L
+    out <- lapply(names(data_list), \(.nm) {
+        .df <- data_list[[.nm]]
+        attrs <- attributes(.df)
+        metadata <- attrs[intersect(mnirs_metadata, names(attrs))]
+        groups <- lapply(group_intervals, \(.g) {
+            structure(
+                create_mnirs_data(.df[.g, , drop = FALSE], metadata),
+                interval_times = NULL,
+                interval_span = NULL
+            )
+        })
+        setNames(groups, if (single) nms else paste0(nms, "_", .nm))
+    })
+    return(unlist(out, recursive = FALSE))
+}
+
+
 #' Run a kinetics worker over each interval and collate results
 #'
 #' Shared skeleton for `analyse_kinetics.*` methods: normalises `data`
-#' to a named list of interval data frames, calls the method worker
-#' once per interval, and collates results via
-#' [build_kinetics_results()].
+#' to a named list of interval data frames, splits sample groups via
+#' [split_kinetics_groups()], calls the method worker once per interval,
+#' and collates results via [build_kinetics_results()].
 #'
 #' @param data A data frame, list of data frames, or grouped data frame.
 #' @param worker Function; the interval-level worker, e.g.
@@ -452,6 +536,8 @@ resolve_interval_args <- function(
 #'   to `worker`.
 #' @param nirs_quo,time_quo Quosures of the caller's `nirs_channels`
 #'   and `time_channel` arguments, captured in the method frame.
+#' @param group_intervals `"ensemble"` or a `list()` of sample index
+#'   vectors; see [split_kinetics_groups()].
 #' @param call The matched call from the user-facing method.
 #' @param env The call recorded for condition reporting.
 #' @inheritParams validate_mnirs
@@ -467,6 +553,7 @@ analyse_kinetics_intervals <- function(
     worker_args,
     nirs_quo,
     time_quo,
+    group_intervals,
     verbose,
     call,
     env
@@ -491,6 +578,10 @@ analyse_kinetics_intervals <- function(
             }
         }
     }
+
+    ## split sample groups after the time conversion so group names key
+    ## the per-interval args below
+    data_list <- split_kinetics_groups(data_list, group_intervals, verbose, env)
 
     ## resolve channel names for interval-map classification only; genuine
     ## channel errors surface later in the worker with proper context

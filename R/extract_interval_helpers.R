@@ -59,12 +59,12 @@
 #'
 #' ## combine multiple specification types
 #' extract_intervals(
-#'     data, 
-#'     start = list(by_lap(2), by_time(400)), 
+#'     data,
+#'     start = list(by_lap(2), by_time(400)),
 #'     end = by_sample(1500)
 #' )
 #'
-#' ## simulate event_channel with character label match 
+#' ## simulate event_channel with character label match
 #' data$event <- NA_character_
 #' data$event[c(1000, 1001)] <- c("start", "lap.1")
 #' data <- create_mnirs_data(data, event_channel = "event")
@@ -166,6 +166,7 @@ as_mnirs_interval <- function(x, arg = "start", env = rlang::caller_env()) {
             ), call = env)
         }
         ## splice nested containers flat, drop NULL elements
+        # fmt: skip
         specs <- unlist(lapply(x, \(.x) {
                 if (inherits(.x, "mnirs_interval_list")) {
                     return(unclass(.x))
@@ -284,6 +285,7 @@ find_interval_time <- function(
     env = rlang::caller_env()
 ) {
     ## multi-spec container: resolve each spec, concatenate in supplied order
+    # fmt: skip
     if (inherits(interval, "mnirs_interval_list")) {
         return(unlist(lapply(interval, \(.x) {
             find_interval_time(.x, t_vec, event_vec, position, env)
@@ -410,8 +412,8 @@ recycle_to_length <- function(
     if (n_param > n) {
         if (verbose) {
             cli_inform(c(
-                "!" = "{.arg {arg}} exceeds the number of \\
-                {name}s by {.val {n_param - n}}.",
+                "!" = "{.arg {arg}} exceeds the number of {name}s by \\
+                {.val {n_param - n}}.",
                 "i" = "Extra values are ignored."
             ), call = env)
         }

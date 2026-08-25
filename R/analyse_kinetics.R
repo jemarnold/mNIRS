@@ -36,6 +36,12 @@
 #'   window with no greater/lesser values within `end_window` after the first
 #'   extreme value. `end_window = Inf` (*default*) returns the global extreme
 #'   from the full sample range (see *Details*).
+#' @param group_intervals Either `"ensemble"` (*default*) to analyse all
+#'   samples of each data frame together, or a non-empty `list()` of
+#'   integer-valued numeric vectors of sample (row) numbers, each analysed as
+#'   a separate interval, e.g. `list(trial1 = 1:12, trial2 = 13:24)`. List
+#'   names become interval names (`interval_<n>` when unnamed). Indices must
+#'   be between `1` and the number of rows (see *Details*).
 #' @param ... Additional arguments passed to the underlying method function.
 #'   See *Details*.
 #' @param fraction **response_time**: A numeric value in the range
@@ -105,6 +111,33 @@
 #'
 #' Specified `nirs_channels` (or channels retrieved from *"mnirs"* metadata)
 #' will be analysed and results returned as a formatted table.
+#'
+#' ## Grouping samples with group_intervals
+#'
+#' `group_intervals = "ensemble"` (the *default*) analyses every sample of
+#' each data frame together as one interval. A `list()` of sample (row)
+#' numbers instead splits each data frame into one interval per group, e.g.
+#' for a 24-row data frame:
+#'
+#' ```r
+#' analyse_kinetics(
+#'     data,
+#'     method = "monoexponential",
+#'     group_intervals = list(trial1 = 1:12, trial2 = 13:24)
+#' )
+#' ```
+#'
+#' - List names become interval names; unnamed groups are `interval_<n>`.
+#' - The same grouping is applied to every data frame of a multi-interval
+#'   input, with interval names suffixed `<group>_<df>` (e.g.
+#'   `trial1_smo2` for an *"mnirs_kinetics"* input split by channel).
+#' - Samples in no group are excluded from analysis (with a message).
+#'   Samples in more than one group are warned about but allowed.
+#' - Row-grouped intervals no longer correspond to their
+#'   [extract_intervals()] `interval_times` metadata, which is dropped, so
+#'   `start_time` falls back to the first non-negative `time_channel` value
+#'   unless supplied (optionally per-interval, keyed by group name).
+#' - Per-interval arguments key by the group names (see below).
 #'
 #' ## Response **start_time** and the baseline window
 #'
@@ -407,6 +440,19 @@
 #' the analysis runs on absolute time. `start_time` itself and duration
 #' coefficients (e.g. `tau`) are unchanged.
 #'
+#' Coefficient rows from separate trials can be analysed separately with
+#' `group_intervals`, e.g. 24 occlusion slopes from two trials:
+#'
+#' ```r
+#' analyse_kinetics(
+#'     result,
+#'     nirs_channels = slope,
+#'     time_channel = peak_slope_time,
+#'     method = "monoexponential",
+#'     group_intervals = list(trial1 = 1:12, trial2 = 13:24)
+#' )
+#' ```
+#'
 #' @returns A formatted table of results, with individual elements accessible
 #'   as a structured list of class *"mnirs_kinetics"* containing:
 #'
@@ -505,6 +551,7 @@ analyse_kinetics <- function(
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
+    group_intervals = "ensemble",
     verbose = TRUE,
     ...,
     fraction = 0.5,
@@ -542,6 +589,7 @@ analyse_kinetics.response_time <- function(
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
+    group_intervals = "ensemble",
     verbose = TRUE,
     ...,
     fraction = 0.5
@@ -556,6 +604,7 @@ analyse_kinetics.response_time <- function(
         mget(unlist(kinetics_dispatch[c("common", "response_time")])),
         enquo(nirs_channels),
         enquo(time_channel),
+        group_intervals,
         verbose,
         match.call(),
         sys.call(-1)
@@ -574,6 +623,7 @@ analyse_kinetics.peak_slope <- function(
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
+    group_intervals = "ensemble",
     verbose = TRUE,
     ...,
     width = NULL,
@@ -592,6 +642,7 @@ analyse_kinetics.peak_slope <- function(
         mget(unlist(kinetics_dispatch[c("common", "peak_slope")])),
         enquo(nirs_channels),
         enquo(time_channel),
+        group_intervals,
         verbose,
         match.call(),
         sys.call(-1)
@@ -610,6 +661,7 @@ analyse_kinetics.monoexponential <- function(
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
+    group_intervals = "ensemble",
     verbose = TRUE,
     ...,
     use_TD = TRUE,
@@ -626,6 +678,7 @@ analyse_kinetics.monoexponential <- function(
         mget(unlist(kinetics_dispatch[c("common", "monoexponential")])),
         enquo(nirs_channels),
         enquo(time_channel),
+        group_intervals,
         verbose,
         match.call(),
         sys.call(-1)
@@ -644,6 +697,7 @@ analyse_kinetics.biexponential <- function(
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
+    group_intervals = "ensemble",
     verbose = TRUE,
     ...,
     use_TD = TRUE,
@@ -661,6 +715,7 @@ analyse_kinetics.biexponential <- function(
         mget(unlist(kinetics_dispatch[c("common", "biexponential")])),
         enquo(nirs_channels),
         enquo(time_channel),
+        group_intervals,
         verbose,
         match.call(),
         sys.call(-1)
@@ -679,6 +734,7 @@ analyse_kinetics.exponential_drift <- function(
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
+    group_intervals = "ensemble",
     verbose = TRUE,
     ...,
     use_TD = TRUE,
@@ -696,6 +752,7 @@ analyse_kinetics.exponential_drift <- function(
         mget(unlist(kinetics_dispatch[c("common", "exponential_drift")])),
         enquo(nirs_channels),
         enquo(time_channel),
+        group_intervals,
         verbose,
         match.call(),
         sys.call(-1)
@@ -714,6 +771,7 @@ analyse_kinetics.sigmoidal <- function(
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
+    group_intervals = "ensemble",
     verbose = TRUE,
     ...,
     shape = c("symmetric", "gompertz", "gompertz_left"),
@@ -730,6 +788,7 @@ analyse_kinetics.sigmoidal <- function(
         mget(unlist(kinetics_dispatch[c("common", "sigmoidal")])),
         enquo(nirs_channels),
         enquo(time_channel),
+        group_intervals,
         verbose,
         match.call(),
         sys.call(-1)
@@ -754,6 +813,7 @@ analyze_kinetics <- function(
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
+    group_intervals = "ensemble",
     verbose = TRUE,
     ...
 ) {
