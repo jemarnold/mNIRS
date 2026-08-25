@@ -86,10 +86,10 @@ For OxCap analysis, we will perform roughly 8 steps:
 
 This article serves as a vignette for some of the kinetics analysis functions recently added to *{mnirs}*, and how they combine to perform robust OxCap analysis.
 
-* `correct_blood_volume()` normalises values for oxy[haem], deoxy[haem], and total[haem] channels (if present), using an iterative method developed from @Beever2020 that properly accommodates negative values. See 
+* `correct_blood_volume()` normalises values for oxy[haem], deoxy[haem], and total[haem] channels (if present), using an iterative method developed from @Beever2020 that properly accommodates negative values. See
 `?correct_blood_volume` for details.
 
-* `extract_intervals()` detects specific events or times in an *"mnirs"* data frame, extracts an interval around each one, and returns a list of data frames The returned list of data frames is ready for further analysis. See 
+* `extract_intervals()` detects specific events or times in an *"mnirs"* data frame, extracts an interval around each one, and returns a list of data frames. The returned list of data frames is ready for further analysis. See
 `?extract_intervals` for details.
 
 * `analyse_kinetics()` evaluates mNIRS response kinetics from a single *"mnirs"* data frame or a list of data frames, with a selection of parametric and non-parametric methods. It returns a formatted table of model results, with internal model components retrieved with `results$...`. See
@@ -99,7 +99,7 @@ We will use this function twice for OxCap analysis:
 
   * `analyse_kinetics(method = "peak_slope")` finds the peak linear regression slopes on deoxy[haem] from the extracted occlusion intervals. The steepest (positive or negative) slope is often interpreted as the point of greatest mismatch between O<sub>2</sub> supply and extraction. See `?peak_slope` for details on the vector-level function called by `analyse_kinetics()`.
 
-  * `analyse_kinetics(method = "monoexponential")` then fits an exponential curve through the resulting slope values over time, to find the rate constant `k`. A self-starting function `SSmonoexponential()` is fit with `stats::nls()`, called as either a 4-parameter model with a time-delay parameter (TD), or a reduced 3-parameter model without TD where response onset is expected to be immediate. See `?monoexponential` and `?SSmonoexponential` for details.
+  * `analyse_kinetics(method = "monoexponential")` then fits an exponential curve through the resulting slope values over time, to find the rate constant *k*. A self-starting function `SSmonoexponential()` is fit with `stats::nls()`, called as either a **4-parameter** model with a time-delay parameter (*TD*), or a reduced **3-parameter** model without *TD* where response onset is expected to be immediate. See `?monoexponential` and `?SSmonoexponential` for details.
 
 
 
@@ -230,7 +230,7 @@ Event labels are matched as regular expressions (regex) by default, so a partial
 
 * `group_intervals`
 
-    Multiple events can be extracted for analysis as `"distinct"` intervals, or `"ensemble"`-averaged together. Different groupings can be ensemble-averaged by providing a list of intervals by number, e.g. `list(c(1, 2), c(3, 4))`.\
+    Multiple events can be extracted for analysis as *"distinct"* intervals, or *"ensemble"*-averaged together. Different groupings can be ensemble-averaged by providing a list of intervals by number, e.g. `list(c(1, 2), c(3, 4))`.\
 \
 For manual grouping, interval numbers must be known ahead of time and always refer to order of occurrence in the data frame (sorted by `time_channel`). For this example, we analyse each interval separately using the default `group_intervals = "distinct"`.
 
@@ -294,9 +294,9 @@ Next, we calculate the slope value for each occlusion interval.
 
     These arguments apply to every method. `start_time` marks the response onset. When intervals come from `extract_intervals()`, it is retrieved automatically from *"mnirs"* metadata. Otherwise it defaults to the first non-negative time value (i.e. `0`).\
 \
-`direction` detects whether the response rises (*"positive"*) or falls (*"negative"*), and defaults to *"auto"*. For parametric fits it also constrains the expected response direction, in case of ambiguous kinetics. For deoxy[haem], we specify `direction = "positive"`, since deoxygenation increases during occlusions.
+`direction` detects whether the response rises (*"positive"*) or falls (*"negative"*), and defaults to *"auto"*. For parametric fits it also constrains the expected response direction, in case of ambiguous kinetics. For deoxy[haem], we specify `direction = "positive"`, since deoxygenation increases during occlusions.\
 \
-`end_window` defines the end of the fitting window by looking forward for a reasonable end time, taking the first peak or trough (for rising or falling response, respectively) with no more extreme value within that span. The default `end_window = Inf` uses the global extreme across the whole interval, appropriate for these short occlusion windows.\
+`end_window` defines the end of the fitting window by looking forward for a reasonable end time, taking the first peak or trough (for rising or falling response, respectively) with no more extreme value within that span. The default `end_window = Inf` uses the global extreme across the whole interval, appropriate for these short occlusion windows.
 
 * `method`
 
@@ -316,7 +316,7 @@ The **peak slope** method is a *semi-parametric* approach: it fits a linear regr
 
 * `align`
 
-    The window can be `"centre"`-aligned around the target sample (`idx`), `"left"`-aligned with `idx` at the start (forward-looking), or `"right"`-aligned with `idx` at the end (backward-looking). We keep the default `"centre"` alignment.
+    The window can be *"centre"*-aligned around the target sample (`idx`), *"left"*-aligned with `idx` at the start (forward-looking), or *"right"*-aligned with `idx` at the end (backward-looking). We keep the default `align = "centre"`.
 
 * `partial`
 
@@ -372,7 +372,7 @@ It fits either a **4-parameter** model `A + (B − A)(1 − exp(−(t − TD) / 
 
 * `use_TD` (*TD* coefficient)
 
-    An argument used with *"exponential"* methods: it explicitly specifies a 4-parameter model with a time delay between the stimulus (e.g. at `t = 0`) and the start of a systematic exponential response. The model falls back to a 3-parameter fit if the 4-parameter fit fails to converge.\
+    An argument used with the exponential methods: it explicitly specifies a **4-parameter** model with a time delay between the stimulus (e.g. at `t = 0`) and the start of a systematic exponential response. The model falls back to a **3-parameter** fit if the 4-parameter fit fails to converge.\
 \
 During repeated occlusions after exercise, the first occlusions may not conform to an exponential response, i.e. if oxygen saturation is too low and limiting to mV̇O<sub>2</sub>. A time delay parameter can capture the true monoexponential response in these cases. This protocol was designed to avoid that delay, so *TD* is not required here.
 
@@ -380,15 +380,15 @@ During repeated occlusions after exercise, the first occlusions may not conform 
 
     The starting (baseline) and ending (asymptote) values of the monoexponential curve, defining either exponential association (positive direction, *B* > *A*) or decay (negative direction, *A* > *B*).
 
-* *tau* coefficient
+* *tau*, *k* coefficients
 
-    The time constant (τ) describes the time (speed) of the exponential response from *A* to *B*, approximated by the time elapsed at 63.2% of the total response amplitude — i.e. when predicted `y` equals `A + 0.632 × (B − A)`.\
+    The time constant (*tau*; τ) describes the time (speed) of the exponential response from *A* to *B*, approximated by the time elapsed at 63.2% of the total response amplitude — i.e. when predicted `y` equals `A + 0.632 × (B − A)`.\
 \
 The rate constant (*k*) is the inverse of the time constant (`k = 1 / tau`) and is also commonly used in NIRS research. *k* is returned as the inverse of `time_channel` units (seconds) by default; here we convert *k* to min<sup>-1</sup>.
 
 * `group_intervals` & `zero_time`
 
-    Note these arguments differ slightly in intent from their `extract_intervals()` counterparts above. Here, `group_intervals` takes a list of **sample (row) numbers**, processing each as separate intervals and returning named groups as interval names. The default `"ensemble"` fits all samples of each data frame together, as in the above `method = "peak_slope"` example.\
+    Note these arguments differ slightly in intent from their `extract_intervals()` counterparts above. Here, `group_intervals` takes a list of **sample (row) numbers**, processing each as separate intervals and returning named groups as interval names. The default *"ensemble"* fits all samples of each data frame together, as in the above `method = "peak_slope"` example.\
 \
 Our `slope_results` has one sample per occlusion, so `list(trial1 = 1:16, trial2 = 17:32)` separates the two trials. As with `extract_intervals()` above, `zero_time` is used to rebase each trial to start from `0`.
 
@@ -454,7 +454,7 @@ plot(monoexp_results, time_labels = TRUE, points = TRUE, labels = FALSE) +
 
 As a final validation step, we can examine the fitting diagnostics for the two trials.
 
-### Examine fit diagnostics
+# Examine fit diagnostics
 
 ```{r}
 #| label: fit diagnostics
@@ -468,19 +468,23 @@ The diagnostics are already strong, suggesting valid monoexponential fit. Howeve
 
 For that, we could use an exploratory third `analyse_kinetics()` method:
 
-### Analyse exponential-linear drift two-phase kinetics
+## `analyse_kinetics()`
+
+### Analyse exponential-drift kinetics
 
 * `method = "exponential_drift"`
 
-The **exponential-drift** method is a *parametric* two-phase approach: it fits a monoexponential primary response with a secondary linear drift beginning near the primary asymptote, with `stats::nls()` and `SSexponential_drift()`. `A`, `B`, `tau`, and the derived `k`, `MRT`, and `HRT` are interpreted the same as for *"monoexponential"* above. The additional `slope` coefficient is the linear drift rate (in response units per unit `time_channel`).
+The **exponential-drift** method is a *parametric* two-phase approach: it fits a monoexponential primary response with a secondary linear drift beginning near the primary asymptote, with `stats::nls()` and `SSexponential_drift()`. *A*, *B*, *tau*, and the derived *k*, *MRT*, and *HRT* are interpreted the same as for *"monoexponential"* above. The additional *slope* coefficient is the linear drift rate (in response units per unit `time_channel`).
+
+It fits a **5-parameter** model `A + (B − A)(1 − exp(−t / tau)) + slope × max(t − texc, 0)`, or a **6-parameter** model adding a time delay *TD*.
 
 A slow drift in mV̇O<sub>2</sub> after the primary recovery is physiologically plausible, e.g. from post-occlusion reactive hyperaemia or a slow-component shift in resting metabolic demand. Separating it from the primary response means the exponential phase is no longer forced to absorb the drift into its asymptote. See `?exponential_drift` and `?SSexponential_drift` for details.
 
-* `tau_mult` (determines where the drift begins at the excursion point; `texc`)
+* `tau_mult` (determines where the drift begins at the excursion point; *texc*)
 
-    The drift onset is not a fitted parameter. It is estimated at a fixed multiple of `tau` after `TD`, reported as the excursion point `texc = TD + tau_mult × tau`. Before `texc`, the drift term is considered to be zero.\
+    The drift onset is not a fitted parameter. It is estimated at a fixed multiple of *tau* after *TD*, reported as the excursion point `texc = TD + tau_mult × tau`. Before *texc*, the drift term is considered to be zero.\
 \
-The default `tau_mult = 3` places drift onset at ~95% of the primary amplitude, i.e. where the primary response is effectively complete. It can be manually adjusted, but smaller multiples allow the drift response to encroach on and absorb more of the primary response, biasing the more physiologically relevant `tau` estimate. We will leave it at the default.
+The default `tau_mult = 3` places drift onset at ~95% of the primary amplitude, i.e. where the primary response is effectively complete. It can be manually adjusted, but smaller multiples allow the drift response to encroach on and absorb more of the primary response, biasing the more physiologically relevant *tau* estimate. We will leave it at the default.
 
 ::: {.callout-caution}
 Please note! **Exponential-drift** kinetics is currently experimental based on empirical observation, and remains to be more rigorously validated.

@@ -1599,7 +1599,7 @@ enforce_direction <- function(
 #'   correction and is `NA` when `n_obs - k - 1 <= 0`.
 #'
 #' @returns A 1-row `data.frame` with columns `n_obs`, `n_params`, `r2`,
-#'   `adj_r2`, `rmse`, `snr`, `cv_rmse`, `aic`, `aicc`, and `bic`.
+#'   `adj_r2`, `rmse`, `cv_rmse`, `snr`, `aic`, `aicc`, and `bic`.
 #'
 #' @keywords internal
 compute_diagnostics <- function(
@@ -1617,8 +1617,8 @@ compute_diagnostics <- function(
         r2 = NA_real_,
         adj_r2 = NA_real_,
         rmse = NA_real_,
-        snr = NA_real_,
         cv_rmse = NA_real_,
+        snr = NA_real_,
         aic = NA_real_,
         aicc = NA_real_,
         bic = NA_real_
@@ -1695,8 +1695,8 @@ compute_diagnostics <- function(
         r2 = r2,
         adj_r2 = adj_r2,
         rmse = rmse,
-        snr = snr,
         cv_rmse = cv_rmse,
+        snr = snr,
         aic = aic,
         aicc = aicc,
         bic = bic
