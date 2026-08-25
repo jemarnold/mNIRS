@@ -453,20 +453,25 @@ plot.mnirs_kinetics <- function(
 #'
 #' @keywords internal
 kinetics_annotations <- function(x) {
-    ## format numbers as display strings, preserving NA
-    fmt <- function(v) {
-        return(ifelse(is.na(v), "NA", signif_trailing(v, 3L, "signif")))
-    }
-
-    ## format a label line, empty when the coefficient is missing (e.g. `TD`
-    ## for channels fitted without a time delay)
-    line <- function(f, v) {
-        return(ifelse(is.na(v), "", sprintf(f, fmt(v))))
-    }
-
     coefs <- x$coefficients
 
-    ## per-method: time offsets (x), fitted values (y), and label formatter.
+    ## one label line per coefficient, `NA` when missing (e.g. `TD` for
+    ## channels fitted without a time delay). `keep` drops lines that are
+    ## redundant, e.g. `MRT` equals `tau` without `TD`
+    line <- \(f, v, keep = TRUE) {
+        ifelse(
+            is.na(v) | !keep,
+            NA_character_,
+            sprintf(f, signif_trailing(v, 3L, "signif"))
+        )
+    }
+
+    ## join per-channel lines, omitting `NA` lines
+    label <- \(...) {
+        apply(cbind(...), 1L, \(l) paste(l[!is.na(l)], collapse = "\n"))
+    }
+
+    ## per-method: time offsets (x), fitted values (y), and label lines.
     ## `offset`/`y` are parallel vectors of coefficient names; the first pair
     ## anchors the label, later pairs add marker-only points
     spec <- switch(
@@ -474,63 +479,52 @@ kinetics_annotations <- function(x) {
         response_time = list(
             offset = "response_time",
             y = "fitted",
-            label = sprintf("response time = %s s", fmt(coefs$response_time))
+            label = label(line("response time = %s s", coefs$response_time))
         ),
         peak_slope = list(
             offset = "peak_slope_time",
             y = "fitted",
-            label = sprintf(
-                "slope = %s /s\npeak slope time = %s s",
-                fmt(coefs$slope),
-                fmt(coefs$peak_slope_time)
+            label = label(
+                line("slope = %s /s", coefs$slope),
+                line("peak slope time = %s s", coefs$peak_slope_time)
             )
         ),
         monoexponential = list(
             offset = "MRT",
             y = "MRT_fitted",
-            label = paste0(
-                line("TD = %s s\n", coefs$TD),
-                sprintf(
-                    "tau = %s s\nMRT = %s s",
-                    fmt(coefs$tau),
-                    fmt(coefs$MRT)
-                )
+            label = label(
+                line("TD = %s s", coefs$TD),
+                line("tau = %s s", coefs$tau),
+                line("MRT = %s s", coefs$MRT, keep = !is.na(coefs$TD))
             )
         ),
         biexponential = list(
             offset = "texc",
             y = "texc_fitted",
-            label = paste0(
-                line("TD = %s s\n", coefs$TD),
-                sprintf(
-                    "tau1 = %s s\ntexc = %s s\ntau2 = %s s",
-                    fmt(coefs$tau1),
-                    fmt(coefs$texc),
-                    fmt(coefs$tau2)
-                )
+            label = label(
+                line("TD = %s s", coefs$TD),
+                line("tau1 = %s s", coefs$tau1),
+                line("texc = %s s", coefs$texc),
+                line("tau2 = %s s", coefs$tau2)
             )
         ),
         exponential_drift = list(
             offset = c("MRT", "texc"),
             y = c("MRT_fitted", "texc_fitted"),
-            label = paste0(
-                line("TD = %s s\n", coefs$TD),
-                sprintf(
-                    "tau = %s s\nMRT = %s s\ntexc = %s s\nslope = %s /s",
-                    fmt(coefs$tau),
-                    fmt(coefs$MRT),
-                    fmt(coefs$texc),
-                    fmt(coefs$slope)
-                )
+            label = label(
+                line("TD = %s s", coefs$TD),
+                line("tau = %s s", coefs$tau),
+                line("MRT = %s s", coefs$MRT, keep = !is.na(coefs$TD)),
+                line("texc = %s s", coefs$texc),
+                line("slope = %s /s", coefs$slope)
             )
         ),
         sigmoidal = list(
             offset = "xmid",
             y = "xmid_fitted",
-            label = sprintf(
-                "slope = %s /s\nxmid = %s s",
-                fmt(coefs$slope),
-                fmt(coefs$xmid)
+            label = label(
+                line("slope = %s /s", coefs$slope),
+                line("xmid = %s s", coefs$xmid)
             )
         )
     )

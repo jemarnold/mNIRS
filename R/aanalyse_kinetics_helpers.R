@@ -21,6 +21,7 @@ method_aliases <- c(
     exponential_linear = "exponential_drift",
     exp_drift = "exponential_drift",
     exp_linear = "exponential_drift",
+    exp_lin = "exponential_drift",
     monoexp_drift = "exponential_drift",
     monoexp_linear = "exponential_drift",
     linear_drift = "exponential_drift",

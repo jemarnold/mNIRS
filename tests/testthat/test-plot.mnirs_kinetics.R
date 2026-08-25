@@ -259,10 +259,8 @@ test_that("kinetics_annotations formats method-specific labels", {
         "^response time = .+ s$"
     )
     expect_match(kinetics_annotations(kin_peak_slope())$label, "^slope = ")
-    expect_match(
-        kinetics_annotations(kin_monoexp())$label,
-        "tau = .+\nMRT = .+ s$"
-    )
+    ## `use_TD = FALSE` -> `MRT` is redundant with `tau` and is omitted
+    expect_match(kinetics_annotations(kin_monoexp())$label, "^tau = .+ s$")
     expect_match(
         kinetics_annotations(kin_biexp())$label,
         "tau1 = .+\ntexc = .+ s\ntau2 = "
@@ -341,7 +339,7 @@ test_that("kinetics_annotations mixed-direction channels share one corner", {
     )
     ann <- kinetics_annotations(x)
     expect_true(all(ann$yval_corner == Inf))
-    expect_equal(ann$vjust, c(1.1, 2.2))
+    expect_equal(ann$vjust, c(1.2, 2.4))
 })
 
 test_that("kinetics_annotations staggers stacked labels by channel rank", {
@@ -349,11 +347,11 @@ test_that("kinetics_annotations staggers stacked labels by channel rank", {
     x <- kin_monoexp(channels = c("smo2_left", "smo2_right"))
     ann <- kinetics_annotations(x)
     expect_equal(length(unique(ann$vjust)), 2L)
-    expect_equal(ann$vjust, c(-0.1, -1.2))
+    expect_equal(ann$vjust, c(-0.2, -1.4))
 })
 
-test_that("kinetics_annotations formats NA coefficients as 'NA'", {
-    ## too few points for a 3-param fit -> NA coefficients
+test_that("kinetics_annotations omits NA coefficients from labels", {
+    ## too few points for a 3-param fit -> NA coefficients -> empty label
     d <- make_monoexp(n = 3)
     x <- suppressWarnings(analyse_kinetics(
         d,
@@ -363,8 +361,7 @@ test_that("kinetics_annotations formats NA coefficients as 'NA'", {
         verbose = FALSE
     ))
     ann <- kinetics_annotations(x)
-    expect_match(ann$label, "MRT = NA s")
-    expect_match(ann$label, "tau = NA")
+    expect_equal(ann$label, "")
 })
 
 test_that("kinetics_annotations appends marker-only rows for extra key points", {
