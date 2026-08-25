@@ -36,6 +36,16 @@ plot(result) +
 
 ```
 
+* `print.mnirs()` & `print.mnirs_kinetics()` now returns their objects invisibly, so can be called incrementally within a function pipeline (which I just learned was possible!).
+
+``` r
+read_mnirs(...) |> 
+    print() |>  ## intermediate view data frame
+    analyse_kinetics(...) |> 
+    print() |>  ## view formatted results table
+    plot()      ## and plot those results
+```
+
 # mnirs 0.7.1
 
 * `shift_mnirs()` now properly excludes partial windows at data edges, where fewer samples can bias calculation of *"min"* or *"max"* shift values on noise.

@@ -486,7 +486,7 @@ kinetics_annotations <- function(x) {
             y = "fitted",
             label = label(
                 line("slope = %s /s", coefs$slope),
-                line("peak slope time = %s s", coefs$peak_slope_time)
+                line("time = %s s", coefs$peak_slope_time)
             )
         ),
         monoexponential = list(

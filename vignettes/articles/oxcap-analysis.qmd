@@ -140,7 +140,7 @@ Note: by default, *Artinis Oxysoft* exports an event label column without a name
 
 ## identify and rename channels, including the event label column
 df <- read_mnirs(
-    file_path = example_mnirs("portamon-oxcap.xlsx"),
+    file_path     = example_mnirs("portamon-oxcap.xlsx"),
     nirs_channels = c(thb = 2, hhb = 3, o2hb = 4),
     event_channel = c(event = "col_6")
 )
@@ -149,21 +149,18 @@ df <- read_mnirs(
 df
 ```
 
-This file has two sequential occlusion trials. There are many ways to identify and separate trials. We will find the longer time gap between consecutive *"Occlusion"* labels, and use that to indicate the separation between trials.
-
 ```{r}
-#| label: split df
+#| label: plot trials
 
-## find the space between occlusion labels separating trials
-occl_times <- df$time[grepl("Occlusion", df$event)]
-split_time <- occl_times[diff(occl_times) > 60] + 10
+## plot the two trial start events
+trial_times <- df$time[grepl("Trial Start", df$event)]
 
-plot(df) +
-    geom_vline(xintercept = split_time, linetype = "dashed")
+plot(df, label_time = TRUE) +
+    geom_vline(xintercept = trial_times, linetype = "dashed")
 ```
 
 
-The two exercise bouts and repeated occlusion trials are clearly identifiable from the raw data plot. A few resting occlusions were also performed at the start of the file, which we will ignore for now.
+The two repeated occlusion trials are clearly identifiable from the raw data plot. A few resting occlusions were also performed at the start of the file, which we will ignore for now.
 
 
 
@@ -193,7 +190,9 @@ df <- df |>
     )
 
 ## plot corrected data with occlusion event indicators
-plot(df) +
+occl_times <- df$time[grepl("Occlusion", df$event)]
+
+plot(df, label_time = TRUE) +
     geom_vline(xintercept = occl_times, linetype = "dotted", alpha = 0.4)
 ```
 
@@ -268,7 +267,7 @@ df_list <- extract_intervals(
 ## visualise all occlusion intervals for error checking
 ## expecting 2 x 16 = 32 total
 plot(df_list, ncol = 8) +
-    theme(axis.text.x = element_blank())
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 ```
 
 
@@ -345,12 +344,12 @@ slope_results <- analyse_kinetics(
 ## view the formatted results
 slope_results
 
-plot(slope_results, ncol = 8, label_size = 3.5) +
-    theme(axis.text.x = element_blank())
+plot(slope_results, ncol = 8, label_size = 3) +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 ```
 
 ::: {.callout-tip}
-Individual kinetics results can be quickly visualised with the built-in `plot()` function with coefficients labelled (see `?plot.mnirs_kinetics`).
+Individual kinetics results can be quickly visualised with the built-in `plot()` function with coefficient labels (see `?plot.mnirs_kinetics`).
 :::
 
 Next, we can recursively analyse the resulting slope coefficients with another `analyse_kinetics()` call using a *"monoexponential"* model to estimate mV̇O<sub>2</sub> recovery.
@@ -552,11 +551,46 @@ The information criteria (`aic`, `aicc`, `bic`) are unitless estimators of predi
 
 However, this suggests nothing about the *physiological rationale* for the added linear drift component, which takes precedence over any purely statistical *"goodness-of-fit"* test. That is a speculative question for another time!
 
-# Conclusion
+# A concise processing pipeline
 
 This article demonstrates how muscle oxidative capacity analysis can be performed using *{mnirs}* with relatively simple, reproducible data wrangling steps.
 
-*{mnirs}* is built with a strong focus on plotting incremental processing & analysis steps along the way. In my opinion, this is an important visual validation step to perform whenever performing multi-step processing & analysis.
+*{mnirs}* is built with a strong focus on plotting incremental processing & analysis steps along the way. In my opinion, this is an important visual validation step to perform whenever performing multi-step processing & analysis. When working with a familiar dataset, the processing & analysis pipeline can be considerably simplified compared to above:
+
+```{r}
+#| label: pipeline
+#| eval: false
+
+read_mnirs(
+    file_path       = example_mnirs("portamon-oxcap.xlsx"),
+    nirs_channels   = c(thb = 2, hhb = 3, o2hb = 4),
+    event_channel   = c(event = "col_6")
+) |>
+    correct_blood_volume(
+        oxy_channel     = o2hb,
+        deoxy_channel   = hhb,
+        total_channel   = thbd
+    ) |> 
+    extract_intervals(
+        start           = "Occlusion",
+        span            = c(1, 5)
+    ) |> 
+    analyse_kinetics(
+        nirs_channels   = hhb,
+        method          = "peak_slope",
+        span            = 3
+    ) |> 
+    analyse_kinetics(
+        nirs_channels   = slope,
+        time_channel    = peak_slope_time,
+        method          = "monoexponential",
+        use_TD          = FALSE,
+        group_intervals = list(trial1 = 1:16, trial2 = 17:32),
+        zero_time       = TRUE
+    ) |> 
+    print() |> 
+    plot()
+```
 
 Future development could wrap these steps into a dedicated convenience function with recommended default parameters, streamlining the analysis process. However, there are always trade-offs between automation and customisation: fitting nonlinear models to sparse, noisy biological data can produce unstable fit parameters or fail to converge. Manual processing steps may still be needed to accommodate these limitations.
 

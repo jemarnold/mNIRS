@@ -28,7 +28,7 @@
 print.mnirs <- function(x, ...) {
     class(x) <- setdiff(class(x), "mnirs")
     print(x, ...)
-    invisible(x)
+    return(invisible(x))
 }
 
 
@@ -136,4 +136,6 @@ print.mnirs_kinetics <- function(x, ...) {
         ## TODO add instructions how to retrieve returned object?
     }
     cat("\n\n")
+
+    return(invisible(x))
 }
