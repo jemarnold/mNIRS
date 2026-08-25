@@ -2355,6 +2355,21 @@ test_that("print.mnirs_kinetics drops 'fitted$' columns from display", {
     expect_true(any(grepl("fitted_column", output)))
 })
 
+test_that("print.mnirs_kinetics drops 'start_time' only when all zero", {
+    coefs <- data.frame(
+        interval = c("int1", "int2"),
+        nirs_channels = "smo2",
+        start_time = c(0, 0),
+        slope = c(1.5, 2.0)
+    )
+    output <- capture.output(print(make_print_kinetics(coefs)))
+    expect_false(any(grepl("start_time", output)))
+
+    coefs$start_time <- c(0, 30)
+    output <- capture.output(print(make_print_kinetics(coefs)))
+    expect_true(any(grepl("start_time", output)))
+})
+
 test_that("print.mnirs_kinetics formats numerics to 4 sig figs", {
     x <- make_print_kinetics(
         data.frame(

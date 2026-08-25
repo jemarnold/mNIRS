@@ -71,7 +71,11 @@ print.mnirs <- function(x, ...) {
 print.mnirs_kinetics <- function(x, ...) {
     coefs <- x$coefficients
     ## remove columns unnecessary for display
-    drop_cols <- c("start_time", grep("fitted$", names(coefs), value = TRUE))
+    drop_start_time <- isTRUE(all(coefs$start_time == 0))
+    drop_cols <- c(
+        if (drop_start_time) "start_time",
+        grep("fitted$", names(coefs), value = TRUE)
+    )
     coefs <- coefs[, !names(coefs) %in% drop_cols, drop = FALSE]
     nrows <- nrow(coefs)
 
