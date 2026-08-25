@@ -377,7 +377,7 @@ test_that("detect_device_channels() parses Artinis legend block", {
         verbose = FALSE
     )
 
-    expect_equal(result$nirs_channels, c(VL_O2Hb = "2", VL_HHb = "3"))
+    expect_equal(result$nirs_channels, c(vl_o2hb = "2", vl_hhb = "3"))
     expect_equal(result$time_channel, c(sample = "1"))
     expect_equal(result$event_channel, c(event = "4"))
     ## unnumbered trailing column mapped to "labels"
@@ -582,12 +582,12 @@ test_that("detect_device_channels() returns appropriate keep_all", {
 
 
 ## parse_oxysoft_legend() ==============================================
-test_that("sanitise_channel_names() collapses non-alphanumerics", {
-    expect_equal(sanitise_channel_names("VL O2Hb"), "VL_O2Hb")
-    expect_equal(sanitise_channel_names("Rx1 - Tx1 tHb"), "Rx1_Tx1_tHb")
-    expect_equal(sanitise_channel_names("(TSI)"), "TSI")
-    expect_equal(sanitise_channel_names("  a  b  "), "a_b")
-    expect_equal(sanitise_channel_names("***"), "")
+test_that("clean_channel_names() collapses non-alphanumerics and lowercases", {
+    expect_equal(clean_channel_names("VL O2Hb"), "vl_o2hb")
+    expect_equal(clean_channel_names("Rx1 - Tx1 tHb"), "rx1_tx1_thb")
+    expect_equal(clean_channel_names("(TSI)"), "tsi")
+    expect_equal(clean_channel_names("  a  b  "), "a_b")
+    expect_equal(clean_channel_names("***"), "")
 })
 
 test_that("parse_oxysoft_legend() parses full legend with labels column", {
@@ -607,11 +607,11 @@ test_that("parse_oxysoft_legend() parses full legend with labels column", {
     expect_equal(result$time_channel, c(sample = "1"))
     expect_equal(
         result$nirs_channels,
-        c(Rx1_Tx1_tHb = "2", Rx1_Tx1_O2Hb = "3")
+        c(rx1_tx1_thb = "2", rx1_tx1_o2hb = "3")
     )
     expect_equal(result$event_channel, c(event = "5"))
     ## unknown parenthesised trace kept, unnumbered trailing col -> labels
-    expect_equal(result$extra_channels, c(TSI = "4", labels = "col_6"))
+    expect_equal(result$extra_channels, c(tsi = "4", labels = "col_6"))
 })
 
 test_that("parse_oxysoft_legend() omits labels without trailing column", {
@@ -625,7 +625,7 @@ test_that("parse_oxysoft_legend() omits labels without trailing column", {
 
     result <- parse_oxysoft_legend(data, header_row = 7L)
 
-    expect_equal(result$nirs_channels, c(O2Hb = "2"))
+    expect_equal(result$nirs_channels, c(o2hb = "2"))
     expect_equal(result$event_channel, c(event = "3"))
     expect_null(result$extra_channels)
 })
@@ -2063,10 +2063,10 @@ test_that("read_mnirs auto-detects Artinis channels when nirs_channels = NULL", 
 
     expect_s3_class(df, "mnirs")
     expect_equal(attr(df, "nirs_device"), "Artinis")
-    expect_equal(attr(df, "nirs_channels"), c("VL_O2Hb", "VL_HHb"))
+    expect_equal(attr(df, "nirs_channels"), c("vl_o2hb", "vl_hhb"))
     expect_equal(attr(df, "time_channel"), "time")
     expect_equal(attr(df, "event_channel"), "event")
-    expect_true(all(c("sample", "time", "VL_O2Hb", "VL_HHb", "event") %in% names(df)))
+    expect_true(all(c("sample", "time", "vl_o2hb", "vl_hhb", "event") %in% names(df)))
 })
 
 test_that("read_mnirs keep_all = FALSE returns only specified columns by default", {
@@ -2511,12 +2511,12 @@ test_that("read_mnirs Oxysoft Portamon works", {
     )
 
     expect_true(all(
-        c("sample", "time", "Rx1_Tx1_tHb", "Rx1_Tx1_HHb", "Rx1_Tx1_O2Hb",
+        c("sample", "time", "rx1_tx1_thb", "rx1_tx1_hhb", "rx1_tx1_o2hb",
           "event", "labels") %in% names(df2)
     ))
     expect_equal(
         attr(df2, "nirs_channels"),
-        c("Rx1_Tx1_tHb", "Rx1_Tx1_HHb", "Rx1_Tx1_O2Hb")
+        c("rx1_tx1_thb", "rx1_tx1_hhb", "rx1_tx1_o2hb")
     )
     expect_equal(attr(df2, "event_channel"), "event")
     expect_true("Occlusion" %in% df2$labels)

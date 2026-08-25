@@ -70,14 +70,16 @@
 #' names in a "Legend" metadata block, which `read_mnirs()` parses to name
 #' columns automatically:
 #'
-#' - Trace names become column names, with non-alphanumeric characters
-#'   replaced by underscores (e.g. `"Rx1 - Tx1 O2Hb"` becomes `Rx1_Tx1_O2Hb`).
-#'   All named traces are set as `nirs_channels`.
+#' - Trace names become lower-case column names, with non-alphanumeric
+#'   characters replaced by underscores (e.g. `"Rx1 - Tx1 O2Hb"` becomes
+#'   `rx1_tx1_o2hb`). All named traces are set as `nirs_channels`.
 #' - The `"(Sample number)"` column is renamed `sample`, and a `time` column
 #'   in seconds is derived from the export sample rate (see *Time parsing*).
 #' - The `"(Event)"` column is renamed `event` and set as `event_channel`.
 #' - A trailing un-numbered column containing event label text is renamed
-#'   `labels`, or dropped when empty.
+#'   `labels` and placed after `event`. It is included only when
+#'   `event_channel` is auto-detected or `keep_all = TRUE`, and dropped when
+#'   empty.
 #'
 #' Explicit `nirs_channels`, `time_channel`, and `event_channel` arguments
 #' override the automatic detection.

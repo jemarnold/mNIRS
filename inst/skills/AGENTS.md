@@ -88,9 +88,7 @@ read_mnirs(
 ```
 
 - Auto-detects device, header row, channel names, time column when `NULL`.
-- Artinis Oxysoft: channels auto-named from file "Legend" metadata — traces
-  sanitised (`Rx1_Tx1_O2Hb`), "(Sample number)" → `sample` (+ derived `time`),
-  "(Event)" → `event`, trailing unnumbered label col → `labels`.
+- Artinis Oxysoft: channels auto-named from file "Legend" metadata — traces cleaned & lowercased (`rx1_tx1_o2hb`), "(Sample number)" → `sample` (+ derived `time`), "(Event)" → `event`, trailing unnumbered label col → `labels`.
 - Date-time `time_channel` converted → numeric, rebased to 0.
 - Warns on irregular sampling (non-monotonic, repeated, unequal).
 - Example files retrieved from `example_mnirs()`.

@@ -204,11 +204,11 @@ parse_oxysoft_legend <- function(data, header_row) {
         time_channel = named_map(time_id, "sample"),
         nirs_channels = named_map(
             cols[!paren],
-            sanitise_channel_names(traces[!paren])
+            clean_channel_names(traces[!paren])
         ),
         event_channel = named_map(event_id, "event"),
         extra_channels = c(
-            named_map(cols[extra], sanitise_channel_names(traces[extra])),
+            named_map(cols[extra], clean_channel_names(traces[extra])),
             named_map(paste0("col_", label_idx, recycle0 = TRUE), "labels")
         )
     ))
@@ -241,14 +241,22 @@ detect_device_channels <- function(
             if (length(.x) > 0L) .x
         })
 
+        ## return all cols to view potential channels when auto-detected
+        keep_all <- is.null(nirs_channels) || keep_all
+
+        ## `labels` accompanies an auto-detected `event_channel` only
+        extra_channels <- legend$extra_channels
+        if (!is.null(event_channel) && !keep_all) {
+            extra_channels <- extra_channels[names(extra_channels) != "labels"]
+        }
+
         ch_list <- list(
             ## user-specified channels always take priority
             time_channel = time_channel %||% legend$time_channel,
             nirs_channels = nirs_channels %||% legend$nirs_channels,
             event_channel = event_channel %||% legend$event_channel,
-            extra_channels = legend$extra_channels,
-            ## return all cols to view potential channels when auto-detected
-            keep_all = if (is.null(nirs_channels)) TRUE else keep_all
+            extra_channels = if (length(extra_channels) > 0L) extra_channels,
+            keep_all = keep_all
         )
 
         if (is.null(ch_list$nirs_channels)) {
@@ -456,12 +464,12 @@ is_empty <- function(x) {
 }
 
 
-#' Sanitise legend trace names to syntactic column names
+#' Clean legend trace names to syntactic column names
 #' @keywords internal
-sanitise_channel_names <- function(x) {
-    ## collapse non-alphanumeric runs to "_", trim edges
+clean_channel_names <- function(x) {
+    ## collapse non-alphanumeric runs to "_", trim edges, lowercase
     x <- gsub("[^[:alnum:]]+", "_", x)
-    return(gsub("^_+|_+$", "", x))
+    return(tolower(gsub("^_+|_+$", "", x)))
 }
 
 
@@ -506,11 +514,12 @@ select_rename_data <- function(
     env = rlang::caller_env()
 ) {
     ## ensure all channel inputs are named (name = original_col_name)
+    ## list order sets column order: extras (e.g. `labels`) follow event
     ch_list <- list(
         time_channel = time_channel,
         event_channel = event_channel,
-        nirs_channels = nirs_channels,
-        extra_channels = extra_channels
+        extra_channels = extra_channels,
+        nirs_channels = nirs_channels
     ) |>
         lapply(\(.x) if (is.null(.x)) .x else name_channels(.x))
 
