@@ -22,17 +22,17 @@ knitr:
 
 Modern wearable muscle near-infrared spectroscopy (mNIRS) devices make it easier than ever to monitor local muscle oxygenation during dynamic activities.
 
-The real challenge comes with deciding how to clean, filter, process, and eventually interpret those data.
+The real challenge comes with deciding how to process, analyse, and eventually interpret those data.
 
 The `{mnirs}` package aims to provide standardised, reproducible methods for reading, processing, and analysing mNIRS data. The goal is to help practitioners detect meaningful signal from noise, and improve our confidence in interpreting and applying information to the clients we work with.
 
 In this vignette we will demonstrate how to:
 
-* 📂 Read files exported from wearable NIRS devices, and import NIRS channels into a standard data frame format with metadata, ready for further processing.
+* 📂 Read files exported from wearable mNIRS devices, and import NIRS channels into a standard data frame format with metadata, ready for further processing.
 
-* 📊 Plot and visualise data frames of class *`"mnirs"`*.
+* 📊 Plot and visualise data frames of class *"mnirs"*.
 
-* 🔍 Retrieve metadata stored with data frames of class *`"mnirs"`* to avoid repetitively specifying which channels to process.
+* 🔍 Retrieve metadata stored with data frames of class *"mnirs"* to avoid repetitively specifying which channels to process.
 
 * ⏱️ Resample data to a higher or lower sample rate, to correct irregular sampling periods, or to match the frequency of other data sources for synchronisation.
 
@@ -46,16 +46,16 @@ In this vignette we will demonstrate how to:
 
 * 🧮 Detect and extract intervals for further analysis.
 
-*`mnirs`* is designed to process NIRS data, but it can be used to read, clean, and process other time series data which require many of the same processing steps. Enjoy!
+*{mnirs}* is designed to process NIRS data, but it can be used to read, clean, and process other time series data which require many of the same processing steps. Enjoy!
 
 
 # 📂 Read data from file
 
 We will read an example data file with two NIRS channels from an incremental ramp cycling assessment recorded with *Moxy* muscle oxygen monitor.
 
-First, install and load the *`mnirs`* package and other required libraries.
+First, install and load the *{mnirs}* package and other required libraries.
 
-*`mnirs`* can be installed with `install.packages("mnirs")`.
+*{mnirs}* can be installed with `install.packages("mnirs")`.
 
 ```{r}
 #| label: setup
@@ -80,9 +80,9 @@ See `read_mnirs()` for more details.
     Specify the location of the data file, including file extension. e.g. `"my_file.xlsx"`, `"C:/myfolder/my_file.csv"`, or `here::here("data", "my_file.csv")`.
 
 ::: {.callout-note}
-### Example data files
+## Example data files
 
-A few example data files are included in the *`mnirs`* package. File paths can be accessed with `example_mnirs()`.
+A few example data files are included in the *{mnirs}* package. File paths can be accessed with `example_mnirs()`.
 :::
 
 * `nirs_channels`
@@ -97,9 +97,9 @@ A few example data files are included in the *`mnirs`* package. File paths can b
 
     Optionally, a channel can be specified which indicates character *event* labels or integer *lap* values in the data table.\
 \
-For *Artinis Oxysoft* exports, which number their data table columns, channel names are read automatically from the file *Legend* metadata: named traces become `nirs_channels` (non-alphanumeric characters replaced with underscores, e.g. `Rx1_Tx1_O2Hb`), the *(Sample number)* column becomes `sample` (with a `time` column derived from the export sample rate), the *(Event)* column becomes `event`, and a trailing un-numbered event label column becomes `labels`. Explicit channel arguments override this detection.\
+Files exported from *Artinis Oxysoft* can automatically detect `nirs_channels` from the *Legend* metadata. Names are cleaned and lowercased (e.g. *"rx1_tx1_o2hb"*). The *"Sample"* column is detected and a *"time"* column is derived as `time_channel`. `event_channel` is also automatically detected, with a secondary *"labels"* column included if present.\
 \
-These channel names are used to detect the data table within the file, and must match exactly with text strings in the file on the same row. We can rename these channels when reading data by specifying a named character vector: 
+Explicitly user-supplied channel names are used to detect the data table within the file, and must match exactly with text strings in the file on the same row. We can rename these channels when reading data by specifying a named character vector: 
 
 ```{r}
 nirs_channels = c(
@@ -118,7 +118,7 @@ Automatic detection usually works well unless there is irregular sampling, or th
 
     `FALSE` by default; if `time_channel` is in date-time (POSIXct) format (e.g., *hh:mm:ss*), by default it will be converted to numeric time in seconds.\
 \
-If `add_timestamp = TRUE`, the date-time start time value in `time_channel` or in the file metadata will be extracted and a `"timestamp"` column will be added to the returned data frame. This can be useful for synchronising devices based on system time.
+If `add_timestamp = TRUE`, the date-time start time value in `time_channel` or in the file metadata will be extracted and a *"timestamp"* column will be added to the returned data frame. This can be useful for synchronising devices based on system time.
 
 * `zero_time`
 
@@ -128,18 +128,23 @@ If `add_timestamp = TRUE`, the date-time start time value in `time_channel` or i
 
     `FALSE` by default; only the channels explicitly specified will be returned in a data frame. `keep_all = TRUE` will return all columns detected from the data table in the file.\
 \
-Blank/empty columns will be omitted. Duplicate column names will be repaired by appending a suffix `"_n"`, and empty column names will be renamed as `col_n`; where `n` is equal to the column number in the data file. Renamed columns should be checked to confirm correct naming if duplicates are present.
+Blank/empty columns will be omitted. Duplicate column names will be repaired by appending a suffix *"_n"*, and empty column names will be renamed as *"col_n"*; where `n` is equal to the column number in the data file. Renamed columns should be checked to confirm correct naming if duplicates are present.
 
 * `verbose`
 
-    `TRUE` by default; this and most *`mnirs`* functions will return warnings and informational messages which are useful for troubleshooting and data validation. This option can be used to silence those messages. *`mnirs`* messages can be silenced globally for a session by setting `options(mnirs.verbose = FALSE)`.
+    `TRUE` by default; this and most *{mnirs}* functions will return warnings and informational messages which are useful for troubleshooting and data validation. This option can be used to silence those messages. *{mnirs}* messages can be silenced globally for a session by setting `options(mnirs.verbose = FALSE)`.
 
 ```{r}
-## {mnirs} includes sample files from a few NIRS devices
+## {mnirs} includes sample files from a few mNIRS devices
 example_mnirs()
 
 ## partial matching will error if matches multiple
 try(example_mnirs("moxy"))
+
+## automatically detect known file formats to explore the data
+read_mnirs(
+    file_path = example_mnirs("artinis")
+)
 
 data_raw <- read_mnirs(
     file_path = example_mnirs("moxy_ramp"), ## call an example data file
@@ -156,28 +161,28 @@ data_raw <- read_mnirs(
     verbose = TRUE                  ## show warnings & messages
 )
 
-## Note the above info message that sample_rate was estimated correctly at 2 Hz ☝
+## Note the above info message that sample_rate was estimated correctly at 2 Hz 👆
 ## ignore the warnings about irregular sampling for now, we will resample later
 
 data_raw
 ```
 
 
-# 📊 Plot *`mnirs`* data
+# 📊 Plot *{mnirs}* data
 
-*`mnirs`* data can be easily viewed by calling `plot()` (explicitly documented as `plot.mnirs()`). This generic plot function uses *`ggplot2`* and will work on data frames (or lists of data frames) processed by *`mnirs`* functions, where the metadata contains `class = *"mnirs"*`.
+*{mnirs}* data can be easily viewed by calling `plot()` (explicitly documented as `plot.mnirs()`). This generic plot function uses `{ggplot2}` and will work on data frames (or lists of data frames) processed by *{mnirs}* functions, where the metadata contains `class = "mnirs"`.
 
-:::{.callout-note}
-### Processing lists of *`mnirs`* data frames
+::: {.callout-note}
+## Processing lists of *{mnirs}* data frames
 
-As of `mnirs v0.7.0`, most processing functions will accept either a single data frame, a list of data frames, or a grouped data frame (requiring `{dplyr}`), and returns a single or list of data frames, respectively. This allows separate processing of NIRS interval data, e.g. filtering and shifting NIRS channels within discrete intervals, rather than on the global data frame.
+As of *{mnirs}* `v0.7.0`, most processing functions will accept either a single data frame, a list of data frames, or a grouped data frame (requiring `{dplyr}`), and returns a single or list of data frames, respectively. This allows separate processing of NIRS interval data, e.g. filtering and shifting NIRS channels within discrete intervals, rather than on the global data frame.
 :::
 
-## `plot.mnirs`
+## `plot.mnirs()`
 
 * `data`
 
-    This function takes in a data frame or list of data frames of class *`mnirs`* and returns a formatted *`ggplot2`* plot. Lists of *`mnirs`* data frames are returned as plot facets.
+    This function takes in a data frame or list of data frames of class *"mnirs"* and returns a formatted `{ggplot2}` plot. Lists of *{mnirs}* data frames are returned as plot facets.
 
 * `points`
 
@@ -201,14 +206,14 @@ plot(
 )
 ```
 
-*`mnirs`* includes a custom *`ggplot2`* theme and colour palette available with `theme_mnirs()` and `palette_mnirs()`. See those documentation references for more details.
+*{mnirs}* includes a custom `{ggplot2}` theme and colour palette available with `theme_mnirs()` and `palette_mnirs()`. See those documentation references for more details.
 
 
-# 🔍 Metadata stored in *`mnirs`* data frames
+# 🔍 Metadata stored in *{mnirs}* data frames
 
-Data frames generated or read by *`mnirs`* functions will return `class = *"mnirs"*` and contain metadata, which can be retrieved with `attributes()`. 
+Data frames generated or read by *{mnirs}* functions will return `class = "mnirs"` and contain metadata, which can be retrieved with `attributes()`. 
 
-Instead of re-defining values like our channel names or sample rate, certain *`mnirs`* functions can automatically retrieve them from metadata. They can always be overwritten manually in subsequent functions, or by using a helper function `create_mnirs_data()`.
+Instead of re-defining values like our channel names or sample rate, certain *{mnirs}* functions can automatically retrieve them from metadata. They can always be overwritten manually in subsequent functions, or by using a helper function `create_mnirs_data()`.
 
 See `create_mnirs_data()` for more details about metadata.
 
@@ -233,19 +238,19 @@ Downsampling can be useful to reduce data size and processing requirement, altho
 
 * `data`
 
-    This function takes in a data frame or list of data frames, applies processing to all channels specified explicitly or implicitly from *`mnirs`* metadata, then returns the processed data frame (or list). *`mnirs`* metadata will be passed to and from this function.\
+    This function takes in a data frame or list of data frames, applies processing to all channels specified explicitly or implicitly from *{mnirs}* metadata, then returns the processed data frame (or list). *{mnirs}* metadata will be passed to and from this function.\
 \
-*`mnirs`* functions are also pipe-friendly for Base R 4.1+ (`|>`) or `{magrittr}` (`%>%`) pipes to chain operations together (see below).
+*{mnirs}* functions are also pipe-friendly for Base R 4.1+ (`|>`) or `{magrittr}` (`%>%`) pipes to chain operations together (see below).
 
 * `time_channel`
 
-    The column name of time series values in `data`. If the data contain *`mnirs`* metadata, this channel will be detected automatically, or it can be specified explicitly.\
+    The column name of time series values in `data`. If the data contain *{mnirs}* metadata, this channel will be detected automatically, or it can be specified explicitly.\
 \
 This function processes all columns in `data`, so `nirs_channels` does not need to be specified.
 
 * `sample_rate`
 
-    The sample rate (in Hz) of `data`. If the data contain *`mnirs`* metadata, this channel will be detected automatically, or it can be specified explicitly.
+    The sample rate (in Hz) of `data`. If the data contain *{mnirs}* metadata, this channel will be detected automatically, or it can be specified explicitly.
 
 * `resample_rate`
 
@@ -253,7 +258,7 @@ This function processes all columns in `data`, so `nirs_channels` does not need 
 
 * `method`
 
-    Any new samples created by resampling (i.e. samples fill in between gaps, or up-sampled indices) can be filled in or left blank as `NA`. The default `method` is to leave new samples blank, and interpolation must be explicitly specified as either *"locf"* to repeat the last observation carried forward, or *"linear"* interpolation.
+    Any new samples created by resampling (i.e. samples fill in between gaps, or up-sampled indices) can be filled in or left blank as `NA`. The default `method = "none"` leaves new samples blank, and interpolation must be explicitly specified as either *"locf"* to repeat the last observation carried forward, or *"linear"* interpolation.
 
 ```{r}
 data_resampled <- resample_mnirs(
@@ -282,7 +287,7 @@ Note: if we perform both of these steps in a piped function call, we will still 
 
 We can see some data issues in the plot above, so let's clean those with a single wrangling function `replace_mnirs()`, to prepare our data for digital filtering and smoothing.
 
-*`mnirs`* tries to include basic functions which work on vector data, and convenience wrappers which combine functionality and can be used on multiple channels in a data frame at once.
+*{mnirs}* tries to include basic functions which work on vector data, and convenience wrappers which combine functionality and can be used on multiple channels in a data frame at once.
 
 Let's explain the functionality of this data-wide function, and for more details about the vector-specific functions see `replace_mnirs()`.
 
@@ -291,11 +296,11 @@ Let's explain the functionality of this data-wide function, and for more details
 
 * `nirs_channels`
 
-    Specify which column names in `data` to process, i.e. the response variables. If the data contain *`mnirs`* metadata, these channels will be detected automatically. Channels not explicitly specified will be passed through unprocessed to the returned data frame.
+    Specify which column names in `data` to process, i.e. the response variables. If the data contain *{mnirs}* metadata, these channels will be detected automatically. Channels not explicitly specified will be passed through unprocessed to the returned data frame.
 
 * `time_channel` & `sample_rate`
 
-    If the data contain *`mnirs`* metadata, these will be detected automatically, or they can be specified explicitly.
+    If the data contain *{mnirs}* metadata, these will be detected automatically, or they can be specified explicitly.
 
 * `invalid_values`, `invalid_above`, or `invalid_below`
 
@@ -311,7 +316,7 @@ Let's explain the functionality of this data-wide function, and for more details
 
 * `method`
 
-    Missing data (`NA`), invalid values, and local outliers specified above can be replaced via interpolation or fill methods; either `"linear"` interpolation (the default), fill with local `"median"`, or `"locf"` (*"last observation carried forward"*).\
+    Missing data (`NA`), invalid values, and local outliers specified above can be replaced via interpolation or fill methods; either *"linear"* interpolation (the default), fill with local *"median"*, or *"locf"* (*"last observation carried forward"*).\
 \
 `NA`s can be passed through to the returned data frame with `method = "none"`. However, subsequent processing & analysis steps may return errors when `NA`s are present. Therefore, it is good practice to deal with missing data early during data processing.
 
@@ -335,7 +340,7 @@ plot(data_cleaned, time_labels = TRUE)
 That cleaned up all the obvious data issues.
 
 
-# 📈 Digital filtering
+# 📈️ Digital filtering
 
 To improve the signal-to-noise ratio in our dataset without losing information, we should apply digital filtering to smooth the data.
 
@@ -343,7 +348,7 @@ To improve the signal-to-noise ratio in our dataset without losing information, 
 
 ## Choosing a digital filter
 
-There are a few digital filtering methods available in *`mnirs`*. Which option is best for *you* will depend in large part on the sample rate of your data and the frequency of the response signal or phenomenon you are interested in observing.
+There are a few digital filtering methods available in *{mnirs}*. Which option is best for *you* will depend in large part on the sample rate of your data and the frequency of the response signal or phenomenon you are interested in observing.
 
 Choosing filter parameters is an important processing step to improve signal-to-noise ratio and enhance our subsequent interpretations. Over-filtering the data can introduce data artefacts which can negatively influence signal analysis and interpretations, just as much as trying to analyse overly-noisy raw data.
 
@@ -453,9 +458,9 @@ We can group NIRS channels together to preserve the absolute and relative scalin
 
     Controls how `nirs_channels` are grouped, to preserve absolute or relative scaling. Either a character keyword or a `list()` of channel-name vectors:\
 \
-`"ensemble"` (the default) shifts all channels together to a common value, preserving the relative scaling between channels.\
+*"ensemble"* (the default) shifts all channels together to a common value, preserving the relative scaling between channels.\
 \
-`"distinct"` shifts each channel independently, losing the relative scaling between channels.\
+*"distinct"* shifts each channel independently, losing the relative scaling between channels.\
 \
 A `list()` of channel-name vectors (e.g. `list(c(A, B), c(C))`) shifts channels `A` & `B` together and `C` separately, preserving relative scaling within, but not between groups.
 
@@ -471,7 +476,7 @@ e.g. `width = 1` will shift from the single minimum sample, whereas `span = 1` w
 
 * `position`
 
-    Specifies the reference point used to shift the data; either `"min"`, `"max"`, or `"first"` sample(s).
+    Specifies the reference point used to shift the data; either *"min"*, *"max"*, or *"first"* sample(s).
 
 
 For this data set, we want to shift each NIRS channel so that the mean of the 2-minute baseline is equal to zero, which would then give us a change in deoxygenation from baseline during the incremental cycling protocol.
@@ -479,7 +484,7 @@ For this data set, we want to shift each NIRS channel so that the mean of the 2-
 ::: {.callout-note}
 ## `{tidyverse}`-style channel name specification
 
-This is a good time to note that here and in most *`mnirs`* functions, data channels can be specified using `{tidyverse}`-style naming. Data frame column names can be specified either with quotes as a character string (`"smo2"`), or as a direct symbol (`smo2`).
+This is a good time to note that here and in most *{mnirs}* functions, data channels can be specified using `{tidyverse}`-style naming. Data frame column names can be specified either with quotes as a character string (`"smo2"`), or as a direct symbol (`smo2`).
 
 `{tidyselect}` support functions such as `starts_with()`, `matches()` can also be used.
 :::
@@ -487,7 +492,7 @@ This is a good time to note that here and in most *`mnirs`* functions, data chan
 ```{r}
 data_shifted <- shift_mnirs(
     data_filtered,
-    group_channels = list(smo2_left, smo2_right), ## 👈 channels shifted separately
+    group_channels = list(smo2_left, smo2_right), ## channels shifted separately
     to = 0,            ## NIRS values will be shifted to zero
     span = 120,        ## shift the *first* 120 sec of data to zero
     position = "first"
@@ -497,13 +502,13 @@ plot(data_shifted, time_labels = TRUE) +
     geom_hline(yintercept = 0, linetype = "dotted")
 ```
 
-Before shifting, the minimum (end of exercise) values for *smo2_left* and *smo2_right* were similar, but the starting baseline values were different. 
+Before shifting, the minimum (end of exercise) values for *"smo2_left"* and *"smo2_right"* were similar, but the starting baseline values were different. 
 
-When we shift both baseline values to zero, however, we can see that the *smo2_left* signal has a smaller deoxygenation amplitude compared to the *smo2_right* signal, and a (slightly) greater hyperaemic reoxygenation peak.
+When we shift both baseline values to zero, however, we can see that the *"smo2_left"* signal has a smaller deoxygenation amplitude compared to the *"smo2_right"* signal, and a (slightly) greater hyperaemic reoxygenation peak.
 
 We have to consider how our assumptions and processing decisions will influence our interpretations; by shifting both starting values, we are normalising for, and implicitly assuming that the baseline represents the same starting condition for the tissues in both legs.
 
-This may or may not be an appropriate assumption for your research question; for example, this may be appropriate when we are more interested in the relative change (delta) in each leg during an intervention or exposure (often referred to as `"∇SmO2"`), but not if we were interested in asymmetries that could influence SmO<sub>2</sub> at rest.
+This may or may not be an appropriate assumption for your research question; for example, this may be appropriate when we are more interested in the relative change (delta) in each leg during an intervention or exposure (often referred to as *"∇SmO2"*), but not if we were interested in asymmetries that could influence SmO<sub>2</sub> at rest.
 
 
 
@@ -515,9 +520,9 @@ We may also want to rescale our data to a new dynamic range, changing the signal
 
     Controls how `nirs_channels` are grouped, to preserve absolute or relative scaling. Either a character keyword or a `list()` of channel-name vectors:\
 \
-`"ensemble"` (the default) rescales all channels together to a common range, preserving the relative scaling between channels.\
+*"ensemble"* (the default) rescales all channels together to a common range, preserving the relative scaling between channels.\
 \
-`"distinct"` rescales each channel independently, losing the relative scaling between channels.\
+*"distinct"* rescales each channel independently, losing the relative scaling between channels.\
 \
 A `list()` of channel-name vectors (e.g. `list(c(A, B), c(C))`) rescales channels `A` & `B` together and `C` separately, preserving relative scaling within, but not between groups.
 
@@ -528,7 +533,7 @@ A `list()` of channel-name vectors (e.g. `list(c(A, B), c(C))`) rescales channel
 ```{r}
 data_rescaled <- rescale_mnirs(
     data_filtered,
-    group_channels = list(smo2_left, smo2_right), ## 👈 channels rescaled separately
+    group_channels = list(smo2_left, smo2_right), ## channels rescaled separately
     range = c(0, 100) ## rescale to a 0-100% functional exercise range
 )
 
@@ -538,9 +543,9 @@ plot(data_rescaled, time_labels = TRUE) +
 
 Here, our assumption is that during a maximal exercise task, the minimum and maximum values represent the functional capacity of each tissue volume being observed. So we rescale the functional dynamic range in each leg.
 
-By normalising this way, we might lose meaningful differences captured by the different amplitudes between *smo2_left* and *smo2_right*, but we might be more interested in the trend or time course of each response.
+By normalising this way, we might lose meaningful differences captured by the different amplitudes between *"smo2_left"* and *"smo2_right"*, but we might be more interested in the trend or time course of each response.
 
-Our interpretation may be that *smo2_right* appears to start at a slightly higher percent of its functional range, deoxygenates faster toward a minimum, and reaches a quasi-plateau near maximal exercise. While *smo2_left* deoxygenates slightly slower and continues to deoxygenate until maximal task tolerance. 
+Our interpretation may be that *"smo2_right"* appears to start at a slightly higher percent of its functional range, deoxygenates faster toward a minimum, and reaches a quasi-plateau near maximal exercise. While *"smo2_left"* deoxygenates slightly slower and continues to deoxygenate until maximal task tolerance. 
 
 Additionally, the left leg reoxygenates slightly faster than the right during recovery. This might, for example, indicate exercise capacity differences between the limbs (although these differences are marginal and only discussed as representative for influence on interpretations).
 
@@ -548,7 +553,7 @@ Additionally, the left leg reoxygenates slightly faster than the right during re
 
 # 🔀 Pipe-friendly functions
 
-Most *`mnirs`* functions can be piped together using Base R 4.1+ (`|>`) or `{magrittr}` (`%>%`). The entire processing workflow can easily be performed in a sequential pipe.
+Most *{mnirs}* functions can be piped together using Base R 4.1+ (`|>`) or `{magrittr}` (`%>%`). The entire processing workflow can easily be performed in a sequential pipe.
 
 To demonstrate this, we'll read a different example file recorded with *Train.Red FYER* muscle oxygen sensor and pipe it through each processing stage straight to a plot.
 
@@ -592,13 +597,13 @@ nirs_data <- read_mnirs(
 plot(nirs_data, time_labels = TRUE)
 ```
 
-We have two exercise intervals in this data set. Let's demonstrate some of the common analysis methods currently available with *`mnirs`*.
+We have two exercise intervals in this data set. Let's demonstrate some of the common analysis methods currently available with *{mnirs}*.
 
 # 🧮 Interval extraction
 
 After the NIRS signal has been cleaned and filtered, it should be ready for further processing and analysis. 
 
-*`mnirs`* is under development to include functionality for processing discrete intervals and events, e.g. reoxygenation kinetics, slope calculations for post-occlusion microvascular responsiveness, and critical oxygenation breakpoints.
+*{mnirs}* is under development to include functionality for processing discrete intervals and events, e.g. reoxygenation kinetics, slope calculations for post-occlusion microvascular responsiveness, and critical oxygenation breakpoints.
 
 
 
@@ -610,13 +615,11 @@ We may have marked event labels or have incremental lap numbers in the specified
 
 * `data`
 
-    This function takes in a single data frame, detects and extracts specified intervals, and returns a list of processed data frames. *`mnirs`* metadata will be passed to and from this function.
+    This function takes in a single data frame, detects and extracts specified intervals, and returns a list of processed data frames. *{mnirs}* metadata will be passed to and from this function.
 
 * `nirs_channels`
 
-    If returning a list of *"distinct"* intervals (see `group_intervals` below), `nirs_channels` does not have to be specified, as no channels are processed.\
-\
-Only when *"ensemble"*-averaging, `nirs_channels` should be specified by providing a list of column names (e.g. `list(c(A, B), c(A))`), where each list item specifies the channels to be ensemble-averaged within the respective group (ensemble-groups are specified by `group_intervals` below), in the order in which they are returned. The default *`mnirs`* metadata will ensemble-average all `nirs_channels`.
+    If returning a list of *"distinct"* intervals (see `group_intervals` below), `nirs_channels` does not have to be specified, as no channels are processed. If `group_intervals = "ensemble"` or a custom grouped list, then `nirs_channels` should be specified or taken from metadata (also see `group_channels` below).
 
 * `start` & `end`
 
@@ -624,13 +627,17 @@ Only when *"ensemble"*-averaging, `nirs_channels` should be specified by providi
 
 * `group_intervals`
 
-    Events can be extracted and returned as a list of `"distinct"` intervals, or `"ensemble"`-averaged into a single data frame. Custom grouping structure for ensemble-averaging can be specified by event number, in order of appearance within the original data.\
+    Events can be extracted and returned as a list of *"distinct"* intervals, or *"ensemble"*-averaged into a single data frame. Custom grouping structure for ensemble-averaging can be specified by event number, in order of appearance within the original data.\
 \
 e.g. `group_intervals = list(c(1, 2), c(3, 4))` would return a list of two intervals, each ensemble-averaged from the respective events, in sequential order from the original data.
 
+* `group_channels`
+#! CORRECT THIS
+    When `group_intervals = "ensemble"` or a custom grouping list, then `group_channels` can be used to specify which `nirs_channels` should be included in the ensemble average. e.g. `list(c(A, B), c(A))` would ensemble-average *"A"* and *"B"* for the first interval group, but only *"A"* for the second group. By default, all `nirs_channels` are included in ensemble-averaging.
+
 * `span`
 
-    When only `start` (or `end`) is provided, `span` specifies a time window in units of `time_channel` as `c(before, after)`, where positive values indicate time after the event and negative values indicate time before. When both `start` and `end` are provided, `span` shifts boundaries additively: `span[1]` adjusts starts, `span[2]` adjusts ends.\
+    A two-element vector of `time_channel` values specifying a time window `c(start, end)` in units of `time_channel`, where positive values indicate time after the event bound and negative values indicate time before. `span[1]` shifts the start bound, `span[2]` shifts the end bound, respectively.\
 \
 A list of unique `span` vectors can be specified for each interval, otherwise a single `span` vector will be recycled to all intervals.
 
@@ -678,6 +685,6 @@ Ensemble-averaging can help mitigate data dropouts and other quality issues from
 
 # Conclusion
 
-This vignette walks through the core functionality of *`mnirs`* to read, clean, and pre-process data in preparation for analysis.
+This vignette walks through the core functionality of *{mnirs}* to read, clean, and pre-process data in preparation for analysis.
 
 Future development and articles will cover standardised analysis methods, including deoxygenation & reoxygenation kinetics and critical oxygenation breakpoint analysis.

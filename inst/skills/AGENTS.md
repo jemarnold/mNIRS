@@ -243,7 +243,7 @@ extract_intervals(
     group_channels = NULL,  # per-group channel selection (see below)
     start = NULL,  # by_time(numeric)/by_label(char)/by_lap(int)/by_sample(int)
     end   = NULL,  # same; NULL = window (span) around start
-    span  = list(c(-60, 60)),    # boundaries c(before, after) per interval
+    span  = list(c(-60, 60)),    # boundaries c(start, end) per interval
     zero_time = FALSE,           # rebase time to 0 per interval
 )
 ## returns named list of "mnirs" dfs
@@ -264,7 +264,7 @@ by_sample(...) # integer row indices
 
 - `by_label()`/`by_lap()` need `event_channel`.
 - `start`/`end` may accept `list()` of multiple mixed `by_*()` types (e.g. `start = list(by_time(30), by_label("go"))`); resolved times concatenated in supplied order.
-- `span = c(before, after)`: negative expands bound earlier before start, positive expands bound later after end; single value recycled by sign (`60` → `c(0, 60)`, `-60` → `c(-60, 0)`).
+- `span = c(start, end)`: negative expands bound earlier before start, positive expands bound later after end; single value recycled by sign (`60` → `c(0, 60)`, `-60` → `c(-60, 0)`).
 - `span`/`group_channels` as `list()` per interval group; recycled as needed.
 
 

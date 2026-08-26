@@ -1,6 +1,15 @@
 # mnirs 0.7.2
 
-* `read_mnirs()` now reads channel names automatically from the *Legend* metadata block of *Artinis Oxysoft* exports. Named traces are set as `nirs_channels` (non-alphanumeric characters replaced with underscores, e.g. *"Rx1_Tx1_O2Hb"*), *"(Sample number)"* becomes *"sample"* with a derived *"time"* column, *"(Event)"* becomes *"event"* and is set as `event_channel`, and the trailing un-numbered event label column becomes *"labels"* (previously e.g. *"col_6"*, which had to be identified manually). Explicit channel arguments override the automatic detection.
+* `read_mnirs()` now reads channel names automatically from *Artinis Oxysoft* exports.
+
+    * *"(Sample number)"* becomes *"sample"* with a derived *"time"* column as previously.
+    
+    * *"(Event)"* becomes *"event"* and is set as `event_channel`, and the trailing un-numbered event label column becomes *"labels"* (still has to be explicitly called as e.g. `event_channel = c(labels = "col_6")`).
+
+    * All other channels in the legend are renamed and returned as `nirs_channels`, with clean, lower case names (e.g. *"Rx1 - Tx1 O2Hb"* renamed as *"rx1_tx1_o2hb"*).
+    
+    * Explicit channel arguments override the automatic detection, as previous.
+
 
 * `extract_intervals()` now accepts a list of multiple `start` and/or `end` values with mixed `by_time()`, `by_label()`, `by_lap()`, or `by_sample()`. Intervals are matched by user-specified order.
 
@@ -12,6 +21,8 @@ extract_intervals(
     end = list(by_lap(3), by_label("10-min marker"))
 )
 ```
+
+* `plot_mnirs`: small adjustments to plot spacing & point sizes.
 
 * `palette_mnirs()` now returns unnamed colours, which was disrupting use with `ggplot2::scale_colour_manual()`.
 
@@ -47,6 +58,10 @@ read_mnirs(...) |>
     print() |>  ## view formatted results table
     plot()      ## and plot those results
 ```
+
+* *"README"* and *"Reading and Cleaning Data with mnirs"* vignette edited with updated functionality and consistent formatting.
+
+
 
 # mnirs 0.7.1
 

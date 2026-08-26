@@ -147,7 +147,7 @@ NULL
 #'   specified explicitly for [read_mnirs()]:
 #'   - `nirs_channels = c(O2Hb = 2, HHb = 3)`
 #'   - `time_channel = c(sample = 1)`
-#'   - `event_channel = c(event = 4, label = )`
+#'   - `event_channel = c(event = 4)`
 #'   - `interval_times = list(start = c(158, 999, 1750) end = c(493, 1333, 1961))` two intervals and post-exercise occlusion
 #'
 #' @source Artinis Medical Systems. Oxymon MKIII, exported via Oxysoft desktop

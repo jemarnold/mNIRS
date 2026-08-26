@@ -56,9 +56,10 @@
 #'   or [by_sample()]. Multiple specifications can be combined with
 #'   `list()` (e.g. `list(by_time(30), by_label("go"))`); see *Details*.
 #'
-#' @param span A one- or two-element numeric vector `c(before, after)` in units
-#'   of `time_channel`, or a `list()` of such vectors. (*default*
-#'   `span = c(-60, 60)`. Applied additively to interval boundaries:
+#' @param span A one- or two-element numeric vector expanding the time bounds
+#'   around `c(start, end)`, in units of `time_channel`; or a `list()` of such
+#'   vectors. (*default* `span = c(-60, 60)`. Applied additively to interval
+#'   boundaries:
 #'   - When both `start` and `end` are specified: `span[1]` shifts start times,
 #'     `span[2]` shifts end times.
 #'   - When only `start` or only `end` is specified: both `span[1]` and

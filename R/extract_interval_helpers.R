@@ -255,7 +255,7 @@ validate_interval_channels <- function(
 }
 
 
-#' recycle a single-element span to c(before, after)
+#' recycle a single-element span to c(start, end)
 #' positive -> c(0, x), negative -> c(x, 0)
 #' @inheritParams validate_mnirs
 #' @keywords internal

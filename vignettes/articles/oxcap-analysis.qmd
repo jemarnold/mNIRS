@@ -120,7 +120,9 @@ theme_set(theme_mnirs()) ## set ggplot2 theme
 ```
 
 
-::: {.callout-note title="Acknowledgement"}
+::: {.callout-note}
+## Acknowledgement
+
 I received this example file from [Dr. Thomas Tripp](https://scholar.google.com/citations?user=A9JwQbYAAAAJ&hl=en), currently a postdoctoral fellow in [Dr. Martin MacInnis](https://scholar.google.com/citations?hl=en&user=tJepNIQAAAAJ)' lab at the University of Calgary. They have kindly allowed me to include this file with the *{mnirs}* package for users to examine themselves.
 
 It can be accessed by calling `example_mnirs("portamon-oxcap")`.
@@ -132,7 +134,7 @@ It can be accessed by calling `example_mnirs("portamon-oxcap")`.
 
 The included example file has three NIRS channels and a sample-number column, automatically converted to a time value by `read_mnirs()`. The file needs no other pre-processing steps.
 
-Note: by default, *Artinis Oxysoft* exports an event label column without a named header — this is the column we will use to identify occlusion events by the label *"Occlusion"*. In *{mnirs}*, an unnamed column is coerced to name `"col_*"` with a numeric suffix for the column position in the data file. In our example file, this event column is therefore `"col_6"`. Not the most elegant solution, but it works for now.
+Note: by default, *Artinis Oxysoft* exports an event label column without a named header — this is the column we will use to identify occlusion events by the label *"Occlusion"*. In *{mnirs}*, an unnamed column is coerced to name *"col_\*"* with a numeric suffix for the column position in the data file. In our example file, this event column is therefore *"col_6"*. Not the most elegant solution, but it works for now.
 
 
 ```{r}
@@ -235,7 +237,7 @@ For manual grouping, interval numbers must be known ahead of time and always ref
 
 * `span`
 
-    A two-element vector of `time_channel` values specifying a time window `c(before, after)`, where positive values indicate time after the event and negative values indicate time before. When both `start` and `end` are provided, `span` shifts boundaries additively: `span[1]` adjusts starts, `span[2]` adjusts ends.\
+    A two-element vector of `time_channel` values specifying a time window `c(start, end)` in units of `time_channel`, where positive values indicate time after the event bound and negative values indicate time before. `span[1]` shifts the start bound, `span[2]` shifts the end bound, respectively.\
 \
 Since all occlusion bouts were held for 5 s, we use a 5-sec time span. If occlusion duration changed through the protocol, we could specify a list of time spans (`span = list()`); here a single vector is recycled.\
 \

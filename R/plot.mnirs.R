@@ -113,11 +113,11 @@ plot.mnirs <- function(
         ggplot2::scale_x_continuous(
             breaks = x_breaks,
             labels = x_labels,
-            expand = ggplot2::expansion(mult = 0.03)
+            expand = ggplot2::expansion(mult = 0.02)
         ) +
         ggplot2::scale_y_continuous(
             breaks = y_breaks,
-            expand = ggplot2::expansion(mult = 0.03)
+            expand = ggplot2::expansion(mult = 0.02)
         ) +
         scale_colour_mnirs(
             name = NULL,
