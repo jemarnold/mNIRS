@@ -91,6 +91,9 @@
 #' contents of the file data table header row exactly.
 #'
 #' ## Time parsing
+#' If `time_channel` is `NULL`, it is resolved in order from the known device
+#' default (or the *Artinis Oxysoft* legend), then by detecting a time-like
+#' column name (e.g. `"time"`, `"hh:mm:ss"`) or time-formatted values.
 #' `time_channel` will be converted to numeric for analysis.
 #'
 #' - If `time_channel` is a date-time (POSIXct) format, it will be converted
@@ -150,113 +153,106 @@ read_mnirs <- function(
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
 
-    ## import data_raw from either excel or csv
-    data <- read_file(file_path)
+    ## import raw character table & detect device
+    raw <- read_file(file_path)
+    device <- detect_mnirs_device(raw)
+    nirs_device <- device$nirs_device
 
-    ## detect mNIRS device from raw data. Returns NULL if not found
-    detected_list <- detect_mnirs_device(data)
-    nirs_device <- detected_list$nirs_device
-    header_row <- detected_list$header_row
-
-    ## resolve channels: use user input if provided, otherwise detect from
-    ## known device channel names. Errors if neither available.
-    channels <- detect_device_channels(
-        data,
-        header_row,
-        nirs_device,
-        nirs_channels,
-        time_channel,
-        event_channel,
-        keep_all,
-        verbose
-    )
-    nirs_channels <- channels$nirs_channels
-    time_channel <- channels$time_channel
-    event_channel <- channels$event_channel
-    extra_channels <- channels$extra_channels
-    keep_all <- channels$keep_all ## TRUE when `nirs_channels` unspecified
-
-    ## extract the data_table, and name by header row
-    table_list <- read_data_table(data, header_row, nirs_channels)
-    data <- table_list$data_table
-    file_header <- table_list$file_header
-
-    ## attempt to detect `time_channel` automatically
-    time_channel <- detect_time_channel(
-        data,
-        time_channel,
-        verbose
+    ## user channels as `c(new = "original")`
+    user <- lapply(
+        list(time = time_channel, event = event_channel, nirs = nirs_channels),
+        name_channels
     )
 
-    ## rename from channel names, make duplicates unique, keep columns
-    ## return list(data_renamed, nirs_renamed, time_renamed, event_renamed)
-    renamed_list <- select_rename_data(
-        data,
-        nirs_channels,
-        time_channel,
-        event_channel,
-        keep_all,
-        verbose,
-        extra_channels
-    )
-    data <- renamed_list$data
-    nirs_renamed <- renamed_list$nirs_channel
-    time_renamed <- renamed_list$time_channel
-    event_renamed <- renamed_list$event_channel
+    ## `keep_all` coerced to `TRUE` when `nirs_channels` are auto-detected,
+    ## otherwise respect user supplied `keep_all`
+    keep_all <- keep_all || is.null(nirs_channels)
 
-    ## remove empty (NA) columns and rows
+    ## resolve channels from user input, device defaults, or Oxysoft legend
+    channels <- resolve_channels(raw, device, user, keep_all, verbose)
+    header_row <- find_header_row(raw, channels$nirs, device$header_row)
+
+    ## name data table by header row
+    ## blank/duplicate names made unique
+    data <- setNames(
+        raw[-seq_len(header_row), ],
+        rename_duplicates(as.character(raw[header_row, ]))
+    )
+    channels$time <- channels$time %||% detect_time_channel(data, verbose)
+
+    ## select and rename channels
+    ## names take priority over clashing data names
+    channels <- match_channels(channels, names(data), verbose)
+    original <- unlist(channels, use.names = FALSE)
+    new <- unlist(lapply(channels, names), use.names = FALSE)
+    col_idx <- match(original, names(data))
+    names(data) <- rename_duplicates(c(new, names(data)))[-seq_along(new)]
+    names(data)[col_idx] <- new
+    data <- data[c(col_idx, if (keep_all) setdiff(seq_along(data), col_idx))]
+    channels <- lapply(channels, names)
+
+    ## remove empty rows and columns
+    ## drop metadata for an empty event column
     data <- remove_empty_rows_cols(data)
-    ## drop dangling metadata if an empty auto-detected event col was removed
-    event_renamed <- intersect(event_renamed, names(data))
-    if (length(event_renamed) == 0L) {
-        event_renamed <- NULL
-    }
-    ## convert char decimal "," to "." and convert column types
-    data <- convert_type(
-        data,
-        nirs_renamed,
-        time_renamed,
-        event_renamed,
-        verbose
-    )
-    ## convert POSIXct to numeric and/or recalc time from zero
-    ## defer header parsing unless the time channel lacks an absolute timestamp
+    event <- intersect(channels$event, names(data))
+    channels["event"] <- list(if (length(event) > 0L) event)
+
+    ## convert decimal "," to "." and column types by role
+    data <- convert_type(data, channels, verbose)
+
+    ## time to numeric, header timestamp parsed lazily only when the
+    ## time series lacks an absolute date-time
     time_list <- parse_time_channel(
-        data,
-        time_renamed,
-        extract_start_timestamp(file_header),
-        add_timestamp,
+        data[[channels$time]],
+        extract_start_timestamp(raw[seq_len(header_row), ]),
         zero_time
     )
-    data <- time_list$data
-    start_timestamp <- time_list$start_timestamp
+    data[[channels$time]] <- time_list$time
+    if (add_timestamp && !is.null(time_list$timestamp)) {
+        data <- tibble::add_column(
+            data,
+            timestamp = time_list$timestamp,
+            .after = channels$time
+        )
+    }
 
-    ## validate and estimate sample rate
-    ## will write new "time" column if Oxysoft export rate detected
-    ## return list(data_sampled, time_renamed, sample_rate)
-    sample_list <- parse_sample_rate(
-        data,
-        file_header,
-        time_renamed,
-        sample_rate,
-        nirs_device,
-        verbose
+    ## Oxysoft exports a sample index: derive a "time" column in seconds
+    ## from the export sample rate, placed in front of the sample column
+    if (identical(nirs_device, "Artinis")) {
+        sample_rate <- oxysoft_sample_rate(raw[seq_len(header_row), ])
+        time_new <- make.unique(c(names(data), "time"), sep = "_")[
+            ncol(data) + 1L
+        ]
+        data <- tibble::add_column(
+            data,
+            "{time_new}" := data[[channels$time]] / sample_rate,
+            .before = channels$time
+        )
+        channels$time <- time_new
+
+        if (verbose) {
+            cli_inform(c(
+                "!" = "Oxysoft {.arg sample_rate} = {.val {sample_rate}} Hz.",
+                "i" = "{.arg time_channel} = {.field {time_new}} added to \\
+                the data frame, in {.cls seconds}."
+            ))
+        }
+    }
+
+    ## validate or estimate sample rate; warn for irregular samples
+    sample_rate <- validate_sample_rate(
+        data, channels$time, sample_rate, verbose
     )
-    data <- sample_list$data
-    time_renamed <- sample_list$time_channel
-    sample_rate <- sample_list$sample_rate
-
-    ## print warnings for irregular samples
-    detect_irregular_samples(data[[time_renamed]], time_renamed, verbose)
+    detect_irregular_samples(data[[channels$time]], channels$time, verbose)
 
     ## assign metadata to attributes(data)
     metadata <- list(
         nirs_device = nirs_device,
-        nirs_channels = nirs_renamed,
-        time_channel = time_renamed,
-        event_channel = event_renamed,
+        nirs_channels = channels$nirs,
+        time_channel = channels$time,
+        event_channel = channels$event,
         sample_rate = sample_rate,
-        start_timestamp = start_timestamp,
+        start_timestamp = time_list$start_timestamp,
         verbose = verbose
     )
 
