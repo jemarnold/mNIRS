@@ -14,11 +14,12 @@
 \item{Column 5}{Unmarked event label (character).}
 }
 
-Channel mapping for \code{\link[=read_mnirs]{read_mnirs()}}:
+Channels are detected automatically from the file legend, or can be
+specified explicitly for \code{\link[=read_mnirs]{read_mnirs()}}:
 \itemize{
 \item \code{nirs_channels = c(O2Hb = 2, HHb = 3)}
 \item \code{time_channel = c(sample = 1)}
-\item \code{event_channel = c(event = 4, label = "col_5")}
+\item \code{event_channel = c(event = 4)}
 \item \verb{interval_times = list(start = c(158, 999, 1750) end = c(493, 1333, 1961))} two intervals and post-exercise occlusion
 }
 }

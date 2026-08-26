@@ -89,9 +89,30 @@ channel names. The header row does not need to be the first row in the file.
 appear and renamed with unique strings.
 \item Columns without a header name in the source file will be renamed to
 \verb{col_*}, where \code{*} is the numeric column number in which they appear in
-the file (e.g. \code{col_6}). This applies to \emph{Artinis Oxysoft} event label
-columns, which do not have a column header and must be identified manually.
+the file (e.g. \code{col_6}).
 }
+}
+
+\subsection{Artinis Oxysoft exports}{
+
+\emph{Artinis Oxysoft} exports number their data table columns and record channel
+names in a "Legend" metadata block, which \code{read_mnirs()} parses to name
+columns automatically:
+\itemize{
+\item Trace names become lower-case column names, with non-alphanumeric
+characters replaced by underscores (e.g. \code{"Rx1 - Tx1 O2Hb"} becomes
+\code{rx1_tx1_o2hb}). All named traces are set as \code{nirs_channels}.
+\item The \code{"(Sample number)"} column is renamed \code{sample}, and a \code{time} column
+in seconds is derived from the export sample rate (see \emph{Time parsing}).
+\item The \code{"(Event)"} column is renamed \code{event} and set as \code{event_channel}.
+\item A trailing un-numbered column containing event label text is renamed
+\code{labels} and placed after \code{event}. It is included only when
+\code{event_channel} is auto-detected or \code{keep_all = TRUE}, and dropped when
+empty.
+}
+
+Explicit \code{nirs_channels}, \code{time_channel}, and \code{event_channel} arguments
+override the automatic detection.
 }
 
 \subsection{Renaming channels}{
@@ -104,6 +125,9 @@ contents of the file data table header row exactly.
 
 \subsection{Time parsing}{
 
+If \code{time_channel} is \code{NULL}, it is resolved in order from the known device
+default (or the \emph{Artinis Oxysoft} legend), then by detecting a time-like
+column name (e.g. \code{"time"}, \code{"hh:mm:ss"}) or time-formatted values.
 \code{time_channel} will be converted to numeric for analysis.
 \itemize{
 \item If \code{time_channel} is a date-time (POSIXct) format, it will be converted

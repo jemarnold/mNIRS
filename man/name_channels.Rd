@@ -7,6 +7,7 @@
 name_channels(x)
 }
 \description{
-Force names on character strings
+Returns a named character vector \code{c(new = "original")}; unnamed elements
+are named by their value. \code{NULL} passes through.
 }
 \keyword{internal}

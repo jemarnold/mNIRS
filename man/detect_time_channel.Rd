@@ -2,26 +2,13 @@
 % Please edit documentation in R/read_mnirs_helpers.R
 \name{detect_time_channel}
 \alias{detect_time_channel}
-\title{Detect time_channel from header row}
+\title{Detect time_channel from column names or time-formatted values}
 \usage{
-detect_time_channel(
-  data,
-  time_channel = NULL,
-  nirs_device = NULL,
-  verbose = TRUE,
-  env = rlang::caller_env()
-)
+detect_time_channel(data, verbose = TRUE, env = rlang::caller_env())
 }
 \arguments{
 \item{data}{A data frame of class \emph{"mnirs"} containing time series data and
 metadata.}
-
-\item{time_channel}{A character string naming the time or sample column.
-Must match a column name in \code{data} exactly.
-\itemize{
-\item If \code{NULL} (default), the \code{time_channel} metadata attribute of \code{data} is
-used.
-}}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
@@ -32,6 +19,6 @@ errors and warnings as coming from the user-facing function rather
 than the validator.}
 }
 \description{
-Detect time_channel from header row
+Detect time_channel from column names or time-formatted values
 }
 \keyword{internal}

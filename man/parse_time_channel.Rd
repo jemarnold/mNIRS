@@ -2,17 +2,23 @@
 % Please edit documentation in R/read_mnirs_helpers.R
 \name{parse_time_channel}
 \alias{parse_time_channel}
-\title{Parse time_channel character or dttm to numeric}
+\title{Parse time_channel character or dttm to numeric seconds}
 \usage{
-parse_time_channel(
-  data,
-  time_channel,
-  start_timestamp = NULL,
-  add_timestamp = FALSE,
-  zero_time = FALSE
-)
+parse_time_channel(x, start_timestamp = NULL, zero_time = FALSE)
+}
+\arguments{
+\item{x}{The time column vector: numeric, character, or POSIXct.}
+
+\item{start_timestamp}{Optional POSIXct from the file header, evaluated
+lazily only when \code{x} is not an absolute date-time series.}
+
+\item{zero_time}{Logical; re-base numeric time to start from zero.}
+}
+\value{
+A list of \code{time} (numeric seconds), \code{timestamp} (POSIXct
+vector or \code{NULL}), and \code{start_timestamp} (POSIXct or \code{NULL}).
 }
 \description{
-Parse time_channel character or dttm to numeric
+Parse time_channel character or dttm to numeric seconds
 }
 \keyword{internal}

@@ -86,9 +86,10 @@ for lap numbers -- or created with \code{\link[=by_time]{by_time()}}, \code{\lin
 or \code{\link[=by_sample]{by_sample()}}. Multiple specifications can be combined with
 \code{list()} (e.g. \code{list(by_time(30), by_label("go"))}); see \emph{Details}.}
 
-\item{span}{A one- or two-element numeric vector \code{c(before, after)} in units
-of \code{time_channel}, or a \code{list()} of such vectors. (\emph{default}
-\code{span = c(-60, 60)}. Applied additively to interval boundaries:
+\item{span}{A one- or two-element numeric vector expanding the time bounds
+around \code{c(start, end)}, in units of \code{time_channel}; or a \code{list()} of such
+vectors. (\emph{default} \code{span = c(-60, 60)}. Applied additively to interval
+boundaries:
 \itemize{
 \item When both \code{start} and \code{end} are specified: \code{span[1]} shifts start times,
 \code{span[2]} shifts end times.

@@ -2,7 +2,7 @@
 % Please edit documentation in R/extract_interval_helpers.R
 \name{recycle_span}
 \alias{recycle_span}
-\title{recycle a single-element span to c(before, after)
+\title{recycle a single-element span to c(start, end)
 positive -> c(0, x), negative -> c(x, 0)}
 \usage{
 recycle_span(span, env = rlang::caller_env())
@@ -13,7 +13,7 @@ errors and warnings as coming from the user-facing function rather
 than the validator.}
 }
 \description{
-recycle a single-element span to c(before, after)
+recycle a single-element span to c(start, end)
 positive -> c(0, x), negative -> c(x, 0)
 }
 \keyword{internal}
