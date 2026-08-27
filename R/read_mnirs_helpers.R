@@ -86,6 +86,7 @@ device_patterns <- list(
     ),
     Train.Red = list(
         time_channel = "Timestamp (seconds passed)",
+        event_channel = "Lap/Event",
         pattern = c("Timestamp (seconds passed)", "SmO2"),
         fixed = TRUE
     ),

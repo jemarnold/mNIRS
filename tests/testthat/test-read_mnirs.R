@@ -397,6 +397,7 @@ test_that("resolve_channels() drops redundant unfiltered/Averaged SmO2", {
         V2 = c("SmO2", "55"),
         V3 = c("SmO2 unfiltered", "60"),
         V4 = c("SmO2 Averaged", "60"),
+        V5 = c("Lap/Event", "1"),
         stringsAsFactors = FALSE
     )
 
@@ -405,6 +406,12 @@ test_that("resolve_channels() drops redundant unfiltered/Averaged SmO2", {
     )
 
     expect_equal(result$nirs, "SmO2")
+    expect_equal(result$event, "Lap/Event")
+
+    ## device event default dropped when absent from header
+    expect_null(resolve_channels(
+        raw[-5L], test_device("Train.Red"), test_user(), verbose = FALSE
+    )$event)
 })
 
 test_that("resolve_channels() parses Artinis legend block", {
@@ -1998,6 +2005,13 @@ test_that("read_mnirs coerces integerish event_channel to integer", {
     # rlang::is_integerish(df$lap)
 
     expect_type(data$lap, "integer")
+})
+
+test_that("read_mnirs auto-detects Train.Red event_channel", {
+    df <- read_mnirs(example_mnirs("train.red_intervals.csv"), verbose = FALSE)
+
+    expect_equal(attr(df, "event_channel"), "Lap/Event")
+    expect_type(df[["Lap/Event"]], "integer")
 })
 
 test_that("read_mnirs train.red works with zero_time", {

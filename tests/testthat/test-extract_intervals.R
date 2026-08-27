@@ -2246,10 +2246,16 @@ test_that("extract_intervals works on train.red data", {
 
     ## structure
     expect_length(result, 2)
-    expect_length(result[[1L]], 3)
-    expect_length(result[[2L]], 3)
-    expect_named(result[[1L]], c("time", "smo2_left", "smo2_right"))
-    expect_named(result[[2L]], c("time", "smo2_left", "smo2_right"))
+    expect_length(result[[1L]], 4)
+    expect_length(result[[2L]], 4)
+    expect_named(
+        result[[1L]],
+        c("time", "Lap/Event", "smo2_left", "smo2_right")
+    )
+    expect_named(
+        result[[2L]],
+        c("time", "Lap/Event", "smo2_left", "smo2_right")
+    )
     ## range of time_channel
     expect_lte(min(result[[1L]][[1]]), 2150 - 30)
     expect_true(all.equal(
