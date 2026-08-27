@@ -22,6 +22,8 @@ extract_intervals(
 )
 ```
 
+* `extract_intervals()` Also now properly retains `event_channel` column in ensemble-averaged intervals (`group_intervals = "ensemble"` or custom groups).
+
 * `plot_mnirs`: small adjustments to plot spacing & point sizes.
 
 * `palette_mnirs()` now returns unnamed colours, which was disrupting use with `ggplot2::scale_colour_manual()`.

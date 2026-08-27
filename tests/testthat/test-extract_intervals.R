@@ -2085,7 +2085,7 @@ test_that("extract_intervals group_channels selects channels per interval", {
     )[[1L]]
 
     expect_named(result, "ensemble")
-    expect_named(result[[1L]], c("time", "smo2_left", "smo2_right"))
+    expect_named(result[[1L]], c("time", "event", "smo2_left", "smo2_right"))
     expect_equal(result$ensemble$smo2_right, interval1$smo2_right)
     ## non-excluded channel still averages both intervals
     expect_false(isTRUE(all.equal(
@@ -2219,8 +2219,11 @@ test_that("extract_intervals works on train.red data", {
 
     ## structure
     expect_length(result, 1)
-    expect_length(result[[1L]], 3)
-    expect_named(result[[1L]], c("time", "smo2_left", "smo2_right"))
+    expect_length(result[[1L]], 4)
+    expect_named(
+        result[[1L]],
+        c("time", "Lap/Event", "smo2_left", "smo2_right")
+    )
     ## range of time_channel
     expect_gte(min(result[[1L]][[1]]), -30)
     expect_true(

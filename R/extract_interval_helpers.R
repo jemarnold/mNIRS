@@ -716,10 +716,14 @@ ensemble_intervals <- function(
     channel_matrix <- as.matrix(df_long[valid, nirs_channels, drop = FALSE])
     channel_sums <- rowsum(channel_matrix, bins[valid], na.rm = TRUE)
     channel_counts <- rowsum(1L - is.na(channel_matrix), bins[valid])
-    result <- data.frame(
-        setNames(list(unique_times), time_channel),
-        as.data.frame(channel_sums / channel_counts)
-    )
+
+    ## event labels cannot be averaged: keep first sample per bin;
+    ## event_channel may be absent from df_long
+    first_rows <- valid[match(seq_along(unique_times), bins[valid])]
+    keep <- c(time_channel, intersect(metadata$event_channel, names(df_long)))
+    result <- df_long[first_rows, keep, drop = FALSE]
+    result[[time_channel]] <- unique_times
+    result[nirs_channels] <- as.data.frame(channel_sums / channel_counts)
 
     ## return with metadata
     return(create_mnirs_data(
