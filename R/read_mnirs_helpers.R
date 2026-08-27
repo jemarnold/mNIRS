@@ -226,7 +226,8 @@ oxysoft_sample_rate <- function(header) {
 #' User-specified channels take priority. Otherwise `nirs` channels are read
 #' from the Oxysoft legend (Artinis) or header cells starting with `SmO2`;
 #' `time` falls back to the device default, and is detected later by
-#' `detect_time_channel()` when still `NULL`.
+#' `detect_time_channel()` when still `NULL`; `event` falls back to the
+#' device default when present in the header row.
 #' @param raw A raw character data frame from `read_file()`.
 #' @param device Output of `detect_mnirs_device()`.
 #' @param user A list of user-specified `time`, `event`, and `nirs` channels,
@@ -264,8 +265,12 @@ resolve_channels <- function(
             startsWith(toupper(header), "SMO2") &
                 !grepl("unfiltered|Averaged", header, ignore.case = TRUE)
         ]
+        ## device default event channel only when present in the header
+        dev <- device_patterns[[nirs_device]]
+        event <- intersect(dev$event_channel, header)
         list(
-            time = device_patterns[[nirs_device]]$time_channel,
+            time = dev$time_channel,
+            event = if (length(event) > 0L) event,
             nirs = if (length(smo2) > 0L) smo2
         )
     }
@@ -311,8 +316,10 @@ find_header_row <- function(
     start = 1L,
     env = rlang::caller_env()
 ) {
+    ## match against uniquified names so renamed duplicates (e.g. `SmO2_1`)
+    ## and blank columns (`col_5`) resolve as they appear in the data table
     header_row <- Find(\(.i) {
-        all(nirs_channels %in% raw[.i, ])
+        all(nirs_channels %in% rename_duplicates(as.character(raw[.i, ])))
     }, c(start, seq_len(nrow(raw))))
 
     if (is.null(header_row)) {

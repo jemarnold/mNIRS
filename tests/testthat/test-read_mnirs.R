@@ -644,6 +644,17 @@ test_that("find_header_row() finds the row containing all channels", {
     expect_equal(find_header_row(raw, c(oxy = "O2Hb"), start = 1L), 3L)
 })
 
+test_that("find_header_row() matches renamed duplicate headers", {
+    raw <- data.frame(
+        V1 = c("meta", "SmO2", "10"),
+        V2 = c("meta", "SmO2", "5"),
+        V3 = c("meta", "Time", "0.1"),
+        stringsAsFactors = FALSE
+    )
+
+    expect_equal(find_header_row(raw, c(left = "SmO2", right = "SmO2_1")), 2L)
+})
+
 test_that("find_header_row() errors when channels not found", {
     raw <- data.frame(
         V1 = c("header", "WrongChannel", "10"),
@@ -1661,6 +1672,15 @@ test_that("read_mnirs auto-detects Train.Red channels when nirs_channels = NULL"
         attr(df, "time_channel"),
         device_patterns$Train.Red$time_channel
     )
+})
+
+test_that("read_mnirs accepts renamed duplicate channels as originals", {
+    df <- read_mnirs(
+        example_mnirs("train.red"),
+        nirs_channels = c(smo2_left = "SmO2", smo2_right = "SmO2_1"),
+        verbose = FALSE
+    )
+    expect_equal(attr(df, "nirs_channels"), c("smo2_left", "smo2_right"))
 })
 
 test_that("read_mnirs auto-detects Artinis channels when nirs_channels = NULL", {

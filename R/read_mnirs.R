@@ -59,8 +59,9 @@
 #' `read_mnirs()` searches the file for a header row containing the requested
 #' channel names. The header row does not need to be the first row in the file.
 #'
-#' - If duplicate column names exist, columns are matched in the order they
-#'   appear and renamed with unique strings.
+#' - If duplicate column names exist, they are made unique with a numbered
+#'   suffix (`_*`), and can be renamed accordingly:
+#'   `nirs_channels = c(smo2_left = "smo2", smo2_right = "smo2_1")`.
 #' - Columns without a header name in the source file will be renamed to
 #'   `col_*`, where `*` is the numeric column number in which they appear in
 #'   the file (e.g. `col_6`).
