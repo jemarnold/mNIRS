@@ -370,10 +370,11 @@ analyse_biexponential <- function(
         .a
     })
 
+    time_channel <- setup$time_channel
     ## NA scaffold (method columns only) for convergence failure
     # fmt: skip
     na_cols <- c(
-        "A", "B1", "tau1", "B2", "tau2", "tau_mult", 
+        "A", "B1", "tau1", "B2", "tau2", "tau_mult",
         "TD", "texc", "texc_fitted"
     )
 
@@ -386,8 +387,14 @@ analyse_biexponential <- function(
         ## tau_mult is honoured
         fitter <- \(.data, .params, on_error) {
             free <- setdiff(.params, names(.a$fix))
-            span <- diff(range(.data$.t))
-            formula <- build_ss_formula(quote(SSbiexponential), .params, .a$fix)
+            span <- diff(range(.data[[2L]]))
+            formula <- build_ss_formula(
+                quote(SSbiexponential),
+                .params,
+                .a$fix,
+                names(.data)[[1L]],
+                names(.data)[[2L]]
+            )
 
             ## explicit getInitial so the tau_mult cap can be derived
             ## from the tau1 seed before the bounds are fixed
@@ -452,6 +459,7 @@ analyse_biexponential <- function(
             fitter,
             fn = quote(SSbiexponential),
             .nirs = .nirs,
+            time_channel = time_channel,
             interval_name = interval_name,
             env = env
         )
@@ -460,7 +468,7 @@ analyse_biexponential <- function(
         }
         params <- fit$params
         coefs <- full_coefs(fit$model, params, .a$fix)
-        span <- diff(range(fit$data$.t))
+        span <- diff(range(fit$data[[time_channel]]))
 
         ## enforce direction: bounded refit on the fast-phase amplitude
         ## D = B1 - A when inverted. the fit bounds are carried over;

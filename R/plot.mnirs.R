@@ -295,9 +295,15 @@ plot.mnirs_kinetics <- function(
                     ## carry over without rebuilding the frame
                     dd <- .d[rep(1L, length(t)), , drop = FALSE]
                     dd[[time_channel]] <- t
+                    ## time symbol from the model formula: a channel
+                    ## colliding with a model parameter is fit aliased
+                    m <- .m[[.ch]]
                     dd[[fcol]] <- stats::predict(
-                        .m[[.ch]],
-                        newdata = data.frame(.t = t - .d$start_times[[1L]])
+                        m,
+                        newdata = setNames(
+                            data.frame(t - .d$start_times[[1L]]),
+                            as.character(stats::formula(m)[[3L]][[2L]])
+                        )
                     )
                     return(dd)
                 }, sp, mods))

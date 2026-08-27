@@ -306,6 +306,7 @@ analyse_monoexponential <- function(
         verbose = verbose,
         env = env
     )
+    time_channel <- setup$time_channel
     ## NA scaffold (method columns only) for convergence failure
     # fmt: skip
     na_cols <- c(
@@ -324,12 +325,15 @@ analyse_monoexponential <- function(
                 formula <- build_ss_formula(
                     quote(SSmonoexponential),
                     .params,
-                    .a$fix
+                    .a$fix,
+                    names(.data)[[1L]],
+                    names(.data)[[2L]]
                 )
                 tryCatch(nls(formula, .data), error = on_error)
             },
             fn = quote(SSmonoexponential),
             .nirs = .nirs,
+            time_channel = time_channel,
             interval_name = interval_name,
             env = env
         )

@@ -289,6 +289,7 @@ analyse_exponential_drift <- function(
         .a
     })
 
+    time_channel <- setup$time_channel
     ## NA scaffold (method columns only) for convergence failure
     # fmt: skip
     na_cols <- c(
@@ -315,12 +316,17 @@ analyse_exponential_drift <- function(
                 ## so port often stops short of its certificate on usable
                 ## coefficients, which are kept with a warning
                 free <- setdiff(.params, names(.a$fix))
-                lower <- c(tau = diff(range(.data$.t)) * 1e-6, TD = 0)[free]
+                lower <- c(
+                    tau = diff(range(.data[[2L]])) * 1e-6,
+                    TD = 0
+                )[free]
                 lower[is.na(lower)] <- -Inf
                 formula <- build_ss_formula(
                     quote(SSexponential_drift),
                     .params,
-                    .a$fix
+                    .a$fix,
+                    names(.data)[[1L]],
+                    names(.data)[[2L]]
                 )
                 model <- tryCatch(
                     suppressWarnings(nls(
@@ -336,6 +342,7 @@ analyse_exponential_drift <- function(
             },
             fn = quote(SSexponential_drift),
             .nirs = .nirs,
+            time_channel = time_channel,
             interval_name = interval_name,
             env = env
         )

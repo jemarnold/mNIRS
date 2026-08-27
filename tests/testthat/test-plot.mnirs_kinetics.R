@@ -184,7 +184,7 @@ kin_expdrift <- function(channels = "smo2", faceted = FALSE) {
         nirs_channels = channels,
         method = "exponential_drift",
         use_TD = FALSE,
-        verbose = FALSE
+        verbose = TRUE
     )
 }
 

@@ -469,9 +469,13 @@
 #'       [lm][stats::lm] object. For `"monoexponential"`,
 #'       `"biexponential"`, and `"sigmoidal"`; an [nls][stats::nls] object.
 #'       For `"response_time"`; `NULL`. Models are fitted on time
-#'       *elapsed from* `start_time`, so [predict][stats::predict] expects
-#'       `.t` in those units. The offset for each interval can be retrieved
-#'       from `interval_times$start_times`.}
+#'       *elapsed from* `start_time`, so [predict][stats::predict] expects a
+#'       `time_channel` column in `newdata` in those units. The offset for
+#'       each interval can be retrieved from `coefficients$start_times`. A
+#'       channel or time column named after a model parameter (e.g. `tau`,
+#'       `TD`, `slope`) is prefixed with `.` in the model formula, so
+#'       `newdata` uses the aliased name; coefficients and results keep
+#'       the original names.}
 #'   \item{`coefficients`}{A data frame of coefficients with one row per
 #'       `nirs_channel` per interval, containing `interval`, `nirs_channels`,
 #'       the resolved `start_time` (the fit onset from which time coefficients

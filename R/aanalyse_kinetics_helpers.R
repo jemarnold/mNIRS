@@ -722,6 +722,21 @@ setup_kinetics_worker <- function(
             .a["fix"] <- list(if (length(f) > 0L) f else NULL)
             .a
         })
+
+        ## the nls formula is built on the channel names, so a channel
+        ## named after a model parameter is aliased by `fit_names()`
+        params <- unique(unlist(lapply(per_channel, \(.a) {
+            if (is.function(fix_params)) fix_params(.a) else fix_params
+        })))
+        clash <- intersect(c(nirs_channels, time_channel), c(params, "D"))
+        if (verbose && length(clash) > 0L) {
+            alias <- paste0(".", clash)
+            cli_inform(c(
+                "i" = "{cli::qty(clash)}Channel name{?s} {.val {clash}} \\
+                collide{?s/} with model parameter{?s}. Renamed: \\
+                {.val {alias}}."
+            ))
+        }
     }
 
     return(list(
@@ -1111,9 +1126,12 @@ warn_fit_failed <- function(
 #'   including `TD` when the channel fits the TD model.
 #' @param .a The channel's resolved argument list (`use_TD`, `fix`).
 #' @param fitter A function `(.data, .params, on_error)` fitting `.params`
-#'   to a data frame of `.x`/`.t` and returning an [nls][stats::nls] model
-#'   or `NULL`. `on_error(e)` reports the condition `e` and returns `NULL`,
-#'   so it doubles as a [tryCatch()] error handler.
+#'   to a data frame with the response and time columns named per
+#'   [fit_names()] and returning an [nls][stats::nls] model or `NULL`.
+#'   `on_error(e)` reports
+#'   the condition `e` and returns `NULL`, so it doubles as a [tryCatch()]
+#'   error handler.
+#' @param time_channel Character; resolved time column name.
 #' @param retry Logical; attempt the reduced model when the TD fit fails.
 #' @inheritParams warn_fit_failed
 #'
@@ -1129,14 +1147,20 @@ fit_td_fallback <- function(
     fitter,
     fn,
     .nirs,
+    time_channel,
     interval_name,
     env,
     retry = .a$use_TD && !"TD" %in% names(.a$fix)
 ) {
     attempt <- \(.params, .retry) {
-        ## dropping TD narrows the window, so subset per attempt
+        ## dropping TD narrows the window, so subset per attempt. columns
+        ## carry the channel names so the model predicts on them; the full
+        ## `params` alias identically across both attempts
         keep <- "TD" %in% .params | t_fit >= 0
-        data <- data.frame(.x = x_fit[keep], .t = t_fit[keep])
+        data <- setNames(
+            data.frame(x_fit[keep], t_fit[keep]),
+            fit_names(.nirs, time_channel, params)
+        )
         on_error <- \(e) {
             warn_fit_failed(
                 fn,
@@ -1336,21 +1360,49 @@ init_fixed <- function(init, params) {
 
 #' Build a self-start model formula with optional fixed parameters
 #'
-#' Constructs `.x ~ fn(.t, ...)` with each free parameter as a bare
+#' Constructs `x ~ fn(t, ...)` with each free parameter as a bare
 #' symbol and each fixed parameter substituted as its constant value.
 #'
 #' @param fn Symbol; the self-start model function.
 #' @param params Character vector of parameter names in `fn` argument
 #'   order.
 #' @param fix Named list of fixed parameter values.
+#' @param x,t Character; the response and time column names (see
+#'   [fit_names()]), so the returned model predicts on the original
+#'   channel names.
 #'
-#' @returns A two-sided [formula][stats::formula] on `.x` and `.t`.
+#' @returns A two-sided [formula][stats::formula] on `x` and `t`.
 #'
 #' @keywords internal
-build_ss_formula <- function(fn, params, fix = list()) {
+build_ss_formula <- function(fn, params, fix = list(), x, t) {
     args <- lapply(setNames(nm = params), \(.p) fix[[.p]] %||% as.name(.p))
-    rhs <- as.call(c(fn, quote(.t), args))
-    return(stats::as.formula(call("~", quote(.x), rhs)))
+    rhs <- as.call(c(fn, as.name(t), args))
+    return(stats::as.formula(call("~", as.name(x), rhs)))
+}
+
+
+#' Alias fit column names that collide with model parameters
+#'
+#' [stats::nls()] formula symbols must be disjoint: a name cannot be
+#' both a data column and a parameter. The fit data frame carries the
+#' channel names so the model predicts on them, so a channel named
+#' after a model parameter (or `D`, the amplitude used by
+#' [enforce_direction()]) is prefixed with `.` in the fit and in the
+#' stored model formula. Coefficients and results keep the original
+#' names.
+#'
+#' @param x,t Character; the response and time channel names.
+#' @param params Character vector of the model parameter names.
+#'
+#' @returns A length-2 character vector of the response and time column
+#'   names to fit on.
+#'
+#' @keywords internal
+fit_names <- function(x, t, params) {
+    nm <- c(x, t)
+    clash <- nm %in% c(params, "D")
+    nm[clash] <- paste0(".", nm[clash])
+    return(nm)
 }
 
 
@@ -1391,7 +1443,8 @@ full_coefs <- function(model, params, fix = list()) {
 #' @param model A converged [nls][stats::nls] model object.
 #' @param coefs Named numeric coefficient vector in model parameter
 #'   order with fixed values merged in (see [full_coefs()]).
-#' @param fit_data Data frame with columns `.x` and `.t`.
+#' @param fit_data Data frame with the response in the first column and
+#'   time in the second; the refit formula is built on those names.
 #' @param direction Character; resolved `"positive"` or `"negative"`.
 #' @param amp_fn Symbol; exported model fn taking `t` and the model
 #'   parameters as named arguments. The self-start fn named in the
@@ -1433,7 +1486,9 @@ enforce_direction <- function(
     ## B1 for the biexponential); direction is the sign of D = B - A
     B_name <- names(coefs)[2]
     want <- if (direction == "positive") 1 else -1
-    x_span <- diff(range(fit_data$.x))
+    x_sym <- as.name(names(fit_data)[[1L]])
+    t_sym <- as.name(names(fit_data)[[2L]])
+    x_span <- diff(range(fit_data[[1L]]))
     extra <- coefs[setdiff(names(coefs), c("A", B_name, names(fix)))]
 
     ## refit box: D sign-constrained with a strictly positive magnitude
@@ -1481,7 +1536,7 @@ enforce_direction <- function(
         u[is.na(u)] <- Inf
         model <- tryCatch(
             suppressWarnings(nls(
-                stats::as.formula(call("~", quote(.x), rhs)),
+                stats::as.formula(call("~", x_sym, rhs)),
                 fit_data,
                 start = start,
                 lower = l,
@@ -1499,7 +1554,7 @@ enforce_direction <- function(
     rhs <- \(A_expr, B_expr) {
         as.call(c(
             amp_fn,
-            quote(.t),
+            t_sym,
             setNames(list(A_expr, B_expr), c("A", B_name)),
             fix[setdiff(names(fix), c("A", B_name))],
             lapply(setNames(nm = names(extra)), as.name)
@@ -1516,7 +1571,7 @@ enforce_direction <- function(
     extra[bad] <- pmin(pmax(-extra[bad], ex_l[bad]), ex_u[bad])
 
     ## refit on amplitude D, substituting a fixed asymptote: A free
-    ## `amp_fn(.t, A, A + D, ...)`, B fixed `amp_fn(.t, B - D, B, ...)`
+    ## `amp_fn(t, A, A + D, ...)`, B fixed `amp_fn(t, B - D, B, ...)`
     A_expr <- if (is.null(B_fix)) {
         A_fix %||% quote(A)
     } else {

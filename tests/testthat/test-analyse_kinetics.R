@@ -3301,3 +3301,80 @@ test_that("analyse_kinetics per-interval args key by group names", {
     expect_equal(diag$n_obs[diag$interval == "A"], 5L)
     expect_equal(diag$n_obs[diag$interval == "B"], 7L)
 })
+
+test_that("analyse_kinetics nls models are built on the input channel names", {
+    set.seed(13)
+    t <- 0:119
+    ## one generator per nls method, each on the same `secs`/`hhb` columns
+    curves <- list(
+        monoexponential = monoexponential(t, 50, 80, 5, 5) + rnorm(120, 0, 0.5),
+        biexponential = biexponential(t, 70, 45, 5, 60, 40, 2) +
+            rnorm(120, 0, 0.5),
+        exponential_drift = exponential_drift(t, 70, 40, 8, 0.2, 4) +
+            rnorm(120, 0, 0.3),
+        sigmoidal = logistic(t, 10, 100, 30, 4) + rnorm(120, 0, 2)
+    )
+    Map(\(.x, .method) {
+        df <- create_mnirs_data(
+            data.frame(secs = t, hhb = .x),
+            nirs_channels = "hhb",
+            time_channel = "secs",
+            sample_rate = 1,
+            interval_times = 0
+        )
+        result <- analyse_kinetics(
+            df,
+            nirs_channels = "hhb",
+            method = .method,
+            use_TD = FALSE,
+            verbose = FALSE
+        )
+        model <- result$model[[1L]]$hhb
+        expect_s3_class(model, "nls")
+        ## formula reads `hhb ~ SS<fn>(secs, ...)`, not internal names
+        fml <- stats::formula(model)
+        expect_identical(fml[[2L]], quote(hhb))
+        expect_identical(fml[[3L]][[2L]], quote(secs))
+        ## so predict() takes newdata named as the input time_channel
+        pred <- stats::predict(model, newdata = data.frame(secs = c(0, 10)))
+        expect_length(pred, 2L)
+        expect_true(all(is.finite(pred)))
+    }, curves, names(curves))
+})
+
+test_that("analyse_kinetics aliases channel names that collide with model parameters", {
+    set.seed(13)
+    ## < 100 samples so the plot overlay re-predicts on the model
+    t <- 0:59
+    ## `tau` response on a `TD` time base, as from recursive kinetics
+    df <- create_mnirs_data(
+        data.frame(TD = t, tau = monoexponential(t, 50, 80, 5, 5) + rnorm(60, 0, 0.5)),
+        nirs_channels = "tau",
+        time_channel = "TD",
+        sample_rate = 1,
+        interval_times = 0
+    )
+    expect_message(
+        result <- analyse_kinetics(
+            df,
+            nirs_channels = "tau",
+            method = "monoexponential"
+        ),
+        "collide with model parameters"
+    )
+    expect_no_message(
+        analyse_kinetics(df, nirs_channels = "tau", method = "monoexponential", verbose = FALSE)
+    )
+    ## coefficients keep the original channel name; the model formula
+    ## is aliased so predict() takes the aliased time name
+    expect_equal(result$coefficients$nirs_channels, "tau")
+    expect_true(all(is.finite(unlist(result$coefficients[c("A", "B", "tau")]))))
+    model <- result$model[[1L]]$tau
+    fml <- stats::formula(model)
+    expect_identical(fml[[2L]], quote(.tau))
+    expect_identical(fml[[3L]][[2L]], quote(.TD))
+    pred <- stats::predict(model, newdata = data.frame(.TD = c(0, 10)))
+    expect_true(all(is.finite(pred)))
+    ## smooth fitted overlay re-predicts on the aliased model
+    expect_no_error(ggplot2::ggplot_build(plot(result, fitted = TRUE)))
+})

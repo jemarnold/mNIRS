@@ -614,6 +614,7 @@ analyse_logistic <- function(
         verbose = verbose,
         env = env
     )
+    time_channel <- setup$time_channel
     ## NA scaffold (method columns only) for convergence failure
     na_cols <- c("A", "B", "xmid", "slope", "xmid_fitted")
 
@@ -622,12 +623,17 @@ analyse_logistic <- function(
         ## resolve per-channel shape and matching self-start fn
         disp <- shape_dispatch[[.a$shape]]
         ch_fn <- disp$model
-        fit_data <- data.frame(.x = x_fit, .t = t_fit)
+        ## columns carry the channel names so the model predicts on them
         params <- c("A", "B", "xmid", "slope")
+        nm <- fit_names(.nirs, time_channel, params)
+        fit_data <- setNames(data.frame(x_fit, t_fit), nm)
 
         ## build nls formula with any fixed params as constants
         model <- tryCatch(
-            nls(build_ss_formula(ch_fn, params, .a$fix), fit_data),
+            nls(
+                build_ss_formula(ch_fn, params, .a$fix, nm[[1L]], nm[[2L]]),
+                fit_data
+            ),
             error = \(e) {
                 warn_fit_failed(ch_fn, e, .nirs, interval_name, env = env)
             }
@@ -670,7 +676,10 @@ analyse_logistic <- function(
         ## predict response at the inflection point xmid, which is already
         ## elapsed from start_time, matching the fit time base
         xmid_fitted <- as.numeric(
-            stats::predict(model, data.frame(.t = coefs[["xmid"]]))
+            stats::predict(
+                model,
+                setNames(data.frame(coefs[["xmid"]]), nm[[2L]])
+            )
         )
 
         build_fit_results(
