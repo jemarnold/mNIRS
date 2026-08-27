@@ -278,12 +278,33 @@ plot.mnirs_kinetics <- function(
     ## parametric methods only: continuous dashed fitted curve in the
     ## channel colour. response_time has no curve; its points are markers.
     if (fitted && x$method != "response_time") {
+        curved <- x$method != "peak_slope"
         p <- p +
             lapply(fit_ch, \(.ch) {
             fcol <- paste0(.ch, "_fitted")
+            d <- plot_data[is.finite(plot_data[[fcol]]), , drop = FALSE]
+            ## curved fits: re-predict on a dense time grid so fitted lines
+            ## plot smoothly when an interval has < 100 fit-window samples
+            sp <- split(d, if (faceted) d$interval else rep_len(1L, nrow(d)), drop = TRUE)
+            if (curved && any(vapply(sp, nrow, 0L) < 100L)) {
+                mods <- if (faceted) x$model[names(sp)] else x$model[1L]
+                d <- do.call(rbind, Map(\(.d, .m) {
+                    r <- range(.d[[time_channel]])
+                    t <- seq(r[1L], r[2L], length.out = max(100L, nrow(.d)))
+                    ## replicate the first row so interval and start_times
+                    ## carry over without rebuilding the frame
+                    dd <- .d[rep(1L, length(t)), , drop = FALSE]
+                    dd[[time_channel]] <- t
+                    dd[[fcol]] <- stats::predict(
+                        .m[[.ch]],
+                        newdata = data.frame(.t = t - .d$start_times[[1L]])
+                    )
+                    return(dd)
+                }, sp, mods))
+            }
             ggplot2::geom_line(
                 ggplot2::aes(y = .data[[fcol]], colour = .ch),
-                data = plot_data[is.finite(plot_data[[fcol]]), , drop = FALSE],
+                data = d,
                 linetype = "dashed",
                 linewidth = 1,
                 show.legend = FALSE

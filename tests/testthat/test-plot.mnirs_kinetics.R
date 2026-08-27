@@ -395,7 +395,7 @@ test_that("plot.mnirs_kinetics returns a ggplot and renders for each method", {
         biexponential = kin_biexp(),
         sigmoidal = kin_sigmoidal()
     )
-    lapply(objs, function(x) {
+    lapply(objs, \(x) {
         p <- plot(x)
         expect_s3_class(p, "ggplot")
         expect_no_error(ggplot2::ggplot_build(p))
@@ -407,6 +407,23 @@ test_that("fitted overlay draws a dashed line per channel for parametric fits", 
     geoms <- layer_geoms(plot(x, markers = FALSE, labels = FALSE))
     ## base signal line per channel (2) + fitted dashed line per channel (2)
     expect_equal(sum(geoms == "GeomLine"), 4L)
+})
+
+test_that("fitted overlay densifies to 100 points only when < 100 samples", {
+    dashed_data <- \(p) {
+        Filter( \(l) {
+            inherits(l$geom, "GeomLine") &&
+                identical(l$aes_params$linetype, "dashed")
+        }, p$layers)[[1L]]$data
+    }
+    ## 60 samples < 100: curve re-predicted on a 100-point grid
+    x <- kin_monoexp()
+    p <- plot(x, markers = FALSE, labels = FALSE)
+    expect_equal(nrow(dashed_data(p)), 100L)
+    ## 121 samples >= 100: observed fit-window rows kept as-is
+    x <- kin_biexp()
+    p <- plot(x, markers = FALSE, labels = FALSE)
+    expect_equal(nrow(dashed_data(p)), sum(is.finite(x$data[[1L]]$smo2_fitted)))
 })
 
 test_that("fitted = FALSE drops the parametric fitted layers", {
