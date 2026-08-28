@@ -4,7 +4,7 @@
 \alias{build_ss_formula}
 \title{Build a self-start model formula with optional fixed parameters}
 \usage{
-build_ss_formula(fn, params, fix = list())
+build_ss_formula(fn, params, fix = list(), x, t)
 }
 \arguments{
 \item{fn}{Symbol; the self-start model function.}
@@ -13,12 +13,16 @@ build_ss_formula(fn, params, fix = list())
 order.}
 
 \item{fix}{Named list of fixed parameter values.}
+
+\item{x, t}{Character; the response and time column names (see
+\code{\link[=fit_names]{fit_names()}}), so the returned model predicts on the original
+channel names.}
 }
 \value{
-A two-sided \link[stats:formula]{formula} on \code{.x} and \code{.t}.
+A two-sided \link[stats:formula]{formula} on \code{x} and \code{t}.
 }
 \description{
-Constructs \code{.x ~ fn(.t, ...)} with each free parameter as a bare
+Constructs \code{x ~ fn(t, ...)} with each free parameter as a bare
 symbol and each fixed parameter substituted as its constant value.
 }
 \keyword{internal}

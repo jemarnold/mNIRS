@@ -12,6 +12,7 @@ fit_td_fallback(
   fitter,
   fn,
   .nirs,
+  time_channel,
   interval_name,
   env,
   retry = .a$use_TD && !"TD" \%in\% names(.a$fix)
@@ -26,13 +27,17 @@ including \code{TD} when the channel fits the TD model.}
 \item{.a}{The channel's resolved argument list (\code{use_TD}, \code{fix}).}
 
 \item{fitter}{A function \verb{(.data, .params, on_error)} fitting \code{.params}
-to a data frame of \code{.x}/\code{.t} and returning an \link[stats:nls]{nls} model
-or \code{NULL}. \code{on_error(e)} reports the condition \code{e} and returns \code{NULL},
-so it doubles as a \code{\link[=tryCatch]{tryCatch()}} error handler.}
+to a data frame with the response and time columns named per
+\code{\link[=fit_names]{fit_names()}} and returning an \link[stats:nls]{nls} model or \code{NULL}.
+\code{on_error(e)} reports
+the condition \code{e} and returns \code{NULL}, so it doubles as a \code{\link[=tryCatch]{tryCatch()}}
+error handler.}
 
 \item{fn}{Symbol or character; the model fn named in the message.}
 
 \item{.nirs}{Character; the channel name.}
+
+\item{time_channel}{Character; resolved time column name.}
 
 \item{interval_name}{Character; the interval label.}
 

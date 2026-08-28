@@ -85,58 +85,55 @@ metadata.
 \code{read_mnirs()} searches the file for a header row containing the requested
 channel names. The header row does not need to be the first row in the file.
 \itemize{
-\item If duplicate column names exist, columns are matched in the order they
-appear and renamed with unique strings.
-\item Columns without a header name in the source file will be renamed to
-\verb{col_*}, where \code{*} is the numeric column number in which they appear in
-the file (e.g. \code{col_6}).
+\item If duplicate column names exist (e.g. for \emph{Train.Red} files), they are
+made unique with a numbered suffix (\verb{_*}), and can be renamed accordingly:
+\code{nirs_channels = c(smo2_left = "smo2", smo2_right = "smo2_1")}.
+\item Unnamed columns in the source file will be renamed to \verb{col_*}, where \code{*}
+is the ordered column number in the file (e.g. \code{col_6}; \emph{Artinis Oxysoft}
+files have an exception to this renaming convention. See below).
 }
 }
 
 \subsection{Artinis Oxysoft exports}{
 
-\emph{Artinis Oxysoft} exports number their data table columns and record channel
-names in a "Legend" metadata block, which \code{read_mnirs()} parses to name
-columns automatically:
+\emph{Artinis Oxysoft} files have numbered data columns and channel names in a
+"Legend" metadata block. \code{read_mnirs()} can detect and rename columns
+automatically:
 \itemize{
-\item Trace names become lower-case column names, with non-alphanumeric
-characters replaced by underscores (e.g. \code{"Rx1 - Tx1 O2Hb"} becomes
-\code{rx1_tx1_o2hb}). All named traces are set as \code{nirs_channels}.
-\item The \code{"(Sample number)"} column is renamed \code{sample}, and a \code{time} column
+\item \code{nirs_channels} names become clean lower-case column names with
+underscores (e.g. \code{"Rx1 - Tx1 O2Hb"} becomes \code{rx1_tx1_o2hb}).
+\item \code{"(Sample number)"} column is renamed \code{sample}, and a \code{time} column
 in seconds is derived from the export sample rate (see \emph{Time parsing}).
-\item The \code{"(Event)"} column is renamed \code{event} and set as \code{event_channel}.
-\item A trailing un-numbered column containing event label text is renamed
-\code{labels} and placed after \code{event}. It is included only when
-\code{event_channel} is auto-detected or \code{keep_all = TRUE}, and dropped when
-empty.
+\item \code{"(Event)"} column is renamed \code{event} and set as \code{event_channel}.
+\item \emph{Oxysoft} exports a trailing un-numbered column containing optional
+event label text. This is renamed \code{labels} if present, or dropped when
+empty. It can be selected as the event column explicitly with
+\code{event_channel = c(event = "labels")}.
 }
 
-Explicit \code{nirs_channels}, \code{time_channel}, and \code{event_channel} arguments
-override the automatic detection.
+Explicit \code{nirs_channels}, \code{time_channel}, and \code{event_channel} renaming
+(as below) overrides the automatic detection names.
 }
 
 \subsection{Renaming channels}{
 
-A named character vector can be specified to rename \code{nirs_channels},
-\code{time_channel}, and \code{event_channel}, in the form
-\code{c(renamed = "original_name")}. The \code{"original_name"} must match the
-contents of the file data table header row exactly.
+All \code{channels} can be renamed by specifying a named character vector in
+the form \code{c(renamed = "original_name")}. The \code{"original_name"} must match
+the file header row exactly.
 }
 
 \subsection{Time parsing}{
 
-If \code{time_channel} is \code{NULL}, it is resolved in order from the known device
-default (or the \emph{Artinis Oxysoft} legend), then by detecting a time-like
-column name (e.g. \code{"time"}, \code{"hh:mm:ss"}) or time-formatted values.
-\code{time_channel} will be converted to numeric for analysis.
+If \code{time_channel} is \code{NULL}, it is resolved from the known device default,
+or by detecting a time-like column name (e.g. \code{"time"}, \code{"hh:mm:ss"}), or
+by detecting a column with time-formatted (POSIXct-like) values.
 \itemize{
 \item If \code{time_channel} is a date-time (POSIXct) format, it will be converted
 to numeric and re-based to start from 0, regardless of \code{zero_time}.
 \item Some devices export a sample index rather than time values. In those
 cases, if an export \code{sample_rate} is detected in the file metadata (e.g.
-\emph{Artinis Oxysoft} exports), \code{read_mnirs()} will create or overwrite a
-\code{"time"} column in seconds derived from the sample index and the detected
-\code{sample_rate}.
+\emph{Artinis Oxysoft} exports), \code{read_mnirs()} will create a \emph{"time"} column
+in seconds derived from the sample index and the detected \code{sample_rate}.
 }
 }
 
@@ -153,7 +150,9 @@ specified explicitly in this case.
 Entirely empty rows and columns are removed. Invalid values (e.g.
 \code{c(NaN, Inf)}) are standardized to \code{NA}. A warning will be displayed when
 irregular sampling is detected (e.g. non-monotonic, repeated, or unequal
-time values), if \code{verbose = TRUE}.
+time values), if \code{verbose = TRUE}. In this case, it is recommended to use
+\code{resample_mnirs()} to standardise the time grid to the desired
+\code{sample_rate}.
 }
 }
 \examples{

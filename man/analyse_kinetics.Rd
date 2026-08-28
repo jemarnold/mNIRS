@@ -194,9 +194,13 @@ as a structured list of class \emph{"mnirs_kinetics"} containing:
 \link[stats:lm]{lm} object. For \code{"monoexponential"},
 \code{"biexponential"}, and \code{"sigmoidal"}; an \link[stats:nls]{nls} object.
 For \code{"response_time"}; \code{NULL}. Models are fitted on time
-\emph{elapsed from} \code{start_time}, so \link[stats:predict]{predict} expects
-\code{.t} in those units. The offset for each interval can be retrieved
-from \code{interval_times$start_times}.}
+\emph{elapsed from} \code{start_time}, so \link[stats:predict]{predict} expects a
+\code{time_channel} column in \code{newdata} in those units. The offset for
+each interval can be retrieved from \code{coefficients$start_times}. A
+channel or time column named after a model parameter (e.g. \code{tau},
+\code{TD}, \code{slope}) is prefixed with \code{.} in the model formula, so
+\code{newdata} uses the aliased name; coefficients and results keep
+the original names.}
 \item{\code{coefficients}}{A data frame of coefficients with one row per
 \code{nirs_channel} per interval, containing \code{interval}, \code{nirs_channels},
 the resolved \code{start_time} (the fit onset from which time coefficients

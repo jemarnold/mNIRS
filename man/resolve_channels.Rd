@@ -37,6 +37,7 @@ List order sets output column order.
 User-specified channels take priority. Otherwise \code{nirs} channels are read
 from the Oxysoft legend (Artinis) or header cells starting with \code{SmO2};
 \code{time} falls back to the device default, and is detected later by
-\code{detect_time_channel()} when still \code{NULL}.
+\code{detect_time_channel()} when still \code{NULL}; \code{event} falls back to the
+device default when present in the header row.
 }
 \keyword{internal}

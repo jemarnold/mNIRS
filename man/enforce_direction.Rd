@@ -25,7 +25,8 @@ enforce_direction(
 \item{coefs}{Named numeric coefficient vector in model parameter
 order with fixed values merged in (see \code{\link[=full_coefs]{full_coefs()}}).}
 
-\item{fit_data}{Data frame with columns \code{.x} and \code{.t}.}
+\item{fit_data}{Data frame with the response in the first column and
+time in the second; the refit formula is built on those names.}
 
 \item{direction}{Character; resolved \code{"positive"} or \code{"negative"}.}
 
