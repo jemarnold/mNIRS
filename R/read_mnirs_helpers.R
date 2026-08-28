@@ -250,6 +250,11 @@ resolve_channels <- function(
     auto <- if (identical(nirs_device, "Artinis")) {
         legend <- parse_oxysoft_legend(raw, device$header_row) %||%
             list(time = c(sample = "1"))
+        ## user `event_channel = "labels"` aliases the unnumbered label column
+        labels_col <- legend$extra[names(legend$extra) == "labels"]
+        if (identical(unname(user$event), "labels") && length(labels_col) == 1L) {
+            user$event[] <- labels_col
+        }
         ## drop legend entries for columns the user has already claimed
         lapply(legend, \(.x) {
             .x <- .x[!.x %in% unlist(user)]

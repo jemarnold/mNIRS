@@ -455,6 +455,13 @@ test_that("resolve_channels() parses Artinis legend block", {
     )
     expect_equal(result$time, c(t = "4"))
     expect_null(result$event)
+
+    ## `event_channel = "labels"` aliases the unnumbered label column
+    result <- resolve_channels(
+        raw, device, test_user(event = c(event = "labels")), verbose = FALSE
+    )
+    expect_equal(result$event, c(event = "col_5"))
+    expect_null(result$extra)
 })
 
 test_that("resolve_channels() Artinis falls back without legend", {
@@ -2193,6 +2200,19 @@ test_that("read_mnirs Oxysoft Portamon works", {
         expect_equal(attr(d, "sample_rate"), 10)
         expect_equal(attr(d, "time_channel"), "time")
     }
+})
+
+test_that("read_mnirs Oxysoft event_channel = 'labels' aliases label column", {
+    df <- read_mnirs(
+        example_mnirs("portamon-oxcap"),
+        nirs_channels = c(thb = 2, hhb = 3, o2hb = 4),
+        event_channel = c(event = "labels"),
+        verbose = FALSE
+    )
+
+    expect_equal(attr(df, "event_channel"), "event")
+    expect_true("Occlusion" %in% df$event)
+    expect_false("labels" %in% names(df))
 })
 
 test_that("read_mnirs Oxysoft edge case channel names", {

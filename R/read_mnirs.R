@@ -59,51 +59,47 @@
 #' `read_mnirs()` searches the file for a header row containing the requested
 #' channel names. The header row does not need to be the first row in the file.
 #'
-#' - If duplicate column names exist, they are made unique with a numbered
-#'   suffix (`_*`), and can be renamed accordingly:
+#' - If duplicate column names exist (e.g. for *Train.Red* files), they are
+#'   made unique with a numbered suffix (`_*`), and can be renamed accordingly:
 #'   `nirs_channels = c(smo2_left = "smo2", smo2_right = "smo2_1")`.
-#' - Columns without a header name in the source file will be renamed to
-#'   `col_*`, where `*` is the numeric column number in which they appear in
-#'   the file (e.g. `col_6`).
+#' - Unnamed columns in the source file will be renamed to `col_*`, where `*`
+#'   is the ordered column number in the file (e.g. `col_6`; *Artinis Oxysoft*
+#'   files have an exception to this renaming convention. See below).
 #'
 #' ## Artinis Oxysoft exports
-#' *Artinis Oxysoft* exports number their data table columns and record channel
-#' names in a "Legend" metadata block, which `read_mnirs()` parses to name
-#' columns automatically:
+#' *Artinis Oxysoft* files have numbered data columns and channel names in a
+#' "Legend" metadata block. `read_mnirs()` can detect and rename columns
+#' automatically:
 #'
-#' - Trace names become lower-case column names, with non-alphanumeric
-#'   characters replaced by underscores (e.g. `"Rx1 - Tx1 O2Hb"` becomes
-#'   `rx1_tx1_o2hb`). All named traces are set as `nirs_channels`.
-#' - The `"(Sample number)"` column is renamed `sample`, and a `time` column
+#' - `nirs_channels` names become clean lower-case column names with
+#'   underscores (e.g. `"Rx1 - Tx1 O2Hb"` becomes `rx1_tx1_o2hb`).
+#' - `"(Sample number)"` column is renamed `sample`, and a `time` column
 #'   in seconds is derived from the export sample rate (see *Time parsing*).
-#' - The `"(Event)"` column is renamed `event` and set as `event_channel`.
-#' - A trailing un-numbered column containing event label text is renamed
-#'   `labels` and placed after `event`. It is included only when
-#'   `event_channel` is auto-detected or `keep_all = TRUE`, and dropped when
-#'   empty.
+#' - `"(Event)"` column is renamed `event` and set as `event_channel`.
+#' - *Oxysoft* exports a trailing un-numbered column containing optional 
+#'   event label text. This is renamed `labels` if present, or dropped when
+#'   empty. It can be selected as the event column explicitly with
+#'   `event_channel = c(event = "labels")`.
 #'
-#' Explicit `nirs_channels`, `time_channel`, and `event_channel` arguments
-#' override the automatic detection.
+#' Explicit `nirs_channels`, `time_channel`, and `event_channel` renaming
+#' (as below) overrides the automatic detection names.
 #'
 #' ## Renaming channels
-#' A named character vector can be specified to rename `nirs_channels`,
-#' `time_channel`, and `event_channel`, in the form
-#' `c(renamed = "original_name")`. The `"original_name"` must match the
-#' contents of the file data table header row exactly.
+#' All `channels` can be renamed by specifying a named character vector in
+#' the form `c(renamed = "original_name")`. The `"original_name"` must match
+#' the file header row exactly.
 #'
 #' ## Time parsing
-#' If `time_channel` is `NULL`, it is resolved in order from the known device
-#' default (or the *Artinis Oxysoft* legend), then by detecting a time-like
-#' column name (e.g. `"time"`, `"hh:mm:ss"`) or time-formatted values.
-#' `time_channel` will be converted to numeric for analysis.
+#' If `time_channel` is `NULL`, it is resolved from the known device default,
+#' or by detecting a time-like column name (e.g. `"time"`, `"hh:mm:ss"`), or
+#' by detecting a column with time-formatted (POSIXct-like) values.
 #'
 #' - If `time_channel` is a date-time (POSIXct) format, it will be converted
 #'   to numeric and re-based to start from 0, regardless of `zero_time`.
 #' - Some devices export a sample index rather than time values. In those
 #'   cases, if an export `sample_rate` is detected in the file metadata (e.g.
-#'   *Artinis Oxysoft* exports), `read_mnirs()` will create or overwrite a
-#'   `"time"` column in seconds derived from the sample index and the detected
-#'   `sample_rate`.
+#'   *Artinis Oxysoft* exports), `read_mnirs()` will create a *"time"* column
+#'   in seconds derived from the sample index and the detected `sample_rate`.
 #'
 #' ## Sample rate
 #' If `sample_rate` is not specified, it is estimated from differences in
@@ -115,7 +111,9 @@
 #' Entirely empty rows and columns are removed. Invalid values (e.g.
 #' `c(NaN, Inf)`) are standardized to `NA`. A warning will be displayed when
 #' irregular sampling is detected (e.g. non-monotonic, repeated, or unequal
-#' time values), if `verbose = TRUE`.
+#' time values), if `verbose = TRUE`. In this case, it is recommended to use
+#' `resample_mnirs()` to standardise the time grid to the desired
+#' `sample_rate`.
 #'
 #' @returns
 #' A [tibble][tibble::tibble-package] of class `"mnirs"`. Metadata are stored
