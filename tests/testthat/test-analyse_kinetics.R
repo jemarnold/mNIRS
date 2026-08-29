@@ -2790,6 +2790,95 @@ test_that("print.mnirs_kinetics truncates when nrow > 10", {
 })
 
 
+## self-start helpers ==================================================
+test_that("solve_grid3() matches lm.fit at every grid point", {
+    set.seed(5)
+    n <- 50
+    G <- 7
+    x <- rnorm(n)
+    ## three random bases per grid point
+    C1 <- matrix(rnorm(n * G), n, G)
+    C2 <- matrix(rnorm(n * G), n, G)
+    C3 <- matrix(rnorm(n * G), n, G)
+    fit <- solve_grid3(
+        g11 = colSums(C1 * C1), g12 = colSums(C1 * C2), g13 = colSums(C1 * C3),
+        g22 = colSums(C2 * C2), g23 = colSums(C2 * C3), g33 = colSums(C3 * C3),
+        b1 = colSums(C1 * x), b2 = colSums(C2 * x), b3 = colSums(C3 * x),
+        xx = sum(x^2)
+    )
+    ref <- vapply(seq_len(G), \(.g) {
+        f <- lm.fit(cbind(C1[, .g], C2[, .g], C3[, .g]), x)
+        c(f$coefficients, sum(f$residuals^2))
+    }, numeric(4L))
+    expect_equal(fit$c1, ref[1L, ], tolerance = 1e-8)
+    expect_equal(fit$c2, ref[2L, ], tolerance = 1e-8)
+    expect_equal(fit$c3, ref[3L, ], tolerance = 1e-8)
+    expect_equal(fit$rss, ref[4L, ], tolerance = 1e-8)
+
+    ## a singular system is flagged rather than propagated
+    sing <- solve_grid3(1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+    expect_identical(sing$rss, Inf)
+})
+
+test_that("free_params() classifies bare symbols as free", {
+    mCall <- quote(f(t = time, A = A, B = 5, tau = tau, TD = TD + 1))
+    expect_identical(free_params(mCall, c("A", "B", "tau", "TD")), c("A", "tau"))
+    ## absent parameters are not free
+    expect_identical(free_params(mCall, c("A", "Q")), "A")
+})
+
+test_that("enforce_direction() uses the self-start gradient on the D refit", {
+    t <- seq(0, 119)
+    x <- monoexponential(t, A = 50, B = 80, tau = 25)
+    fit_data <- data.frame(.x = x, .t = t)
+    coefs <- c(A = 50, B = 20, tau = 25)
+
+    result <- enforce_direction(
+        model = NULL,
+        coefs = coefs,
+        fit_data = fit_data,
+        direction = "positive",
+        amp_fn = quote(SSmonoexponential),
+        lower = c(tau = 1e-4),
+        .nirs = "smo2",
+        interval_name = "test"
+    )
+
+    expect_named(coef(result$model), c("A", "B", "tau"))
+    expect_equal(result$coefs[["A"]], 50, tolerance = 1e-3)
+    expect_equal(result$coefs[["B"]], 80, tolerance = 1e-3)
+
+    ## fixed asymptote paths
+    result_A <- enforce_direction(
+        model = NULL,
+        coefs = coefs,
+        fit_data = fit_data,
+        direction = "positive",
+        amp_fn = quote(SSmonoexponential),
+        lower = c(tau = 1e-4),
+        fix = list(A = 50),
+        .nirs = "smo2",
+        interval_name = "test"
+    )
+    expect_named(coef(result_A$model), c("B", "tau"))
+    expect_equal(result_A$coefs[["B"]], 80, tolerance = 1e-3)
+
+    result_B <- enforce_direction(
+        model = NULL,
+        coefs = coefs,
+        fit_data = fit_data,
+        direction = "positive",
+        amp_fn = quote(SSmonoexponential),
+        lower = c(tau = 1e-4),
+        fix = list(B = 80),
+        .nirs = "smo2",
+        interval_name = "test"
+    )
+    expect_named(coef(result_B$model), c("A", "tau"))
+    expect_equal(result_B$coefs[["A"]], 50, tolerance = 1e-3)
+})
+
+
 ## fix_coefs() =========================================================
 test_that("fix_coefs() fixes single parameter correctly", {
     set.seed(303)

@@ -298,13 +298,14 @@ plot.mnirs_kinetics <- function(
                     ## time symbol from the model formula: a channel
                     ## colliding with a model parameter is fit aliased
                     m <- .m[[.ch]]
-                    dd[[fcol]] <- stats::predict(
+                    ## self-start models predict with a gradient attribute
+                    dd[[fcol]] <- as.vector(stats::predict(
                         m,
                         newdata = setNames(
                             data.frame(t - .d$start_times[[1L]]),
                             as.character(stats::formula(m)[[3L]][[2L]])
                         )
-                    )
+                    ))
                     return(dd)
                 }, sp, mods))
             }

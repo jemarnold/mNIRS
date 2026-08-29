@@ -27,6 +27,48 @@ test_that("monoexponential() approaches asymptote B", {
     )
 })
 
+test_that("SSmonoexponential() gradient matches numericDeriv for the free parameters", {
+    t <- seq(-10, 120, by = 0.5)
+    env <- list2env(list(t = t, A = 70, B = 40, tau = 8, TD = 3))
+    chk <- function(expr, pars) {
+        an <- attr(eval(expr, env), "gradient")
+        nd <- attr(numericDeriv(expr, pars, env), "gradient")
+        expect_identical(colnames(an), pars)
+        expect_equal(unname(an), unname(nd), tolerance = 1e-5)
+    }
+    chk(quote(SSmonoexponential(t, A, B, tau, TD)), c("A", "B", "tau", "TD"))
+    chk(quote(SSmonoexponential(t, A, B, tau)), c("A", "B", "tau"))
+    ## a constant in the formula contributes no column
+    chk(quote(SSmonoexponential(t, A = 70, B, tau, TD)), c("B", "tau", "TD"))
+    ## no free parameter, no gradient; the exported fn stays plain
+    expect_null(attr(SSmonoexponential(t, 70, 40, 8), "gradient"))
+    expect_null(attr(monoexponential(t, 70, 40, 8), "gradient"))
+})
+
+test_that("monoexp_start() matches a per-point least-squares grid search", {
+    set.seed(8)
+    t <- 0:60
+    x <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15) +
+        rnorm(length(t), 0, 3)
+    start <- monoexp_start(x, t, has_TD = TRUE)
+    expect_named(start, c("A", "B", "tau", "TD"))
+
+    ## the asymptotes at the chosen grid point are the lm solution
+    e <- exp(-pmax(t - start[["TD"]], 0) / start[["tau"]])
+    cf <- lm.fit(cbind(e, 1 - e), x)$coefficients
+    expect_equal(unname(start[c("A", "B")]), unname(cf), tolerance = 1e-8)
+
+    ## a fixed asymptote projects the other onto its basis
+    start_A <- monoexp_start(x, t, fixed = list(A = 10), has_TD = TRUE)
+    expect_equal(start_A[["A"]], 10)
+    e <- exp(-pmax(t - start_A[["TD"]], 0) / start_A[["tau"]])
+    expect_equal(
+        start_A[["B"]],
+        unname(lm.fit(cbind(1 - e), x - 10 * e)$coefficients),
+        tolerance = 1e-8
+    )
+})
+
 test_that("monoexponential() handles rising curves (B > A)", {
     t <- 1:60
     result <- monoexponential(t, A = 10, B = 100, tau = 8, TD = 15)

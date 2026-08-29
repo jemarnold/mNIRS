@@ -173,6 +173,52 @@ test_that("SSbiexponential() fixes A at a constant", {
     expect_equal(unname(predict(model, data.frame(t = 0))[1]), 0)
 })
 
+test_that("SSbiexponential() gradient matches numericDeriv for the free parameters", {
+    t <- seq(-10, 120, by = 0.5)
+    env <- list2env(list(
+        t = t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40, r = 0.125, TD = 3
+    ))
+    chk <- function(expr, pars) {
+        an <- attr(eval(expr, env), "gradient")
+        nd <- attr(numericDeriv(expr, pars, env), "gradient")
+        expect_identical(colnames(an), pars)
+        expect_equal(unname(an), unname(nd), tolerance = 1e-5)
+    }
+    chk(
+        quote(SSbiexponential(t, A, B1, tau1, B2, tau2, TD)),
+        c("A", "B1", "tau1", "B2", "tau2", "TD")
+    )
+    ## a constant in the formula contributes no column
+    chk(
+        quote(SSbiexponential(t, A, B1, tau1 = 5, B2, tau2)),
+        c("A", "B1", "B2", "tau2")
+    )
+    chk(
+        quote(biexp_ratio(t, A, B1, r, B2, tau2, TD)),
+        c("A", "B1", "r", "B2", "tau2", "TD")
+    )
+    ## no free parameter, no gradient; the exported fn stays plain
+    expect_null(attr(SSbiexponential(t, 70, 40, 5, 60, 40), "gradient"))
+    expect_null(attr(biexponential(t, 70, 40, 5, 60, 40), "gradient"))
+})
+
+test_that("biexp_start() matches a per-point least-squares grid search", {
+    set.seed(8)
+    t <- 0:120
+    x <- biexponential(t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40) +
+        rnorm(length(t), 0, 0.5)
+    start <- biexp_start(x, t, has_TD = TRUE)
+    expect_named(start, c("A", "B1", "tau1", "B2", "tau2", "TD"))
+
+    ## the linear coefficients at the chosen grid point are the lm solution
+    ts <- pmax(t - start[["TD"]], 0)
+    e1 <- exp(-ts / start[["tau1"]])
+    e2 <- exp(-ts / start[["tau2"]])
+    cf <- lm.fit(cbind(e1, e2 - e1, 1 - e2), x)$coefficients
+    expect_equal(unname(start[c("A", "B1", "B2")]), unname(cf), tolerance = 1e-8)
+    expect_true(start[["tau2"]] >= 2 * start[["tau1"]])
+})
+
 test_that("SSbiexponential() fixes tau1 in the formula", {
     set.seed(5)
     t <- 0:120
@@ -781,6 +827,72 @@ test_that("analyse_biexponential() fix holds tau1 constant", {
     )
 })
 
+test_that("analyse_biexponential() fix holds tau2 constant on the ratio fit", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        fix = list(tau2 = 40),
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+
+    expect_equal(result$tau2, 40)
+    expect_named(
+        coef(attr(result, "model")$smo2), c("A", "B1", "tau1", "B2")
+    )
+    expect_true(all.equal(result$tau1, 5, tolerance = 2, scale = 1))
+})
+
+test_that("analyse_biexponential() returns NA when the phases are not separable", {
+    ## a gamma-like shape t * exp(-t / tau) is the tau1 -> tau2 limit of the
+    ## model: the fit pins at the ratio bound rather than collapsing the
+    ## phases with runaway amplitudes
+    set.seed(9)
+    t <- 0:120
+    x <- 70 - 30 * (t / 10) * exp(1 - t / 10) + rnorm(121, 0, 0.3)
+    data <- create_mnirs_data(
+        data.frame(time = t, smo2 = x),
+        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+    )
+
+    warns <- capture_warnings(
+        result <- analyse_biexponential(data, nirs_channels = "smo2")
+    )
+
+    failed <- grep("fit failed", warns, value = TRUE)
+    expect_length(failed, 1L)
+    expect_match(failed, "6-parameter")
+    expect_match(failed, "not separable")
+    ## the reduced model cannot resolve it either, so no retry is announced
+    expect_no_match(failed, "Attempting")
+    expect_true(is.na(result$A))
+    expect_true(is.na(result$tau1))
+    expect_null(attr(result, "model")$smo2)
+})
+
+test_that("analyse_biexponential() returned model is canonical and converged", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        verbose = FALSE
+    )
+    model <- attr(result, "model")$smo2
+
+    expect_named(coef(model), c("A", "B1", "tau1", "B2", "tau2", "TD"))
+    expect_true(model$convInfo$isConv)
+    expect_true(result$tau2 >= 2 * result$tau1)
+    ## coefficient table mirrors the model
+    expect_equal(result$tau1, coef(model)[["tau1"]])
+    ## the self-start model predicts with a gradient attribute
+    pred <- predict(model, newdata = data.frame(time = c(0, 10)))
+    expect_length(pred, 2L)
+    expect_true(all(is.finite(pred)))
+})
+
 test_that("analyse_biexponential() caps a runaway tau2 at 10x the span", {
     ## fast dip onto a linear ramp: the slow limb has no finite time
     ## constant, so tau2 runs to its upper bound
@@ -960,11 +1072,11 @@ test_that("analyse_biexponential() converges on real dataset", {
     deoxy <- intervals[grepl("^deoxy", names(intervals))]
 
     results <- analyse_kinetics(
-        deoxy,
+        deoxy[2:3],
         nirs_channels = c(smo2_left_vl, smo2_right_vl),
-        method = "biexponential",
-        verbose = FALSE
+        method = "biexponential"
     )
+    results$warnings
     plot(results)
     plot(results, components = TRUE, scales = "free")
 

@@ -83,6 +83,8 @@ abort_validation <- function(
     env = rlang::caller_env()
 ) {
     type <- if (integer) "integer" else "numeric"
+    ## label the argument expression only on failure
+    name <- rlang::as_label(name)
 
     cli_abort(c(
         "x" = paste0(
@@ -109,7 +111,7 @@ validate_numeric <- function(
         return(invisible(NULL))
     }
 
-    name <- rlang::as_label(substitute(x))
+    name <- substitute(x)
 
     ## cheap early type check
     if (!is.numeric(x)) {

@@ -1133,6 +1133,8 @@ warn_fit_failed <- function(
 #'   error handler.
 #' @param time_channel Character; resolved time column name.
 #' @param retry Logical; attempt the reduced model when the TD fit fails.
+#'   A condition of class `"mnirs_fit_final"` (see [fit_final_error()])
+#'   reports a failure the reduced model cannot resolve and skips the retry.
 #' @inheritParams warn_fit_failed
 #'
 #' @returns A list with `model` (or `NULL`), the `params` actually fit,
@@ -1162,13 +1164,16 @@ fit_td_fallback <- function(
             fit_names(.nirs, time_channel, params)
         )
         on_error <- \(e) {
+            if (inherits(e, "mnirs_fit_final")) {
+                retry <<- FALSE
+            }
             warn_fit_failed(
                 fn,
                 e,
                 .nirs,
                 interval_name,
                 length(.params),
-                .retry,
+                .retry && retry,
                 env
             )
             NULL
@@ -1191,6 +1196,25 @@ fit_td_fallback <- function(
         fit <- attempt(setdiff(params, "TD"), FALSE)
     }
     return(fit)
+}
+
+
+#' Fit error the reduced model cannot resolve
+#'
+#' An error condition for [fit_td_fallback()] `on_error` handlers that
+#' describes the data rather than the attempt (e.g. inseparable
+#' biexponential phases), so the reduced-model retry is skipped.
+#'
+#' @param message Character; the condition message.
+#'
+#' @returns A condition of class `"mnirs_fit_final"` and `"simpleError"`.
+#'
+#' @keywords internal
+fit_final_error <- function(message) {
+    return(structure(
+        class = c("mnirs_fit_final", "simpleError", "error", "condition"),
+        list(message = message, call = NULL)
+    ))
 }
 
 
@@ -1358,6 +1382,61 @@ init_fixed <- function(init, params) {
 }
 
 
+#' Free parameters of a self-start model call
+#'
+#' A parameter written as a bare symbol in the model call is free (fitted
+#' by [stats::nls()]); one written as a constant or expression is fixed.
+#' Used by the model functions to return gradient columns for the free
+#' parameters only, in call order, as [stats::nls()] indexes the
+#' `"gradient"` attribute by position.
+#'
+#' @param mCall A matched call to the model function.
+#' @param params Character vector of the model parameter names.
+#'
+#' @returns A character vector; the subset of `params` that are free.
+#'
+#' @keywords internal
+free_params <- function(mCall, params) {
+    return(params[vapply(params, \(.p) is.name(mCall[[.p]]), logical(1))])
+}
+
+
+#' Batched 3-parameter least squares over a grid
+#'
+#' Solves the normal equations of a 3-column linear model at every grid
+#' point at once, given the Gram entries `g_ij = <c_i, c_j>` and
+#' right-hand sides `b_i = <c_i, x>` as equal-shaped arrays (one element
+#' per grid point). Used by the self-start initialisers to profile the
+#' non-linear parameters on a grid without a per-point decomposition.
+#'
+#' @param g11,g12,g13,g22,g23,g33 Gram entries of the three basis columns.
+#' @param b1,b2,b3 Inner products of the basis columns with the response.
+#' @param xx The response sum of squares `<x, x>`.
+#'
+#' @returns A list with the coefficient arrays `c1`, `c2`, `c3` and the
+#'   residual sum of squares `rss`, which is `Inf` where the system is
+#'   singular.
+#'
+#' @keywords internal
+solve_grid3 <- function(g11, g12, g13, g22, g23, g33, b1, b2, b3, xx) {
+    ## symmetric 3x3 inverse by adjugate, vectorised over grid points
+    a11 <- g22 * g33 - g23^2
+    a12 <- g13 * g23 - g12 * g33
+    a13 <- g12 * g23 - g13 * g22
+    a22 <- g11 * g33 - g13^2
+    a23 <- g12 * g13 - g11 * g23
+    a33 <- g11 * g22 - g12^2
+    det <- g11 * a11 + g12 * a12 + g13 * a13
+    c1 <- (a11 * b1 + a12 * b2 + a13 * b3) / det
+    c2 <- (a12 * b1 + a22 * b2 + a23 * b3) / det
+    c3 <- (a13 * b1 + a23 * b2 + a33 * b3) / det
+    ## at the least-squares optimum rss = <x, x> - <b, c>
+    rss <- xx - (b1 * c1 + b2 * c2 + b3 * c3)
+    rss[!is.finite(rss + c1 + c2 + c3)] <- Inf
+    return(list(c1 = c1, c2 = c2, c3 = c3, rss = rss))
+}
+
+
 #' Build a self-start model formula with optional fixed parameters
 #'
 #' Constructs `x ~ fn(t, ...)` with each free parameter as a bare
@@ -1446,9 +1525,12 @@ full_coefs <- function(model, params, fix = list()) {
 #' @param fit_data Data frame with the response in the first column and
 #'   time in the second; the refit formula is built on those names.
 #' @param direction Character; resolved `"positive"` or `"negative"`.
-#' @param amp_fn Symbol; exported model fn taking `t` and the model
-#'   parameters as named arguments. The self-start fn named in the
-#'   warning is `SS<amp_fn>`.
+#' @param amp_fn Symbol; model fn taking `t` and the model parameters as
+#'   named arguments. A self-start fn returning a `"gradient"` attribute
+#'   (free symbols, asymptotes first) makes both refits analytic; a plain
+#'   fn falls through to [stats::numericDeriv()].
+#' @param fn Character; the self-start fn named in the warning
+#'   (*default* `SS<amp_fn>`, or `amp_fn` itself when already prefixed).
 #' @param lower,upper Named numeric bounds for free parameters other
 #'   than the asymptotes. Sign-floor bounds should be data-scaled
 #'   small values (not `.Machine$double.eps`) so pinned-floor
@@ -1474,6 +1556,7 @@ enforce_direction <- function(
     fit_data,
     direction,
     amp_fn,
+    fn = sub("^(SS)?", "SS", as.character(amp_fn)),
     lower = NULL,
     upper = NULL,
     floor_params = NULL,
@@ -1508,7 +1591,6 @@ enforce_direction <- function(
     }
 
     fail <- \() {
-        fn <- paste0("SS", as.character(amp_fn))
         cli_warn(c(
             "x" = "{.fn {fn}} fit for {.field {(.nirs)}} in \\
             {.field {interval_name}} could not satisfy \\
@@ -1571,15 +1653,36 @@ enforce_direction <- function(
     extra[bad] <- pmin(pmax(-extra[bad], ex_l[bad]), ex_u[bad])
 
     ## refit on amplitude D, substituting a fixed asymptote: A free
-    ## `amp_fn(t, A, A + D, ...)`, B fixed `amp_fn(t, B - D, B, ...)`
-    A_expr <- if (is.null(B_fix)) {
-        A_fix %||% quote(A)
-    } else {
-        call("-", B_fix, quote(D))
-    }
+    ## `B = A + D`, A fixed `B = A_fix + D`, B fixed `A = B_fix - D`.
+    ## the model gradient over its free symbols (asymptotes first) maps
+    ## onto (A, D) by the chain rule; nls resolves `amp_D` from the
+    ## formula environment, this frame
     A_free <- is.null(A_fix) && is.null(B_fix)
+    amp <- eval(amp_fn)
+    amp_D <- function(t, D, A = NULL, ...) {
+        A_val <- if (is.null(B_fix)) A_fix %||% A else B_fix - D
+        B_val <- B_fix %||% (A_val + D)
+        val <- amp(t, A_val, B_val, ...)
+        g <- attr(val, "gradient")
+        if (is.null(g)) {
+            return(val)
+        }
+        attr(val, "gradient") <- cbind(
+            if (A_free) cbind(A = g[, 1L] + g[, 2L]),
+            D = if (is.null(B_fix)) g[, 2L] else -g[, 1L],
+            g[, -(1:2), drop = FALSE]
+        )
+        return(val)
+    }
     refit <- port_fit(
-        rhs(A_expr, B_fix %||% call("+", A_expr, quote(D))),
+        as.call(c(
+            quote(amp_D),
+            t_sym,
+            D = quote(D),
+            if (A_free) list(A = quote(A)),
+            fix[setdiff(names(fix), c("A", B_name))],
+            lapply(setNames(nm = names(extra)), as.name)
+        )),
         c(if (A_free) c(A = coefs[["A"]]), D = D0, extra)
     )
     if (is.null(refit)) {

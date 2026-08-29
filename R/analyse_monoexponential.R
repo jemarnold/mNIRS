@@ -91,25 +91,33 @@ monoexponential <- function(t, A, B, tau, TD = NULL) {
 #'
 #' @keywords internal
 monoexp_init <- function(mCall, data, LHS, ...) {
-    ## self-start parameters for nls of monoexponential fit function
-    tx <- sortedXyData(mCall[["t"]], LHS, data)
-    x <- tx[["y"]]
-    t <- tx[["x"]]
-
-    ## user-fixed parameter values constrain the free estimates
     fixed <- list(...)$fixed %||% list()
+    tx <- sortedXyData(mCall[["t"]], LHS, data)
+    return(monoexp_start(tx[["y"]], tx[["x"]], fixed, "TD" %in% names(mCall)))
+}
 
-    ## check if TD parameter exists in the call
-    has_TD <- "TD" %in% names(mCall)
 
-    ## profile tau (and TD for the 4-parameter model) on a coarse grid
-    ## and keep the RSS-minimising start (cf. `biexp_init()`).
-    ## the model is linear in A and B once tau and TD are held fixed,
-    ## so the asymptotes are solved by least squares at every grid
-    ## point. point estimates from derivative changepoints or
-    ## log-linearisation are too sensitive to noise, overshoot, and
-    ## plateau data on real NIRS signals, and can strand nls with a
-    ## singular gradient
+#' Grid-profiled starting estimates for the monoexponential model
+#'
+#' Vector-level initialiser behind [monoexp_init()], called directly by the
+#' kinetics worker on the fit window. Profiles `tau` (and `TD` for the
+#' 4-parameter model) on a coarse grid and keeps the RSS-minimising start
+#' (cf. [biexp_start()]). The model is linear in `A` and `B` once `tau`
+#' and `TD` are held, so the asymptotes are solved by least squares at
+#' every grid point at once. Point estimates from derivative changepoints
+#' or log-linearisation are too sensitive to noise, overshoot, and plateau
+#' data on real NIRS signals, and can strand nls with a singular gradient.
+#'
+#' @param x,t Numeric vectors of the response and time.
+#' @param fixed A named list of user-fixed parameter values, which narrow
+#'   the grids and constrain the free estimates.
+#' @param has_TD Logical; include the time delay `TD`.
+#'
+#' @returns A named numeric vector of starting estimates in model order.
+#'
+#' @keywords internal
+monoexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
+    n <- length(t)
     span <- diff(range(t))
     if (!is.finite(span) || span <= 0) {
         span <- 1
@@ -122,40 +130,92 @@ monoexp_init <- function(mCall, data, LHS, ...) {
         fixed$TD %||% seq(0, 0.5 * span, length.out = 21L)
     }
 
-    ## y = B + (A - B) * e, so free A and B come from simple regression
-    ## of x on e, and a single free asymptote from projection on its
-    ## basis; a degenerate grid point (e.g. all points pre-onset) yields
-    ## non-finite estimates and is discarded via infinite rss
-    solve_AB <- function(e) {
-        A <- fixed$A
-        B <- fixed$B
+    ## y = A e + B (1 - e): the response is centred so the asymptotes are
+    ## solved on deviations (better conditioned) and shifted back. a
+    ## user-fixed asymptote folds into the response and the other projects
+    ## onto its basis; a degenerate grid point (e.g. all points pre-onset)
+    ## solves non-finite and is discarded via infinite rss
+    xm <- mean(x)
+    xc <- x - xm
+    sx <- sum(xc)
+    xx <- sum(xc^2)
+    A_fix <- if (!is.null(fixed$A)) fixed$A - xm
+    B_fix <- if (!is.null(fixed$B)) fixed$B - xm
+
+    ## one block per TD: columns of E are the grid taus
+    blocks <- lapply(td_grid, \(.td) {
+        ts <- if (has_TD) pmax(t - .td, 0) else t
+        E <- exp(-outer(ts, tau_grid, `/`))
+        s <- colSums(E)
+        d <- colSums(E^2)
+        xe <- drop(crossprod(E, xc))
+        g12 <- s - d
+        g22 <- n - 2 * s + d
+        A <- A_fix
+        B <- B_fix
         if (is.null(A) && is.null(B)) {
-            ec <- e - mean(e)
-            slope <- sum(ec * x) / sum(ec^2)
-            B <- mean(x) - slope * mean(e)
-            A <- B + slope
+            det <- d * g22 - g12^2
+            A <- (g22 * xe - g12 * (sx - xe)) / det
+            B <- (d * (sx - xe) - g12 * xe) / det
         } else if (is.null(A)) {
-            A <- sum(e * (x - B * (1 - e))) / sum(e^2)
+            A <- (xe - B * g12) / d
         } else if (is.null(B)) {
-            B <- sum((1 - e) * (x - A * e)) / sum((1 - e)^2)
+            B <- (sx - xe - A * g12) / g22
         }
-        rss <- if (is.finite(A + B)) sum((x - B - (A - B) * e)^2) else Inf
-        return(c(A = A, B = B, rss = rss))
+        rss <- xx - 2 * (A * xe + B * (sx - xe)) +
+            A^2 * d + 2 * A * B * g12 + B^2 * g22
+        rss[!is.finite(rss)] <- Inf
+        list(
+            A = rep_len(A + xm, length(tau_grid)),
+            B = rep_len(B + xm, length(tau_grid)),
+            rss = rss
+        )
+    })
+    k <- which.min(vapply(blocks, \(.b) min(.b$rss), numeric(1)))
+    i <- which.min(blocks[[k]]$rss)
+    if (!is.finite(blocks[[k]]$rss[[i]])) {
+        stop("No starting estimates could be resolved from the response.")
     }
 
-    grid <- expand.grid(tau = tau_grid, TD = td_grid)
-    fits <- vapply(seq_len(nrow(grid)), \(.i) {
-        solve_AB(exp(-(if (has_TD) pmax(t - grid$TD[.i], 0) else t) /
-            grid$tau[.i]))
-    }, numeric(3L))
-    best <- which.min(fits["rss", ])
-
     return(c(
-        A = fits[["A", best]],
-        B = fits[["B", best]],
-        tau = grid$tau[best],
-        TD = if (has_TD) grid$TD[best]
+        A = blocks[[k]]$A[[i]],
+        B = blocks[[k]]$B[[i]],
+        tau = tau_grid[[i]],
+        TD = if (has_TD) td_grid[[k]]
     ))
+}
+
+
+#' Monoexponential model with gradient
+#'
+#' Model function of [SSmonoexponential()]: [monoexponential()] plus the
+#' partial derivatives for the parameters written as bare symbols in the
+#' call (see [free_params()]), so [stats::nls()] skips
+#' [stats::numericDeriv()] and a parameter fixed as a constant in the
+#' formula contributes no gradient column.
+#'
+#' @inheritParams monoexponential
+#'
+#' @returns A numeric vector of predicted values with a `"gradient"`
+#'   attribute when any parameter is free.
+#'
+#' @keywords internal
+monoexp_model <- function(t, A, B, tau, TD = NULL) {
+    has_TD <- !is.null(TD)
+    ts <- if (has_TD) pmax(t - TD, 0) else t
+    e <- exp(-ts / tau)
+    val <- A + (B - A) * (1 - e)
+    free <- free_params(match.call(), c("A", "B", "tau", if (has_TD) "TD"))
+    if (length(free) > 0L) {
+        grad <- cbind(
+            A = e,
+            B = 1 - e,
+            tau = -(B - A) * e * ts / tau^2,
+            TD = if (has_TD) -(t > TD) * (B - A) * e / tau
+        )
+        attr(val, "gradient") <- grad[, free, drop = FALSE]
+    }
+    return(val)
 }
 
 
@@ -180,6 +240,11 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #'   time delay is expected, as it converges more reliably. [stats::nls()]
 #'   reads the free parameters from the formula right-hand side, so omitting
 #'   `TD` incurs no degrees-of-freedom penalty.
+#'
+#' The model function returns the analytic gradient for the free
+#'   parameters as a `"gradient"` attribute, so [stats::nls()] does not
+#'   resort to [stats::numericDeriv()] and [stats::predict()] on a fitted
+#'   model carries the attribute; drop it with `as.vector()`.
 #'
 #' ## Fixing parameters
 #'
@@ -229,7 +294,7 @@ monoexp_init <- function(mCall, data, LHS, ...) {
 #'
 #' @export
 SSmonoexponential <- selfStart(
-    model = monoexponential,
+    model = monoexp_model,
     initial = init_fixed(monoexp_init, c("A", "B", "tau", "TD")),
     parameters = c("A", "B", "tau", "TD")
 )
@@ -329,7 +394,20 @@ analyse_monoexponential <- function(
                     names(.data)[[1L]],
                     names(.data)[[2L]]
                 )
-                tryCatch(nls(formula, .data), error = on_error)
+                ## seed from the grid profile directly on the fit vectors
+                tryCatch(
+                    {
+                        start <- monoexp_start(
+                            .data[[1L]], .data[[2L]], .a$fix, "TD" %in% .params
+                        )
+                        nls(
+                            formula,
+                            .data,
+                            start = start[setdiff(.params, names(.a$fix))]
+                        )
+                    },
+                    error = on_error
+                )
             },
             fn = quote(SSmonoexponential),
             .nirs = .nirs,
@@ -349,7 +427,7 @@ analyse_monoexponential <- function(
             coefs,
             fit$data,
             direction = .a$direction,
-            amp_fn = quote(monoexponential),
+            amp_fn = quote(SSmonoexponential),
             ## data-scaled tau floor: tau pinned here is a degenerate
             ## step fit, not a genuine response
             lower = if (!"tau" %in% names(.a$fix)) {

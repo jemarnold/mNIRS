@@ -125,24 +125,38 @@ biexp_texc <- function(A, B1, tau1, B2, tau2, TD = NULL) {
 #'
 #' @keywords internal
 biexp_init <- function(mCall, data, LHS, ...) {
-    ## user-fixed values narrow the grids; the amplitudes are always
-    ## solved free, as this is only a seed
     fixed <- list(...)$fixed %||% list()
-
     tx <- sortedXyData(mCall[["t"]], LHS, data)
-    x <- tx[["y"]]
-    t <- tx[["x"]]
-    has_TD <- "TD" %in% names(mCall)
+    return(biexp_start(tx[["y"]], tx[["x"]], fixed, "TD" %in% names(mCall)))
+}
+
+
+#' Grid-profiled starting estimates for the biexponential model
+#'
+#' Vector-level initialiser behind [biexp_init()], called directly by the
+#' kinetics worker on the fit window. Profiles the time constants (and
+#' `TD`) on a coarse grid and keeps the RSS-minimising start (cf.
+#' [expdrift_start()]). The model is linear in `A`, `B1`, and `B2` once
+#' `tau1`, `tau2`, and `TD` are held, so those are solved by least squares
+#' at every grid point at once: the Gram entries of the bases `e1`,
+#' `e2 - e1`, `1 - e2` for every `(tau1, tau2)` pair follow from the
+#' column products of the two exponential matrices, and [solve_grid3()]
+#' solves the pairs in one pass. User-fixed values narrow the grids; the
+#' amplitudes are always solved free, as this is only a seed. Pairs with
+#' `tau2 < 2 * tau1` are dropped as their bases are near-collinear, unless
+#' both time constants are fixed.
+#'
+#' @inheritParams monoexp_start
+#'
+#' @returns A named numeric vector of starting estimates in model order.
+#'
+#' @keywords internal
+biexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
+    n <- length(t)
     span <- diff(range(t))
     if (!is.finite(span) || span <= 0) {
         span <- 1
     }
-
-    ## profile the time constants (and TD) on a coarse grid and keep the
-    ## RSS-minimising start (cf. `expdrift_init()`). the model is linear
-    ## in A, B1, and B2 once tau1, tau2, and TD are held, so those are
-    ## solved by least squares at every grid point. pairs with tau2 close
-    ## to tau1 are dropped as their bases are near-collinear
     tau1_grid <- fixed$tau1 %||%
         exp(seq(log(span / 100), log(span / 2), length.out = 13L))
     tau2_grid <- fixed$tau2 %||%
@@ -152,30 +166,138 @@ biexp_init <- function(mCall, data, LHS, ...) {
     } else {
         fixed$TD %||% seq(0, span / 3, length.out = 11L)
     }
-    grid <- expand.grid(tau1 = tau1_grid, tau2 = tau2_grid, TD = td_grid)
-    grid <- grid[grid$tau2 >= 2 * grid$tau1, , drop = FALSE]
+    n1 <- length(tau1_grid)
+    n2 <- length(tau2_grid)
+    ok <- outer(tau1_grid, tau2_grid, \(.a, .b) .b >= 2 * .a)
+    if (!is.null(fixed$tau1) && !is.null(fixed$tau2)) {
+        ok[] <- TRUE
+    }
+    ## expand tau1- and tau2-indexed vectors over the (tau1, tau2) grid
+    by1 <- \(v) matrix(v, n1, n2)
+    by2 <- \(v) matrix(v, n1, n2, byrow = TRUE)
 
-    fits <- vapply(seq_len(nrow(grid)), \(.i) {
-        ts <- if (has_TD) pmax(t - grid$TD[.i], 0) else t
-        e1 <- exp(-ts / grid$tau1[.i])
-        e2 <- exp(-ts / grid$tau2[.i])
-        X <- cbind(e1, e2 - e1, 1 - e2)
-        cf <- qr.coef(qr(X), x)
-        c(cf, sum((x - X %*% cf)^2))
-    }, numeric(4L))
-    best <- which.min(fits[4L, ])
-    if (length(best) == 0L) {
+    ## the response is centred for conditioning; the constant is carried
+    ## by the bases (they sum to one), so the asymptotes shift back
+    xm <- mean(x)
+    xc <- x - xm
+    sx <- sum(xc)
+    xx <- sum(xc^2)
+    blocks <- lapply(td_grid, \(.td) {
+        ts <- if (has_TD) pmax(t - .td, 0) else t
+        E1 <- exp(-outer(ts, tau1_grid, `/`))
+        E2 <- exp(-outer(ts, tau2_grid, `/`))
+        P <- crossprod(E1, E2)
+        d1 <- colSums(E1^2)
+        d2 <- colSums(E2^2)
+        s1 <- colSums(E1)
+        s2 <- colSums(E2)
+        xe1 <- drop(crossprod(E1, xc))
+        xe2 <- drop(crossprod(E2, xc))
+        fit <- solve_grid3(
+            g11 = by1(d1),
+            g12 = P - by1(d1),
+            g13 = by1(s1) - P,
+            g22 = by1(d1) + by2(d2) - 2 * P,
+            g23 = P - by1(s1) + by2(s2 - d2),
+            g33 = by2(n - 2 * s2 + d2),
+            b1 = by1(xe1),
+            b2 = by2(xe2) - by1(xe1),
+            b3 = sx - by2(xe2),
+            xx = xx
+        )
+        fit$rss[!ok] <- Inf
+        fit
+    })
+    k <- which.min(vapply(blocks, \(.b) min(.b$rss), numeric(1)))
+    b <- blocks[[k]]
+    ij <- arrayInd(which.min(b$rss), dim(b$rss))
+    if (!is.finite(b$rss[ij])) {
         stop("No starting estimates could be resolved from the response.")
     }
 
     return(c(
-        A = fits[[1L, best]],
-        B1 = fits[[2L, best]],
-        tau1 = grid$tau1[best],
-        B2 = fits[[3L, best]],
-        tau2 = grid$tau2[best],
-        TD = if (has_TD) grid$TD[best]
+        A = b$c1[ij] + xm,
+        B1 = b$c2[ij] + xm,
+        tau1 = tau1_grid[[ij[[1L]]]],
+        B2 = b$c3[ij] + xm,
+        tau2 = tau2_grid[[ij[[2L]]]],
+        TD = if (has_TD) td_grid[[k]]
     ))
+}
+
+
+#' Biexponential model with gradient
+#'
+#' [biexp_core()] evaluates the curve and its partial derivatives on the
+#' canonical parameters. [biexp_model()] is the model function of
+#' [SSbiexponential()]: [biexponential()] plus the gradient for the
+#' parameters written as bare symbols in the call (see [free_params()]),
+#' so [stats::nls()] skips [stats::numericDeriv()]. [biexp_ratio()] is
+#' the internal fitting model on `(r = tau1 / tau2, tau2)`: the phase
+#' separation `tau2 >= 2 * tau1` becomes the box bound `r <= 0.5`, closing
+#' the non-identifiable valley at `tau1 -> tau2` that stalls the canonical
+#' fit with a runaway `B1`.
+#'
+#' @param r A numeric parameter for the time-constant ratio `tau1 / tau2`.
+#' @inheritParams biexponential
+#'
+#' @returns [biexp_core()]: a list of the curve `val` and the partial
+#'   derivatives by parameter name. [biexp_model()], [biexp_ratio()]: a
+#'   numeric vector of predicted values with a `"gradient"` attribute when
+#'   any parameter is free.
+#'
+#' @keywords internal
+biexp_core <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
+    has_TD <- !is.null(TD)
+    ts <- if (has_TD) pmax(t - TD, 0) else t
+    e1 <- exp(-ts / tau1)
+    e2 <- exp(-ts / tau2)
+    return(list(
+        val = A + (B1 - A) * (1 - e1) + (B2 - B1) * (1 - e2),
+        A = e1,
+        B1 = e2 - e1,
+        tau1 = -(B1 - A) * e1 * ts / tau1^2,
+        B2 = 1 - e2,
+        tau2 = -(B2 - B1) * e2 * ts / tau2^2,
+        TD = if (has_TD) {
+            -(t > TD) * ((B1 - A) * e1 / tau1 + (B2 - B1) * e2 / tau2)
+        }
+    ))
+}
+
+
+#' @rdname biexp_core
+#' @keywords internal
+biexp_model <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
+    g <- biexp_core(t, A, B1, tau1, B2, tau2, TD)
+    val <- g$val
+    free <- free_params(
+        match.call(),
+        c("A", "B1", "tau1", "B2", "tau2", if (!is.null(TD)) "TD")
+    )
+    if (length(free) > 0L) {
+        attr(val, "gradient") <- do.call(cbind, g[free])
+    }
+    return(val)
+}
+
+
+#' @rdname biexp_core
+#' @keywords internal
+biexp_ratio <- function(t, A, B1, r, B2, tau2, TD = NULL) {
+    g <- biexp_core(t, A, B1, r * tau2, B2, tau2, TD)
+    val <- g$val
+    free <- free_params(
+        match.call(),
+        c("A", "B1", "r", "B2", "tau2", if (!is.null(TD)) "TD")
+    )
+    if (length(free) > 0L) {
+        ## chain rule through tau1 = r * tau2
+        g$r <- g$tau1 * tau2
+        g$tau2 <- g$tau2 + g$tau1 * r
+        attr(val, "gradient") <- do.call(cbind, g[free])
+    }
+    return(val)
 }
 
 
@@ -202,6 +324,13 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #' The two phases are weakly identified when `tau1` and `tau2` are close, so
 #' `algorithm = "port"` with the time constants bounded non-negative and
 #' `control = nls.control(warnOnly = TRUE)` is recommended.
+#' [analyse_kinetics()] additionally fits on the ratio `tau1 / tau2` to
+#' hold the phases apart.
+#'
+#' The model function returns the analytic gradient for the free
+#' parameters as a `"gradient"` attribute, so [stats::nls()] does not
+#' resort to [stats::numericDeriv()] and [stats::predict()] on a fitted
+#' model carries the attribute; drop it with `as.vector()`.
 #'
 #' The 5-parameter form is recommended for small samples or when no obvious
 #'   time delay is expected, as it converges more reliably. [stats::nls()]
@@ -251,7 +380,7 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #'
 #' @export
 SSbiexponential <- selfStart(
-    model = biexponential,
+    model = biexp_model,
     initial = init_fixed(
         biexp_init,
         c("A", "B1", "tau1", "B2", "tau2", "TD")
@@ -336,74 +465,112 @@ analyse_biexponential <- function(
     ## NA scaffold (method columns only) for convergence failure
     na_cols <- c("A", "B1", "tau1", "B2", "tau2", "TD", "texc", "texc_fitted")
 
-    ## method-specific fit: self-starting biexponential via nls; a failed
-    ## 6-param fit falls back to the 5-param model
+    ## the phases separate at tau2 >= 2 * tau1 (`r_max` = tau1 / tau2),
+    ## matching the start grid; a fit pinned at the bound wants the
+    ## non-identifiable tau1 = tau2 valley and is reported as such
+    r_max <- 0.5
+    pinned <- \(cf) isTRUE(cf[["r"]] >= r_max * (1 - 1e-6))
+    not_separable <- "Fast and slow phases are not separable (tau1 approaches tau2)."
+
+    ## canonical <-> ratio coefficient vectors, keeping parameter order
+    to_ratio <- \(cf) {
+        cf[["tau1"]] <- cf[["tau1"]] / cf[["tau2"]]
+        names(cf) <- sub("^tau1$", "r", names(cf))
+        cf
+    }
+    to_canon <- \(cf) {
+        cf[["r"]] <- cf[["r"]] * cf[["tau2"]]
+        names(cf) <- sub("^r$", "tau1", names(cf))
+        cf
+    }
+
+    ## fit bounds. ratio space: taus floored as degeneracy markers, r
+    ## capped at the separation, tau2 capped so a runaway slow component
+    ## cannot diverge with B2. canonical space: the separation is the box
+    ## bound tau2 >= 2 * tau1 when tau1 is user-fixed, else only the floor
+    ## (the canonical refit starts at a separated optimum)
+    bounds <- \(span, ratio, fix) {
+        if (ratio) {
+            list(
+                lower = c(r = 1e-6, tau2 = span * 1e-6, TD = 0),
+                upper = c(r = r_max, tau2 = 10 * span)
+            )
+        } else {
+            list(
+                lower = c(
+                    tau1 = span * 1e-6,
+                    tau2 = max(span * 1e-6, 2 * fix$tau1),
+                    TD = 0
+                ),
+                upper = c(tau2 = 10 * span)
+            )
+        }
+    }
+    ## named box over the free parameters, unbounded where unset
+    box <- \(bnd, free, fill) {
+        b <- setNames(bnd[free], free)
+        b[is.na(b)] <- fill
+        b
+    }
+    port_fit <- \(formula, .data, start, bnd, on_error) {
+        lower <- box(bnd$lower, names(start), -Inf)
+        upper <- box(bnd$upper, names(start), Inf)
+        tryCatch(
+            suppressWarnings(nls(
+                formula,
+                .data,
+                ## a grid edge can overshoot its cap by rounding
+                start = pmin(pmax(start, lower), upper),
+                algorithm = "port",
+                lower = lower,
+                upper = upper,
+                control = stats::nls.control(maxiter = 500L, warnOnly = TRUE)
+            )),
+            error = on_error
+        )
+    }
+
+    ## method-specific fit: biexponential via nls port on the ratio
+    ## parameterisation, or canonical when tau1 is user-fixed (r is then
+    ## not a box bound); a failed 6-param fit falls back to the 5-param
+    ## model. the returned model is always canonical
     biexp_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
-        ## the phases are weakly identified when the time constants are
-        ## close, so port often stops short of its certificate on usable
+        fix <- .a$fix
+        ratio <- !"tau1" %in% names(fix)
+        space <- \(.params) if (ratio) sub("^tau1$", "r", .params) else .params
+
+        ## port often stops short of its certificate on usable
         ## coefficients, which are kept with a warning
         fitter <- \(.data, .params, on_error) {
-            free <- setdiff(.params, names(.a$fix))
-            span <- diff(range(.data[[2L]]))
-            formula <- build_ss_formula(
-                quote(SSbiexponential),
-                .params,
-                .a$fix,
-                names(.data)[[1L]],
-                names(.data)[[2L]]
-            )
-
-            ## taus floored as degeneracy markers; tau2 capped so a
-            ## runaway slow component cannot diverge with B2
-            lower <- c(tau1 = span * 1e-6, tau2 = span * 1e-6, TD = 0)[free]
-            names(lower) <- free
-            lower[is.na(lower)] <- -Inf
-            upper <- c(tau2 = 10 * span)[free]
-            names(upper) <- free
-            upper[is.na(upper)] <- Inf
-
-            port_fit <- \(start) {
-                tryCatch(
-                    suppressWarnings(nls(
-                        formula,
-                        .data,
-                        start = start,
-                        algorithm = "port",
-                        lower = lower,
-                        upper = upper,
-                        control = stats::nls.control(
-                            maxiter = 500L,
-                            warnOnly = TRUE
-                        )
-                    )),
-                    error = on_error
-                )
-            }
+            params <- space(.params)
+            free <- setdiff(params, names(fix))
             start <- tryCatch(
-                stats::getInitial(formula, .data),
+                biexp_start(.data[[1L]], .data[[2L]], fix, "TD" %in% .params),
                 error = on_error
             )
             if (is.null(start)) {
                 return(NULL)
             }
-            model <- port_fit(start)
-
-            ## the phases are exchangeable, so the optimum may land with
-            ## the fast label on the slow term; refit from the swapped
-            ## start (same RSS optimum) so tau1 <= tau2 is reported
-            cf <- if (is.null(model)) NULL else coef(model)
-            swap <- all(c("tau1", "tau2", "B1") %in% free) &&
-                !is.null(cf) &&
-                isTRUE(cf[["tau1"]] > cf[["tau2"]])
-            if (swap) {
-                A_val <- .a$fix$A %||% cf[["A"]]
-                B2_val <- .a$fix$B2 %||% cf[["B2"]]
-                cf[c("tau1", "tau2", "B1")] <- c(
-                    cf[["tau2"]], cf[["tau1"]], A_val + B2_val - cf[["B1"]]
-                )
-                model <- port_fit(cf) %||% model
+            if (ratio) {
+                start <- to_ratio(start)
             }
-            accept_port_fit(model, on_error)
+            formula <- build_ss_formula(
+                if (ratio) quote(biexp_ratio) else quote(SSbiexponential),
+                params,
+                fix,
+                names(.data)[[1L]],
+                names(.data)[[2L]]
+            )
+            bnd <- bounds(diff(range(.data[[2L]])), ratio, fix)
+            model <- accept_port_fit(
+                port_fit(formula, .data, start[free], bnd, on_error),
+                on_error
+            )
+            ## a property of the data, so the reduced model is not retried
+            if (!is.null(model) && ratio && pinned(coef(model))) {
+                return(on_error(fit_final_error(not_separable)))
+            }
+            model
         }
 
         fit <- fit_td_fallback(
@@ -422,26 +589,26 @@ analyse_biexponential <- function(
             return(build_na_results(na_cols))
         }
         params <- fit$params
-        coefs <- full_coefs(fit$model, params, .a$fix)
+        coefs <- full_coefs(fit$model, space(params), fix)
         span <- diff(range(fit$data[[time_channel]]))
+        bnd <- bounds(span, ratio, fix)
 
         ## enforce direction: bounded refit on the fast-phase amplitude
-        ## D = B1 - A when inverted. the fit bounds are carried over;
-        ## TD >= 0 is structural, so only D and the tau floors mark a
-        ## degenerate fit
-        free <- setdiff(params, names(.a$fix))
-        lower <- c(tau1 = span * 1e-6, tau2 = span * 1e-6, TD = 0)
-        upper <- c(tau2 = 10 * span)
+        ## D = B1 - A when inverted. the fit bounds are carried over; TD
+        ## >= 0 and the separation are structural, so only D and the
+        ## floors mark a degenerate fit
+        free <- setdiff(space(params), names(fix))
         enforced <- enforce_direction(
             fit$model,
             coefs,
             fit$data,
             direction = .a$direction,
-            amp_fn = quote(biexponential),
-            lower = lower[intersect(names(lower), free)],
-            upper = upper[intersect(names(upper), free)],
-            floor_params = c("D", "tau1", "tau2"),
-            fix = .a$fix,
+            amp_fn = if (ratio) quote(biexp_ratio) else quote(SSbiexponential),
+            fn = "SSbiexponential",
+            lower = bnd$lower[intersect(names(bnd$lower), free)],
+            upper = bnd$upper[intersect(names(bnd$upper), free)],
+            floor_params = c("D", if (ratio) c("r", "tau2")),
+            fix = fix,
             .nirs = .nirs,
             interval_name = interval_name,
             env = env
@@ -449,7 +616,49 @@ analyse_biexponential <- function(
         if (is.null(enforced)) {
             return(build_na_results(na_cols))
         }
+        model <- enforced$model
         coefs <- enforced$coefs
+
+        ## canonical re-expression from the ratio optimum, so the returned
+        ## model reports (tau1, tau2): an interior stationary point
+        ## converges at once, a pinned one is not separable
+        if (ratio) {
+            degenerate <- pinned(coefs)
+            model <- if (!degenerate) {
+                accept_port_fit(
+                    port_fit(
+                        build_ss_formula(
+                            quote(SSbiexponential),
+                            params,
+                            fix,
+                            names(fit$data)[[1L]],
+                            names(fit$data)[[2L]]
+                        ),
+                        fit$data,
+                        to_canon(coefs)[setdiff(params, names(fix))],
+                        bounds(span, FALSE, fix),
+                        \(e) NULL
+                    ),
+                    \(e) NULL
+                )
+            }
+            if (is.null(model)) {
+                warn_fit_failed(
+                    quote(SSbiexponential),
+                    simpleError(if (degenerate) {
+                        not_separable
+                    } else {
+                        "Canonical re-expression of the fit failed."
+                    }),
+                    .nirs,
+                    interval_name,
+                    length(params),
+                    env = env
+                )
+                return(build_na_results(na_cols))
+            }
+            coefs <- full_coefs(model, params, fix)
+        }
 
         ## TD is already elapsed from start_time, matching the fit time base
         TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL
@@ -490,7 +699,7 @@ analyse_biexponential <- function(
                 texc = texc_val,
                 texc_fitted = texc_fitted_val
             ),
-            enforced$model,
+            model,
             x_fit,
             t_fit,
             valid,

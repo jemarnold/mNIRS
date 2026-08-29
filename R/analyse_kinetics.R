@@ -360,11 +360,15 @@
 #' See [biexponential()] for the model family and [SSbiexponential()] for
 #' self-start initialisation.
 #'
-#' The two phases are exchangeable, so fits are reported with
-#' `tau1 <= tau2`. The slow time constant `tau2` is capped at ten times the
-#' record span: a slow tail
-#' far beyond the record identifies only its rate, not `tau2` and `B2`
-#' separately.
+#' The two phases are separated as `tau2 >= 2 * tau1`: the model is fit on
+#' the ratio `tau1 / tau2` bounded at `0.5`, which closes the
+#' non-identifiable region at `tau1 = tau2` where the two terms collapse
+#' into one with runaway amplitudes. A response whose best fit lies at that
+#' bound (the phases are not separable) returns `NA` coefficients with a
+#' warning; consider the *"monoexponential"* or *"exponential_drift"*
+#' methods instead. The slow time constant `tau2` is capped at ten times
+#' the record span: a slow tail far beyond the record identifies only its
+#' rate, not `tau2` and `B2` separately.
 #'
 #' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`, as
 #' above.

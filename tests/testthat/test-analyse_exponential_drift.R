@@ -51,6 +51,49 @@ test_that("SSexponential_drift() fits the 6-parameter TD form", {
     expect_true(all.equal(coefs[["TD"]], 15, tolerance = 3, scale = 1))
 })
 
+test_that("SSexponential_drift() gradient matches numericDeriv for the free parameters", {
+    ## sample points off the hinge, where the one-sided derivative is exact
+    t <- seq(-10, 120, by = 0.5) + 0.1
+    env <- list2env(list(
+        t = t, A = 70, B = 40, tau = 8, slope = -0.2, tau_mult = 3, TD = 3
+    ))
+    chk <- function(expr, pars) {
+        an <- attr(eval(expr, env), "gradient")
+        nd <- attr(numericDeriv(expr, pars, env), "gradient")
+        expect_identical(colnames(an), pars)
+        expect_equal(unname(an), unname(nd), tolerance = 1e-5)
+    }
+    chk(
+        quote(SSexponential_drift(t, A, B, tau, slope, tau_mult = 3, TD)),
+        c("A", "B", "tau", "slope", "TD")
+    )
+    chk(
+        quote(SSexponential_drift(t, A, B, tau, slope, tau_mult)),
+        c("A", "B", "tau", "slope", "tau_mult")
+    )
+    expect_null(
+        attr(exponential_drift(t, 70, 40, 8, -0.2, 3), "gradient")
+    )
+})
+
+test_that("expdrift_start() matches a per-point least-squares grid search", {
+    set.seed(8)
+    t <- 0:150
+    x <- exponential_drift(
+        t, A = 10, B = 100, tau = 12, slope = -0.5, tau_mult = 4, TD = 15
+    ) + rnorm(length(t), 0, 2)
+    start <- expdrift_start(x, t, fixed = list(tau_mult = 4), has_TD = TRUE)
+    expect_named(start, c("A", "B", "tau", "slope", "tau_mult", "TD"))
+
+    ## the linear coefficients at the chosen grid point are the lm solution
+    e <- exp(-pmax(t - start[["TD"]], 0) / start[["tau"]])
+    h <- pmax(t - start[["TD"]] - 4 * start[["tau"]], 0)
+    cf <- lm.fit(cbind(e, 1 - e, h), x)$coefficients
+    expect_equal(
+        unname(start[c("A", "B", "slope")]), unname(cf), tolerance = 1e-8
+    )
+})
+
 test_that("SSexponential_drift() fits the 5-parameter form with a fixed A", {
     set.seed(3)
     t <- 0:150

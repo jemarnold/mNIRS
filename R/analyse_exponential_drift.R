@@ -80,26 +80,37 @@ exponential_drift <- function(t, A, B, tau, slope, tau_mult, TD = NULL) {
 #'
 #' @keywords internal
 expdrift_init <- function(mCall, data, LHS, ...) {
-    ## user-fixed tau, TD, and tau_mult narrow the grids; the linear
-    ## parameters are always solved free, as this is only a seed
     fixed <- list(...)$fixed %||% list()
-
     tx <- sortedXyData(mCall[["t"]], LHS, data)
-    x <- tx[["y"]]
-    t <- tx[["x"]]
-    has_TD <- "TD" %in% names(mCall)
+    return(expdrift_start(tx[["y"]], tx[["x"]], fixed, "TD" %in% names(mCall)))
+}
+
+
+#' Grid-profiled starting estimates for the exponential-drift model
+#'
+#' Vector-level initialiser behind [expdrift_init()], called directly by
+#' the kinetics worker on the fit window. Profiles `tau` (and `TD`) on a
+#' coarse grid and keeps the RSS-minimising start (cf.
+#' [monoexp_start()]). The model is linear in `A`, `B`, and `slope` once
+#' `tau` and `TD` are held, so those are solved by least squares at every
+#' grid point at once via [solve_grid3()]. User-fixed `tau`, `TD`, and
+#' `tau_mult` narrow the grids; the linear parameters are always solved
+#' free, as this is only a seed. `tau` is capped so the drift onset stays
+#' inside the record; a grid point whose hinge has no support is singular
+#' and skipped.
+#'
+#' @inheritParams monoexp_start
+#'
+#' @returns A named numeric vector of starting estimates in model order.
+#'
+#' @keywords internal
+expdrift_start <- function(x, t, fixed = list(), has_TD = FALSE) {
+    n <- length(t)
     span <- diff(range(t))
     if (!is.finite(span) || span <= 0) {
         span <- 1
     }
     tau_mult <- fixed$tau_mult %||% 3
-
-    ## profile tau (and TD) on a coarse grid and keep the RSS-minimising
-    ## start (cf. `monoexp_init()`). the model is linear in A, B, and
-    ## slope once tau and TD are held, so those are solved by least
-    ## squares at every grid point. tau is capped so the drift onset
-    ## stays inside the record; a grid point whose hinge has no support
-    ## solves to NA and is skipped
     tau_grid <- fixed$tau %||%
         exp(seq(log(span / 100), log(span / tau_mult), length.out = 25L))
     td_grid <- if (!has_TD) {
@@ -107,25 +118,90 @@ expdrift_init <- function(mCall, data, LHS, ...) {
     } else {
         fixed$TD %||% seq(0, 0.5 * span, length.out = 21L)
     }
-    grid <- expand.grid(tau = tau_grid, TD = td_grid)
 
-    fits <- vapply(seq_len(nrow(grid)), \(.i) {
-        ts <- if (has_TD) pmax(t - grid$TD[.i], 0) else t
-        e <- exp(-ts / grid$tau[.i])
-        X <- cbind(e, 1 - e, pmax(t - grid$TD[.i] - tau_mult * grid$tau[.i], 0))
-        cf <- qr.coef(qr(X), x)
-        c(cf, sum((x - X %*% cf)^2))
-    }, numeric(4L))
-    best <- which.min(fits[4L, ])
+    ## bases e, 1 - e, and the hinge from the drift onset; the response is
+    ## centred for conditioning and the asymptotes shifted back
+    xm <- mean(x)
+    xc <- x - xm
+    sx <- sum(xc)
+    xx <- sum(xc^2)
+    blocks <- lapply(td_grid, \(.td) {
+        ts <- if (has_TD) pmax(t - .td, 0) else t
+        E <- exp(-outer(ts, tau_grid, `/`))
+        H <- pmax(outer(t - .td, tau_mult * tau_grid, `-`), 0)
+        s <- colSums(E)
+        d <- colSums(E^2)
+        xe <- drop(crossprod(E, xc))
+        eh <- colSums(E * H)
+        solve_grid3(
+            g11 = d,
+            g12 = s - d,
+            g13 = eh,
+            g22 = n - 2 * s + d,
+            g23 = colSums(H) - eh,
+            g33 = colSums(H^2),
+            b1 = xe,
+            b2 = sx - xe,
+            b3 = drop(crossprod(H, xc)),
+            xx = xx
+        )
+    })
+    k <- which.min(vapply(blocks, \(.b) min(.b$rss), numeric(1)))
+    b <- blocks[[k]]
+    i <- which.min(b$rss)
+    if (!is.finite(b$rss[[i]])) {
+        stop("No starting estimates could be resolved from the response.")
+    }
 
     return(c(
-        A = fits[[1L, best]],
-        B = fits[[2L, best]],
-        tau = grid$tau[best],
-        slope = fits[[3L, best]],
+        A = b$c1[[i]] + xm,
+        B = b$c2[[i]] + xm,
+        tau = tau_grid[[i]],
+        slope = b$c3[[i]],
         tau_mult = tau_mult,
-        TD = if (has_TD) grid$TD[best]
+        TD = if (has_TD) td_grid[[k]]
     ))
+}
+
+
+#' Exponential-drift model with gradient
+#'
+#' Model function of [SSexponential_drift()]: [exponential_drift()] plus
+#' the partial derivatives for the parameters written as bare symbols in
+#' the call (see [free_params()]), so [stats::nls()] skips
+#' [stats::numericDeriv()]. The hinge derivatives are one-sided at the
+#' drift onset.
+#'
+#' @inheritParams exponential_drift
+#'
+#' @returns A numeric vector of predicted values with a `"gradient"`
+#'   attribute when any parameter is free.
+#'
+#' @keywords internal
+expdrift_model <- function(t, A, B, tau, slope, tau_mult, TD = NULL) {
+    has_TD <- !is.null(TD)
+    ts <- if (has_TD) pmax(t - TD, 0) else t
+    e <- exp(-ts / tau)
+    texc <- sum(TD, tau_mult * tau)
+    h <- pmax(t - texc, 0)
+    val <- A + (B - A) * (1 - e) + slope * h
+    free <- free_params(
+        match.call(),
+        c("A", "B", "tau", "slope", "tau_mult", if (has_TD) "TD")
+    )
+    if (length(free) > 0L) {
+        on <- t > texc
+        grad <- cbind(
+            A = e,
+            B = 1 - e,
+            tau = -(B - A) * e * ts / tau^2 - slope * tau_mult * on,
+            slope = h,
+            tau_mult = -slope * tau * on,
+            TD = if (has_TD) -(t > TD) * (B - A) * e / tau - slope * on
+        )
+        attr(val, "gradient") <- grad[, free, drop = FALSE]
+    }
+    return(val)
 }
 
 
@@ -152,6 +228,12 @@ expdrift_init <- function(mCall, data, LHS, ...) {
 #' The hinge at `texc = TD + tau_mult * tau` is not differentiable, so
 #' `algorithm = "port"` with `tau` (and `TD`) bounded non-negative and
 #' `control = nls.control(warnOnly = TRUE)` is recommended.
+#'
+#' The model function returns the analytic gradient (one-sided at the
+#' hinge) for the free parameters as a `"gradient"` attribute, so
+#' [stats::nls()] does not resort to [stats::numericDeriv()] and
+#' [stats::predict()] on a fitted model carries the attribute; drop it
+#' with `as.vector()`.
 #'
 #' ## Fixing parameters
 #'
@@ -188,7 +270,7 @@ expdrift_init <- function(mCall, data, LHS, ...) {
 #'
 #' @export
 SSexponential_drift <- selfStart(
-    model = exponential_drift,
+    model = expdrift_model,
     initial = init_fixed(
         expdrift_init,
         c("A", "B", "tau", "slope", "tau_mult", "TD")
@@ -328,14 +410,21 @@ analyse_exponential_drift <- function(
                     names(.data)[[1L]],
                     names(.data)[[2L]]
                 )
+                ## seed from the grid profile directly on the fit vectors
                 model <- tryCatch(
-                    suppressWarnings(nls(
-                        formula,
-                        .data,
-                        algorithm = "port",
-                        lower = lower,
-                        control = stats::nls.control(warnOnly = TRUE)
-                    )),
+                    {
+                        start <- expdrift_start(
+                            .data[[1L]], .data[[2L]], .a$fix, "TD" %in% .params
+                        )
+                        suppressWarnings(nls(
+                            formula,
+                            .data,
+                            start = start[free],
+                            algorithm = "port",
+                            lower = lower,
+                            control = stats::nls.control(warnOnly = TRUE)
+                        ))
+                    },
                     error = on_error
                 )
                 accept_port_fit(model, on_error)
@@ -358,7 +447,7 @@ analyse_exponential_drift <- function(
             coefs,
             fit$data,
             direction = .a$direction,
-            amp_fn = quote(exponential_drift),
+            amp_fn = quote(SSexponential_drift),
             ## data-scaled tau floor: tau pinned here is a degenerate
             ## step fit, not a genuine response
             lower = if (!"tau" %in% names(.a$fix)) {
