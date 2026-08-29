@@ -35,13 +35,13 @@ test_that("detect_direction detects dominant excursion from baseline", {
     ## rising limb occupies most of the record but primary direction is down
     t <- 0:120
     x <- biexponential(
-        t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40, tau_mult = 2
+        t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40
     )
     expect_equal(detect_direction(x, t), "negative")
 
     ## mirrored rise-decay overshoot
     x <- biexponential(
-        t, A = 45, B1 = 70, tau1 = 5, B2 = 55, tau2 = 40, tau_mult = 2
+        t, A = 40, B1 = 70, tau1 = 5, B2 = 50, tau2 = 40
     )
     expect_equal(detect_direction(x, t), "positive")
 })
@@ -3018,115 +3018,6 @@ test_that("analyse_kinetics works visually on Train.Red", {
 })
 
 
-## benchmark ===========================================================
-test_that("analyse_kinetics benchmark", {
-    ## baselne established from documented example on initial run;
-    ## fails if itr/sec regresses by >10%
-    skip("benchmark baseline test")
-
-    data_list <- read_mnirs(
-        example_mnirs("train.red"),
-        nirs_channels = c(
-            smo2_left = "SmO2 unfiltered",
-            smo2_right = "SmO2 unfiltered"
-        ),
-        time_channel = c(time = "Timestamp (seconds passed)"),
-        zero_time = TRUE,
-        verbose = FALSE
-    ) |>
-        resample_mnirs(method = "linear", verbose = FALSE) |>
-        extract_intervals(
-            group_intervals = "distinct",
-            start = by_time(368, 1084),
-            span = c(-20, 90),
-            zero_time = TRUE,
-            verbose = FALSE
-        )
-
-    # bench::mark(
-    #     analyse_peak_slope = suppressWarnings(
-    #         lapply(data_list, \(.df) {
-    #             analyse_peak_slope(
-    #                 .df,
-    #                 nirs_channels = c(smo2_left, smo2_right),
-    #                 span = 10,
-    #                 verbose = FALSE
-    #             )
-    #         })
-    #     ),
-    #     kinetics.peak_slope = analyse_kinetics(
-    #         data_list,
-    #         nirs_channels = c(smo2_left, smo2_right),
-    #         method = "peak_slope",
-    #         span = 10,
-    #         verbose = FALSE
-    #     ),
-    #     analyse_monoexponential = suppressWarnings(
-    #         lapply(data_list, \(.df) {
-    #             analyse_monoexponential(
-    #                 .df,
-    #                 nirs_channels = c(smo2_left, smo2_right),
-    #                 use_TD = TRUE,
-    #                 verbose = FALSE
-    #             )
-    #         })
-    #     ),
-    #     kinetics.monoexponential = analyse_kinetics(
-    #         data_list,
-    #         nirs_channels = c(smo2_left, smo2_right),
-    #         method = "monoexponential",
-    #         use_TD = TRUE,
-    #         verbose = FALSE
-    #     ),
-    #     analyse_response = suppressWarnings(
-    #         lapply(data_list, \(.df) {
-    #             analyse_response_time(
-    #                 .df,
-    #                 nirs_channels = c(smo2_left, smo2_right),
-    #                 fraction = 0.5,
-    #                 verbose = FALSE
-    #             )
-    #         })
-    #     ),
-    #     kinetics.monoexponential = analyse_kinetics(
-    #         data_list,
-    #         nirs_channels = c(smo2_left, smo2_right),
-    #         method = "response_time",
-    #         fraction = 0.5,
-    #         verbose = FALSE
-    #     ),
-    #     iterations = 5L,
-    #     check = FALSE
-    # )
-
-    # A tibble: 2 × 13
-    #>    expression                 min median `itr/sec` mem_alloc `gc/sec`
-    #>    <bch:expr>              <bch:> <bch:>     <dbl> <bch:byt>    <dbl>
-    #>  1 analyse_peak_slope      69.3ms 73.4ms      13.8    30.4MB     22.1
-    #>  2 analyse_kinetics.peak_… 72.4ms 75.4ms      13.3    30.5MB     21.2
-
-    # itr_per_sec <- bm$`itr/sec`
-
-    # ## baseline: update this value when optimising (seconds)
-    # ## run test interactively to calibrate:
-    # ##   itr_per_sec will be printed on first failure
-    # baseline <- 8
-    # threshold <- baseline * 1.10 ## 10% regression budget
-
-    # expect_lte(
-    #     itr_per_sec,
-    #     threshold,
-    #     label = sprintf(
-    #         "%.3f itr/sec exceeds %.0f%% of baseline %.3fs (limit %.3fs)",
-    #         itr_per_sec,
-    #         110,
-    #         baseline,
-    #         threshold
-    #     )
-    # )
-})
-
-
 ## resolve_interval_args ==================================================
 test_that("resolve_interval_args peels interval-keyed args", {
     args <- list(
@@ -3308,7 +3199,7 @@ test_that("analyse_kinetics nls models are built on the input channel names", {
     ## one generator per nls method, each on the same `secs`/`hhb` columns
     curves <- list(
         monoexponential = monoexponential(t, 50, 80, 5, 5) + rnorm(120, 0, 0.5),
-        biexponential = biexponential(t, 70, 45, 5, 60, 40, 2) +
+        biexponential = biexponential(t, 70, 40, 5, 60, 40) +
             rnorm(120, 0, 0.5),
         exponential_drift = exponential_drift(t, 70, 40, 8, 0.2, 4) +
             rnorm(120, 0, 0.3),

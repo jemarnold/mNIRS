@@ -321,8 +321,8 @@ plot.mnirs_kinetics <- function(
     ## model component overlay ================================
     ## undocumented `components = TRUE`: reconstruct the model terms from
     ## natural-scale coefficients over the fitted rows. comp1 is the
-    ## primary monoexponential; comp2 is the secondary term clocked from
-    ## texc: the biexponential slow phase (B1 to B2), or the
+    ## primary monoexponential; comp2 is the secondary term: the
+    ## biexponential slow phase (B1 to B2) clocked from the onset, or the
     ## exponential_drift linear drift from (texc, texc_fitted)
     comp_methods <- c("biexponential", "exponential_drift")
     if (isTRUE(list(...)[["components"]]) && x$method %in% comp_methods) {
@@ -345,8 +345,7 @@ plot.mnirs_kinetics <- function(
             cd <- d[c(time_channel, if (faceted) "interval")]
             if (x$method == "biexponential") {
                 cd$comp1 <- monoexponential(t_rel, co$A, co$B1, co$tau1, TD)
-                cd$comp2 <-
-                    monoexponential(t_rel, co$B1, co$B2, co$tau2, co$texc)
+                cd$comp2 <- monoexponential(t_rel, co$B1, co$B2, co$tau2, TD)
             } else {
                 cd$comp1 <- monoexponential(t_rel, co$A, co$B, co$tau, TD)
                 cd$comp2 <- ifelse(

@@ -62,11 +62,11 @@ make_biexp <- function(A = 70, B1 = 45, B2 = 60, channels = "smo2", n = 121) {
     set.seed(1)
     t <- seq(0, n - 1, length.out = n)
     df <- setNames(
-        data.frame(t, biexponential(t, A, B1, 5, B2, 40, 2) + rnorm(n, 0, 0.5)),
+        data.frame(t, biexponential(t, A, B1, 5, B2, 40) + rnorm(n, 0, 0.5)),
         c("time", channels[1])
     )
     for (ch in channels[-1]) {
-        df[[ch]] <- biexponential(t, A + 5, B1 + 5, 5, B2 + 5, 40, 2) +
+        df[[ch]] <- biexponential(t, A + 5, B1 + 5, 5, B2 + 5, 40) +
             rnorm(n, 0, 0.5)
     }
     create_mnirs_data(

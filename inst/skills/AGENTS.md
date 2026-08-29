@@ -296,7 +296,7 @@ analyse_kinetics(
     align = c("centre", "left", "right"),
     partial = FALSE, na.rm = FALSE,
     use_TD = TRUE, shape = c("symmetric", "gompertz", "gompertz_left"),
-    tau_ratio = 2.5, fix = NULL
+    tau_mult = 3, fix = NULL
 )
 ## analyze_kinetics(...) alias
 ```
@@ -310,7 +310,8 @@ analyse_kinetics(
 - **`"response_time"`**: `fraction` (default `0.5`; `0.632` ≈ MRT).
 - **`"peak_slope"`**: `width` XOR `span`; `align` (`"centre"`/`"left"`/`"right"`); `partial`, `na.rm` (default `FALSE`).
 - **`"monoexponential"`**: `use_TD` (default `TRUE`; 4-param → 3-param fallback), `fix`.
-- **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `tau_ratio` (default `2.5`; lower bound on `tau2/tau1`; **always global**, never per-channel), `fix`.
+- **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `fix`. Phases exchangeable; reported with `tau1 <= tau2`.
+- **`"exponential_drift"`**: `use_TD`, `tau_mult` (default `3`; drift onset `texc = TD + tau_mult * tau`, always held constant), `fix`.
 - **`"sigmoidal"`**: `shape` (`"symmetric"` default = `SSlogistic()`; `"gompertz"` early-inflection (right); `"gompertz_left"` late-inflection), `fix`.
 
 Per-channel overrides via inline named `list()` (names must match `nirs_channels`):
@@ -367,7 +368,7 @@ Times are elapsed from `start_time`; `*_fitted` = predicted value at that point.
 | `"response_time"` | `A` baseline mean, `B` extreme (peak/trough) value, `response_time`, `response_value` (observed), `fitted` (target `A + (B-A)*fraction`), `idx` (sample/row number at `response_value`) |
 | `"peak_slope"` | `slope` (`x/t`), `intercept`, `fitted`, `peak_slope_time`, `idx` (sample/row number at `align` position) |
 | `"monoexponential"` | `A` baseline, `B` asymptote, `tau`, `k` (`1/tau`), `TD` delay (if `use_TD`), `MRT` (`TD+tau`), `HRT` (`TD+tau·ln2`), `MRT_fitted`, `HRT_fitted` |
-| `"biexponential"` | `A` start, `B1` & `tau1` fast component, `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `texc` (excursion point), `texc_fitted` |
+| `"biexponential"` | `A` start, `B1` & `tau1` fast component, `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `texc` (fitted turning point; `NA` if monotonic), `texc_fitted` |
 | `"sigmoidal"` | `A` & `B` start + end asymptotes, `xmid` inflection time (only literally *"middle"* for `shape = "symmetric"`), `slope` (`dx/dt` at `xmid`), `xmid_fitted` |
 
 **Diagnostics:** `n_obs`, `n_params`, `r2`, `adj_r2`, `rmse`, `snr`, `cv_rmse`,
@@ -396,10 +397,10 @@ nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = df)   # 3- or 4-param
 biexponential(t, A, B1, tau1, B2, tau2, TD = NULL)
 ## 5-param: A + (B1-A)*(1 - exp(-t/tau1)) + (B2-B1)*(1 - exp(-t/tau2))
 ## 6-param: as above with ts = pmax(t - TD, 0) substituted for t
-nls(x ~ SSbiexponential(t, A, B1, lt1, B2, lr, TD), data = df)
-## NB self-start on log-ratio scale: lt1 = log(tau1), lr = log(tau2/tau1);
-## `lr` enforces `tau_ratio` bound. `fix` on natural-scale tau1/tau2
-## analyse_kinetics() back-converts to tau1/tau2, direct calls return log scale
+## both phases clocked from onset; turning point
+## texc = TD + log(r)/(1/tau1 - 1/tau2), r = -(B1-A)*tau2/((B2-B1)*tau1), NA if r <= 1
+nls(x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, TD), data = df,
+    algorithm = "port", lower = c(-Inf, -Inf, 0, -Inf, 0, 0))   # 5- or 6-param
 
 logistic(t, A, B, xmid, slope, asym = NULL)  # 4-param symmetric / 5-param Richards
 gompertz(t, A, B, xmid, slope)               # early-inflection
@@ -469,7 +470,7 @@ format_hmmss(x)         # numeric seconds → "mm:ss" or "h:mm:ss"
 | `group_intervals = "ensemble"` needs regularised time grid | `resample → extract_intervals`; warns if irregular |
 | `monoexponential`/`biexponential` convergence fallback | Weak fits (certain convergence errors) return fit with warnings |
 | `direction`-bounded fit | return `NA` coefficients if unsatisfiable; verify `biexponential` in particular |
-| `biexponential(tau_ratio = 2.5)` bound | weakly identified biexponential fits may settle on the `tau2/tau1` bound; check `warnings` + `diagnostics`, consider reduced `method` |
+| `biexponential` identifiability | phases weakly identified when `tau1 ≈ tau2` or amplitudes small; check `warnings` + `diagnostics`, consider reduced `method` |
 
 ---
 
@@ -492,7 +493,7 @@ format_hmmss(x)         # numeric seconds → "mm:ss" or "h:mm:ss"
 | `R/analyse_response_time.R` | `response_time()` |
 | `R/analyse_peak_slope.R` | `peak_slope()`, `rolling_slope()` |
 | `R/analyse_monoexponential.R` | `monoexponential()`, `SSmonoexponential()` |
-| `R/analyse_biexponential.R` | `biexponential()`, `SSbiexponential()`, `biexp_init()`, `biexp_fix_ss()` |
+| `R/analyse_biexponential.R` | `biexponential()`, `SSbiexponential()`, `biexp_init()`, `biexp_texc()` |
 | `R/analyse_sigmoidal.R` | `logistic()`, `gompertz()`, `gompertz_left()`, `SS*()` |
 | `R/plot.mnirs.R` | `plot.mnirs()`, `plot.mnirs_kinetics()`, `theme_mnirs()`, `palette_mnirs()`, scale/format fns |
 | `R/mnirs_methods.R` | `print.mnirs()`, `print.mnirs_kinetics()` |
