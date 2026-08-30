@@ -341,7 +341,7 @@
 #' excursion while a concurrent *slow* component (`B2`, `tau2`), clocked
 #' from the same onset, recovers the response toward a stable plateau. The
 #' fitted turning point of the curve is reported as `texc` and
-#' `texc_fitted`; both are `NA` when the fitted response is monotonic.
+#' `texc_fitted`.
 #'
 #' Model equations:
 #'
@@ -360,15 +360,25 @@
 #' See [biexponential()] for the model family and [SSbiexponential()] for
 #' self-start initialisation.
 #'
-#' The two phases are separated as `tau2 >= 2 * tau1`: the model is fit on
-#' the ratio `tau1 / tau2` bounded at `0.5`, which closes the
-#' non-identifiable region at `tau1 = tau2` where the two terms collapse
-#' into one with runaway amplitudes. A response whose best fit lies at that
-#' bound (the phases are not separable) returns `NA` coefficients with a
-#' warning; consider the *"monoexponential"* or *"exponential_drift"*
-#' methods instead. The slow time constant `tau2` is capped at ten times
-#' the record span: a slow tail far beyond the record identifies only its
-#' rate, not `tau2` and `B2` separately.
+#' The two phases are separated by fitting on the ratio `tau1 / tau2`
+#' bounded at `0.98`, which closes the non-identifiable region at
+#' `tau1 = tau2` where the two terms collapse into one with runaway
+#' amplitudes. The slow time constant `tau2` is capped at ten times the
+#' record span: a slow tail far beyond the record identifies only its rate,
+#' not `tau2` and `B2` separately.
+#'
+#' The biexponential model is nested over the monoexponential (`B1 = B2`),
+#' so every channel is also fit with the *"monoexponential"* method on the
+#' same window and time-delay structure (with `A`, `B2` as `B`, and `TD`
+#' carried over from `fix`). The biexponential fit is kept only when it is
+#' an excursion-recovery (its turning point `texc` exists) and the
+#' extra-sum-of-squares F-test rejects the monoexponential at `p < 0.05`.
+#' Otherwise -- a monotonic fit, a second phase the data do not support, or
+#' a failed biexponential fit (e.g. phases not separable) -- the
+#' monoexponential fit is returned in the biexponential columns with
+#' `B1 = B2 = B`, `tau1 = tau`, and `tau2`, `texc`, `texc_fitted` as `NA`,
+#' with a warning. The `model` coefficient column names the method each
+#' row comes from.
 #'
 #' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`, as
 #' above.
@@ -478,7 +488,10 @@
 #'   \item{`coefficients`}{A data frame of coefficients with one row per
 #'       `nirs_channel` per interval, containing `interval`, `nirs_channels`,
 #'       the resolved `start_time` (the fit onset from which time coefficients
-#'       are elapsed), and method-specific parameters.}
+#'       are elapsed), and method-specific parameters. For
+#'       `"biexponential"`, `model` names the method each row's
+#'       coefficients come from (`"biexponential"`, or
+#'       `"monoexponential"` when reduced).}
 #'   \item{`data`}{A list of the original input data frames augmented with a
 #'       `*_fitted` column of fitted values for each processed `nirs_channel`.}
 #'   \item{`interval_times`}{A data frame with one row per interval and
@@ -725,9 +738,11 @@ analyse_kinetics.biexponential <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    return(analyse_kinetics_intervals(
+    ## the biexponential fit is resolved against a nested monoexponential
+    ## comparator (see `kinetics_reductions`); the undocumented
+    ## `force_biexponential = TRUE` keeps the raw fit for troubleshooting
+    return(analyse_kinetics_reduced(
         data,
-        analyse_biexponential,
         "biexponential",
         mget(unlist(kinetics_dispatch[c("common", "biexponential")])),
         enquo(nirs_channels),
@@ -736,7 +751,8 @@ analyse_kinetics.biexponential <- function(
         zero_time,
         verbose,
         match.call(),
-        sys.call(-1)
+        sys.call(-1),
+        reduce = !isTRUE(list(...)$force_biexponential)
     ))
 }
 

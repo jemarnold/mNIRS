@@ -131,6 +131,12 @@ biexp_init <- function(mCall, data, LHS, ...) {
 }
 
 
+
+## biexponential phase separation: the largest admissible tau1 / tau2,
+## shared by the start grid and the fit bounds
+tau_ratio <- 0.98
+
+
 #' Grid-profiled starting estimates for the biexponential model
 #'
 #' Vector-level initialiser behind [biexp_init()], called directly by the
@@ -143,8 +149,8 @@ biexp_init <- function(mCall, data, LHS, ...) {
 #' column products of the two exponential matrices, and [solve_grid3()]
 #' solves the pairs in one pass. User-fixed values narrow the grids; the
 #' amplitudes are always solved free, as this is only a seed. Pairs with
-#' `tau2 < 2 * tau1` are dropped as their bases are near-collinear, unless
-#' both time constants are fixed.
+#' `tau1 / tau2 > 0.98` are dropped as their bases are near-collinear,
+#' unless both time constants are fixed.
 #'
 #' @inheritParams monoexp_start
 #'
@@ -168,7 +174,7 @@ biexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
     }
     n1 <- length(tau1_grid)
     n2 <- length(tau2_grid)
-    ok <- outer(tau1_grid, tau2_grid, \(.a, .b) .b >= 2 * .a)
+    ok <- outer(tau1_grid, tau2_grid, \(.a, .b) .b >= .a / tau_ratio)
     if (!is.null(fixed$tau1) && !is.null(fixed$tau2)) {
         ok[] <- TRUE
     }
@@ -234,8 +240,8 @@ biexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
 #' parameters written as bare symbols in the call (see [free_params()]),
 #' so [stats::nls()] skips [stats::numericDeriv()]. [biexp_ratio()] is
 #' the internal fitting model on `(r = tau1 / tau2, tau2)`: the phase
-#' separation `tau2 >= 2 * tau1` becomes the box bound `r <= 0.5`, closing
-#' the non-identifiable valley at `tau1 -> tau2` that stalls the canonical
+#' separation becomes the box bound `r <= 0.98`, closing the
+#' non-identifiable valley at `tau1 -> tau2` that stalls the canonical
 #' fit with a runaway `B1`.
 #'
 #' @param r A numeric parameter for the time-constant ratio `tau1 / tau2`.
@@ -465,10 +471,10 @@ analyse_biexponential <- function(
     ## NA scaffold (method columns only) for convergence failure
     na_cols <- c("A", "B1", "tau1", "B2", "tau2", "TD", "texc", "texc_fitted")
 
-    ## the phases separate at tau2 >= 2 * tau1 (`r_max` = tau1 / tau2),
-    ## matching the start grid; a fit pinned at the bound wants the
-    ## non-identifiable tau1 = tau2 valley and is reported as such
-    r_max <- 0.5
+    ## the phases separate at tau1 / tau2 <= `r_max`, matching the start
+    ## grid; a fit pinned at the bound wants the non-identifiable
+    ## tau1 = tau2 valley and is reported as such
+    r_max <- tau_ratio
     pinned <- \(cf) isTRUE(cf[["r"]] >= r_max * (1 - 1e-6))
     not_separable <- "Fast and slow phases are not separable (tau1 approaches tau2)."
 
@@ -487,7 +493,7 @@ analyse_biexponential <- function(
     ## fit bounds. ratio space: taus floored as degeneracy markers, r
     ## capped at the separation, tau2 capped so a runaway slow component
     ## cannot diverge with B2. canonical space: the separation is the box
-    ## bound tau2 >= 2 * tau1 when tau1 is user-fixed, else only the floor
+    ## bound tau2 >= tau1 / r_max when tau1 is user-fixed, else only the floor
     ## (the canonical refit starts at a separated optimum)
     bounds <- \(span, ratio, fix) {
         if (ratio) {
@@ -499,7 +505,7 @@ analyse_biexponential <- function(
             list(
                 lower = c(
                     tau1 = span * 1e-6,
-                    tau2 = max(span * 1e-6, 2 * fix$tau1),
+                    tau2 = max(span * 1e-6, fix$tau1 / r_max),
                     TD = 0
                 ),
                 upper = c(tau2 = 10 * span)

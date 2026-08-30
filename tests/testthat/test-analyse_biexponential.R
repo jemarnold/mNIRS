@@ -216,7 +216,7 @@ test_that("biexp_start() matches a per-point least-squares grid search", {
     e2 <- exp(-ts / start[["tau2"]])
     cf <- lm.fit(cbind(e1, e2 - e1, 1 - e2), x)$coefficients
     expect_equal(unname(start[c("A", "B1", "B2")]), unname(cf), tolerance = 1e-8)
-    expect_true(start[["tau2"]] >= 2 * start[["tau1"]])
+    expect_true(start[["tau2"]] >= start[["tau1"]] / tau_ratio)
 })
 
 test_that("SSbiexponential() fixes tau1 in the formula", {
@@ -884,7 +884,7 @@ test_that("analyse_biexponential() returned model is canonical and converged", {
 
     expect_named(coef(model), c("A", "B1", "tau1", "B2", "tau2", "TD"))
     expect_true(model$convInfo$isConv)
-    expect_true(result$tau2 >= 2 * result$tau1)
+    expect_true(result$tau2 >= result$tau1 / tau_ratio)
     ## coefficient table mirrors the model
     expect_equal(result$tau1, coef(model)[["tau1"]])
     ## the self-start model predicts with a gradient attribute
@@ -1063,6 +1063,298 @@ test_that("analyse_kinetics() passes fix to the biexponential method", {
 })
 
 
+## monoexponential reduction ========================================
+
+## monotonic two-phase response: B1 between A and B2, no turning point
+create_monotonic_data <- function(seed = 7, TD = NULL, t = 0:119) {
+    set.seed(seed)
+    x <- biexponential(t, A = 70, B1 = 55, tau1 = 5, B2 = 40, tau2 = 40, TD) +
+        rnorm(length(t), 0, 0.3)
+    create_mnirs_data(
+        data.frame(time = t, smo2 = x),
+        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+    )
+}
+
+test_that("analyse_kinetics() reduces a monotonic biexponential fit", {
+    data <- create_monotonic_data()
+
+    expect_warning(
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = "smo2",
+            method = "biexponential",
+            use_TD = FALSE
+        ),
+        "reduced to"
+    )
+    cf <- result$coefficients
+    model <- result$model[[1L]]$smo2
+
+    expect_equal(names(cf)[1:4], c("interval", "nirs_channels", "start_time", "model"))
+    expect_equal(cf$model, "monoexponential")
+    expect_named(coef(model), c("A", "B", "tau"))
+    expect_equal(cf$A, coef(model)[["A"]])
+    expect_equal(cf$B1, coef(model)[["B"]])
+    expect_equal(cf$B2, coef(model)[["B"]])
+    expect_equal(cf$tau1, coef(model)[["tau"]])
+    expect_true(is.na(cf$tau2))
+    expect_true(is.na(cf$texc))
+    expect_true(is.na(cf$texc_fitted))
+    ## diagnostics and fitted values follow the reduced model
+    expect_equal(result$diagnostics$n_params, 3L)
+    expect_equal(
+        result$data[[1L]]$smo2_fitted,
+        as.vector(predict(model))
+    )
+    ## recorded with the reason, regardless of verbose
+    msgs <- result$warnings$message
+    expect_true(any(grepl("reduced to", msgs)))
+    expect_true(any(grepl("monotonic", msgs)))
+})
+
+test_that("analyse_kinetics() reduces a monoexponential response", {
+    set.seed(3)
+    t <- 0:120
+    x <- monoexponential(t, A = 70, B = 40, tau = 8) + rnorm(length(t), 0, 0.3)
+    data <- create_mnirs_data(
+        data.frame(time = t, smo2 = x),
+        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+    )
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+
+    expect_equal(result$coefficients$model, "monoexponential")
+    expect_true(all.equal(result$coefficients$tau1, 8, tolerance = 1, scale = 1))
+    expect_true(inherits(result$model[[1L]]$smo2, "nls"))
+})
+
+test_that("analyse_kinetics() keeps a supported excursion-recovery fit", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        verbose = FALSE
+    )
+    forced <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        force_biexponential = TRUE,
+        verbose = FALSE
+    )
+
+    expect_equal(result$coefficients$model, "biexponential")
+    expect_true(is.finite(result$coefficients$texc))
+    expect_named(
+        coef(result$model[[1L]]$smo2),
+        c("A", "B1", "tau1", "B2", "tau2", "TD")
+    )
+    expect_false(any(grepl("reduced to", result$warnings$message)))
+    ## the raw fit is unchanged by the comparison
+    expect_equal(result$coefficients, forced$coefficients)
+    expect_equal(result$diagnostics, forced$diagnostics)
+})
+
+test_that("force_biexponential = TRUE keeps a monotonic fit", {
+    data <- create_monotonic_data()
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        use_TD = FALSE,
+        force_biexponential = TRUE,
+        verbose = FALSE
+    )
+    cf <- result$coefficients
+
+    expect_equal(cf$model, "biexponential")
+    expect_true(is.na(cf$texc))
+    expect_false(is.na(cf$tau2))
+    expect_false(cf$B1 == cf$B2)
+    expect_false(any(grepl("reduced to", result$warnings$message)))
+})
+
+test_that("reduced fit matches the time-delay structure and window", {
+    data <- create_monotonic_data(seed = 11, TD = 10, t = -20:120)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        verbose = FALSE
+    )
+    cf <- result$coefficients
+    model <- result$model[[1L]]$smo2
+
+    expect_equal(cf$model, "monoexponential")
+    expect_equal(is.finite(cf$TD), "TD" %in% names(coef(model)))
+    ## fitted rows are the reduced model's window
+    expect_equal(
+        result$diagnostics$n_obs,
+        sum(is.finite(result$data[[1L]]$smo2_fitted))
+    )
+    expect_equal(result$diagnostics$n_params, length(coef(model)))
+})
+
+test_that("reduction carries fixed parameters over", {
+    data <- create_monotonic_data()
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        use_TD = FALSE,
+        fix = list(A = 70, B2 = 40),
+        verbose = FALSE
+    )
+    cf <- result$coefficients
+
+    expect_equal(cf$model, "monoexponential")
+    expect_equal(cf$A, 70)
+    expect_equal(cf$B1, 40)
+    expect_equal(cf$B2, 40)
+    expect_named(coef(result$model[[1L]]$smo2), "tau")
+
+    ## parameters without a monoexponential counterpart are dropped
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        use_TD = FALSE,
+        fix = list(tau1 = 5),
+        verbose = FALSE
+    )
+
+    expect_equal(result$coefficients$model, "monoexponential")
+    expect_named(coef(result$model[[1L]]$smo2), c("A", "B", "tau"))
+})
+
+test_that("reduction resolves per interval", {
+    data <- list(
+        excursion = create_biexp_data(noise_sd = 0.3),
+        monotonic = create_monotonic_data()
+    )
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+    cf <- result$coefficients
+
+    expect_equal(cf$interval, c("excursion", "monotonic"))
+    expect_equal(cf$model, c("biexponential", "monoexponential"))
+    expect_named(
+        coef(result$model$excursion$smo2), c("A", "B1", "tau1", "B2", "tau2")
+    )
+    expect_named(coef(result$model$monotonic$smo2), c("A", "B", "tau"))
+    expect_true(is.finite(cf$texc[[1L]]))
+    expect_true(is.na(cf$texc[[2L]]))
+    reduced <- result$warnings[grepl("reduced to", result$warnings$message), ]
+    expect_equal(reduced$interval, "monotonic")
+    expect_equal(reduced$nirs_channels, "smo2")
+})
+
+test_that("reduction resolves per channel", {
+    data <- create_biexp_data(noise_sd = 0.3, channels = c("smo2", "hhb"))
+    data$hhb <- create_monotonic_data()$smo2
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = c(smo2, hhb),
+        method = "biexponential",
+        use_TD = list(smo2 = TRUE, hhb = FALSE),
+        verbose = FALSE
+    )
+    cf <- result$coefficients
+
+    expect_equal(cf$nirs_channels, c("smo2", "hhb"))
+    expect_equal(cf$model, c("biexponential", "monoexponential"))
+    expect_true(is.finite(cf$TD[[1L]]))
+    expect_true(is.na(cf$TD[[2L]]))
+    expect_true(inherits(result$model[[1L]]$smo2, "nls"))
+    expect_true(inherits(result$model[[1L]]$hhb, "nls"))
+    expect_equal(
+        sum(is.finite(result$data[[1L]]$hhb_fitted)),
+        result$diagnostics$n_obs[[2L]]
+    )
+})
+
+test_that("a row where both fits fail is left as is", {
+    data <- create_mnirs_data(
+        data.frame(time = 0:2, smo2 = c(70, 60, 55)),
+        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+    )
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        verbose = FALSE
+    )
+    cf <- result$coefficients
+
+    expect_equal(cf$model, "biexponential")
+    expect_true(is.na(cf$A))
+    expect_null(result$model[[1L]]$smo2)
+    expect_false(any(grepl("reduced to", result$warnings$message)))
+})
+
+test_that("reduce_kinetics() applies the shape test and F-test", {
+    data <- create_monotonic_data()
+    args <- list(
+        start_time = NULL, direction = "auto", end_window = Inf,
+        use_TD = FALSE, fix = NULL
+    )
+    run <- \(worker, method) {
+        analyse_kinetics_intervals(
+            data, worker, method, args,
+            rlang::quo(smo2), rlang::quo(NULL),
+            "ensemble", FALSE, FALSE, quote(f()), quote(f())
+        )
+    }
+    full <- run(analyse_biexponential, "biexponential")
+    reduced <- run(analyse_monoexponential, "monoexponential")
+    spec <- kinetics_reductions$biexponential
+
+    ## the shape test rejects the monotonic fit
+    out <- reduce_kinetics(full, reduced, spec, verbose = FALSE)
+    expect_equal(out$coefficients$model, "monoexponential")
+    expect_match(out$warnings$message, "monotonic", all = FALSE)
+
+    ## without it the F-test decides on its own
+    spec$accept <- NULL
+    out <- reduce_kinetics(full, reduced, spec, verbose = FALSE)
+    expect_true(out$coefficients$model %in% c("biexponential", "monoexponential"))
+    if (out$coefficients$model == "monoexponential") {
+        expect_match(out$warnings$message, "F\\(", all = FALSE)
+    }
+})
+
+test_that("map_fix() renames through nested maps", {
+    fix_map <- kinetics_reductions$biexponential$fix_map
+
+    expect_equal(map_fix(list(A = 1, B2 = 2, tau1 = 3), fix_map), list(A = 1, B = 2))
+    expect_equal(map_fix(list(tau1 = 3), fix_map), setNames(list(), character()))
+    expect_equal(
+        map_fix(list(smo2 = list(B2 = 2), hhb = list(tau2 = 4)), fix_map),
+        list(smo2 = list(B = 2), hhb = setNames(list(), character()))
+    )
+})
+
+
 ## integration tests ================================================
 
 test_that("analyse_biexponential() converges on real dataset", {
@@ -1072,20 +1364,21 @@ test_that("analyse_biexponential() converges on real dataset", {
     deoxy <- intervals[grepl("^deoxy", names(intervals))]
 
     results <- analyse_kinetics(
-        deoxy[2:3],
-        nirs_channels = c(smo2_left_vl, smo2_right_vl),
+        deoxy,
+        # nirs_channels = c(smo2_left_vl, smo2_right_vl),
         method = "biexponential"
     )
-    results$warnings
+    tibble(results$warnings)
     plot(results)
     plot(results, components = TRUE, scales = "free")
 
     coefs <- results$coefficients
-    (success <- mean(!is.na(coefs$tau1)))
-    expect_true(all(success >= 0.909090))
-
-    (texc_success <- mean(!is.na(coefs$texc)))
-    expect_true(all(success >= 0.727272))
+    ## deoxy_2 is an excursion-recovery, deoxy_3 a monotonic drop
+    expect_equal(
+        coefs$model,
+        c("biexponential", "biexponential", "monoexponential", "monoexponential")
+    )
+    expect_true(all(!is.na(coefs$tau1)))
 
     ## reoxy
     reoxy <- intervals[grepl("^reoxy", names(intervals))]

@@ -51,6 +51,39 @@ kinetics_time_coefs <- c(
 )
 
 
+## canonical method -> interval worker name, resolved at call time so
+## file collation order is irrelevant
+kinetics_workers <- c(
+    response_time = "analyse_response_time",
+    peak_slope = "analyse_peak_slope",
+    monoexponential = "analyse_monoexponential",
+    biexponential = "analyse_biexponential",
+    exponential_drift = "analyse_exponential_drift",
+    sigmoidal = "analyse_logistic"
+)
+
+
+## nested reductions: a full method and the reduced method it collapses
+## to when the extra parameters are not supported by the data (see
+## `reduce_kinetics()`). `coef_map` copies reduced coefficient columns
+## into the full schema (full column <- reduced column); unmapped full
+## columns are NA. `fix_map` carries user-fixed parameters over to the
+## reduced fit (full parameter -> reduced parameter); unmapped are
+## dropped. `accept` is a vectorised shape test on the full coefficient
+## data frame (NULL for the F-test alone), explained by `reject_msg`
+kinetics_reductions <- list(
+    biexponential = list(
+        to = "monoexponential",
+        coef_map = c(A = "A", B1 = "B", B2 = "B", tau1 = "tau", TD = "TD"),
+        fix_map = c(A = "A", B2 = "B", TD = "TD"),
+        ## excursion-recovery only: the fitted turning point must exist
+        accept = \(cf) is.finite(cf$texc),
+        reject_msg = "Fitted response is monotonic ({.field texc} is \\
+        {.val {NA}})."
+    )
+)
+
+
 #' Detect the direction of a response signal
 #'
 #' Resolves whether a signal responds upward (`"positive"`) or downward
@@ -631,6 +664,308 @@ analyse_kinetics_intervals <- function(
 
     ## collate and return mnirs_kinetics object
     return(build_kinetics_results(data_list, result_list, method, call))
+}
+
+
+#' Run a kinetics method with its nested reduced-model fallback
+#'
+#' Wraps [analyse_kinetics_intervals()] for methods listed in
+#' `kinetics_reductions`: the full model is fit first, then the reduced
+#' comparator on the same intervals with arguments carried over by
+#' [reduced_worker_args()], and each channel fit is resolved by
+#' [reduce_kinetics()]. Methods without a reduction, or `reduce = FALSE`,
+#' return the full fit with the `model` coefficient column only.
+#'
+#' @param method Character; the canonical full method name.
+#' @param reduce Logical; attempt the reduction.
+#' @inheritParams analyse_kinetics_intervals
+#'
+#' @returns An *"mnirs_kinetics"* object.
+#'
+#' @keywords internal
+analyse_kinetics_reduced <- function(
+    data,
+    method,
+    worker_args,
+    nirs_quo,
+    time_quo,
+    group_intervals,
+    zero_time,
+    verbose,
+    call,
+    env,
+    reduce = TRUE
+) {
+    full <- analyse_kinetics_intervals(
+        data,
+        get(kinetics_workers[[method]], mode = "function"),
+        method,
+        worker_args,
+        nirs_quo,
+        time_quo,
+        group_intervals,
+        zero_time,
+        verbose,
+        call,
+        env
+    )
+    spec <- kinetics_reductions[[method]]
+    if (!isTRUE(reduce) || is.null(spec)) {
+        full$coefficients <- add_model_col(full$coefficients, method)
+        return(full)
+    }
+    ## comparator conditions are captured in its `warnings`, not emitted
+    reduced <- analyse_kinetics_intervals(
+        data,
+        get(kinetics_workers[[spec$to]], mode = "function"),
+        spec$to,
+        reduced_worker_args(full, worker_args, spec),
+        nirs_quo,
+        time_quo,
+        group_intervals,
+        zero_time,
+        verbose = FALSE,
+        call,
+        env
+    )
+    return(reduce_kinetics(full, reduced, spec, verbose, env))
+}
+
+
+## `model` column after `start_time`: the method each row's coefficients
+## come from
+add_model_col <- function(coefs, model) {
+    coefs$model <- model
+    lead <- c("interval", "nirs_channels", "start_time", "model")
+    return(coefs[, c(lead, setdiff(names(coefs), lead))])
+}
+
+
+#' Worker arguments for a reduced comparator fit
+#'
+#' Derives the argument list of the reduced method in `spec` from the
+#' full method's arguments and result, so both fits share a window and
+#' time-delay structure and the extra-sum-of-squares F-test in
+#' [reduce_kinetics()] is nested. Arguments the reduced method does not
+#' take are dropped. `use_TD` mirrors the model each channel actually
+#' resolved to (`TD` finite), as a per-interval map of per-channel
+#' values; a channel whose full fit failed keeps the user's setting.
+#' `fix` is carried over through `spec$fix_map`, recursing into
+#' per-interval and per-channel maps.
+#'
+#' @param full The full method's *"mnirs_kinetics"* result.
+#' @param worker_args Named list of the full method's arguments.
+#' @param spec A `kinetics_reductions` entry.
+#'
+#' @returns A named list of worker arguments for the reduced method.
+#'
+#' @keywords internal
+reduced_worker_args <- function(full, worker_args, spec) {
+    ## `mget()` of a named vector nests names; flatten for lookups
+    names(worker_args) <- unname(names(worker_args))
+    keep <- unlist(kinetics_dispatch[c("common", spec$to)], use.names = FALSE)
+    args <- worker_args[intersect(names(worker_args), keep)]
+
+    coefs <- full$coefficients
+    intervals <- names(full$data)
+    chans <- unique(coefs$nirs_channels)
+
+    if ("use_TD" %in% keep) {
+        first_coef <- setdiff(
+            names(coefs),
+            c("interval", "nirs_channels", "start_time")
+        )[[1L]]
+        td <- ifelse(
+            is.na(coefs[[first_coef]]),
+            full$channel_args$use_TD %||% TRUE,
+            is.finite(coefs$TD)
+        )
+        by_int <- split(setNames(td, coefs$nirs_channels), coefs$interval)
+        by_int <- by_int[intervals]
+        uniform <- all(vapply(by_int, identical, logical(1), by_int[[1L]]))
+        ## an interval named after a channel would be read as a channel
+        ## map; fall back to a per-channel map, else the user's setting
+        args$use_TD <- if (!any(intervals %in% chans)) {
+            lapply(by_int, as.list)
+        } else if (uniform) {
+            as.list(by_int[[1L]])
+        } else {
+            worker_args$use_TD
+        }
+    }
+
+    if ("fix" %in% keep && !is.null(args$fix)) {
+        fix <- map_fix(args$fix, spec$fix_map)
+        args$fix <- if (length(fix) > 0L) fix
+    }
+    return(args)
+}
+
+
+## rename a fixed-parameter list through `fix_map`, recursing into maps
+## (lists of lists); an emptied leaf stays `list()` so nested maps keep
+## their keys
+map_fix <- function(fix, fix_map) {
+    if (length(fix) > 0L && all(vapply(fix, is.list, logical(1)))) {
+        return(lapply(fix, map_fix, fix_map))
+    }
+    fix <- fix[intersect(names(fix), names(fix_map))]
+    return(setNames(fix, fix_map[names(fix)]))
+}
+
+
+#' Resolve a full fit against its nested reduced comparator
+#'
+#' Row-wise (per interval and channel) model selection between the full
+#' method's result and the reduced method's result fit by
+#' [analyse_kinetics_reduced()]. The full fit is kept when it succeeded,
+#' passes the shape test `spec$accept`, and the extra-sum-of-squares
+#' F-test against the reduced fit rejects the reduction at `p < 0.05`.
+#' The test needs both fits on the same observations with spare degrees
+#' of freedom; otherwise the shape test alone decides. A failed full fit
+#' falls back to the reduced fit; a row where both failed is left as is.
+#'
+#' Reduced rows carry the reduced coefficients, model, fitted values,
+#' and diagnostics in the full method's schema via `spec$coef_map`, and
+#' `model` names the method each row comes from. The reduction is
+#' warned about and recorded in `warnings` along with any conditions the
+#' reduced fit raised for that channel.
+#'
+#' @param full,reduced The *"mnirs_kinetics"* results of the full and
+#'   reduced methods on the same data.
+#' @param spec A `kinetics_reductions` entry.
+#' @inheritParams validate_mnirs
+#'
+#' @returns `full`, resolved.
+#'
+#' @keywords internal
+reduce_kinetics <- function(
+    full,
+    reduced,
+    spec,
+    verbose = TRUE,
+    env = rlang::caller_env()
+) {
+    alpha <- 0.05
+    cf <- full$coefficients
+    cr <- reduced$coefficients
+    key <- \(.d) paste(.d$interval, .d$nirs_channels)
+    if (!identical(key(cf), key(cr))) {
+        cli_abort(c(
+            "x" = "Internal: reduced fit rows do not align with the full fit."
+        ), call = env)
+    }
+    id_cols <- c("interval", "nirs_channels", "start_time")
+    coef_cols <- setdiff(names(cf), id_cols)
+    full_ok <- !is.na(cf[[coef_cols[[1L]]]])
+    red_ok <- !is.na(cr[[setdiff(names(cr), id_cols)[[1L]]]])
+    shape_ok <- if (is.null(spec$accept)) {
+        rep(TRUE, nrow(cf))
+    } else {
+        spec$accept(cf) %in% TRUE
+    }
+
+    ## extra-sum-of-squares F-test from the diagnostics (rss = rmse^2 * n)
+    df_f <- full$diagnostics
+    df_r <- reduced$diagnostics
+    df1 <- df_f$n_params - df_r$n_params
+    df2 <- df_f$n_obs - df_f$n_params
+    comparable <- full_ok &
+        red_ok &
+        df_f$n_obs == df_r$n_obs &
+        df1 >= 1L &
+        df2 >= 1L
+    comparable[is.na(comparable)] <- FALSE
+    rss_f <- df_f$rmse^2 * df_f$n_obs
+    rss_r <- df_r$rmse^2 * df_r$n_obs
+    f_stat <- ((rss_r - rss_f) / df1) / (rss_f / df2)
+    p <- rep(NA_real_, nrow(cf))
+    p[comparable] <- ifelse(
+        rss_f[comparable] == 0,
+        0,
+        stats::pf(
+            f_stat[comparable],
+            df1[comparable],
+            df2[comparable],
+            lower.tail = FALSE
+        )
+    )
+
+    keep_full <- (full_ok & shape_ok & ifelse(comparable, p < alpha, TRUE)) %in%
+        TRUE
+    reduce <- !keep_full & (full_ok | red_ok)
+    idx <- which(reduce)
+    cf$model <- ifelse(reduce, spec$to, full$method)
+
+    if (length(idx) > 0L) {
+        ## coefficients, diagnostics: reduced values in the full schema
+        cf[idx, coef_cols] <- NA
+        cf[idx, names(spec$coef_map)] <- cr[idx, unname(spec$coef_map)]
+        full$diagnostics[idx, ] <- df_r[idx, ]
+
+        ## model, fitted values: per-interval swaps of the reduced channels;
+        ## `[<-` keeps the list classes and data frame metadata
+        swap <- \(.int, .x, .y, .cols) {
+            ch <- cf$nirs_channels[idx][cf$interval[idx] == .int]
+            if (length(ch) > 0L) {
+                .x[.cols(ch)] <- .y[.cols(ch)]
+            }
+            .x
+        }
+        full$model[] <- Map(
+            swap, names(full$model), full$model, reduced$model,
+            MoreArgs = list(.cols = identity)
+        )
+        full$data[] <- Map(
+            swap, names(full$data), full$data, reduced$data,
+            MoreArgs = list(.cols = \(.ch) paste0(.ch, "_fitted"))
+        )
+
+        ## warn per reduced row; recorded alongside the reduced fit's own
+        ## conditions for those channels
+        fn_full <- paste0("SS", full$method)
+        fn_red <- paste0("SS", spec$to)
+        reasons <- vapply(idx, \(.i) {
+            if (!full_ok[[.i]]) {
+                "Fit failed."
+            } else if (!shape_ok[[.i]]) {
+                cli::format_inline(spec$reject_msg)
+            } else {
+                cli::format_inline(
+                    "Extra-sum-of-squares F({df1[.i]}, {df2[.i]}) = \\
+                    {signif(f_stat[.i], 3)}, p = {signif(p[.i], 3)} >= \\
+                    {alpha}."
+                )
+            }
+        }, character(1))
+        heads <- vapply(idx, \(.i) {
+            cli::format_inline(
+                "{.fn {fn_full}} fit for {.field {cf$nirs_channels[.i]}} \\
+                in {.field {cf$interval[.i]}} reduced to {.fn {fn_red}}."
+            )
+        }, character(1))
+        if (verbose) {
+            Map(\(.h, .r) {
+                cli_warn(c("!" = .h, "i" = .r), call = warn_call(env))
+            }, heads, reasons)
+        }
+        rw <- reduced$warnings
+        rw <- rw[key(rw) %in% key(cf)[idx], , drop = FALSE]
+        full$warnings <- rbind(
+            full$warnings,
+            rw,
+            data.frame(
+                interval = cf$interval[idx],
+                nirs_channels = cf$nirs_channels[idx],
+                type = "warning",
+                message = cli::ansi_strip(paste(heads, reasons, sep = " - "))
+            )
+        )
+        rownames(full$warnings) <- NULL
+    }
+
+    full$coefficients <- add_model_col(cf, cf$model)
+    return(full)
 }
 
 

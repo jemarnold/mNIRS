@@ -364,9 +364,13 @@ test_that("analyse_exponential_drift() converges on real dataset", {
     skip("Manual fit convergence check")
 
     intervals <- readRDS(test_path("testdata/5-1_intervals_short.rds"))
-    nirs_channels <- c(
-        "smo2_left_vl", "smo2_right_vl", "smo2_left_rf", "smo2_right_rf"
-    )
+    deoxy <- intervals[grepl("^deoxy", names(intervals))]
+
+    analyse_kinetics(
+        deoxy,
+        method = "exp-drift",
+    ) |>
+        plot()
 
     ## end-to-end path: window detection and held drift onset.
     ## start_time = 0 anchors the fit at the interval onset
