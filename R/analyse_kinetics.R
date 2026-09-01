@@ -40,7 +40,7 @@
 #' @param group_intervals Either `"ensemble"` (*default*) to analyse all
 #'   samples of each data frame together, or a non-empty `list()` of
 #'   integer-valued numeric vectors of sample (row) numbers, each analysed as
-#'   a separate interval, e.g. `list(trial1 = 1:12, trial2 = 13:24)`. List
+#'   a separate interval, e.g. `list(trial1 = 1:10, trial2 = 11:20)`. List
 #'   names become interval names (`interval_<n>` when unnamed). Indices must
 #'   be between `1` and the number of rows (see *Details*).
 #' @param zero_time Logical. Default is `FALSE`. If `TRUE`, re-calculates
@@ -127,7 +127,7 @@
 #' analyse_kinetics(
 #'     data,
 #'     method = "monoexponential",
-#'     group_intervals = list(trial1 = 1:12, trial2 = 13:24)
+#'     group_intervals = list(trial1 = 1:10, trial2 = 11:20)
 #' )
 #' ```
 #'
@@ -469,7 +469,7 @@
 #'     nirs_channels = slope,
 #'     time_channel = peak_slope_time,
 #'     method = "monoexponential",
-#'     group_intervals = list(trial1 = 1:12, trial2 = 13:24)
+#'     group_intervals = list(trial1 = 1:10, trial2 = 11:20)
 #' )
 #' ```
 #'

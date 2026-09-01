@@ -20,6 +20,9 @@ as_data_list <- function(data, env = rlang::caller_env()) {
             ), call = env)
         }
         chan <- factor(coefs$nirs_channels, unique(coefs$nirs_channels))
+        ## retain source interval labels without an `interval` column, which
+        ## would hijack facet detection in `plot.mnirs()`
+        names(coefs)[names(coefs) == "interval"] <- "source_interval"
         return(lapply(split(coefs, chan), `rownames<-`, NULL))
     }
 

@@ -48,7 +48,7 @@ test_that("as_data_list() splits mnirs_kinetics coefficients by channel", {
         expect_equal(nrow(result[[.ch]]), 2)
         expect_equal(rownames(result[[.ch]]), c("1", "2"))
         expect_true(all(result[[.ch]]$nirs_channels == .ch))
-        expect_equal(result[[.ch]]$interval, c("a", "b"))
+        expect_equal(result[[.ch]]$source_interval, c("a", "b"))
     }
     expect_equal(result$ch1$tau, c(2, 4))
 })

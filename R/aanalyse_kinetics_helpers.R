@@ -513,8 +513,8 @@ split_kinetics_groups <- function(
         cli_abort(c(
             "x" = "{.arg group_intervals} must be {.val ensemble} or a \\
             {.cls list} of sample indices.",
-            "i" = "e.g. {.code group_intervals = list(trial1 = 1:12, \\
-            trial2 = 13:24)}."
+            "i" = "e.g. {.code group_intervals = list(trial1 = 1:10, \\
+            trial2 = 11:20)}."
         ), call = env)
     }
     ## the same groups apply to every df, so validate against the shortest
