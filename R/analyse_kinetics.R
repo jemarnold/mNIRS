@@ -50,9 +50,10 @@
 #'   retrieved from metadata stays aligned.
 #' @param ... Additional arguments passed to the underlying method function.
 #'   See *Details*.
-#' @param fraction **response_time**: A numeric value in the range
-#'   `[0, 1]` specifying the fractional response amplitude to detect.
-#'   Defaults to `0.5` (50% response, i.e. half-response time).
+#' @param fraction **response_time**: A numeric vector of values in the range
+#'   `[0, 1]` specifying the fractional response amplitude(s) to detect.
+#'   Defaults to `0.5` (50% response, i.e. half-response time). Multiple
+#'   values (e.g. `c(0.5, 0.632)`) return one coefficient row per fraction.
 #' @param width **peak_slope**: An integer defining the local window in
 #'   number of samples around `idx` in which to perform the operation,
 #'   according to `align`. Only one of either `width` or `span` must be defined.

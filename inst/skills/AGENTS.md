@@ -307,7 +307,7 @@ analyse_kinetics(
 `"biexponential"`/`"sigmoidal"`, resolved per channel, returns `NA` if unsatisfiable.
 
 **Per-method args:**
-- **`"response_time"`**: `fraction` (default `0.5`; `0.632` ≈ MRT).
+- **`"response_time"`**: `fraction` (default `0.5`; `0.632` ≈ MRT; vectorised, e.g. `c(0.5, 0.632)` → one coefficient row per fraction).
 - **`"peak_slope"`**: `width` XOR `span`; `align` (`"centre"`/`"left"`/`"right"`); `partial`, `na.rm` (default `FALSE`).
 - **`"monoexponential"`**: `use_TD` (default `TRUE`; 4-param → 3-param fallback), `fix`.
 - **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `fix`. Phases exchangeable; reported with `tau1 <= tau2`.
@@ -365,7 +365,7 @@ Times are elapsed from `start_time`; `*_fitted` = predicted value at that point.
 
 | Method | Columns |
 |---|---|
-| `"response_time"` | `A` baseline mean, `B` extreme (peak/trough) value, `response_time`, `response_value` (observed), `fitted` (target `A + (B-A)*fraction`), `idx` (sample/row number at `response_value`) |
+| `"response_time"` | `fraction` (one row per value), `A` baseline mean, `B` extreme (peak/trough) value, `response_time`, `response_value` (observed), `fitted` (target `A + (B-A)*fraction`), `idx` (sample/row number at `response_value`) |
 | `"peak_slope"` | `slope` (`x/t`), `intercept`, `fitted`, `peak_slope_time`, `idx` (sample/row number at `align` position) |
 | `"monoexponential"` | `A` baseline, `B` asymptote, `tau`, `k` (`1/tau`), `TD` delay (if `use_TD`), `MRT` (`TD+tau`), `HRT` (`TD+tau·ln2`), `MRT_fitted`, `HRT_fitted` |
 | `"biexponential"` | `A` start, `B1` & `tau1` fast component, `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `texc` (fitted turning point; `NA` if monotonic), `texc_fitted` |

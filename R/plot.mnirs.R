@@ -404,10 +404,11 @@ plot.mnirs_kinetics <- function(
                     plot_data[post, , drop = FALSE]
                 )
             })
-            ## baseline as a single point at the onset (start_time, A)
-            base_pts <- x$coefficients[
+            ## baseline as a single point at the onset (start_time, A);
+            ## unique() drops duplicate rows from multiple fractions
+            base_pts <- unique(x$coefficients[
                 c("interval", "nirs_channels", "start_time", "A")
-            ]
+            ])
             if (!faceted) {
                 base_pts$interval <- NULL
             }
@@ -506,7 +507,12 @@ kinetics_annotations <- function(x) {
         response_time = list(
             offset = "response_time",
             y = "fitted",
-            label = label(line("response time = %s s", coefs$response_time))
+            ## fraction-specific labels, e.g. "50% response = 7.9 s";
+            ## outer sprintf resolves the percentage, leaving `%s` for line()
+            label = label(line(
+                sprintf("%g%%%% response = %%s s", coefs$fraction * 100),
+                coefs$response_time
+            ))
         ),
         peak_slope = list(
             offset = "peak_slope_time",
@@ -823,7 +829,7 @@ theme_mnirs <- function(
 #' @examplesIf rlang::is_installed("scales")
 #' scales::show_col(palette_mnirs())
 #' scales::show_col(palette_mnirs(2))
-#' scales::show_col(palette_mnirs("red", "orange"))
+#' scales::show_col(palette_mnirs("red", "blue", "green"))
 #'
 #' @export
 palette_mnirs <- function(...) {

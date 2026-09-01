@@ -256,7 +256,7 @@ test_that("kinetics_annotations xval is onset plus method offset", {
 test_that("kinetics_annotations formats method-specific labels", {
     expect_match(
         kinetics_annotations(kin_response_time())$label,
-        "^response time = .+ s$"
+        "\\% response = .+ s$"
     )
     expect_match(kinetics_annotations(kin_peak_slope())$label, "^slope = ")
     ## `use_TD = FALSE` -> `MRT` is redundant with `tau` and is omitted

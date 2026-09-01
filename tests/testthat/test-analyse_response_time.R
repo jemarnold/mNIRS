@@ -212,8 +212,8 @@ test_that("analyse_response_time returns correct structure", {
     expect_s3_class(result, "data.frame")
     expect_equal(nrow(result), 2L)
     expect_named(result, c(
-        "interval", "nirs_channels", "A", "B", "response_time", 
-        "response_value", "fitted", "idx"
+        "interval", "nirs_channels", "fraction", "A", "B", 
+        "response_time", "response_value", "fitted", "idx"
     ))
 
     expect_type(result$nirs_channels, "character")
@@ -328,6 +328,32 @@ test_that("analyse_response_time channel_args override defaults", {
         result$response_time[result$nirs_channels == "x"]
     )
     expect_equal(attr(result, "channel_args")$fraction, c(0.5, 0.25))
+})
+
+test_that("vector fraction returns one coefficient row per fraction", {
+    x <- c(rep(0, 5), seq(0, 100, length.out = 20))
+    t <- seq_along(x)
+
+    df <- create_mnirs_data(
+        data.frame(t, x),
+        nirs_channels = "x",
+        time_channel = "t"
+    )
+    result <- analyse_kinetics(
+        df,
+        method = "response_time",
+        start_time = 5,
+        fraction = c(0.5, 0.632),
+        verbose = FALSE
+    )
+    coefs <- result$coefficients
+
+    expect_equal(coefs$fraction, c(0.5, 0.632))
+    expect_equal(coefs$fitted, coefs$A + (coefs$B - coefs$A) * coefs$fraction)
+    ## higher fraction reached later
+    expect_lt(coefs$response_time[1], coefs$response_time[2])
+    ## vector arg collapsed into the single channel_args row
+    expect_equal(result$channel_args$fraction, "0.5, 0.632")
 })
 
 test_that("analyse_response_time fitted_data contains baseline, response, extreme", {

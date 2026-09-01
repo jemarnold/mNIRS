@@ -8,9 +8,10 @@
 #' @param start_time A numeric value specifying the start of the kinetics
 #'   response in units of `t`. Observations where `t <= start_time` define the
 #'   baseline window. Defaults to `0`.
-#' @param fraction A numeric value in the range `[0, 1]` specifying the
-#'   fractional response amplitude to detect. Defaults to `0.5` (50% response,
-#'   i.e. half-response time).
+#' @param fraction A numeric vector of values in the range `[0, 1]` specifying
+#'   the fractional response amplitude(s) to detect. Defaults to `0.5` (50%
+#'   response, i.e. half-response time). Multiple values (e.g.
+#'   `c(0.5, 0.632)`) return one result per fraction.
 #' @param ... Additional arguments.
 #' @inheritParams replace_invalid
 #' @inheritParams find_kinetics_idx
@@ -47,12 +48,13 @@
 #'   \item{`A`}{Mean baseline value (mean of `x` where `t <= start_time`).}
 #'   \item{`B`}{Extreme value (maximum or minimum) after `start_time`.}
 #'   \item{`response_time`}{Elapsed time from `start_time` to the fractional
-#'   response, in units of `t`.}
-#'   \item{`response_value`}{The observed signal value at the response index.}
+#'   response, in units of `t`; one element per `fraction`.}
+#'   \item{`response_value`}{The observed signal value at the response index;
+#'   one element per `fraction`.}
 #'   \item{`fitted`}{The predicted fractional response value
-#'   (`A + (B - A) * fraction`).}
+#'   (`A + (B - A) * fraction`); one element per `fraction`.}
 #'   \item{`baseline_idx`}{Integer indices where `t <= start_time`.}
-#'   \item{`response_idx`}{Integer index at the `response_value`.}
+#'   \item{`response_idx`}{Integer index at each `response_value`.}
 #'   \item{`extreme_idx`}{Integer index at the extreme value (`B`).}
 #'
 #' @seealso [analyse_kinetics()], [peak_slope()], [monoexponential()]
@@ -62,24 +64,19 @@
 #' t <- 0:60
 #' x <- monoexponential(t, A = 20, B = 60, tau = 8, TD = 10) + rnorm(length(t), 0, 1)
 #'
-#' ## estimated half-response time
-#' HRT <- response_time(x, t, start_time = 10, fraction = 0.5)
-#'
-#' ## estimated mean response time (time constant; tau ~= 63.2% amplitude)
-#' MRT <- response_time(x, t, start_time = 10, fraction = 0.632)
+#' ## half-response time (0.5) and mean response time (0.632 ~= tau)
+#' RT <- response_time(x, t, start_time = 10, fraction = c(0.5, 0.632))
 #'
 #' plot(t, x, type = "l", col = "grey60", xlab = "t", ylab = "x")
 #' ## baseline mean across baseline_idx
 #' segments(
-#'     t[min(HRT$baseline_idx)], HRT$A,
-#'     t[max(HRT$baseline_idx)], HRT$A,
+#'     t[min(RT$baseline_idx)], RT$A,
+#'     t[max(RT$baseline_idx)], RT$A,
 #'     col = "red", lwd = 2
 #' )
-#' ## fraction = 0.5 (red): response_value and extreme
-#' points(t[HRT$response_idx], HRT$response_value, col = "red", pch = 19)
-#' points(t[HRT$extreme_idx], HRT$B, col = "red", pch = 19)
-#' ## fraction = 0.632 (blue): response_value
-#' points(t[MRT$response_idx], MRT$response_value, col = "blue", pch = 19)
+#' ## fraction = 0.5 (red) and 0.632 (blue): response_value, and extreme
+#' points(t[RT$response_idx], RT$response_value, col = c("red", "blue"), pch = 19)
+#' points(t[RT$extreme_idx], RT$B, col = "red", pch = 19)
 #'
 #' @export
 response_time <- function(
@@ -95,7 +92,7 @@ response_time <- function(
     ## as coming from the user-facing function
     env <- list(...)$env %||% environment()
     validate_numeric(
-        fraction, 1L, c(0, 1), msg2 = "between {col_blue('[0, 1]')}.",
+        fraction, Inf, c(0, 1), msg2 = "between {col_blue('[0, 1]')}.",
         env = env
     )
     direction <- match.arg(direction)
@@ -152,16 +149,19 @@ response_time <- function(
     B <- x[extreme_idx]
     response_fitted <- A + (B - A) * fraction
     compare_fn <- if (direction == "positive") `>=` else `<=`
-    response_idx <- which(compare_fn(x_valid, response_fitted))[1L]
+    ## first sample reaching each fractional response value
+    response_idx <- vapply(response_fitted, \(.f) {
+        which(compare_fn(x_valid, .f))[1L]
+    }, integer(1))
 
-    if (is.na(response_idx)) {
+    if (anyNA(response_idx)) {
         if (verbose) {
             cli_warn(c(
                 "!" = "No valid {.val {direction}} extremes after \\
                 {.arg start_time}. Returning {.val {NA}}."
             ), call = warn_call(env))
         }
-        response_fitted <- NA_real_
+        response_fitted[is.na(response_idx)] <- NA_real_
     }
 
     return(list(
@@ -188,9 +188,10 @@ response_time <- function(
 #' @inheritParams analyse_kinetics
 #' @inheritParams response_time
 #'
-#' @returns A `data.frame` with one row per `nirs_channel` and columns
-#'   `nirs_channels`, `A`, `B`, `response_time`, `response_value`,
-#'   `fitted`, `idx`. Per-channel metadata are attached as attributes:
+#' @returns A `data.frame` with one row per `nirs_channel` per `fraction`
+#'   and columns `nirs_channels`, `fraction`, `A`, `B`, `response_time`,
+#'   `response_value`, `fitted`, `idx`. Per-channel metadata are attached
+#'   as attributes:
 #'   - `"model"`: `NULL` (no parametric model is fitted).
 #'   - `"fitted_data"`: a named list of per-channel data frames with
 #'     columns `window_idx` and `fitted`, containing the baseline,
@@ -252,7 +253,9 @@ analyse_response_time <- function(
         ## `response_time()` indexes the fit window; map the response sample
         ## back to its original data frame row, which differs whenever
         ## non-finite samples were dropped. NA idx maps to NA
+        ## one row per fraction; scalar A/B recycle across rows
         coefs <- data.frame(
+            fraction = .a$fraction,
             A = response$A,
             B = response$B,
             response_time = response$response_time,
@@ -285,7 +288,7 @@ analyse_response_time <- function(
             diag = compute_diagnostics(
                 x = x_fit[1L:3L], ## placeholder
                 t = t_fit[1L:3L], ## placeholder
-                fitted = c(coefs$A, coefs$fitted, coefs$B),
+                fitted = c(coefs$A[1L], coefs$fitted[1L], coefs$B[1L]),
                 n_params = 0L, ## invalid for response time method
                 env = env
             )

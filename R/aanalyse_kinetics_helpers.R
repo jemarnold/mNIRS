@@ -319,10 +319,12 @@ build_kinetics_results <- function(
     channel_args <- bind_attr("channel_args")
 
     ## combine scalar coefficients; `interval` to col[1] and the resolved
-    ## fit onset `start_time` (rows align with `channel_args`) after
+    ## fit onset `start_time` (matched from `channel_args` by interval and
+    ## channel, since coefs may hold multiple rows per channel) after
     ## `nirs_channels`
     coefs <- do.call(rbind, result_list)
-    coefs$start_time <- channel_args$start_time
+    key <- \(.df) paste(.df$interval, .df$nirs_channels)
+    coefs$start_time <- channel_args$start_time[match(key(coefs), key(channel_args))]
     lead_cols <- c("interval", "nirs_channels", "start_time")
     coefs <- coefs[, c(lead_cols, setdiff(names(coefs), lead_cols))]
     rownames(coefs) <- NULL
@@ -1183,6 +1185,10 @@ analyse_kinetics_channels <- function(
                         ## deparse() wraps beyond its default width, which would
                         ## expand the single-row data frame
                         paste(deparse(.x), collapse = "")
+                    } else if (length(.x) > 1L) {
+                        ## collapse vector args (e.g. multiple `fraction`
+                        ## values) to fit the single-row data frame
+                        paste(.x, collapse = ", ")
                     } else {
                         .x
                     }
@@ -1321,7 +1327,7 @@ validate_kinetics_args <- function(
         }
         if (!is.null(.a$fraction)) {
             validate_numeric(
-                .a$fraction, 1L, c(0, 1), 
+                .a$fraction, Inf, c(0, 1),
                 msg2 = "between {col_blue('[0, 1]')}.", env = env
             )
         }
