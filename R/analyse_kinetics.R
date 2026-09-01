@@ -133,8 +133,11 @@
 #'
 #' - List names become interval names; unnamed groups are `interval_<n>`.
 #' - The same grouping is applied to every data frame of a multi-interval
-#'   input, with interval names suffixed `<group>_<df>` (e.g.
-#'   `trial1_smo2` for an *"mnirs_kinetics"* input split by channel).
+#'   input, with interval names suffixed `<group>_<df>` (e.g. `trial1_A`).
+#'   For an *"mnirs_kinetics"* input split by channel, the source channel
+#'   instead prefixes the returned channel names (e.g. `smo2_slope`) and
+#'   intervals keep the group names, so intervals group across source
+#'   channels; per-interval arguments still key by `<group>_<channel>`.
 #' - Samples in no group are excluded from analysis (with a message).
 #'   Samples in more than one group are warned about but allowed.
 #' - Row-grouped intervals no longer correspond to their

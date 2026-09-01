@@ -331,12 +331,15 @@ build_kinetics_results <- function(
 
     ## start_times: resolved fit onset (user value > interval_times metadata
     ## > first time), uniform across channels within an interval;
-    ## end_times sourced from interval_times metadata when any is present
+    ## end_times sourced from interval_times metadata when any is present.
+    ## recursive inputs repeat interval names across source channels, so
+    ## dedupe to one row per interval
+    first <- !duplicated(names(data_list))
     interval_times_df <- data.frame(
-        interval = names(data_list),
+        interval = names(data_list)[first],
         start_times = coefs$start_time[!duplicated(coefs$interval)]
     )
-    end_times <- vapply(data_list, \(.df) {
+    end_times <- vapply(data_list[first], \(.df) {
         unlist(attr(.df, "interval_times"))[2L] %||% NA_real_
     }, numeric(1), USE.NAMES = FALSE)
     if (!all(is.na(end_times))) {
@@ -368,13 +371,18 @@ build_kinetics_results <- function(
         call$method <- method
     }
 
+    ## per-interval model lists keyed by channel; intervals repeated across
+    ## source channels (recursive inputs) concatenate into one list
+    model_list <- setNames(lapply(result_list, attr, "model"), names(data_list))
+    models <- lapply(
+        split(model_list, factor(names(data_list), unique(names(data_list)))),
+        \(.m) do.call(c, unname(.m))
+    )
+
     return(structure(
         list(
             method = method,
-            model = setNames(
-                lapply(result_list, attr, "model"),
-                names(data_list)
-            ),
+            model = models,
             coefficients = coefs,
             data = fitted_data_list,
             interval_times = interval_times_df,
@@ -602,7 +610,11 @@ analyse_kinetics_intervals <- function(
 
     ## recursive coef input: time-point coefs are elapsed from each interval's
     ## onset, so shift the chosen `time_channel` to absolute time
-    if (inherits(data, "mnirs_kinetics")) {
+    recursive <- inherits(data, "mnirs_kinetics")
+    if (recursive) {
+        ## source channels of the input coefs, qualifying the fitted channel
+        ## names after the worker loop below
+        src_channels <- names(data_list)
         tc <- validate_time_channel(time_quo, data_list[[1L]], env = env)
         if (tc %in% kinetics_time_coefs) {
             data_list <- lapply(data_list, \(.df) {
@@ -663,6 +675,36 @@ analyse_kinetics_intervals <- function(
             env = env
         ))
     })
+
+    ## recursive coef input: move the source channel qualifier from the
+    ## interval names (`trial1_hhb`) to the fitted channel names
+    ## (`hhb_slope`), so intervals group across source channels
+    if (recursive) {
+        src <- rep(src_channels, each = length(data_list) %/% length(src_channels))
+        intervals <- mapply(\(.nm, .src) {
+            sfx <- paste0("_", .src)
+            if (endsWith(.nm, sfx)) substr(.nm, 1L, nchar(.nm) - nchar(sfx)) else .nm
+        }, names(data_list), src, USE.NAMES = FALSE)
+        relabelled <- Map(\(.res, .df, .src, .int) {
+            raw <- names(attr(.res, "fitted_data"))
+            pref <- paste(.src, raw, sep = "_")
+            requalify <- \(.d) {
+                .d$interval <- rep(.int, nrow(.d))
+                .d$nirs_channels <- pref[match(.d$nirs_channels, raw)]
+                .d
+            }
+            .res <- requalify(.res)
+            attr(.res, "diagnostics") <- requalify(attr(.res, "diagnostics"))
+            attr(.res, "channel_args") <- requalify(attr(.res, "channel_args"))
+            attr(.res, "warnings") <- requalify(attr(.res, "warnings"))
+            names(attr(.res, "fitted_data")) <- pref
+            names(attr(.res, "model")) <- pref
+            names(.df)[match(raw, names(.df))] <- pref
+            list(res = .res, df = .df)
+        }, result_list, data_list, src, intervals)
+        result_list <- setNames(lapply(relabelled, `[[`, "res"), intervals)
+        data_list <- setNames(lapply(relabelled, `[[`, "df"), intervals)
+    }
 
     ## collate and return mnirs_kinetics object
     return(build_kinetics_results(data_list, result_list, method, call))
@@ -786,8 +828,13 @@ reduced_worker_args <- function(full, worker_args, spec) {
         by_int <- by_int[intervals]
         uniform <- all(vapply(by_int, identical, logical(1), by_int[[1L]]))
         ## an interval named after a channel would be read as a channel
-        ## map; fall back to a per-channel map, else the user's setting
-        args$use_TD <- if (!any(intervals %in% chans)) {
+        ## map; fall back to a per-channel map, else the user's setting.
+        ## recursive results relabel interval/channel names after fitting,
+        ## so maps cannot key the reduced run (duplicated intervals):
+        ## mirror only a uniform resolution
+        args$use_TD <- if (anyDuplicated(intervals) > 0L) {
+            if (length(unique(td)) == 1L) td[[1L]] else worker_args$use_TD
+        } else if (!any(intervals %in% chans)) {
             lapply(by_int, as.list)
         } else if (uniform) {
             as.list(by_int[[1L]])
@@ -909,8 +956,11 @@ reduce_kinetics <- function(
         ## `[<-` keeps the list classes and data frame metadata
         swap <- \(.int, .x, .y, .cols) {
             ch <- cf$nirs_channels[idx][cf$interval[idx] == .int]
-            if (length(ch) > 0L) {
-                .x[.cols(ch)] <- .y[.cols(ch)]
+            ## recursive results hold one source channel per data frame, so
+            ## swap only the columns each element declares
+            cols <- intersect(.cols(ch), names(.x))
+            if (length(cols) > 0L) {
+                .x[cols] <- .y[cols]
             }
             .x
         }

@@ -1555,16 +1555,44 @@ test_that("analyse_kinetics group_intervals splits recursive kinetics input", {
         verbose = FALSE
     )
 
+    ## source channel qualifies the returned channel names, not the intervals
     expect_equal(
         result$coefficients$interval,
-        c("trial1_ch1", "trial2_ch1", "trial1_ch2", "trial2_ch2")
+        c("trial1", "trial2", "trial1", "trial2")
     )
-    expect_equal(nrow(result$data$trial2_ch1), 12L)
+    expect_equal(
+        result$coefficients$nirs_channels,
+        c("ch1_tau", "ch1_tau", "ch2_tau", "ch2_tau")
+    )
+    expect_named(result$data, c("trial1", "trial2", "trial1", "trial2"))
+    expect_equal(nrow(result$data[[2L]]), 12L)
     ## time-point coef still shifted to absolute time before splitting
     expect_equal(
-        result$data$trial2_ch1$TD,
+        result$data[[2L]]$TD,
         coefs$TD[13:24] + coefs$start_time[13:24]
     )
+
+    ## prefixed channel names carried through the whole returned object
+    expect_equal(result$interval_times$interval, c("trial1", "trial2"))
+    expect_equal(
+        result$diagnostics[c("interval", "nirs_channels")],
+        result$coefficients[c("interval", "nirs_channels")]
+    )
+    expect_equal(
+        result$channel_args[c("interval", "nirs_channels")],
+        result$coefficients[c("interval", "nirs_channels")]
+    )
+    expect_named(result$model, c("trial1", "trial2"))
+    expect_named(result$model$trial1, c("ch1_tau", "ch2_tau"))
+
+    ## analysed coef column, its fitted column, and metadata are prefixed
+    expect_contains(names(result$data[[1L]]), c("ch1_tau", "ch1_tau_fitted"))
+    expect_false("tau" %in% names(result$data[[1L]]))
+    expect_equal(attr(result$data[[1L]], "nirs_channels"), "ch1_tau")
+
+    ## formatted output prints the prefixed channel names
+    expect_output(print(result), "ch1_tau")
+    expect_output(print(result), "ch2_tau")
 })
 
 test_that("analyse_kinetics group_intervals drops uncovered rows with message", {
@@ -1714,10 +1742,11 @@ test_that("analyse_kinetics offsets time-point coefs by start_time recursively",
         ))
     }
 
-    ## time-point coef as time_channel: shifted to absolute time in `data`
+    ## time-point coef as time_channel: shifted to absolute time in `data`;
+    ## the analysed coef column carries the source channel prefix
     result <- recurse("tau", "TD")
     expect_equal(result$data$ch1$TD, coefs$TD + coefs$start_time)
-    expect_equal(result$data$ch1$tau, coefs$tau)
+    expect_equal(result$data$ch1$ch1_tau, coefs$tau)
 
     ## `start_time` itself and duration coefs are used unchanged
     result <- recurse("tau", "start_time")
@@ -1726,7 +1755,7 @@ test_that("analyse_kinetics offsets time-point coefs by start_time recursively",
 
     result <- recurse("TD", "tau")
     expect_equal(result$data$ch1$tau, coefs$tau)
-    expect_equal(result$data$ch1$TD, coefs$TD)
+    expect_equal(result$data$ch1$ch1_TD, coefs$TD)
 
     ## inform message fires
     expect_message(recurse("tau", "TD", verbose = TRUE), "absolute time")
