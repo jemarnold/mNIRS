@@ -116,7 +116,6 @@ library(ggplot2) ## for plotting
 library(mnirs)   ## install: pak::pak("jemarnold/mnirs@dev")
 
 options(mnirs.verbose = FALSE) ## silence mnirs messages
-theme_set(theme_mnirs()) ## set ggplot2 theme
 ```
 
 
@@ -571,7 +570,7 @@ read_mnirs(
     correct_blood_volume(
         oxy_channel     = o2hb,
         deoxy_channel   = hhb,
-        total_channel   = thbd
+        total_channel   = thb
     ) |> 
     extract_intervals(
         start           = "Occlusion",

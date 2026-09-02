@@ -26,7 +26,7 @@
 #'   - `nirs_channels = c("SmO2 Live", "SmO2 Live(2)")`
 #'   - `time_channel = c("hh:mm:ss")`
 #'   - `event_channel = c("Lap")`
-#'   - `interval_times = list(start = c(204, 878))` (start and end of exercise)
+#'   - `interval_times = list(start = c(204, 868))` (start and end of exercise)
 #'
 #' @source Moxy Monitor (Fortiori Design LLC), exported via PerfPro Studio
 #'   desktop software (https://perfprostudio.com/).
