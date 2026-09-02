@@ -161,7 +161,7 @@ test_that("analyse_exponential_drift() returns correct structure and recovers pa
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
-        "interval", "nirs_channels", "A", "B", "tau", "k", "TD", "MRT", "HRT",
+        "interval", "nirs_channels", "A", "B", "TD", "tau", "k", "MRT", "HRT",
         "texc", "slope", "tau_mult", "MRT_fitted", "HRT_fitted", "texc_fitted"
     ))
     expect_equal(nrow(result), 1L)

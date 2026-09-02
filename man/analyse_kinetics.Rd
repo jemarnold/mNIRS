@@ -163,7 +163,7 @@ the local window. (see \emph{Details}).}
 Logical; default is
 \code{TRUE}, attempts to fit the model with a "time-delay" parameter \code{TD}
 before the response onset. i.e., a 4-parameter \code{\link[=SSmonoexponential]{SSmonoexponential()}} model
-(A, B, tau, TD); or a 6-parameter \code{\link[=biexponential]{biexponential()}} model (A, B1, tau1,
+(A, B, tau, TD); or a 6-parameter \code{\link[=biexponential]{biexponential()}} model (A, B, tau,
 B2, tau2, TD). If \code{use_TD = FALSE} or the fit fails (with a
 warning), attempts to fall back to a reduced model without \code{TD}.}
 
@@ -332,7 +332,7 @@ For \emph{"monoexponential"}, \emph{"biexponential"}, \emph{"exponential_drift"}
 \emph{"sigmoidal"} methods,
 \code{direction} also constrains the sign of the fitted amplitude \code{B - A}, and
 the sigmoidal \code{slope}. For the \emph{"biexponential"} method, \code{direction}
-constrains the sign of the fast-phase amplitude \code{B1 - A}. A fit that
+constrains the sign of the fast-phase amplitude \code{B - A}. A fit that
 cannot satisfy the requested direction returns \code{NA} coefficients with a
 warning.
 }
@@ -490,7 +490,7 @@ Aliases: \code{method = c("biexp", "double exponential")}.
 
 A parametric approach fitting a self-starting biexponential
 excursion-recovery function to the response curve using \code{\link[stats:nls]{stats::nls()}} with
-\code{\link[=SSbiexponential]{SSbiexponential()}}. A \emph{fast} component (\code{B1}, \code{tau1}) drives the initial
+\code{\link[=SSbiexponential]{SSbiexponential()}}. A \emph{fast} component (\code{B}, \code{tau}) drives the initial
 excursion while a concurrent \emph{slow} component (\code{B2}, \code{tau2}), clocked
 from the same onset, recovers the response toward a stable plateau. The
 fitted turning point of the curve is reported as \code{texc} and
@@ -498,28 +498,28 @@ fitted turning point of the curve is reported as \code{texc} and
 
 Model equations:
 \itemize{
-\item 5-parameter: \code{A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))}
+\item 5-parameter: \code{A + (B - A) * (1 - exp(-t / tau)) + (B2 - B) * (1 - exp(-t / tau2))}
 \item 6-parameter, where \code{ts = pmax(t - TD, 0)}:
-\code{A + (B1 - A) * (1 - exp(-ts / tau1)) + (B2 - B1) * (1 - exp(-ts / tau2))}
+\code{A + (B - A) * (1 - exp(-ts / tau)) + (B2 - B) * (1 - exp(-ts / tau2))}
 }
 
-\code{A} is the starting value. \code{B1} & \code{tau1} are the asymptote and time
+\code{A} is the starting value. \code{B} & \code{tau} are the asymptote and time
 constant of the fast response. \code{B2} & \code{tau2} are the asymptote and time
 constant of the slower response plateau as time approaches \code{Inf} (typically
-\verb{tau2 >> tau1}). All three of \code{A}, \code{B1}, and \code{B2} are values on the response
+\verb{tau2 >> tau}). All three of \code{A}, \code{B}, and \code{B2} are values on the response
 scale, consistent with the \code{\link[=monoexponential]{monoexponential()}} and sigmoidal asymptotes.
 Set \code{use_TD = TRUE} (\emph{default}) to specify the time-delay parameter \code{TD}.
-The fast-phase mean response time \code{MRT = TD + tau1} is reported as for
+The fast-phase mean response time \code{MRT = TD + tau} is reported as for
 \emph{"monoexponential"}.
 See \code{\link[=biexponential]{biexponential()}} for the model family and \code{\link[=SSbiexponential]{SSbiexponential()}} for
 self-start initialisation.
 
 The two phases are fit sequentially. Stage 1 fits the fast phase as a
 \emph{"monoexponential"} on the \code{end_window} window (to the first
-peak/trough plus \code{end_window}), giving \code{A}, \code{tau1}, and \code{TD}. Stage 2
-fits the full model to the whole response with \code{A}, \code{tau1}, and \code{TD}
-held within a tight range of their stage-1 values and \code{B1}, \code{B2},
-\code{tau2} free. \code{tau2} is floored above the \code{tau1} range so the phases
+peak/trough plus \code{end_window}), giving \code{A}, \code{tau}, and \code{TD}. Stage 2
+fits the full model to the whole response with \code{A}, \code{tau}, and \code{TD}
+held within a tight range of their stage-1 values and \code{B}, \code{B2},
+\code{tau2} free. \code{tau2} is floored above the \code{tau} range so the phases
 stay separated, and capped at ten times the record span: a slow tail
 far beyond the record identifies only its rate, not \code{tau2} and \code{B2}
 separately. \code{end_window} should be set to isolate the fast phase; the
@@ -528,17 +528,18 @@ default \code{Inf} resolves to \code{30} time units past the first peak/trough
 
 The biexponential fit is kept only when the data support both phases.
 A channel falls back to the \emph{"exponential_drift"} model (fit on the
-whole response, with \code{A}, \code{B1} as \code{B}, \code{tau1} as \code{tau}, and \code{TD}
-carried over from \code{fix}) when the fit fails (e.g. phases not
+whole response, with \code{A}, \code{B}, \code{tau}, and \code{TD} carried over from
+\code{fix}) when the fit fails (e.g. phases not
 separable), the fitted response is monotonic (no turning point
 \code{texc}), \code{tau2} exceeds twice the fitted time span (a slow phase the
 record cannot tell from a linear drift), or the slow-phase amplitude
-\verb{|B2 - B1|} is below twice the fit RMSE. The exponential-drift fit is
+\verb{|B2 - B|} is below twice the fit RMSE. The exponential-drift fit is
 in turn subject to its own fallback to \emph{"monoexponential"} (see
 below). Each fallback is warned about and recorded in \code{warnings}. The
 \code{model} coefficient column names the method each row comes from, and
-the coefficient columns are the union of the three models' parameters,
-\code{NA} where a row's model has no such parameter.
+the coefficient columns are the union of the three models' parameters:
+\code{A}, \code{B}, \code{tau}, \code{TD}, and \code{MRT} are shared, the rest \code{NA} where a
+row's model has no such parameter.
 
 Any parameter may be held constant with \code{fix}, e.g. \code{fix = list(A = 0)}, as
 above.

@@ -15,7 +15,7 @@ analyse_biexponential(
   end_window = Inf,
   verbose = TRUE,
   ...,
-  tau1_flex = 1/3,
+  tau_flex = 1/3,
   TD_flex = 2,
   A_flex = NULL,
   env = rlang::caller_env()
@@ -40,12 +40,12 @@ used.
 }}
 
 \item{use_TD}{Logical; \code{TRUE} attempts to fit the fast phase with a
-time delay, giving a 6-parameter \code{\link[=SSbiexponential]{SSbiexponential()}} model (A, B1,
-tau1, B2, tau2, TD). If that fit fails, or if \code{use_TD = FALSE}, the
+time delay, giving a 6-parameter \code{\link[=SSbiexponential]{SSbiexponential()}} model (A, B,
+tau, B2, tau2, TD). If that fit fails, or if \code{use_TD = FALSE}, the
 reduced 5-parameter model without \code{TD} is fit.}
 
-\item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B1},
-\code{tau1}, \code{B2}, \code{tau2}, \code{TD}) to hold constant during fitting, e.g.
+\item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B},
+\code{tau}, \code{B2}, \code{tau2}, \code{TD}) to hold constant during fitting, e.g.
 \code{fix = list(A = 0)}. Fixed parameters are excluded from estimation and
 reported at their fixed values. Applied to every channel, or
 per-channel as a list of lists keyed by channel name, e.g.
@@ -77,10 +77,10 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 \item{...}{Additional arguments passed to the underlying method function.
 See \emph{Details}.}
 
-\item{tau1_flex}{Numeric; multiplicative half-width of the stage-2
-\code{tau1} bounds about the stage-1 value,
-\verb{tau1 * [1 / (1 + tau1_flex), 1 + tau1_flex]}. \code{tau2} is floored at
-the \code{tau1} ceiling divided by \code{0.98} and capped at ten times the span.}
+\item{tau_flex}{Numeric; multiplicative half-width of the stage-2
+\code{tau} bounds about the stage-1 value,
+\verb{tau * [1 / (1 + tau_flex), 1 + tau_flex]}. \code{tau2} is floored at
+the \code{tau} ceiling divided by \code{0.98} and capped at ten times the span.}
 
 \item{TD_flex}{Numeric; additive half-width of the stage-2 \code{TD} bounds
 in units of \code{time_channel}, floored at \code{0}.}
@@ -95,7 +95,7 @@ than the validator.}
 }
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns
-\code{nirs_channels}, \code{A}, \code{B1}, \code{tau1}, \code{MRT}, \code{texc}, \code{B2}, \code{tau2}, \code{TD},
+\code{nirs_channels}, \code{A}, \code{B}, \code{TD}, \code{tau}, \code{MRT}, \code{texc}, \code{B2}, \code{tau2},
 \code{MRT_fitted}, \code{texc_fitted}. Per-channel metadata are attached as
 attributes:
 \itemize{
@@ -116,8 +116,8 @@ excursion-recovery curve to each \code{nirs_channel} within a single \emph{"mnir
 data frame in two stages: the fast phase as a monoexponential on the
 \code{end_window} window (\code{\link[=fit_monoexponential]{fit_monoexponential()}}; \code{Inf} resolves to 30
 time units past the first extreme), then the full
-\code{\link[=SSbiexponential]{SSbiexponential()}} model on the whole response with \code{A}, \code{tau1}, and
-\code{TD} box-bounded about their stage-1 values and \code{B1}, \code{B2}, \code{tau2}
+\code{\link[=SSbiexponential]{SSbiexponential()}} model on the whole response with \code{A}, \code{tau}, and
+\code{TD} box-bounded about their stage-1 values and \code{B}, \code{B2}, \code{tau2}
 free. See \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing documentation.
 }
 \seealso{

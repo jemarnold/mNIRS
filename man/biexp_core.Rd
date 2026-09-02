@@ -5,9 +5,9 @@
 \alias{biexp_model}
 \title{Biexponential model with gradient}
 \usage{
-biexp_core(t, A, B1, tau1, B2, tau2, TD = NULL)
+biexp_core(t, A, B, tau, B2, tau2, TD = NULL)
 
-biexp_model(t, A, B1, tau1, B2, tau2, TD = NULL)
+biexp_model(t, A, B, tau, B2, tau2, TD = NULL)
 }
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
@@ -15,10 +15,10 @@ biexp_model(t, A, B1, tau1, B2, tau2, TD = NULL)
 \item{A}{A numeric parameter for the starting value of the response
 variable (the \code{t = 0} intercept).}
 
-\item{B1}{A numeric parameter for the asymptote of the \emph{fast} component;
+\item{B}{A numeric parameter for the asymptote of the \emph{fast} component;
 the value the fast response alone would approach.}
 
-\item{tau1}{A numeric parameter for the \emph{fast} time constant (\eqn{\tau_1}),
+\item{tau}{A numeric parameter for the \emph{fast} time constant (\eqn{\tau_1}),
 in units of the predictor variable \code{t}. Dominates the initial steep
 response.}
 
@@ -27,7 +27,7 @@ the stable plateau the response recovers toward as \code{t} approaches
 infinity.}
 
 \item{tau2}{A numeric parameter for the \emph{slow} time constant (\eqn{\tau_2}),
-in units of the predictor variable \code{t}. Typically \verb{tau2 >> tau1}.}
+in units of the predictor variable \code{t}. Typically \verb{tau2 >> tau}.}
 
 \item{TD}{A numeric parameter for the time delay before the onset of the
 response, in units of the predictor variable \code{t}. If \code{NULL} (\emph{default}),

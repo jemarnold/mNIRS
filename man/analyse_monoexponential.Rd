@@ -80,7 +80,7 @@ than the validator.}
 }
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns
-\code{nirs_channels}, \code{A}, \code{B}, \code{tau}, \code{k}, \code{TD}, \code{MRT}, \code{HRT}, \code{MRT_fitted},
+\code{nirs_channels}, \code{A}, \code{B}, \code{TD}, \code{tau}, \code{k}, \code{MRT}, \code{HRT}, \code{MRT_fitted},
 \code{HRT_fitted}. Per-channel metadata are attached as
 attributes:
 \itemize{

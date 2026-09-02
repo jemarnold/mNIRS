@@ -19,17 +19,17 @@ A named numeric vector of starting estimates in model order.
 }
 \description{
 Vector-level initialiser behind \code{\link[=biexp_init]{biexp_init()}}, called directly by the
-kinetics worker with \code{tau1} and \code{TD} held at their stage-1 values to
+kinetics worker with \code{tau} and \code{TD} held at their stage-1 values to
 seed the slow phase. Profiles the time constants (and
 \code{TD}) on a coarse grid and keeps the RSS-minimising start (cf.
-\code{\link[=expdrift_start]{expdrift_start()}}). The model is linear in \code{A}, \code{B1}, and \code{B2} once
-\code{tau1}, \code{tau2}, and \code{TD} are held, so those are solved by least squares
+\code{\link[=expdrift_start]{expdrift_start()}}). The model is linear in \code{A}, \code{B}, and \code{B2} once
+\code{tau}, \code{tau2}, and \code{TD} are held, so those are solved by least squares
 at every grid point at once: the Gram entries of the bases \code{e1},
-\code{e2 - e1}, \code{1 - e2} for every \verb{(tau1, tau2)} pair follow from the
+\code{e2 - e1}, \code{1 - e2} for every \verb{(tau, tau2)} pair follow from the
 column products of the two exponential matrices, and \code{\link[=solve_grid3]{solve_grid3()}}
 solves the pairs in one pass. User-fixed values narrow the grids; the
 amplitudes are always solved free, as this is only a seed. Pairs with
-\code{tau1 / tau2 > 0.98} are dropped as their bases are near-collinear,
+\code{tau / tau2 > 0.98} are dropped as their bases are near-collinear,
 unless both time constants are fixed.
 }
 \keyword{internal}

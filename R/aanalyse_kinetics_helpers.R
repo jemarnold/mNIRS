@@ -67,14 +67,14 @@ kinetics_workers <- c(
 ## from these and fallback chains report their union
 kinetics_coef_cols <- list(
     monoexponential = c(
-        "A", "B", "tau", "k", "TD", "MRT", "HRT", "MRT_fitted", "HRT_fitted"
+        "A", "B", "TD", "tau", "k", "MRT", "HRT", "MRT_fitted", "HRT_fitted"
     ),
     exponential_drift = c(
-        "A", "B", "tau", "k", "TD", "MRT", "HRT", "texc", "slope", "tau_mult",
+        "A", "B", "TD", "tau", "k", "MRT", "HRT", "texc", "slope", "tau_mult",
         "MRT_fitted", "HRT_fitted", "texc_fitted"
     ),
     biexponential = c(
-        "A", "B", "tau", "MRT", "texc", "B2", "tau2", "TD", "MRT_fitted",
+        "A", "B", "TD", "tau", "MRT", "texc", "B2", "tau2", "MRT_fitted",
         "texc_fitted"
     )
 )
@@ -126,13 +126,16 @@ first_reason <- function(...) {
 }
 
 
-## coefficient columns of a method and every method it can fall back to
+## coefficient columns of a method and every method it can fall back to;
+## `*_fitted` columns trail the union
 kinetics_chain_cols <- function(method) {
     to <- kinetics_fallbacks[[method]]$to
-    return(union(
+    cols <- union(
         kinetics_coef_cols[[method]],
         if (!is.null(to)) kinetics_chain_cols(to)
-    ))
+    )
+    fitted <- grepl("_fitted$", cols)
+    return(c(cols[!fitted], cols[fitted]))
 }
 
 

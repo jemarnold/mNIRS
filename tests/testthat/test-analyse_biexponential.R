@@ -284,8 +284,8 @@ test_that("analyse_biexponential() returns correct structure", {
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
-        "interval", "nirs_channels", "A", "B", "tau",
-        "MRT", "texc", "B2", "tau2", "TD", "MRT_fitted", "texc_fitted"
+        "interval", "nirs_channels", "A", "B", "TD", "tau",
+        "MRT", "texc", "B2", "tau2", "MRT_fitted", "texc_fitted"
     ))
     expect_equal(nrow(result), 1L)
 
@@ -1047,8 +1047,8 @@ test_that("analyse_kinetics() falls back from a monotonic biexponential fit", {
 
     expect_equal(names(cf)[1:4], c("interval", "nirs_channels", "start_time", "model"))
     expect_true(cf$model %in% fallback_models)
-    ## the union schema carries every model's columns
-    expect_true(all(kinetics_chain_cols("biexponential") %in% names(cf)))
+    ## the union schema carries every model's columns, `_fitted` last
+    expect_equal(names(cf)[-(1:4)], kinetics_chain_cols("biexponential"))
     ## the fallback row reports its own model's coefficients
     expect_true(all(is.na(cf[biexp_only])))
     expect_equal(cf$A, coef(model)[["A"]])
@@ -1313,6 +1313,20 @@ test_that("keep_fix() filters through nested maps", {
     expect_equal(
         keep_fix(list(smo2 = list(B = 2), hhb = list(tau2 = 4)), keep),
         list(smo2 = list(B = 2), hhb = setNames(list(), character()))
+    )
+})
+
+test_that("kinetics_chain_cols() unions the chain with `_fitted` columns last", {
+    expect_equal(
+        kinetics_chain_cols("biexponential"),
+        c(
+            "A", "B", "TD", "tau", "MRT", "texc", "B2", "tau2", "k", "HRT",
+            "slope", "tau_mult", "MRT_fitted", "texc_fitted", "HRT_fitted"
+        )
+    )
+    expect_equal(
+        kinetics_chain_cols("monoexponential"),
+        kinetics_coef_cols$monoexponential
     )
 })
 

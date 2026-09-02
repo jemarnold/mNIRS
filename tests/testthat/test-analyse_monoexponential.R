@@ -378,7 +378,7 @@ test_that("analyse_monoexponential() returns correct structure", {
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
-        "interval", "nirs_channels", "A", "B", "tau", "k", "TD", 
+        "interval", "nirs_channels", "A", "B", "TD", "tau", "k",
         "MRT", "HRT", "MRT_fitted", "HRT_fitted"
     ))
     expect_equal(nrow(result), 1L)

@@ -322,7 +322,7 @@ SSmonoexponential <- selfStart(
 #' @inheritParams analyse_kinetics
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
-#'   `nirs_channels`, `A`, `B`, `tau`, `k`, `TD`, `MRT`, `HRT`, `MRT_fitted`,
+#'   `nirs_channels`, `A`, `B`, `TD`, `tau`, `k`, `MRT`, `HRT`, `MRT_fitted`,
 #'   `HRT_fitted`. Per-channel metadata are attached as
 #'   attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
@@ -501,9 +501,9 @@ fit_monoexponential <- function(
         data.frame(
             A = coefs[["A"]],
             B = coefs[["B"]],
+            TD = TD_arg %||% NA_real_,
             tau = coefs[["tau"]],
             k = 1 / coefs[["tau"]], ## time_channel units^-1
-            TD = TD_arg %||% NA_real_,
             MRT = MRT_val,
             HRT = HRT_val,
             MRT_fitted = fitted_params[[1L]],

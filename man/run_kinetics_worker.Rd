@@ -43,7 +43,7 @@ Calls the interval worker of \code{method}, then for methods listed in
 \code{kinetics_fallbacks} tests each channel's fit with the method's
 \code{trigger}. Channels with a reason are refit by the fallback method
 (recursively down the chain) with the arguments it takes, user-fixed
-parameters carried over through \code{fix_map}, and per-channel maps keyed
+parameters restricted to \code{fix_keep}, and per-channel maps keyed
 to those channels only. Their coefficients, model, fitted values,
 diagnostics, and resolved arguments are replaced by the fallback fit's,
 and the fallback is warned about and recorded in the \code{warnings}

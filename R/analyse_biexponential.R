@@ -408,7 +408,7 @@ SSbiexponential <- selfStart(
 #' @inheritParams analyse_kinetics
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
-#'   `nirs_channels`, `A`, `B`, `tau`, `MRT`, `texc`, `B2`, `tau2`, `TD`,
+#'   `nirs_channels`, `A`, `B`, `TD`, `tau`, `MRT`, `texc`, `B2`, `tau2`,
 #'   `MRT_fitted`, `texc_fitted`. Per-channel metadata are attached as
 #'   attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
@@ -620,12 +620,12 @@ analyse_biexponential <- function(
             data.frame(
                 A = coefs[["A"]],
                 B = coefs[["B"]],
+                TD = TD_arg %||% NA_real_,
                 tau = coefs[["tau"]],
                 MRT = MRT_val,
                 texc = texc_val,
                 B2 = coefs[["B2"]],
                 tau2 = coefs[["tau2"]],
-                TD = TD_arg %||% NA_real_,
                 MRT_fitted = fitted_params[[1L]],
                 texc_fitted = fitted_params[[2L]]
             ),

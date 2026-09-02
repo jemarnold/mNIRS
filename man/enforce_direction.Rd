@@ -66,7 +66,7 @@ numeric vector in \verb{(A, B, ...)} space including fixed values, or
 \code{\link[=build_na_results]{build_na_results()}}).
 }
 \description{
-Direction is the sign of the primary amplitude \code{D = B - A} (\code{B1 - A}
+Direction is the sign of the primary amplitude \code{D = B - A} (\code{B - A}
 for the biexponential), where the primary asymptote follows \code{A} in
 model parameter order. A fit is satisfied when \code{D} and every free
 parameter lie inside the refit box (\code{D} sign-constrained; \code{lower}/
