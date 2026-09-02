@@ -41,6 +41,11 @@ The 3-parameter form is recommended for small samples or when no obvious
 time delay is expected, as it converges more reliably. \code{\link[stats:nls]{stats::nls()}}
 reads the free parameters from the formula right-hand side, so omitting
 \code{TD} incurs no degrees-of-freedom penalty.
+
+The model function returns the analytic gradient for the free
+parameters as a \code{"gradient"} attribute, so \code{\link[stats:nls]{stats::nls()}} does not
+resort to \code{\link[stats:numericDeriv]{stats::numericDeriv()}} and \code{\link[stats:predict]{stats::predict()}} on a fitted
+model carries the attribute; drop it with \code{as.vector()}.
 \subsection{Fixing parameters}{
 
 Any parameter may be held constant by writing a value in place of its

@@ -310,8 +310,8 @@ analyse_kinetics(
 - **`"response_time"`**: `fraction` (default `0.5`; `0.632` ≈ MRT; vectorised, e.g. `c(0.5, 0.632)` → one coefficient row per fraction).
 - **`"peak_slope"`**: `width` XOR `span`; `align` (`"centre"`/`"left"`/`"right"`); `partial`, `na.rm` (default `FALSE`).
 - **`"monoexponential"`**: `use_TD` (default `TRUE`; 4-param → 3-param fallback), `fix`.
-- **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `fix`. Sequential fit: fast monoexp on `end_window` window (`Inf` → first extreme + 20 time units) → full biexp with `A`/`tau1`/`TD` held near stage-1 values, `B1`/`B2`/`tau2` free. Reduces to monoexp (`model` column) by F-test / monotonic `texc`.
-- **`"exponential_drift"`**: `use_TD`, `tau_mult` (default `3`; drift onset `texc = TD + tau_mult * tau`, always held constant), `fix`.
+- **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `fix`. Sequential fit: fast monoexp on `end_window` window (`Inf` → first extreme + 20 time units) → full biexp with `A`/`tau1`/`TD` held near stage-1 values, `B1`/`B2`/`tau2` free. Falls back (warning; `model` column) to exp_drift → monoexp on fit failure, monotonic `texc`, `tau2 >= 2 × span`, or `|B2 - B1| < 2 × rmse`. Coef columns = union of the chain (`NA` where n/a). Undocumented `model_fallback = FALSE` keeps raw fit.
+- **`"exponential_drift"`**: `use_TD`, `tau_mult` (default `3`; drift onset `texc = TD + tau_mult * tau`, always held constant), `fix`. Falls back to monoexp on fit failure or `|slope| × (t_end - texc) < 2 × rmse` (`model` column; `model_fallback = FALSE` keeps raw fit).
 - **`"sigmoidal"`**: `shape` (`"symmetric"` default = `SSlogistic()`; `"gompertz"` early-inflection (right); `"gompertz_left"` late-inflection), `fix`.
 
 Per-channel overrides via inline named `list()` (names must match `nirs_channels`):
@@ -368,7 +368,8 @@ Times are elapsed from `start_time`; `*_fitted` = predicted value at that point.
 | `"response_time"` | `fraction` (one row per value), `A` baseline mean, `B` extreme (peak/trough) value, `response_time`, `response_value` (observed), `fitted` (target `A + (B-A)*fraction`), `idx` (sample/row number at `response_value`) |
 | `"peak_slope"` | `slope` (`x/t`), `intercept`, `fitted`, `peak_slope_time`, `idx` (sample/row number at `align` position) |
 | `"monoexponential"` | `A` baseline, `B` asymptote, `tau`, `k` (`1/tau`), `TD` delay (if `use_TD`), `MRT` (`TD+tau`), `HRT` (`TD+tau·ln2`), `MRT_fitted`, `HRT_fitted` |
-| `"biexponential"` | `A` start, `B1` & `tau1` fast component, `MRT` (`TD+tau1`), `texc` (fitted turning point; `NA` if monotonic), `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `MRT_fitted`, `texc_fitted` |
+| `"biexponential"` | `A` start, `B1` & `tau1` fast component, `MRT` (`TD+tau1`), `texc` (fitted turning point; `NA` if monotonic), `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `MRT_fitted`, `texc_fitted`; plus `model` and the exp_drift/monoexp columns (`NA` unless fallen back) |
+| `"exponential_drift"` | monoexp columns + `texc` (drift onset `TD + tau_mult·tau`), `slope` (`dx/dt`), `tau_mult`, `texc_fitted`; plus `model` |
 | `"sigmoidal"` | `A` & `B` start + end asymptotes, `xmid` inflection time (only literally *"middle"* for `shape = "symmetric"`), `slope` (`dx/dt` at `xmid`), `xmid_fitted` |
 
 **Diagnostics:** `n_obs`, `n_params`, `r2`, `adj_r2`, `rmse`, `snr`, `cv_rmse`,
@@ -470,7 +471,7 @@ format_hmmss(x)         # numeric seconds → "mm:ss" or "h:mm:ss"
 | `group_intervals = "ensemble"` needs regularised time grid | `resample → extract_intervals`; warns if irregular |
 | `monoexponential`/`biexponential` convergence fallback | Weak fits (certain convergence errors) return fit with warnings |
 | `direction`-bounded fit | return `NA` coefficients if unsatisfiable; verify `biexponential` in particular |
-| `biexponential` identifiability | fast phase fixed by stage-1 monoexp on `end_window`; a window too long past the extreme gives a slow stage 1 and reduction to monoexp; check `warnings` + `model` column |
+| `biexponential` identifiability | fast phase fixed by stage-1 monoexp on `end_window`; a window too long past the extreme gives a slow stage 1 and fallback to exp_drift/monoexp; check `warnings` + `model` column |
 
 ---
 

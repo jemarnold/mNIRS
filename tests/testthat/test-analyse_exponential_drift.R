@@ -358,6 +358,96 @@ test_that("analyse_exponential_drift() enforces direction", {
 })
 
 
+## model fallback ===================================================
+
+test_that("analyse_kinetics() keeps a supported drift", {
+    data <- create_expdrift_data()
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "exponential_drift",
+        tau_mult = 4,
+        verbose = FALSE
+    )
+    forced <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "exponential_drift",
+        tau_mult = 4,
+        model_fallback = FALSE,
+        verbose = FALSE
+    )
+    cf <- result$coefficients
+
+    expect_equal(names(cf)[1:4], c("interval", "nirs_channels", "start_time", "model"))
+    expect_equal(cf$model, "exponential_drift")
+    expect_true(all.equal(cf$slope, 0.2, tolerance = 0.05, scale = 1))
+    expect_false(any(grepl("fell back to", result$warnings$message)))
+    expect_equal(cf, forced$coefficients)
+})
+
+test_that("analyse_kinetics() falls back from a negligible drift", {
+    data <- create_expdrift_data(slope = 0)
+
+    expect_warning(
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = "smo2",
+            method = "exponential_drift"
+        ),
+        "fell back to"
+    )
+    cf <- result$coefficients
+    model <- result$model[[1L]]$smo2
+
+    expect_equal(cf$model, "monoexponential")
+    expect_named(coef(model), c("A", "B", "tau", "TD"))
+    expect_equal(cf$tau, coef(model)[["tau"]])
+    expect_true(all(is.na(cf[c("slope", "tau_mult", "texc", "texc_fitted")])))
+    expect_equal(result$diagnostics$n_params, 4L)
+    expect_equal(
+        result$data[[1L]]$smo2_fitted,
+        as.vector(predict(model))
+    )
+    msgs <- result$warnings$message
+    expect_true(any(grepl("Drift amplitude", msgs)))
+
+    ## the raw fit is kept on request
+    forced <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "exponential_drift",
+        model_fallback = FALSE,
+        verbose = FALSE
+    )
+    expect_equal(forced$coefficients$model, "exponential_drift")
+    expect_false(is.na(forced$coefficients$slope))
+})
+
+test_that("exponential_drift fallback resolves per channel with fix carried", {
+    data <- create_expdrift_data(channels = c("smo2", "hhb"))
+    data$hhb <- create_expdrift_data(slope = 0, seed = 1)$smo2
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = c(smo2, hhb),
+        method = "exponential_drift",
+        tau_mult = list(smo2 = 4, hhb = 4),
+        fix = list(A = 70),
+        verbose = FALSE
+    )
+    cf <- result$coefficients
+
+    expect_equal(cf$nirs_channels, c("smo2", "hhb"))
+    expect_equal(cf$model, c("exponential_drift", "monoexponential"))
+    expect_equal(cf$A, c(70, 70))
+    expect_named(coef(result$model[[1L]]$hhb), c("B", "tau", "TD"))
+    fell <- result$warnings[grepl("fell back to", result$warnings$message), ]
+    expect_equal(fell$nirs_channels, "hhb")
+})
+
+
 ## integration tests ================================================
 
 test_that("analyse_exponential_drift() converges on real dataset", {

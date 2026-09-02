@@ -22,7 +22,7 @@ Custom \emph{{mnirs}} colour palette
 \dontshow{if (rlang::is_installed("scales")) withAutoprint(\{ # examplesIf}
 scales::show_col(palette_mnirs())
 scales::show_col(palette_mnirs(2))
-scales::show_col(palette_mnirs("red", "orange"))
+scales::show_col(palette_mnirs("red", "blue", "green"))
 \dontshow{\}) # examplesIf}
 }
 \seealso{

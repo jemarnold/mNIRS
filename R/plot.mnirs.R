@@ -338,23 +338,33 @@ plot.mnirs_kinetics <- function(
             ## holds only time, interval, and component columns, so user
             ## channel names can never collide with coefficient names
             cf <- x$coefficients[x$coefficients$nirs_channels == .ch, ]
-            co <- cf[if (faceted) match(d$interval, cf$interval) else 1L, ]
+            co <- cf[
+                if (faceted) match(d$interval, cf$interval) else rep(1L, nrow(d)),
+            ]
             t_rel <- d[[time_channel]] - co$start_time
             ## TD NA marks a fit with no time delay; those fits only keep
             ## rows from the onset, so TD = 0 is equivalent
             TD <- ifelse(is.finite(co$TD), co$TD, 0)
             cd <- d[c(time_channel, if (faceted) "interval")]
-            if (x$method == "biexponential") {
-                cd$comp1 <- monoexponential(t_rel, co$A, co$B1, co$tau1, TD)
-                cd$comp2 <- monoexponential(t_rel, co$B1, co$B2, co$tau2, TD)
-            } else {
-                cd$comp1 <- monoexponential(t_rel, co$A, co$B, co$tau, TD)
-                cd$comp2 <- ifelse(
-                    t_rel >= co$texc,
-                    co$texc_fitted + co$slope * (t_rel - co$texc),
+            ## terms follow the model that fit each row; a coefficient
+            ## absent from the schema reads as NA
+            model <- co$model %||% rep(x$method, nrow(co))
+            g <- \(.nm) co[[.nm]] %||% NA_real_
+            biexp <- model == "biexponential"
+            cd$comp1 <- ifelse(
+                biexp,
+                monoexponential(t_rel, g("A"), g("B1"), g("tau1"), TD),
+                monoexponential(t_rel, g("A"), g("B"), g("tau"), TD)
+            )
+            cd$comp2 <- ifelse(
+                biexp,
+                monoexponential(t_rel, g("B1"), g("B2"), g("tau2"), TD),
+                ifelse(
+                    model == "exponential_drift" & t_rel >= g("texc"),
+                    g("texc_fitted") + g("slope") * (t_rel - g("texc")),
                     NA_real_
                 )
-            }
+            )
 
             comp_line <- \(.col, .d = cd) ggplot2::geom_line(
                 ggplot2::aes(y = .data[[.col]], colour = .ch),
@@ -476,7 +486,9 @@ plot.mnirs_kinetics <- function(
 #'
 #' @returns A `data.frame` with columns `interval`, `nirs_channels`,
 #'   `xval`, `yval`, `label`, and `vjust`. Marker rows have an empty `label`
-#'   and `NA` `vjust`; label rows have infinite `xval`/`yval`.
+#'   and `NA` `vjust`; label rows have infinite `xval`/`yval`. Rows are
+#'   annotated by the model that fit them (the `model` coefficient column
+#'   where the method has a fallback chain, else the method).
 #'   `NULL` for a method with no annotation spec, in which case
 #'   [plot.mnirs_kinetics()] draws the fitted curve alone.
 #'
@@ -506,8 +518,8 @@ kinetics_annotations <- function(x) {
     ## per-method: time offsets (x), fitted values (y), and label lines.
     ## `offset`/`y` are parallel vectors of coefficient names, one marker
     ## point per pair
-    spec <- switch(
-        x$method,
+    annotation_spec <- \(method, coefs) switch(
+        method,
         response_time = list(
             offset = "response_time",
             y = "fitted",
@@ -565,32 +577,62 @@ kinetics_annotations <- function(x) {
         )
     )
 
+    ## rows are annotated by the model that fit them: the per-row `model`
+    ## where the method has a fallback chain, else the method. marker rows
+    ## carry no label or stacking; label rows anchor at the panel corner.
+    ## `row` keeps coefficient order across the model groups
+    models <- coefs$model %||% rep(x$method, nrow(coefs))
+    ann <- do.call(rbind, lapply(split(seq_len(nrow(coefs)), models), \(.i) {
+        cf <- coefs[.i, , drop = FALSE]
+        spec <- annotation_spec(models[[.i[[1L]]]], cf)
+        if (is.null(spec)) {
+            return(NULL)
+        }
+        markers <- Map(\(off, y) {
+            data.frame(
+                row = .i,
+                interval = cf$interval,
+                nirs_channels = cf$nirs_channels,
+                xval = cf$start_time + cf[[off]],
+                yval = cf[[y]],
+                label = "",
+                stringsAsFactors = FALSE
+            )
+        }, spec$offset, spec$y)
+        ## channels with all-NA fits contribute no label lines
+        n <- lengths(spec$label)
+        labels <- data.frame(
+            row = rep(.i, n),
+            interval = rep(cf$interval, n),
+            nirs_channels = rep(cf$nirs_channels, n),
+            xval = rep(Inf, sum(n)),
+            yval = rep(NA_real_, sum(n)),
+            label = as.character(unlist(spec$label)),
+            stringsAsFactors = FALSE
+        )
+        rbind(do.call(rbind, markers), labels)
+    }))
+
     ## methods without an annotation spec degrade to a curve-only plot
-    if (is.null(spec)) {
+    if (is.null(ann)) {
         return(NULL)
     }
-
-    ## one marker row per channel per offset/y pair
-    marker_rows <- function(off, y) {
-        return(data.frame(
-            interval = coefs$interval,
-            nirs_channels = coefs$nirs_channels,
-            xval = coefs$start_time + coefs[[off]],
-            yval = coefs[[y]],
-            stringsAsFactors = FALSE
-        ))
-    }
-
-    ## marker rows carry no label or stacking
-    ann <- do.call(rbind, Map(marker_rows, spec$offset, spec$y))
-    ann[c("label", "vjust")] <- list("", NA_real_)
+    ## marker rows first, then label rows in coefficient order
+    is_lab <- nzchar(ann$label)
+    ann <- rbind(ann[!is_lab, ], ann[is_lab, ][order(ann$row[is_lab]), ])
+    is_lab <- nzchar(ann$label)
 
     ## signed response direction: fitted slope sign (peak_slope, sigmoidal),
-    ## otherwise plateau minus baseline
+    ## otherwise plateau minus baseline; the plateau is `B2` or `B`,
+    ## whichever the row's model reports
     dir <- if (is.null(coefs[["A"]])) {
         coefs[["slope"]]
     } else {
-        (coefs[["B2"]] %||% coefs[["B"]]) - coefs[["A"]]
+        plateau <- Reduce(
+            \(.x, .y) ifelse(is.na(.x), .y, .x),
+            coefs[intersect(c("B2", "B"), names(coefs))]
+        )
+        plateau - coefs[["A"]]
     }
 
     ## one corner per panel: labels anchor to the right edge, so use the half
@@ -602,28 +644,24 @@ kinetics_annotations <- function(x) {
         coefs$interval,
         FUN = \(s) sum(s, na.rm = TRUE)
     ) > 0
-
-    ## one text row per label line anchored at the corner; channels with
-    ## all-NA fits contribute none
-    n <- lengths(spec$label)
-    lab <- data.frame(
-        interval = rep(coefs$interval, n),
-        nirs_channels = rep(coefs$nirs_channels, n),
-        xval = rep(Inf, sum(n)),
-        yval = rep(ifelse(rises, -Inf, Inf), n),
-        label = as.character(unlist(spec$label)),
-        stringsAsFactors = FALSE
-    )
+    ann$yval[is_lab] <- ifelse(rises[ann$row[is_lab]], -Inf, Inf)
 
     ## stack lines inward from the corner, half a line-gap from the border,
     ## keeping top-to-bottom order in both corners. `vjust` is in single-line
     ## text heights (~0.7 font size), so 1.6 approximates geom_text's 1.2
     ## lineheight
-    idx <- stats::ave(seq_along(lab$label), lab$interval, FUN = seq_along)
-    rev_idx <- stats::ave(idx, lab$interval, FUN = rev)
-    lab$vjust <- ifelse(lab$yval < 0, 0.8 - 1.6 * rev_idx, 0.2 + 1.6 * idx)
-
-    return(rbind(ann, lab))
+    ann$vjust <- NA_real_
+    if (any(is_lab)) {
+        lab <- ann[is_lab, ]
+        idx <- stats::ave(seq_along(lab$label), lab$interval, FUN = seq_along)
+        rev_idx <- stats::ave(idx, lab$interval, FUN = rev)
+        ann$vjust[is_lab] <- ifelse(
+            lab$yval < 0, 0.8 - 1.6 * rev_idx, 0.2 + 1.6 * idx
+        )
+    }
+    ann$row <- NULL
+    rownames(ann) <- NULL
+    return(ann)
 }
 
 

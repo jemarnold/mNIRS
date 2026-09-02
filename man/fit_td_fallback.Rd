@@ -45,7 +45,9 @@ error handler.}
 errors and warnings as coming from the user-facing function rather
 than the validator.}
 
-\item{retry}{Logical; attempt the reduced model when the TD fit fails.}
+\item{retry}{Logical; attempt the reduced model when the TD fit fails.
+A condition of class \code{"mnirs_fit_final"} (see \code{\link[=fit_final_error]{fit_final_error()}})
+reports a failure the reduced model cannot resolve and skips the retry.}
 }
 \value{
 A list with \code{model} (or \code{NULL}), the \code{params} actually fit,

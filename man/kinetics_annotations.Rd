@@ -11,18 +11,21 @@ kinetics_annotations(x)
 }
 \value{
 A \code{data.frame} with columns \code{interval}, \code{nirs_channels},
-\code{xval}, \code{yval}, \code{label}, \code{yval_corner}, and \code{vjust}. Methods with
-multiple key points append marker-only rows with an empty \code{label}.
+\code{xval}, \code{yval}, \code{label}, and \code{vjust}. Marker rows have an empty \code{label}
+and \code{NA} \code{vjust}; label rows have infinite \code{xval}/\code{yval}. Rows are
+annotated by the model that fit them (the \code{model} coefficient column
+where the method has a fallback chain, else the method).
 \code{NULL} for a method with no annotation spec, in which case
 \code{\link[=plot.mnirs_kinetics]{plot.mnirs_kinetics()}} draws the fitted curve alone.
 }
 \description{
-Maps a fitted \code{mnirs_kinetics} method to its key coefficient marker
-(\code{xval}, \code{yval}) and formatted \code{label}, one row per \code{nirs_channel}
-per interval, for \code{\link[=plot.mnirs_kinetics]{plot.mnirs_kinetics()}}. Marker x-coordinates are the
-resolved onset plus the method's time coefficient. Labels sit in the corner
-at the panel's right edge vacated by the fitted data, judged from the
-coefficient direction. \code{vjust} staggers stacked labels by channel rank
-within each interval.
+Maps a fitted \code{mnirs_kinetics} method to its key coefficient markers
+(\code{xval}, \code{yval}) and formatted label lines for \code{\link[=plot.mnirs_kinetics]{plot.mnirs_kinetics()}}.
+Marker rows are one per \code{nirs_channel} per key point per interval, with
+x-coordinates the resolved onset plus the method's time coefficient.
+Label rows are one per label line, anchored (\code{xval = Inf},
+\code{yval = -Inf} or \code{Inf}) at the corner of the panel's right edge vacated by
+the fitted data, judged from the coefficient direction. \code{vjust} stacks
+the lines inward from the corner in channel order within each interval.
 }
 \keyword{internal}

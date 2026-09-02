@@ -381,19 +381,19 @@
 #' default `Inf` resolves to `30` time units past the first peak/trough
 #' (recorded in `channel_args`).
 #'
-#' The biexponential model is nested over the monoexponential (`B1 = B2`),
-#' so every channel is also fit with the *"monoexponential"* method on the
-#' whole response with the same time-delay structure (with `A`, `B2` as
-#' `B`, and `TD` carried over from `fix`). The biexponential fit is kept
-#' only when it is an excursion-recovery (its turning point `texc` exists)
-#' and the
-#' extra-sum-of-squares F-test rejects the monoexponential at `p < 0.05`.
-#' Otherwise -- a monotonic fit, a second phase the data do not support, or
-#' a failed biexponential fit (e.g. phases not separable) -- the
-#' monoexponential fit is returned in the biexponential columns with
-#' `B1 = B2 = B`, `tau1 = tau`, and `tau2`, `texc`, `texc_fitted` as `NA`,
-#' with a warning. The `model` coefficient column names the method each
-#' row comes from.
+#' The biexponential fit is kept only when the data support both phases.
+#' A channel falls back to the *"exponential_drift"* model (fit on the
+#' whole response, with `A`, `B1` as `B`, `tau1` as `tau`, and `TD`
+#' carried over from `fix`) when the fit fails (e.g. phases not
+#' separable), the fitted response is monotonic (no turning point
+#' `texc`), `tau2` exceeds twice the fitted time span (a slow phase the
+#' record cannot tell from a linear drift), or the slow-phase amplitude
+#' `|B2 - B1|` is below twice the fit RMSE. The exponential-drift fit is
+#' in turn subject to its own fallback to *"monoexponential"* (see
+#' below). Each fallback is warned about and recorded in `warnings`. The
+#' `model` coefficient column names the method each row comes from, and
+#' the coefficient columns are the union of the three models' parameters,
+#' `NA` where a row's model has no such parameter.
 #'
 #' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`, as
 #' above.
@@ -419,6 +419,15 @@
 #' excursion point `texc = TD + tau_mult * tau` elapsed from `start_time`
 #' (the same frame as `TD` and `MRT`). Set `use_TD = TRUE` (*default*) to
 #' include the time-delay parameter `TD`.
+#'
+#' The drift is kept only when the data support it. A channel falls back
+#' to the *"monoexponential"* model (same window and time-delay structure,
+#' with `A`, `B`, `tau`, and `TD` carried over from `fix`) when the fit
+#' fails or the drift amplitude over the remaining record,
+#' `|slope| * (t_end - texc)`, is below twice the fit RMSE, with a
+#' warning recorded in `warnings`. The `model` coefficient column names
+#' the method each row comes from; monoexponential rows report `texc`,
+#' `slope`, `tau_mult`, and `texc_fitted` as `NA`.
 #'
 #' `A`, `B`, `tau`, `slope`, and `TD` may be held constant with `fix`, as
 #' above.
@@ -504,9 +513,10 @@
 #'       `nirs_channel` per interval, containing `interval`, `nirs_channels`,
 #'       the resolved `start_time` (the fit onset from which time coefficients
 #'       are elapsed), and method-specific parameters. For
-#'       `"biexponential"`, `model` names the method each row's
-#'       coefficients come from (`"biexponential"`, or
-#'       `"monoexponential"` when reduced).}
+#'       `"biexponential"` and `"exponential_drift"`, `model` names the
+#'       method each row's coefficients come from after any fallback, and
+#'       the parameter columns are the union of the method's and its
+#'       fallbacks' (`NA` where a row's model has no such parameter).}
 #'   \item{`data`}{A list of the original input data frames augmented with a
 #'       `*_fitted` column of fitted values for each processed `nirs_channel`.}
 #'   \item{`interval_times`}{A data frame with one row per interval and
@@ -639,7 +649,6 @@ analyse_kinetics.response_time <- function(
     }
     return(analyse_kinetics_intervals(
         data,
-        analyse_response_time,
         "response_time",
         mget(unlist(kinetics_dispatch[c("common", "response_time")])),
         enquo(nirs_channels),
@@ -679,7 +688,6 @@ analyse_kinetics.peak_slope <- function(
     }
     return(analyse_kinetics_intervals(
         data,
-        analyse_peak_slope,
         "peak_slope",
         mget(unlist(kinetics_dispatch[c("common", "peak_slope")])),
         enquo(nirs_channels),
@@ -717,7 +725,6 @@ analyse_kinetics.monoexponential <- function(
     }
     return(analyse_kinetics_intervals(
         data,
-        analyse_monoexponential,
         "monoexponential",
         mget(unlist(kinetics_dispatch[c("common", "monoexponential")])),
         enquo(nirs_channels),
@@ -756,12 +763,12 @@ analyse_kinetics.biexponential <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
-    ## the biexponential fit is resolved against a nested monoexponential
-    ## comparator (see `kinetics_reductions`); the undocumented
-    ## `force_biexponential = TRUE` keeps the raw fit for troubleshooting.
-    ## `tau1_flex`, `TD_flex`, `A_flex` are the stage-2 half-widths about
-    ## the stage-1 fast phase (see `analyse_biexponential()`), undocumented
-    return(analyse_kinetics_reduced(
+    ## unsupported fits fall back down the chain in `kinetics_fallbacks`;
+    ## the undocumented `model_fallback = FALSE` keeps the raw fit for
+    ## troubleshooting. `tau1_flex`, `TD_flex`, `A_flex` are the stage-2
+    ## half-widths about the stage-1 fast phase (see
+    ## `analyse_biexponential()`), undocumented
+    return(analyse_kinetics_intervals(
         data,
         "biexponential",
         mget(unlist(kinetics_dispatch[c("common", "biexponential")])),
@@ -772,7 +779,7 @@ analyse_kinetics.biexponential <- function(
         verbose,
         match.call(),
         sys.call(-1),
-        reduce = !isTRUE(list(...)$force_biexponential)
+        fallback = !isFALSE(list(...)$model_fallback)
     ))
 }
 
@@ -800,9 +807,11 @@ analyse_kinetics.exponential_drift <- function(
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## an unsupported drift falls back to the monoexponential (see
+    ## `kinetics_fallbacks`); the undocumented `model_fallback = FALSE`
+    ## keeps the raw fit
     return(analyse_kinetics_intervals(
         data,
-        analyse_exponential_drift,
         "exponential_drift",
         mget(unlist(kinetics_dispatch[c("common", "exponential_drift")])),
         enquo(nirs_channels),
@@ -811,7 +820,8 @@ analyse_kinetics.exponential_drift <- function(
         zero_time,
         verbose,
         match.call(),
-        sys.call(-1)
+        sys.call(-1),
+        fallback = !isFALSE(list(...)$model_fallback)
     ))
 }
 
@@ -840,7 +850,6 @@ analyse_kinetics.sigmoidal <- function(
     }
     return(analyse_kinetics_intervals(
         data,
-        analyse_logistic,
         "sigmoidal",
         mget(unlist(kinetics_dispatch[c("common", "sigmoidal")])),
         enquo(nirs_channels),

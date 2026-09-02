@@ -6,7 +6,6 @@
 \usage{
 analyse_kinetics_intervals(
   data,
-  worker,
   method,
   worker_args,
   nirs_quo,
@@ -15,19 +14,17 @@ analyse_kinetics_intervals(
   zero_time,
   verbose,
   call,
-  env
+  env,
+  fallback = TRUE
 )
 }
 \arguments{
 \item{data}{A data frame, list of data frames, or grouped data frame.}
 
-\item{worker}{Function; the interval-level worker, e.g.
-\code{\link[=analyse_monoexponential]{analyse_monoexponential()}}.}
-
 \item{method}{Character; the canonical method name.}
 
 \item{worker_args}{Named list of method-specific arguments passed
-to \code{worker}.}
+to the method's worker in \code{kinetics_workers}.}
 
 \item{nirs_quo, time_quo}{Quosures of the caller's \code{nirs_channels}
 and \code{time_channel} arguments, captured in the method frame.}
@@ -46,6 +43,9 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 \item{call}{The matched call from the user-facing method.}
 
 \item{env}{The call recorded for condition reporting.}
+
+\item{fallback}{Logical; resolve the method's fallback chain in
+\code{kinetics_fallbacks} per channel (see \code{\link[=run_kinetics_worker]{run_kinetics_worker()}}).}
 }
 \value{
 An \emph{"mnirs_kinetics"} object from
@@ -54,7 +54,8 @@ An \emph{"mnirs_kinetics"} object from
 \description{
 Shared skeleton for \verb{analyse_kinetics.*} methods: normalises \code{data}
 to a named list of interval data frames, splits sample groups via
-\code{\link[=split_kinetics_groups]{split_kinetics_groups()}}, calls the method worker once per interval,
-and collates results via \code{\link[=build_kinetics_results]{build_kinetics_results()}}.
+\code{\link[=split_kinetics_groups]{split_kinetics_groups()}}, calls the method worker once per interval
+via \code{\link[=run_kinetics_worker]{run_kinetics_worker()}}, and collates results via
+\code{\link[=build_kinetics_results]{build_kinetics_results()}}.
 }
 \keyword{internal}

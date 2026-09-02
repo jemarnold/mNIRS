@@ -4,7 +4,7 @@
 \alias{SSbiexponential}
 \title{Self-starting biexponential model}
 \usage{
-SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult, TD)
+SSbiexponential(t, A, B1, tau1, B2, tau2, TD)
 }
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
@@ -12,9 +12,8 @@ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult, TD)
 \item{A}{A numeric parameter for the starting value of the response
 variable (the \code{t = 0} intercept).}
 
-\item{B1}{A numeric parameter for the asymptote of the initial \emph{fast}
-component; the value the initial response approaches at the excursion
-point.}
+\item{B1}{A numeric parameter for the asymptote of the \emph{fast} component;
+the value the fast response alone would approach.}
 
 \item{tau1}{A numeric parameter for the \emph{fast} time constant (\eqn{\tau_1}),
 in units of the predictor variable \code{t}. Dominates the initial steep
@@ -27,13 +26,9 @@ infinity.}
 \item{tau2}{A numeric parameter for the \emph{slow} time constant (\eqn{\tau_2}),
 in units of the predictor variable \code{t}. Typically \verb{tau2 >> tau1}.}
 
-\item{tau_mult}{A numeric multiple of \code{tau1} after \code{TD} at which the slow
-component begins: excursion point; \code{texc = TD + tau_mult * tau1}
-(\code{TD = 0} when absent).}
-
 \item{TD}{A numeric parameter for the time delay before the onset of the
 response, in units of the predictor variable \code{t}. If \code{NULL} (\emph{default}),
-a 6-parameter model without time delay is used.}
+a 5-parameter model without time delay is used.}
 }
 \value{
 A numeric vector of predicted values the same length as the
@@ -42,23 +37,29 @@ predictor variable \code{t}.
 \description{
 Creates initial coefficient estimates for a \code{selfStart} wrapper around
 \code{\link[=biexponential]{biexponential()}}, for use with \code{\link[stats:nls]{stats::nls()}}. Supports both the
-6-parameter form (A, B1, tau1, B2, tau2, tau_mult) and the 7-parameter
-form adding a time delay TD; arity is inferred from the formula passed
-to \code{\link[stats:nls]{stats::nls()}}.
+5-parameter form (A, B1, tau1, B2, tau2) and the 6-parameter form adding
+a time delay TD; arity is inferred from the formula passed to
+\code{\link[stats:nls]{stats::nls()}}.
 }
 \details{
+5-parameter model:
+\code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2)}
+
 6-parameter model:
-\code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult)}
+\code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, TD)}
 
-7-parameter model:
-\code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult, TD)}
+The two phases are weakly identified when \code{tau1} and \code{tau2} are close, so
+\code{algorithm = "port"} with the time constants bounded non-negative and
+\code{control = nls.control(warnOnly = TRUE)} is recommended.
+\code{\link[=analyse_kinetics]{analyse_kinetics()}} instead fits the phases sequentially, holding the
+fast phase near a monoexponential estimate.
 
-The hinge at \code{texc = TD + tau_mult * tau1} is not differentiable, so
-\code{algorithm = "port"} with the time constants bounded non-negative,
-\code{tau_mult >= 1}, and \code{control = nls.control(warnOnly = TRUE)} is
-recommended.
+The model function returns the analytic gradient for the free
+parameters as a \code{"gradient"} attribute, so \code{\link[stats:nls]{stats::nls()}} does not
+resort to \code{\link[stats:numericDeriv]{stats::numericDeriv()}} and \code{\link[stats:predict]{stats::predict()}} on a fitted
+model carries the attribute; drop it with \code{as.vector()}.
 
-The 6-parameter form is recommended for small samples or when no obvious
+The 5-parameter form is recommended for small samples or when no obvious
 time delay is expected, as it converges more reliably. \code{\link[stats:nls]{stats::nls()}}
 reads the free parameters from the formula right-hand side, so omitting
 \code{TD} incurs no degrees-of-freedom penalty.
@@ -66,8 +67,8 @@ reads the free parameters from the formula right-hand side, so omitting
 
 Any parameter may be held constant by writing a value in place of its
 name in the formula, e.g.
-\code{x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult = 2)}
-holds the slow onset at \code{2 * tau1}. Fixed parameters are excluded from
+\code{x ~ SSbiexponential(t, A, B1, tau1 = 5, B2, tau2)}
+holds the fast time constant at \code{5}. Fixed parameters are excluded from
 estimation and are not returned by \code{\link[stats:coef]{stats::coef()}}.
 }
 }
@@ -75,26 +76,25 @@ estimation and are not returned by \code{\link[stats:coef]{stats::coef()}}.
 ## create a biexponential excursion-recovery curve with random noise
 set.seed(13)
 t <- 0:120
-x <- biexponential(
-    t, A = 70, B1 = 45, tau1 = 5, B2 = 60, tau2 = 40, tau_mult = 2
-) + rnorm(length(t), 0, 0.8)
+x <- biexponential(t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40) +
+    rnorm(length(t), 0, 0.8)
 data <- data.frame(t, x)
 
 model <- nls(
-    x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult),
+    x ~ SSbiexponential(t, A, B1, tau1, B2, tau2),
     data = data,
     algorithm = "port",
-    lower = c(-Inf, -Inf, 0, -Inf, 0, 1),
+    lower = c(-Inf, -Inf, 0, -Inf, 0),
     control = nls.control(warnOnly = TRUE)
 )
 summary(model)
 
-## fix the slow onset at 2 tau1
+## fix the fast time constant
 model_fixed <- nls(
-    x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, tau_mult = 2),
+    x ~ SSbiexponential(t, A, B1, tau1 = 5, B2, tau2),
     data = data,
     algorithm = "port",
-    lower = c(-Inf, -Inf, 0, -Inf, 0),
+    lower = c(-Inf, -Inf, -Inf, 0),
     control = nls.control(warnOnly = TRUE)
 )
 summary(model_fixed)

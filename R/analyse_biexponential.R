@@ -45,11 +45,11 @@
 #' short of `B1`, followed by a *slow* recovery back to a stable plateau at
 #' `B2`. The turning point occurs where the two phase rates cancel:
 #' `texc = TD + log(r) / (1 / tau1 - 1 / tau2)` with
-#' `r = -(B1 - A) * tau2 / ((B2 - B1) * tau1)`, which exists only when the
-#' amplitudes oppose in sign and the fast phase dominates at the onset
-#' (`r > 1`). If `B1` is between `A` and `B2`, the response is monotonic but
-#' still two-phase. If `B1 = B2`, the curve reduces to a [monoexponential()]
-#' with single time constant `tau1` and asymptote `B2`.
+#' `ratio = -(B1 - A) * tau2 / ((B2 - B1) * tau1)`, which exists only when
+#' the amplitudes oppose in sign and the fast phase dominates at the onset
+#' (`ratio > 1`). If `B1` is between `A` and `B2`, the response is monotonic
+#' but still two-phase. If `B1 = B2`, the curve reduces to a
+#' [monoexponential()] with single time constant `tau1` and asymptote `B2`.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -474,17 +474,14 @@ analyse_biexponential <- function(
         .a
     })
     ## NA scaffold (method columns only) for convergence failure
-    na_cols <- c(
-        "A", "B1", "tau1", "MRT", "texc", "B2", "tau2", "TD", "MRT_fitted",
-        "texc_fitted"
-    )
+    na_cols <- kinetics_coef_cols$biexponential
 
     ## method-specific fit in two stages. stage 1: the fast phase as a
     ## monoexponential on the `end_window` window (`x_fit`, `t_fit`).
     ## stage 2: the biexponential on the full response, with A, tau1, and
     ## TD box-bounded around their stage-1 values by the `*_flex`
     ## half-widths; B1, B2, and tau2 free. a failed stage returns NA, and
-    ## the nested monoexponential comparator resolves the row upstream
+    ## the fallback chain resolves the row upstream
     biexp_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
         fix <- .a$fix %||% list()
 

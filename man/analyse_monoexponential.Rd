@@ -62,7 +62,10 @@ back to \code{0} or the first positive time value (see \emph{Details}).}
 window in which to look for the end of the kinetics fit; returns the
 window with no greater/lesser values within \code{end_window} after the first
 extreme value. \code{end_window = Inf} (\emph{default}) returns the global extreme
-from the full sample range (see \emph{Details}).}
+from the full sample range (see \emph{Details}). For \emph{"biexponential"},
+\code{end_window} bounds the fast-phase (stage 1) window only, and \code{Inf}
+resolves to \code{30} time units past the first extreme; the full model is
+fit to the whole response.}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad

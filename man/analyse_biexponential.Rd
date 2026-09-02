@@ -9,13 +9,15 @@ analyse_biexponential(
   nirs_channels = NULL,
   time_channel = NULL,
   use_TD = TRUE,
-  tau_mult = NULL,
   fix = NULL,
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
   verbose = TRUE,
   ...,
+  tau1_flex = 1/3,
+  TD_flex = 2,
+  A_flex = NULL,
   env = rlang::caller_env()
 )
 }
@@ -37,29 +39,18 @@ Must match a column name in \code{data} exactly.
 used.
 }}
 
-\item{use_TD}{Logical; \code{TRUE} attempts to fit a 7-parameter
-\code{\link[=SSbiexponential]{SSbiexponential()}} model (A, B1, tau1, B2, tau2, tau_mult, TD) with a
-time delay. If the 7-parameter fit fails, or if \code{use_TD = FALSE},
-attempts to fit a reduced 6-parameter \code{\link[=SSbiexponential]{SSbiexponential()}} model without
-\code{TD}.}
-
-\item{tau_mult}{An \emph{optional} numeric multiple of \code{tau1} after \code{TD} at
-which the slow component onset is held
-(\code{texc = TD + tau_mult * tau1}). If \code{NULL} (\emph{default}), \code{tau_mult} is a
-free parameter estimated from the data, bounded below by \code{1} so the
-slow phase begins no earlier than one fast time constant. A supplied
-value is held constant during fitting and silently takes precedence
-over a \code{fix = list(tau_mult = )} entry. Applied to every channel, or
-per-channel as a list keyed by channel name, e.g.
-\code{tau_mult = list(smo2 = 2)}.}
+\item{use_TD}{Logical; \code{TRUE} attempts to fit the fast phase with a
+time delay, giving a 6-parameter \code{\link[=SSbiexponential]{SSbiexponential()}} model (A, B1,
+tau1, B2, tau2, TD). If that fit fails, or if \code{use_TD = FALSE}, the
+reduced 5-parameter model without \code{TD} is fit.}
 
 \item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B1},
-\code{tau1}, \code{B2}, \code{tau2}, \code{tau_mult}, \code{TD}) to hold constant during
-fitting, e.g. \code{fix = list(A = 0)}. Fixed parameters are excluded from
-estimation and reported at their fixed values. Applied to every
-channel, or per-channel as a list of lists keyed by channel name, e.g.
+\code{tau1}, \code{B2}, \code{tau2}, \code{TD}) to hold constant during fitting, e.g.
+\code{fix = list(A = 0)}. Fixed parameters are excluded from estimation and
+reported at their fixed values. Applied to every channel, or
+per-channel as a list of lists keyed by channel name, e.g.
 \code{fix = list(smo2 = list(A = 0))}. \code{TD} is fixable for channels where
-\code{use_TD = TRUE}; a fixed \code{TD} disables the 6-parameter fallback.}
+\code{use_TD = TRUE}; a fixed \code{TD} disables the 5-parameter fallback.}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
 time of response onset (effectively time = \code{0} of the response). If \code{NULL}
@@ -74,7 +65,10 @@ back to \code{0} or the first positive time value (see \emph{Details}).}
 window in which to look for the end of the kinetics fit; returns the
 window with no greater/lesser values within \code{end_window} after the first
 extreme value. \code{end_window = Inf} (\emph{default}) returns the global extreme
-from the full sample range (see \emph{Details}).}
+from the full sample range (see \emph{Details}). For \emph{"biexponential"},
+\code{end_window} bounds the fast-phase (stage 1) window only, and \code{Inf}
+resolves to \code{30} time units past the first extreme; the full model is
+fit to the whole response.}
 
 \item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
 warnings and information messages helpful for troubleshooting. Ad
@@ -83,14 +77,26 @@ global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 \item{...}{Additional arguments passed to the underlying method function.
 See \emph{Details}.}
 
+\item{tau1_flex}{Numeric; multiplicative half-width of the stage-2
+\code{tau1} bounds about the stage-1 value,
+\verb{tau1 * [1 / (1 + tau1_flex), 1 + tau1_flex]}. \code{tau2} is floored at
+the \code{tau1} ceiling divided by \code{0.98} and capped at ten times the span.}
+
+\item{TD_flex}{Numeric; additive half-width of the stage-2 \code{TD} bounds
+in units of \code{time_channel}, floored at \code{0}.}
+
+\item{A_flex}{Numeric; additive half-width of the stage-2 \code{A} bounds on
+the response scale. \code{NULL} (\emph{default}) uses twice the stage-1
+residual standard deviation.}
+
 \item{env}{The calling environment or a defused call, used to report
 errors and warnings as coming from the user-facing function rather
 than the validator.}
 }
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns
-\code{nirs_channels}, \code{A}, \code{B1}, \code{tau1}, \code{B2}, \code{tau2}, \code{tau_mult}, \code{TD},
-\code{texc}, \code{texc_fitted}. Per-channel metadata are attached as
+\code{nirs_channels}, \code{A}, \code{B1}, \code{tau1}, \code{MRT}, \code{texc}, \code{B2}, \code{tau2}, \code{TD},
+\code{MRT_fitted}, \code{texc_fitted}. Per-channel metadata are attached as
 attributes:
 \itemize{
 \item \code{"model"}: an \link[stats:nls]{nls} model object, or \code{NULL} for channels
@@ -107,7 +113,12 @@ recording the resolved arguments used.
 Internal channel-level dispatch for
 \code{analyse_kinetics(method = "biexponential")}. Fits a biexponential
 excursion-recovery curve to each \code{nirs_channel} within a single \emph{"mnirs"}
-data frame. See \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing documentation.
+data frame in two stages: the fast phase as a monoexponential on the
+\code{end_window} window (\code{\link[=fit_monoexponential]{fit_monoexponential()}}; \code{Inf} resolves to 30
+time units past the first extreme), then the full
+\code{\link[=SSbiexponential]{SSbiexponential()}} model on the whole response with \code{A}, \code{tau1}, and
+\code{TD} box-bounded about their stage-1 values and \code{B1}, \code{B2}, \code{tau2}
+free. See \code{\link[=analyse_kinetics]{analyse_kinetics()}} for user-facing documentation.
 }
 \seealso{
 \code{\link[=analyse_kinetics]{analyse_kinetics()}}, \code{\link[=biexponential]{biexponential()}}, \code{\link[=SSbiexponential]{SSbiexponential()}}

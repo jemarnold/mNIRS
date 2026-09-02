@@ -63,33 +63,97 @@ kinetics_workers <- c(
 )
 
 
-## nested reductions: a full method and the reduced method it collapses
-## to when the extra parameters are not supported by the data (see
-## `reduce_kinetics()`). `coef_map` copies reduced coefficient columns
-## into the full schema (full column <- reduced column); unmapped full
-## columns are NA. `fix_map` carries user-fixed parameters over to the
-## reduced fit (full parameter -> reduced parameter); unmapped are
-## dropped. `args` overrides reduced worker arguments so the comparator
-## fits the same window as the full model. `accept` is a vectorised
-## shape test on the full coefficient data frame (NULL for the F-test
-## alone), explained by `reject_msg`
-kinetics_reductions <- list(
-    biexponential = list(
-        to = "monoexponential",
-        coef_map = c(
-            A = "A", B1 = "B", B2 = "B", tau1 = "tau", TD = "TD", MRT = "MRT",
-            MRT_fitted = "MRT_fitted"
-        ),
-        fix_map = c(A = "A", B2 = "B", TD = "TD"),
-        ## the biexponential `end_window` bounds its fast phase only; the
-        ## full model spans the whole response
-        args = list(end_window = Inf),
-        ## excursion-recovery only: the fitted turning point must exist
-        accept = \(cf) is.finite(cf$texc),
-        reject_msg = "Fitted response is monotonic ({.field texc} is \\
-        {.val {NA}})."
+## coefficient columns of the nls methods; workers build their NA scaffolds
+## from these and fallback chains report their union
+kinetics_coef_cols <- list(
+    monoexponential = c(
+        "A", "B", "tau", "k", "TD", "MRT", "HRT", "MRT_fitted", "HRT_fitted"
+    ),
+    exponential_drift = c(
+        "A", "B", "tau", "k", "TD", "MRT", "HRT", "texc", "slope", "tau_mult",
+        "MRT_fitted", "HRT_fitted", "texc_fitted"
+    ),
+    biexponential = c(
+        "A", "B1", "tau1", "MRT", "texc", "B2", "tau2", "TD", "MRT_fitted",
+        "texc_fitted"
     )
 )
+
+
+## amplitude gate: a secondary phase spanning fewer than this many RMSE of
+## the full fit is not supported by the data
+fallback_gate <- 2
+
+
+## model fallback chain: the reduced method a full method falls back to
+## when `trigger` names a reason on a channel's coefficient row `cf`, given
+## the fit's `rmse`, fitted time `span`, and last fitted time `t_end`
+## elapsed from the onset (see `run_kinetics_worker()`). `fix_map` carries
+## user-fixed parameters over (full -> reduced); unmapped are dropped.
+## `args` overrides reduced worker arguments
+kinetics_fallbacks <- list(
+    biexponential = list(
+        to = "exponential_drift",
+        fix_map = c(A = "A", B1 = "B", tau1 = "tau", TD = "TD"),
+        ## the biexponential `end_window` bounds its fast phase only; the
+        ## drift model spans the whole response
+        args = list(end_window = Inf),
+        trigger = \(cf, rmse, span, t_end) first_reason(
+            "Fit failed." = is.na(cf$A),
+            "Fitted response is monotonic (texc is NA)." = !is.finite(cf$texc),
+            "tau2 exceeds twice the fitted time span." = cf$tau2 >= 2 * span,
+            "Slow-phase amplitude is below 2 RMSE." =
+                abs(cf$B2 - cf$B1) < fallback_gate * rmse
+        )
+    ),
+    exponential_drift = list(
+        to = "monoexponential",
+        fix_map = c(A = "A", B = "B", tau = "tau", TD = "TD"),
+        args = list(),
+        trigger = \(cf, rmse, span, t_end) first_reason(
+            "Fit failed." = is.na(cf$A),
+            "Drift amplitude is below 2 RMSE." = !is.finite(cf$slope) ||
+                abs(cf$slope) * (t_end - cf$texc) < fallback_gate * rmse
+        )
+    )
+)
+
+
+## name of the first TRUE condition, else NA
+first_reason <- function(...) {
+    hits <- vapply(list(...), isTRUE, logical(1))
+    return(if (any(hits)) names(hits)[[which(hits)[[1L]]]] else NA_character_)
+}
+
+
+## coefficient columns of a method and every method it can fall back to
+kinetics_chain_cols <- function(method) {
+    to <- kinetics_fallbacks[[method]]$to
+    return(union(
+        kinetics_coef_cols[[method]],
+        if (!is.null(to)) kinetics_chain_cols(to)
+    ))
+}
+
+
+## rbind data frames with differing columns, padding absent ones with NA;
+## `cols` fixes the column order, else first-encounter order. NULL and
+## zero-row inputs are dropped; NULL when none remain
+bind_union <- function(dfs, cols = NULL) {
+    dfs <- Filter(\(.d) NROW(.d) > 0L, dfs)
+    cols <- cols %||% Reduce(union, lapply(dfs, names))
+    out <- do.call(rbind, lapply(dfs, \(.d) {
+        miss <- setdiff(cols, names(.d))
+        if (length(miss) > 0L) {
+            .d[miss] <- NA
+        }
+        .d[cols]
+    }))
+    if (!is.null(out)) {
+        rownames(out) <- NULL
+    }
+    return(out)
+}
 
 
 #' Detect the direction of a response signal
@@ -318,22 +382,24 @@ build_kinetics_results <- function(
 ) {
     ## bind channel-level attr dfs across intervals; each carries `interval`
     ## col[1]. result dfs built without `warnings` fall back to zero rows
+    ## `channel_args` columns differ between a method and its fallbacks
     bind_attr <- function(attr_name) {
-        df <- do.call(rbind, lapply(result_list, attr, attr_name)) %||%
-            kinetics_warnings_df()
-        rownames(df) <- NULL
-        return(df)
+        return(bind_union(lapply(result_list, attr, attr_name)) %||%
+            kinetics_warnings_df())
     }
     channel_args <- bind_attr("channel_args")
 
     ## combine scalar coefficients; `interval` to col[1] and the resolved
     ## fit onset `start_time` (matched from `channel_args` by interval and
     ## channel, since coefs may hold multiple rows per channel) after
-    ## `nirs_channels`
+    ## `nirs_channels`, then `model` where the method has a fallback
     coefs <- do.call(rbind, result_list)
     key <- \(.df) paste(.df$interval, .df$nirs_channels)
     coefs$start_time <- channel_args$start_time[match(key(coefs), key(channel_args))]
-    lead_cols <- c("interval", "nirs_channels", "start_time")
+    lead_cols <- intersect(
+        c("interval", "nirs_channels", "start_time", "model"),
+        names(coefs)
+    )
     coefs <- coefs[, c(lead_cols, setdiff(names(coefs), lead_cols))]
     rownames(coefs) <- NULL
 
@@ -576,15 +642,14 @@ split_kinetics_groups <- function(
 #'
 #' Shared skeleton for `analyse_kinetics.*` methods: normalises `data`
 #' to a named list of interval data frames, splits sample groups via
-#' [split_kinetics_groups()], calls the method worker once per interval,
-#' and collates results via [build_kinetics_results()].
+#' [split_kinetics_groups()], calls the method worker once per interval
+#' via [run_kinetics_worker()], and collates results via
+#' [build_kinetics_results()].
 #'
 #' @param data A data frame, list of data frames, or grouped data frame.
-#' @param worker Function; the interval-level worker, e.g.
-#'   [analyse_monoexponential()].
 #' @param method Character; the canonical method name.
 #' @param worker_args Named list of method-specific arguments passed
-#'   to `worker`.
+#'   to the method's worker in `kinetics_workers`.
 #' @param nirs_quo,time_quo Quosures of the caller's `nirs_channels`
 #'   and `time_channel` arguments, captured in the method frame.
 #' @param group_intervals `"ensemble"` or a `list()` of sample index
@@ -594,6 +659,8 @@ split_kinetics_groups <- function(
 #'   by the same offset.
 #' @param call The matched call from the user-facing method.
 #' @param env The call recorded for condition reporting.
+#' @param fallback Logical; resolve the method's fallback chain in
+#'   `kinetics_fallbacks` per channel (see [run_kinetics_worker()]).
 #' @inheritParams validate_mnirs
 #'
 #' @returns An *"mnirs_kinetics"* object from
@@ -602,7 +669,6 @@ split_kinetics_groups <- function(
 #' @keywords internal
 analyse_kinetics_intervals <- function(
     data,
-    worker,
     method,
     worker_args,
     nirs_quo,
@@ -611,7 +677,8 @@ analyse_kinetics_intervals <- function(
     zero_time,
     verbose,
     call,
-    env
+    env,
+    fallback = TRUE
 ) {
     ## normalise input to named list of data frames
     data_list <- as_data_list(data, env = env)
@@ -670,18 +737,19 @@ analyse_kinetics_intervals <- function(
         worker_args, names(data_list), chan_names, verbose, env
     )
 
-    ## iterate over each interval
+    ## iterate over each interval, resolving model fallbacks per channel
     result_list <- lapply(seq_along(data_list), \(.i) {
-        rlang::inject(worker(
-            data = data_list[[.i]],
-            nirs_channels = !!nirs_quo,
-            time_channel = !!time_quo,
-            !!!interval_args[[.i]],
-            verbose = verbose,
-            interval_name = names(data_list)[[.i]],
-            bypass_checks = TRUE,
-            env = env
-        ))
+        run_kinetics_worker(
+            method,
+            data_list[[.i]],
+            interval_args[[.i]],
+            nirs_quo,
+            time_quo,
+            names(data_list)[[.i]],
+            verbose,
+            fallback,
+            env
+        )
     })
 
     ## recursive coef input: move the source channel qualifier from the
@@ -719,145 +787,164 @@ analyse_kinetics_intervals <- function(
 }
 
 
-#' Run a kinetics method with its nested reduced-model fallback
+#' Run a kinetics worker on one interval with its model fallback chain
 #'
-#' Wraps [analyse_kinetics_intervals()] for methods listed in
-#' `kinetics_reductions`: the full model is fit first, then the reduced
-#' comparator on the same intervals with arguments carried over by
-#' [reduced_worker_args()], and each channel fit is resolved by
-#' [reduce_kinetics()]. Methods without a reduction, or `reduce = FALSE`,
-#' return the full fit with the `model` coefficient column only.
+#' Calls the interval worker of `method`, then for methods listed in
+#' `kinetics_fallbacks` tests each channel's fit with the method's
+#' `trigger`. Channels with a reason are refit by the fallback method
+#' (recursively down the chain) with the arguments it takes, user-fixed
+#' parameters carried over through `fix_map`, and per-channel maps keyed
+#' to those channels only. Their coefficients, model, fitted values,
+#' diagnostics, and resolved arguments are replaced by the fallback fit's,
+#' and the fallback is warned about and recorded in the `warnings`
+#' attribute. A row where every fit in the chain failed reports the last
+#' method tried with `NA` coefficients.
 #'
-#' @param method Character; the canonical full method name.
-#' @param reduce Logical; attempt the reduction.
+#' Methods with a fallback report the fitting method per row in a `model`
+#' coefficient column and the union of the chain's coefficient columns
+#' (`NA` where a model has no such parameter), so intervals bind
+#' regardless of which triggers fire.
+#'
+#' @param method Character; the canonical method name.
+#' @param data A single *"mnirs"* data frame (one interval).
+#' @param args Named list of the worker's resolved arguments.
+#' @param nirs_quo A quosure or character vector of channel names.
+#' @param interval_name Character; the interval label.
+#' @param fallback Logical; attempt the fallback chain.
 #' @inheritParams analyse_kinetics_intervals
 #'
-#' @returns An *"mnirs_kinetics"* object.
+#' @returns The worker's attributed coefficient data frame.
 #'
 #' @keywords internal
-analyse_kinetics_reduced <- function(
-    data,
+run_kinetics_worker <- function(
     method,
-    worker_args,
+    data,
+    args,
     nirs_quo,
     time_quo,
-    group_intervals,
-    zero_time,
+    interval_name,
     verbose,
-    call,
-    env,
-    reduce = TRUE
+    fallback = TRUE,
+    env = rlang::caller_env()
 ) {
-    full <- analyse_kinetics_intervals(
-        data,
-        get(kinetics_workers[[method]], mode = "function"),
-        method,
-        worker_args,
-        nirs_quo,
-        time_quo,
-        group_intervals,
-        zero_time,
-        verbose,
-        call,
-        env
-    )
-    spec <- kinetics_reductions[[method]]
-    if (!isTRUE(reduce) || is.null(spec)) {
-        full$coefficients <- add_model_col(full$coefficients, method)
-        return(full)
+    worker <- get(kinetics_workers[[method]], mode = "function")
+    res <- rlang::inject(worker(
+        data = data,
+        nirs_channels = !!nirs_quo,
+        time_channel = !!time_quo,
+        !!!args,
+        verbose = verbose,
+        interval_name = interval_name,
+        bypass_checks = TRUE,
+        env = env
+    ))
+    spec <- kinetics_fallbacks[[method]]
+    if (is.null(spec)) {
+        return(res)
     }
-    ## comparator conditions are captured in its `warnings`, not emitted
-    reduced <- analyse_kinetics_intervals(
-        data,
-        get(kinetics_workers[[spec$to]], mode = "function"),
-        spec$to,
-        reduced_worker_args(full, worker_args, spec),
-        nirs_quo,
-        time_quo,
-        group_intervals,
-        zero_time,
-        verbose = FALSE,
-        call,
-        env
+
+    ## split the coefficient rows from the per-channel metadata attributes
+    a <- attributes(res)
+    attr_nms <- c(
+        "time_channel", "model", "fitted_data", "diagnostics", "channel_args",
+        "warnings"
     )
-    return(reduce_kinetics(full, reduced, spec, verbose, env))
-}
-
-
-## `model` column after `start_time`: the method each row's coefficients
-## come from
-add_model_col <- function(coefs, model) {
-    coefs$model <- model
-    lead <- c("interval", "nirs_channels", "start_time", "model")
-    return(coefs[, c(lead, setdiff(names(coefs), lead))])
-}
-
-
-#' Worker arguments for a reduced comparator fit
-#'
-#' Derives the argument list of the reduced method in `spec` from the
-#' full method's arguments and result, so both fits share a window and
-#' time-delay structure and the extra-sum-of-squares F-test in
-#' [reduce_kinetics()] is nested. Arguments the reduced method does not
-#' take are dropped. `use_TD` mirrors the model each channel actually
-#' resolved to (`TD` finite), as a per-interval map of per-channel
-#' values; a channel whose full fit failed keeps the user's setting.
-#' `fix` is carried over through `spec$fix_map`, recursing into
-#' per-interval and per-channel maps. `spec$args` overrides arguments
-#' outright (e.g. the comparator window).
-#'
-#' @param full The full method's *"mnirs_kinetics"* result.
-#' @param worker_args Named list of the full method's arguments.
-#' @param spec A `kinetics_reductions` entry.
-#'
-#' @returns A named list of worker arguments for the reduced method.
-#'
-#' @keywords internal
-reduced_worker_args <- function(full, worker_args, spec) {
-    ## `mget()` of a named vector nests names; flatten for lookups
-    names(worker_args) <- unname(names(worker_args))
-    keep <- unlist(kinetics_dispatch[c("common", spec$to)], use.names = FALSE)
-    args <- worker_args[intersect(names(worker_args), keep)]
-    args[names(spec$args)] <- spec$args
-
-    coefs <- full$coefficients
-    intervals <- names(full$data)
-    chans <- unique(coefs$nirs_channels)
-
-    if ("use_TD" %in% keep) {
-        first_coef <- setdiff(
-            names(coefs),
-            c("interval", "nirs_channels", "start_time")
-        )[[1L]]
-        td <- ifelse(
-            is.na(coefs[[first_coef]]),
-            full$channel_args$use_TD %||% TRUE,
-            is.finite(coefs$TD)
+    cf <- res
+    attributes(cf) <- a[c("names", "row.names", "class")]
+    cf$model <- method
+    chans_all <- cf$nirs_channels
+    finish <- \(.cf, .a) {
+        .cf <- bind_union(
+            list(.cf),
+            c("interval", "nirs_channels", "model", kinetics_chain_cols(method))
         )
-        by_int <- split(setNames(td, coefs$nirs_channels), coefs$interval)
-        by_int <- by_int[intervals]
-        uniform <- all(vapply(by_int, identical, logical(1), by_int[[1L]]))
-        ## an interval named after a channel would be read as a channel
-        ## map; fall back to a per-channel map, else the user's setting.
-        ## recursive results relabel interval/channel names after fitting,
-        ## so maps cannot key the reduced run (duplicated intervals):
-        ## mirror only a uniform resolution
-        args$use_TD <- if (anyDuplicated(intervals) > 0L) {
-            if (length(unique(td)) == 1L) td[[1L]] else worker_args$use_TD
-        } else if (!any(intervals %in% chans)) {
-            lapply(by_int, as.list)
-        } else if (uniform) {
-            as.list(by_int[[1L]])
-        } else {
-            worker_args$use_TD
-        }
+        attributes(.cf) <- c(attributes(.cf), .a[attr_nms])
+        .cf
     }
 
-    if ("fix" %in% keep && !is.null(args$fix)) {
-        fix <- map_fix(args$fix, spec$fix_map)
-        args$fix <- if (length(fix) > 0L) fix
+    ## per-channel triggers on the fitted window; a failed fit has no
+    ## window and is caught by its NA coefficients
+    reasons <- if (fallback) {
+        vapply(seq_len(nrow(cf)), \(.i) {
+            t <- data[[a$time_channel]][a$fitted_data[[.i]]$window_idx]
+            spec$trigger(
+                cf[.i, ],
+                rmse = a$diagnostics$rmse[[.i]],
+                span = diff(range(t)),
+                t_end = max(t) - a$channel_args$start_time[[.i]]
+            )
+        }, character(1))
+    } else {
+        rep(NA_character_, nrow(cf))
     }
-    return(args)
+    idx <- which(!is.na(reasons))
+    if (length(idx) == 0L) {
+        return(finish(cf, a))
+    }
+
+    ## warn per channel; recorded alongside the fits' own conditions
+    chans <- chans_all[idx]
+    fn_full <- paste0("SS", method)
+    fn_to <- paste0("SS", spec$to)
+    heads <- vapply(chans, \(.ch) {
+        cli::format_inline(
+            "{.fn {fn_full}} fit for {.field {(.ch)}} in \\
+            {.field {interval_name}} fell back to {.fn {fn_to}}."
+        )
+    }, character(1))
+    if (verbose) {
+        Map(\(.h, .r) {
+            cli_warn(c("!" = .h, "i" = .r), call = warn_call(env))
+        }, heads, reasons[idx])
+    }
+
+    ## fallback arguments: those the method takes, overridden by the spec,
+    ## fixed parameters renamed, and per-channel maps keyed to the fallback
+    ## channels only
+    sub_args <- args[intersect(
+        names(args),
+        unlist(kinetics_dispatch[c("common", spec$to)], use.names = FALSE)
+    )]
+    sub_args[names(spec$args)] <- spec$args
+    sub_args$fix <- map_fix(sub_args$fix %||% list(), spec$fix_map)
+    sub_args <- Filter(length, Map(\(.x, .nm) {
+        ## a plain `fix` parameter list is global, not a channel map
+        is_map <- is_arg_map(.x) &&
+            (.nm != "fix" || all(vapply(.x, is.list, logical(1))))
+        if (is_map) .x[names(.x) %in% c("", chans)] else .x
+    }, sub_args, names(sub_args)))
+    sub <- run_kinetics_worker(
+        spec$to, data, sub_args, chans, time_quo, interval_name, verbose,
+        fallback, env
+    )
+
+    ## splice the fallback rows in, keeping channel order
+    b <- attributes(sub)
+    sub_cf <- sub
+    attributes(sub_cf) <- b[c("names", "row.names", "class")]
+    sub_cf$model <- sub_cf$model %||% spec$to
+    by_chan <- \(.df) {
+        .df[match(chans_all, .df$nirs_channels), , drop = FALSE]
+    }
+    cf <- by_chan(bind_union(list(cf[-idx, ], sub_cf)))
+    a$model[chans] <- b$model[chans]
+    a$fitted_data[chans] <- b$fitted_data[chans]
+    a$diagnostics <- by_chan(rbind(a$diagnostics[-idx, ], b$diagnostics))
+    a$channel_args <- by_chan(
+        bind_union(list(a$channel_args[-idx, ], b$channel_args))
+    )
+    a$warnings <- rbind(
+        a$warnings,
+        data.frame(
+            interval = interval_name,
+            nirs_channels = chans,
+            type = "warning",
+            message = cli::ansi_strip(paste(heads, reasons[idx], sep = " - "))
+        ),
+        b$warnings
+    )
+    rownames(a$warnings) <- NULL
+    return(finish(cf, a))
 }
 
 
@@ -870,164 +957,6 @@ map_fix <- function(fix, fix_map) {
     }
     fix <- fix[intersect(names(fix), names(fix_map))]
     return(setNames(fix, fix_map[names(fix)]))
-}
-
-
-#' Resolve a full fit against its nested reduced comparator
-#'
-#' Row-wise (per interval and channel) model selection between the full
-#' method's result and the reduced method's result fit by
-#' [analyse_kinetics_reduced()]. The full fit is kept when it succeeded,
-#' passes the shape test `spec$accept`, and the extra-sum-of-squares
-#' F-test against the reduced fit rejects the reduction at `p < 0.05`.
-#' The test needs both fits on the same observations with spare degrees
-#' of freedom; otherwise the shape test alone decides. A failed full fit
-#' falls back to the reduced fit; a row where both failed is left as is.
-#'
-#' Reduced rows carry the reduced coefficients, model, fitted values,
-#' and diagnostics in the full method's schema via `spec$coef_map`, and
-#' `model` names the method each row comes from. The reduction is
-#' warned about and recorded in `warnings` along with any conditions the
-#' reduced fit raised for that channel.
-#'
-#' @param full,reduced The *"mnirs_kinetics"* results of the full and
-#'   reduced methods on the same data.
-#' @param spec A `kinetics_reductions` entry.
-#' @inheritParams validate_mnirs
-#'
-#' @returns `full`, resolved.
-#'
-#' @keywords internal
-reduce_kinetics <- function(
-    full,
-    reduced,
-    spec,
-    verbose = TRUE,
-    env = rlang::caller_env()
-) {
-    alpha <- 0.05
-    cf <- full$coefficients
-    cr <- reduced$coefficients
-    key <- \(.d) paste(.d$interval, .d$nirs_channels)
-    if (!identical(key(cf), key(cr))) {
-        cli_abort(c(
-            "x" = "Internal: reduced fit rows do not align with the full fit."
-        ), call = env)
-    }
-    id_cols <- c("interval", "nirs_channels", "start_time")
-    coef_cols <- setdiff(names(cf), id_cols)
-    full_ok <- !is.na(cf[[coef_cols[[1L]]]])
-    red_ok <- !is.na(cr[[setdiff(names(cr), id_cols)[[1L]]]])
-    shape_ok <- if (is.null(spec$accept)) {
-        rep(TRUE, nrow(cf))
-    } else {
-        spec$accept(cf) %in% TRUE
-    }
-
-    ## extra-sum-of-squares F-test from the diagnostics (rss = rmse^2 * n)
-    df_f <- full$diagnostics
-    df_r <- reduced$diagnostics
-    df1 <- df_f$n_params - df_r$n_params
-    df2 <- df_f$n_obs - df_f$n_params
-    comparable <- full_ok &
-        red_ok &
-        df_f$n_obs == df_r$n_obs &
-        df1 >= 1L &
-        df2 >= 1L
-    comparable[is.na(comparable)] <- FALSE
-    rss_f <- df_f$rmse^2 * df_f$n_obs
-    rss_r <- df_r$rmse^2 * df_r$n_obs
-    f_stat <- ((rss_r - rss_f) / df1) / (rss_f / df2)
-    p <- rep(NA_real_, nrow(cf))
-    p[comparable] <- ifelse(
-        rss_f[comparable] == 0,
-        0,
-        stats::pf(
-            f_stat[comparable],
-            df1[comparable],
-            df2[comparable],
-            lower.tail = FALSE
-        )
-    )
-
-    keep_full <- (full_ok & shape_ok & ifelse(comparable, p < alpha, TRUE)) %in%
-        TRUE
-    reduce <- !keep_full & (full_ok | red_ok)
-    idx <- which(reduce)
-    cf$model <- ifelse(reduce, spec$to, full$method)
-
-    if (length(idx) > 0L) {
-        ## coefficients, diagnostics: reduced values in the full schema
-        cf[idx, coef_cols] <- NA
-        cf[idx, names(spec$coef_map)] <- cr[idx, unname(spec$coef_map)]
-        full$diagnostics[idx, ] <- df_r[idx, ]
-
-        ## model, fitted values: per-interval swaps of the reduced channels;
-        ## `[<-` keeps the list classes and data frame metadata
-        swap <- \(.int, .x, .y, .cols) {
-            ch <- cf$nirs_channels[idx][cf$interval[idx] == .int]
-            ## recursive results hold one source channel per data frame, so
-            ## swap only the columns each element declares
-            cols <- intersect(.cols(ch), names(.x))
-            if (length(cols) > 0L) {
-                .x[cols] <- .y[cols]
-            }
-            .x
-        }
-        full$model[] <- Map(
-            swap, names(full$model), full$model, reduced$model,
-            MoreArgs = list(.cols = identity)
-        )
-        full$data[] <- Map(
-            swap, names(full$data), full$data, reduced$data,
-            MoreArgs = list(.cols = \(.ch) paste0(.ch, "_fitted"))
-        )
-
-        ## warn per reduced row; recorded alongside the reduced fit's own
-        ## conditions for those channels
-        fn_full <- paste0("SS", full$method)
-        fn_red <- paste0("SS", spec$to)
-        reasons <- vapply(idx, \(.i) {
-            if (!full_ok[[.i]]) {
-                "Fit failed."
-            } else if (!shape_ok[[.i]]) {
-                cli::format_inline(spec$reject_msg)
-            } else {
-                cli::format_inline(
-                    "Extra-sum-of-squares F({df1[.i]}, {df2[.i]}) = \\
-                    {signif(f_stat[.i], 3)}, p = {signif(p[.i], 3)} >= \\
-                    {alpha}."
-                )
-            }
-        }, character(1))
-        heads <- vapply(idx, \(.i) {
-            cli::format_inline(
-                "{.fn {fn_full}} fit for {.field {cf$nirs_channels[.i]}} \\
-                in {.field {cf$interval[.i]}} reduced to {.fn {fn_red}}."
-            )
-        }, character(1))
-        if (verbose) {
-            Map(\(.h, .r) {
-                cli_warn(c("!" = .h, "i" = .r), call = warn_call(env))
-            }, heads, reasons)
-        }
-        rw <- reduced$warnings
-        rw <- rw[key(rw) %in% key(cf)[idx], , drop = FALSE]
-        full$warnings <- rbind(
-            full$warnings,
-            rw,
-            data.frame(
-                interval = cf$interval[idx],
-                nirs_channels = cf$nirs_channels[idx],
-                type = "warning",
-                message = cli::ansi_strip(paste(heads, reasons, sep = " - "))
-            )
-        )
-        rownames(full$warnings) <- NULL
-    }
-
-    full$coefficients <- add_model_col(cf, cf$model)
-    return(full)
 }
 
 

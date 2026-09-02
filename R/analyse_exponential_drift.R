@@ -373,11 +373,7 @@ analyse_exponential_drift <- function(
 
     time_channel <- setup$time_channel
     ## NA scaffold (method columns only) for convergence failure
-    # fmt: skip
-    na_cols <- c(
-        "A", "B", "tau", "k", "TD", "MRT", "HRT", "texc", "slope", "tau_mult",
-        "MRT_fitted", "HRT_fitted", "texc_fitted"
-    )
+    na_cols <- kinetics_coef_cols$exponential_drift
 
     ## method-specific fit: self-starting exponential-drift via nls; a
     ## failed 6-param fit falls back to the 5-param model

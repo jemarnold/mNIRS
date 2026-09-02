@@ -419,10 +419,7 @@ fit_monoexponential <- function(
     env = rlang::caller_env()
 ) {
     ## NA scaffold (method columns only) for convergence failure
-    # fmt: skip
-    na_cols <- c(
-        "A", "B", "tau", "k", "TD", "MRT", "HRT", "MRT_fitted", "HRT_fitted"
-    )
+    na_cols <- kinetics_coef_cols$monoexponential
     fit <- fit_td_fallback(
         x_fit,
         t_fit,

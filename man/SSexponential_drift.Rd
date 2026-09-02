@@ -51,6 +51,12 @@ formula passed to \code{\link[stats:nls]{stats::nls()}}.
 The hinge at \code{texc = TD + tau_mult * tau} is not differentiable, so
 \code{algorithm = "port"} with \code{tau} (and \code{TD}) bounded non-negative and
 \code{control = nls.control(warnOnly = TRUE)} is recommended.
+
+The model function returns the analytic gradient (one-sided at the
+hinge) for the free parameters as a \code{"gradient"} attribute, so
+\code{\link[stats:nls]{stats::nls()}} does not resort to \code{\link[stats:numericDeriv]{stats::numericDeriv()}} and
+\code{\link[stats:predict]{stats::predict()}} on a fitted model carries the attribute; drop it
+with \code{as.vector()}.
 \subsection{Fixing parameters}{
 
 Any parameter may be held constant by writing a value in place of its

@@ -10,6 +10,7 @@ enforce_direction(
   fit_data,
   direction,
   amp_fn,
+  fn = sub("^(SS)?", "SS", as.character(amp_fn)),
   lower = NULL,
   upper = NULL,
   floor_params = NULL,
@@ -30,9 +31,13 @@ time in the second; the refit formula is built on those names.}
 
 \item{direction}{Character; resolved \code{"positive"} or \code{"negative"}.}
 
-\item{amp_fn}{Symbol; exported model fn taking \code{t} and the model
-parameters as named arguments. The self-start fn named in the
-warning is \verb{SS<amp_fn>}.}
+\item{amp_fn}{Symbol; model fn taking \code{t} and the model parameters as
+named arguments. A self-start fn returning a \code{"gradient"} attribute
+(free symbols, asymptotes first) makes both refits analytic; a plain
+fn falls through to \code{\link[stats:numericDeriv]{stats::numericDeriv()}}.}
+
+\item{fn}{Character; the self-start fn named in the warning
+(\emph{default} \verb{SS<amp_fn>}, or \code{amp_fn} itself when already prefixed).}
 
 \item{lower, upper}{Named numeric bounds for free parameters other
 than the asymptotes. Sign-floor bounds should be data-scaled

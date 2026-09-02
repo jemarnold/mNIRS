@@ -1003,7 +1003,7 @@ test_that("analyse_kinetics() passes fix to the biexponential method", {
 })
 
 
-## monoexponential reduction ========================================
+## model fallback chain =============================================
 
 ## monotonic two-phase response: B1 between A and B2, no turning point
 create_monotonic_data <- function(seed = 7, TD = NULL, t = 0:119) {
@@ -1016,7 +1016,21 @@ create_monotonic_data <- function(seed = 7, TD = NULL, t = 0:119) {
     )
 }
 
-test_that("analyse_kinetics() reduces a monotonic biexponential fit", {
+## fast drop then a linear recovery: a slow phase no record can resolve
+create_linear_tail_data <- function(seed = 5, t = 0:119) {
+    set.seed(seed)
+    x <- exponential_drift(t, A = 70, B = 40, tau = 5, slope = 0.1, tau_mult = 3) +
+        rnorm(length(t), 0, 0.3)
+    create_mnirs_data(
+        data.frame(time = t, smo2 = x),
+        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+    )
+}
+
+fallback_models <- c("exponential_drift", "monoexponential")
+biexp_only <- c("B1", "tau1", "B2", "tau2")
+
+test_that("analyse_kinetics() falls back from a monotonic biexponential fit", {
     data <- create_monotonic_data()
 
     expect_warning(
@@ -1026,36 +1040,34 @@ test_that("analyse_kinetics() reduces a monotonic biexponential fit", {
             method = "biexponential",
             use_TD = FALSE
         ),
-        "reduced to"
+        "fell back to"
     )
     cf <- result$coefficients
     model <- result$model[[1L]]$smo2
 
     expect_equal(names(cf)[1:4], c("interval", "nirs_channels", "start_time", "model"))
-    expect_equal(cf$model, "monoexponential")
-    expect_named(coef(model), c("A", "B", "tau"))
+    expect_true(cf$model %in% fallback_models)
+    ## the union schema carries every model's columns
+    expect_true(all(kinetics_chain_cols("biexponential") %in% names(cf)))
+    ## the fallback row reports its own model's coefficients
+    expect_true(all(is.na(cf[biexp_only])))
     expect_equal(cf$A, coef(model)[["A"]])
-    expect_equal(cf$B1, coef(model)[["B"]])
-    expect_equal(cf$B2, coef(model)[["B"]])
-    expect_equal(cf$tau1, coef(model)[["tau"]])
-    ## reduced MRT carries over from the monoexponential (no TD: tau)
-    expect_equal(cf$MRT, cf$tau1)
-    expect_true(is.na(cf$tau2))
-    expect_true(is.na(cf$texc))
-    expect_true(is.na(cf$texc_fitted))
-    ## diagnostics and fitted values follow the reduced model
-    expect_equal(result$diagnostics$n_params, 3L)
+    expect_equal(cf$B, coef(model)[["B"]])
+    expect_equal(cf$tau, coef(model)[["tau"]])
+    expect_equal(cf$MRT, cf$tau)
+    ## diagnostics and fitted values follow the fallback model
+    expect_equal(result$diagnostics$n_params, length(coef(model)))
     expect_equal(
         result$data[[1L]]$smo2_fitted,
         as.vector(predict(model))
     )
     ## recorded with the reason, regardless of verbose
     msgs <- result$warnings$message
-    expect_true(any(grepl("reduced to", msgs)))
+    expect_true(any(grepl("fell back to", msgs)))
     expect_true(any(grepl("monotonic", msgs)))
 })
 
-test_that("analyse_kinetics() reduces a monoexponential response", {
+test_that("analyse_kinetics() falls back to a monoexponential response", {
     set.seed(3)
     t <- 0:120
     x <- monoexponential(t, A = 70, B = 40, tau = 8) + rnorm(length(t), 0, 0.3)
@@ -1071,10 +1083,14 @@ test_that("analyse_kinetics() reduces a monoexponential response", {
         use_TD = FALSE,
         verbose = FALSE
     )
+    cf <- result$coefficients
 
-    expect_equal(result$coefficients$model, "monoexponential")
-    expect_true(all.equal(result$coefficients$tau1, 8, tolerance = 1, scale = 1))
+    expect_equal(cf$model, "monoexponential")
+    expect_true(all.equal(cf$tau, 8, tolerance = 1, scale = 1))
+    expect_true(all(is.na(cf[c(biexp_only, "slope", "texc")])))
     expect_true(inherits(result$model[[1L]]$smo2, "nls"))
+    ## both fallbacks are recorded
+    expect_equal(sum(grepl("fell back to", result$warnings$message)), 2L)
 })
 
 test_that("analyse_kinetics() keeps a supported excursion-recovery fit", {
@@ -1090,23 +1106,25 @@ test_that("analyse_kinetics() keeps a supported excursion-recovery fit", {
         data,
         nirs_channels = "smo2",
         method = "biexponential",
-        force_biexponential = TRUE,
+        model_fallback = FALSE,
         verbose = FALSE
     )
+    cf <- result$coefficients
 
-    expect_equal(result$coefficients$model, "biexponential")
-    expect_true(is.finite(result$coefficients$texc))
+    expect_equal(cf$model, "biexponential")
+    expect_true(is.finite(cf$texc))
+    expect_true(all(is.na(cf[c("B", "tau", "slope")])))
     expect_named(
         coef(result$model[[1L]]$smo2),
         c("A", "B1", "tau1", "B2", "tau2", "TD")
     )
-    expect_false(any(grepl("reduced to", result$warnings$message)))
-    ## the raw fit is unchanged by the comparison
-    expect_equal(result$coefficients, forced$coefficients)
+    expect_false(any(grepl("fell back to", result$warnings$message)))
+    ## the raw fit is unchanged by the triggers
+    expect_equal(cf, forced$coefficients)
     expect_equal(result$diagnostics, forced$diagnostics)
 })
 
-test_that("force_biexponential = TRUE keeps a monotonic fit", {
+test_that("model_fallback = FALSE keeps a monotonic fit", {
     data <- create_monotonic_data()
 
     result <- analyse_kinetics(
@@ -1114,7 +1132,7 @@ test_that("force_biexponential = TRUE keeps a monotonic fit", {
         nirs_channels = "smo2",
         method = "biexponential",
         use_TD = FALSE,
-        force_biexponential = TRUE,
+        model_fallback = FALSE,
         verbose = FALSE
     )
     cf <- result$coefficients
@@ -1123,32 +1141,32 @@ test_that("force_biexponential = TRUE keeps a monotonic fit", {
     expect_true(is.na(cf$texc))
     expect_false(is.na(cf$tau2))
     expect_false(cf$B1 == cf$B2)
-    expect_false(any(grepl("reduced to", result$warnings$message)))
+    expect_false(any(grepl("fell back to", result$warnings$message)))
 })
 
-test_that("reduced fit matches the time-delay structure and window", {
-    data <- create_monotonic_data(seed = 11, TD = 10, t = -20:120)
+test_that("a slow phase beyond the record falls back to exponential_drift", {
+    data <- create_linear_tail_data()
 
     result <- analyse_kinetics(
         data,
         nirs_channels = "smo2",
         method = "biexponential",
+        use_TD = FALSE,
         verbose = FALSE
     )
     cf <- result$coefficients
-    model <- result$model[[1L]]$smo2
 
-    expect_equal(cf$model, "monoexponential")
-    expect_equal(is.finite(cf$TD), "TD" %in% names(coef(model)))
-    ## fitted rows are the reduced model's window
-    expect_equal(
-        result$diagnostics$n_obs,
-        sum(is.finite(result$data[[1L]]$smo2_fitted))
-    )
-    expect_equal(result$diagnostics$n_params, length(coef(model)))
+    expect_equal(cf$model, "exponential_drift")
+    expect_true(all.equal(cf$slope, 0.1, tolerance = 0.05, scale = 1))
+    expect_true(is.finite(cf$texc))
+    expect_named(coef(result$model[[1L]]$smo2), c("A", "B", "tau", "slope"))
+    expect_true(all(is.na(cf[biexp_only])))
+    msgs <- result$warnings$message
+    expect_true(any(grepl("fell back to", msgs)))
+    expect_true(any(grepl("tau2 exceeds", msgs)))
 })
 
-test_that("reduced comparator fits the full response, not end_window", {
+test_that("fallback fits the full response, not end_window", {
     data <- create_monotonic_data(seed = 11, TD = 10, t = -20:120)
 
     result <- analyse_kinetics(
@@ -1158,13 +1176,21 @@ test_that("reduced comparator fits the full response, not end_window", {
         end_window = 30,
         verbose = FALSE
     )
+    cf <- result$coefficients
+    model <- result$model[[1L]]$smo2
 
-    expect_equal(result$coefficients$model, "monoexponential")
+    expect_true(cf$model %in% fallback_models)
+    expect_equal(is.finite(cf$TD), "TD" %in% names(coef(model)))
     expect_gte(result$diagnostics$n_obs, sum(data$time >= 0))
-    expect_equal(result$channel_args$end_window, 30)
+    expect_equal(
+        result$diagnostics$n_obs,
+        sum(is.finite(result$data[[1L]]$smo2_fitted))
+    )
+    ## resolved arguments are the fallback fit's
+    expect_equal(result$channel_args$end_window, Inf)
 })
 
-test_that("reduction carries fixed parameters over", {
+test_that("fallback carries fixed parameters over", {
     data <- create_monotonic_data()
 
     result <- analyse_kinetics(
@@ -1172,32 +1198,31 @@ test_that("reduction carries fixed parameters over", {
         nirs_channels = "smo2",
         method = "biexponential",
         use_TD = FALSE,
-        fix = list(A = 70, B2 = 40),
+        fix = list(A = 70, B1 = 55),
         verbose = FALSE
     )
     cf <- result$coefficients
 
-    expect_equal(cf$model, "monoexponential")
+    expect_true(cf$model %in% fallback_models)
     expect_equal(cf$A, 70)
-    expect_equal(cf$B1, 40)
-    expect_equal(cf$B2, 40)
-    expect_named(coef(result$model[[1L]]$smo2), "tau")
+    expect_equal(cf$B, 55)
+    expect_false(any(c("A", "B") %in% names(coef(result$model[[1L]]$smo2))))
 
-    ## parameters without a monoexponential counterpart are dropped
+    ## parameters without a counterpart are dropped
     result <- analyse_kinetics(
         data,
         nirs_channels = "smo2",
         method = "biexponential",
         use_TD = FALSE,
-        fix = list(tau1 = 5),
+        fix = list(tau2 = 40),
         verbose = FALSE
     )
 
-    expect_equal(result$coefficients$model, "monoexponential")
-    expect_named(coef(result$model[[1L]]$smo2), c("A", "B", "tau"))
+    expect_true(result$coefficients$model %in% fallback_models)
+    expect_true(all(c("A", "B", "tau") %in% names(coef(result$model[[1L]]$smo2))))
 })
 
-test_that("reduction resolves per interval", {
+test_that("fallback resolves per interval", {
     data <- list(
         excursion = create_biexp_data(noise_sd = 0.3),
         monotonic = create_monotonic_data()
@@ -1213,44 +1238,52 @@ test_that("reduction resolves per interval", {
     cf <- result$coefficients
 
     expect_equal(cf$interval, c("excursion", "monotonic"))
-    expect_equal(cf$model, c("biexponential", "monoexponential"))
+    expect_equal(cf$model[[1L]], "biexponential")
+    expect_true(cf$model[[2L]] %in% fallback_models)
     expect_named(
         coef(result$model$excursion$smo2), c("A", "B1", "tau1", "B2", "tau2")
     )
-    expect_named(coef(result$model$monotonic$smo2), c("A", "B", "tau"))
     expect_true(is.finite(cf$texc[[1L]]))
-    expect_true(is.na(cf$texc[[2L]]))
-    reduced <- result$warnings[grepl("reduced to", result$warnings$message), ]
-    expect_equal(reduced$interval, "monotonic")
-    expect_equal(reduced$nirs_channels, "smo2")
+    expect_true(is.na(cf$tau2[[2L]]))
+    fell <- result$warnings[grepl("fell back to", result$warnings$message), ]
+    expect_true(all(fell$interval == "monotonic"))
+    expect_true(all(fell$nirs_channels == "smo2"))
 })
 
-test_that("reduction resolves per channel", {
+test_that("fallback resolves per channel", {
     data <- create_biexp_data(noise_sd = 0.3, channels = c("smo2", "hhb"))
     data$hhb <- create_monotonic_data()$smo2
 
-    result <- analyse_kinetics(
-        data,
-        nirs_channels = c(smo2, hhb),
-        method = "biexponential",
-        use_TD = list(smo2 = TRUE, hhb = FALSE),
-        verbose = FALSE
+    ## the per-channel map is keyed to the fallback channel only
+    expect_no_warning(
+        result <- analyse_kinetics(
+            data,
+            nirs_channels = c(smo2, hhb),
+            method = "biexponential",
+            use_TD = list(smo2 = TRUE, hhb = FALSE),
+            fix = list(smo2 = list(A = 70), hhb = list(A = 70)),
+            verbose = FALSE
+        )
     )
     cf <- result$coefficients
 
     expect_equal(cf$nirs_channels, c("smo2", "hhb"))
-    expect_equal(cf$model, c("biexponential", "monoexponential"))
+    expect_equal(cf$model[[1L]], "biexponential")
+    expect_true(cf$model[[2L]] %in% fallback_models)
     expect_true(is.finite(cf$TD[[1L]]))
     expect_true(is.na(cf$TD[[2L]]))
+    expect_equal(cf$A, c(70, 70))
     expect_true(inherits(result$model[[1L]]$smo2, "nls"))
     expect_true(inherits(result$model[[1L]]$hhb, "nls"))
+    expect_equal(result$diagnostics$nirs_channels, c("smo2", "hhb"))
+    expect_equal(result$channel_args$nirs_channels, c("smo2", "hhb"))
     expect_equal(
         sum(is.finite(result$data[[1L]]$hhb_fitted)),
         result$diagnostics$n_obs[[2L]]
     )
 })
 
-test_that("a row where both fits fail is left as is", {
+test_that("a row where every fit fails reports the last method", {
     data <- create_mnirs_data(
         data.frame(time = 0:2, smo2 = c(70, 60, 55)),
         nirs_channels = "smo2", time_channel = "time", sample_rate = 1
@@ -1264,52 +1297,34 @@ test_that("a row where both fits fail is left as is", {
     )
     cf <- result$coefficients
 
-    expect_equal(cf$model, "biexponential")
+    expect_equal(cf$model, "monoexponential")
     expect_true(is.na(cf$A))
     expect_null(result$model[[1L]]$smo2)
-    expect_false(any(grepl("reduced to", result$warnings$message)))
-})
-
-test_that("reduce_kinetics() applies the shape test and F-test", {
-    data <- create_monotonic_data()
-    args <- list(
-        start_time = NULL, direction = "auto", end_window = Inf,
-        use_TD = FALSE, fix = NULL
-    )
-    run <- \(worker, method) {
-        analyse_kinetics_intervals(
-            data, worker, method, args,
-            rlang::quo(smo2), rlang::quo(NULL),
-            "ensemble", FALSE, FALSE, quote(f()), quote(f())
-        )
-    }
-    full <- run(analyse_biexponential, "biexponential")
-    reduced <- run(analyse_monoexponential, "monoexponential")
-    spec <- kinetics_reductions$biexponential
-
-    ## the shape test rejects the monotonic fit
-    out <- reduce_kinetics(full, reduced, spec, verbose = FALSE)
-    expect_equal(out$coefficients$model, "monoexponential")
-    expect_match(out$warnings$message, "monotonic", all = FALSE)
-
-    ## without it the F-test decides on its own
-    spec$accept <- NULL
-    out <- reduce_kinetics(full, reduced, spec, verbose = FALSE)
-    expect_true(out$coefficients$model %in% c("biexponential", "monoexponential"))
-    if (out$coefficients$model == "monoexponential") {
-        expect_match(out$warnings$message, "F\\(", all = FALSE)
-    }
+    expect_equal(sum(grepl("fell back to", result$warnings$message)), 2L)
 })
 
 test_that("map_fix() renames through nested maps", {
-    fix_map <- kinetics_reductions$biexponential$fix_map
+    fix_map <- kinetics_fallbacks$biexponential$fix_map
 
-    expect_equal(map_fix(list(A = 1, B2 = 2, tau1 = 3), fix_map), list(A = 1, B = 2))
-    expect_equal(map_fix(list(tau1 = 3), fix_map), setNames(list(), character()))
+    expect_equal(map_fix(list(A = 1, B1 = 2, tau2 = 3), fix_map), list(A = 1, B = 2))
+    expect_equal(map_fix(list(tau2 = 3), fix_map), setNames(list(), character()))
     expect_equal(
-        map_fix(list(smo2 = list(B2 = 2), hhb = list(tau2 = 4)), fix_map),
+        map_fix(list(smo2 = list(B1 = 2), hhb = list(tau2 = 4)), fix_map),
         list(smo2 = list(B = 2), hhb = setNames(list(), character()))
     )
+})
+
+test_that("bind_union() pads differing columns and keeps a fixed order", {
+    a <- data.frame(x = 1, y = "a")
+    b <- data.frame(y = "b", z = TRUE)
+
+    out <- bind_union(list(a, b))
+    expect_named(out, c("x", "y", "z"))
+    expect_equal(out$x, c(1, NA))
+    expect_equal(out$z, c(NA, TRUE))
+    expect_named(bind_union(list(a, b), c("z", "y", "x", "w")), c("z", "y", "x", "w"))
+    expect_equal(bind_union(list(a[0, ], b))$y, "b")
+    expect_null(bind_union(list(a[0, ])))
 })
 
 
@@ -1333,11 +1348,9 @@ test_that("analyse_biexponential() converges on real dataset", {
 
     coefs <- results$coefficients
     ## deoxy_2 is an excursion-recovery, deoxy_3 a monotonic drop
-    expect_equal(
-        coefs$model,
-        c("biexponential", "biexponential", "monoexponential", "monoexponential")
-    )
-    expect_true(all(!is.na(coefs$tau1)))
+    expect_equal(coefs$model[1:2], c("biexponential", "biexponential"))
+    expect_true(all(coefs$model[3:4] %in% fallback_models))
+    expect_true(all(!is.na(coefs$A)))
 
     ## reoxy
     reoxy <- intervals[grepl("^reoxy", names(intervals))]
