@@ -38,7 +38,7 @@ kinetics_dispatch <- list(
     response_time = c("fraction"),
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
     monoexponential = c("use_TD", "fix"),
-    biexponential = c("use_TD", "fix", "tau1_flex", "TD_flex", "A_flex"),
+    biexponential = c("use_TD", "fix", "tau_flex", "TD_flex", "A_flex"),
     exponential_drift = c("use_TD", "tau_mult", "fix"),
     sigmoidal = c("shape", "fix")
 )
@@ -74,7 +74,7 @@ kinetics_coef_cols <- list(
         "MRT_fitted", "HRT_fitted", "texc_fitted"
     ),
     biexponential = c(
-        "A", "B1", "tau1", "MRT", "texc", "B2", "tau2", "TD", "MRT_fitted",
+        "A", "B", "tau", "MRT", "texc", "B2", "tau2", "TD", "MRT_fitted",
         "texc_fitted"
     )
 )
@@ -88,13 +88,13 @@ fallback_gate <- 2
 ## model fallback chain: the reduced method a full method falls back to
 ## when `trigger` names a reason on a channel's coefficient row `cf`, given
 ## the fit's `rmse`, fitted time `span`, and last fitted time `t_end`
-## elapsed from the onset (see `run_kinetics_worker()`). `fix_map` carries
-## user-fixed parameters over (full -> reduced); unmapped are dropped.
+## elapsed from the onset (see `run_kinetics_worker()`). `fix_keep` names
+## the user-fixed parameters the reduced model shares; others are dropped.
 ## `args` overrides reduced worker arguments
 kinetics_fallbacks <- list(
     biexponential = list(
         to = "exponential_drift",
-        fix_map = c(A = "A", B1 = "B", tau1 = "tau", TD = "TD"),
+        fix_keep = c("A", "B", "tau", "TD"),
         ## the biexponential `end_window` bounds its fast phase only; the
         ## drift model spans the whole response
         args = list(end_window = Inf),
@@ -103,12 +103,12 @@ kinetics_fallbacks <- list(
             "Fitted response is monotonic (texc is NA)." = !is.finite(cf$texc),
             "tau2 exceeds twice the fitted time span." = cf$tau2 >= 2 * span,
             "Slow-phase amplitude is below 2 RMSE." =
-                abs(cf$B2 - cf$B1) < fallback_gate * rmse
+                abs(cf$B2 - cf$B) < fallback_gate * rmse
         )
     ),
     exponential_drift = list(
         to = "monoexponential",
-        fix_map = c(A = "A", B = "B", tau = "tau", TD = "TD"),
+        fix_keep = c("A", "B", "tau", "TD"),
         args = list(),
         trigger = \(cf, rmse, span, t_end) first_reason(
             "Fit failed." = is.na(cf$A),
@@ -793,7 +793,7 @@ analyse_kinetics_intervals <- function(
 #' `kinetics_fallbacks` tests each channel's fit with the method's
 #' `trigger`. Channels with a reason are refit by the fallback method
 #' (recursively down the chain) with the arguments it takes, user-fixed
-#' parameters carried over through `fix_map`, and per-channel maps keyed
+#' parameters restricted to `fix_keep`, and per-channel maps keyed
 #' to those channels only. Their coefficients, model, fitted values,
 #' diagnostics, and resolved arguments are replaced by the fallback fit's,
 #' and the fallback is warned about and recorded in the `warnings`
@@ -853,14 +853,6 @@ run_kinetics_worker <- function(
     attributes(cf) <- a[c("names", "row.names", "class")]
     cf$model <- method
     chans_all <- cf$nirs_channels
-    finish <- \(.cf, .a) {
-        .cf <- bind_union(
-            list(.cf),
-            c("interval", "nirs_channels", "model", kinetics_chain_cols(method))
-        )
-        attributes(.cf) <- c(attributes(.cf), .a[attr_nms])
-        .cf
-    }
 
     ## per-channel triggers on the fitted window; a failed fit has no
     ## window and is caught by its NA coefficients
@@ -878,85 +870,92 @@ run_kinetics_worker <- function(
         rep(NA_character_, nrow(cf))
     }
     idx <- which(!is.na(reasons))
-    if (length(idx) == 0L) {
-        return(finish(cf, a))
-    }
 
-    ## warn per channel; recorded alongside the fits' own conditions
-    chans <- chans_all[idx]
-    fn_full <- paste0("SS", method)
-    fn_to <- paste0("SS", spec$to)
-    heads <- vapply(chans, \(.ch) {
-        cli::format_inline(
-            "{.fn {fn_full}} fit for {.field {(.ch)}} in \\
-            {.field {interval_name}} fell back to {.fn {fn_to}}."
+    if (length(idx) > 0L) {
+        ## warn per channel; recorded alongside the fits' own conditions
+        chans <- chans_all[idx]
+        fn_full <- paste0("SS", method)
+        fn_to <- paste0("SS", spec$to)
+        heads <- vapply(chans, \(.ch) {
+            cli::format_inline(
+                "{.fn {fn_full}} fit for {.field {(.ch)}} in \\
+                {.field {interval_name}} fell back to {.fn {fn_to}}."
+            )
+        }, character(1))
+        if (verbose) {
+            Map(\(.h, .r) {
+                cli_warn(c("!" = .h, "i" = .r), call = warn_call(env))
+            }, heads, reasons[idx])
+        }
+
+        ## fallback arguments: those the method takes, overridden by the
+        ## spec, fixed parameters the reduced model shares, and per-channel
+        ## maps keyed to the fallback channels only
+        sub_args <- args[intersect(
+            names(args),
+            unlist(kinetics_dispatch[c("common", spec$to)], use.names = FALSE)
+        )]
+        sub_args[names(spec$args)] <- spec$args
+        sub_args$fix <- keep_fix(sub_args$fix %||% list(), spec$fix_keep)
+        sub_args <- Filter(length, Map(\(.x, .nm) {
+            ## a plain `fix` parameter list is global, not a channel map
+            is_map <- is_arg_map(.x) &&
+                (.nm != "fix" || all(vapply(.x, is.list, logical(1))))
+            if (is_map) .x[names(.x) %in% c("", chans)] else .x
+        }, sub_args, names(sub_args)))
+        sub <- run_kinetics_worker(
+            spec$to, data, sub_args, chans, time_quo, interval_name, verbose,
+            fallback, env
         )
-    }, character(1))
-    if (verbose) {
-        Map(\(.h, .r) {
-            cli_warn(c("!" = .h, "i" = .r), call = warn_call(env))
-        }, heads, reasons[idx])
+
+        ## splice the fallback channels in, keeping channel order: row-wise
+        ## pieces (data frames) are rebound on the union of their columns,
+        ## per-channel lists replaced by name
+        b <- attributes(sub)
+        sub_cf <- sub
+        attributes(sub_cf) <- b[c("names", "row.names", "class")]
+        sub_cf$model <- sub_cf$model %||% spec$to
+        splice <- \(.full, .sub) {
+            if (!is.data.frame(.full)) {
+                return(replace(.full, chans, .sub[chans]))
+            }
+            .df <- bind_union(list(.full[-idx, ], .sub))
+            .df[match(chans_all, .df$nirs_channels), , drop = FALSE]
+        }
+        cf <- splice(cf, sub_cf)
+        pieces <- c("model", "fitted_data", "diagnostics", "channel_args")
+        a[pieces] <- Map(splice, a[pieces], b[pieces])
+        a$warnings <- rbind(
+            a$warnings,
+            data.frame(
+                interval = interval_name,
+                nirs_channels = chans,
+                type = "warning",
+                message = cli::ansi_strip(paste(heads, reasons[idx], sep = " - "))
+            ),
+            b$warnings
+        )
+        rownames(a$warnings) <- NULL
     }
 
-    ## fallback arguments: those the method takes, overridden by the spec,
-    ## fixed parameters renamed, and per-channel maps keyed to the fallback
-    ## channels only
-    sub_args <- args[intersect(
-        names(args),
-        unlist(kinetics_dispatch[c("common", spec$to)], use.names = FALSE)
-    )]
-    sub_args[names(spec$args)] <- spec$args
-    sub_args$fix <- map_fix(sub_args$fix %||% list(), spec$fix_map)
-    sub_args <- Filter(length, Map(\(.x, .nm) {
-        ## a plain `fix` parameter list is global, not a channel map
-        is_map <- is_arg_map(.x) &&
-            (.nm != "fix" || all(vapply(.x, is.list, logical(1))))
-        if (is_map) .x[names(.x) %in% c("", chans)] else .x
-    }, sub_args, names(sub_args)))
-    sub <- run_kinetics_worker(
-        spec$to, data, sub_args, chans, time_quo, interval_name, verbose,
-        fallback, env
+    ## the chain's union schema, so intervals bind regardless of which
+    ## triggers fired
+    cf <- bind_union(
+        list(cf),
+        c("interval", "nirs_channels", "model", kinetics_chain_cols(method))
     )
-
-    ## splice the fallback rows in, keeping channel order
-    b <- attributes(sub)
-    sub_cf <- sub
-    attributes(sub_cf) <- b[c("names", "row.names", "class")]
-    sub_cf$model <- sub_cf$model %||% spec$to
-    by_chan <- \(.df) {
-        .df[match(chans_all, .df$nirs_channels), , drop = FALSE]
-    }
-    cf <- by_chan(bind_union(list(cf[-idx, ], sub_cf)))
-    a$model[chans] <- b$model[chans]
-    a$fitted_data[chans] <- b$fitted_data[chans]
-    a$diagnostics <- by_chan(rbind(a$diagnostics[-idx, ], b$diagnostics))
-    a$channel_args <- by_chan(
-        bind_union(list(a$channel_args[-idx, ], b$channel_args))
-    )
-    a$warnings <- rbind(
-        a$warnings,
-        data.frame(
-            interval = interval_name,
-            nirs_channels = chans,
-            type = "warning",
-            message = cli::ansi_strip(paste(heads, reasons[idx], sep = " - "))
-        ),
-        b$warnings
-    )
-    rownames(a$warnings) <- NULL
-    return(finish(cf, a))
+    attributes(cf) <- c(attributes(cf), a[attr_nms])
+    return(cf)
 }
 
 
-## rename a fixed-parameter list through `fix_map`, recursing into maps
-## (lists of lists); an emptied leaf stays `list()` so nested maps keep
-## their keys
-map_fix <- function(fix, fix_map) {
+## restrict a fixed-parameter list to `params`, recursing into maps (lists
+## of lists); an emptied leaf stays `list()` so nested maps keep their keys
+keep_fix <- function(fix, params) {
     if (length(fix) > 0L && all(vapply(fix, is.list, logical(1)))) {
-        return(lapply(fix, map_fix, fix_map))
+        return(lapply(fix, keep_fix, params))
     }
-    fix <- fix[intersect(names(fix), names(fix_map))]
-    return(setNames(fix, fix_map[names(fix)]))
+    return(fix[intersect(names(fix), params)])
 }
 
 
@@ -1229,7 +1228,7 @@ analyse_kinetics_channels <- function(
             ## (response before start_time)
             # fmt: skip
             check_cols <- intersect(
-            c("TD", "tau", "tau1", "tau2", "response_time", "peak_slope_time"),
+            c("TD", "tau", "tau2", "response_time", "peak_slope_time"),
             names(result)
         )
 
@@ -1833,7 +1832,7 @@ full_coefs <- function(model, params, fix = list()) {
 
 #' Enforce the requested direction on a converged parametric fit
 #'
-#' Direction is the sign of the primary amplitude `D = B - A` (`B1 - A`
+#' Direction is the sign of the primary amplitude `D = B - A` (`B - A`
 #' for the biexponential), where the primary asymptote follows `A` in
 #' model parameter order. A fit is satisfied when `D` and every free
 #' parameter lie inside the refit box (`D` sign-constrained; `lower`/
@@ -1896,7 +1895,7 @@ enforce_direction <- function(
     env = rlang::caller_env()
 ) {
     ## the primary asymptote follows A in model parameter order (B, or
-    ## B1 for the biexponential); direction is the sign of D = B - A
+    ## B for the biexponential); direction is the sign of D = B - A
     B_name <- names(coefs)[2]
     want <- if (direction == "positive") 1 else -1
     x_sym <- as.name(names(fit_data)[[1L]])

@@ -1,22 +1,22 @@
 #' Biexponential function
 #'
-#' Calculate a two-phase curve: a fast monoexponential response toward `B1`
-#' and a slow monoexponential response from `B1` toward a stable plateau at
+#' Calculate a two-phase curve: a fast monoexponential response toward `B`
+#' and a slow monoexponential response from `B` toward a stable plateau at
 #' `B2`, both clocked from the response onset and summed.
 #'
 #' @param t A numeric vector of the predictor variable (time).
 #' @param A A numeric parameter for the starting value of the response
 #'   variable (the `t = 0` intercept).
-#' @param B1 A numeric parameter for the asymptote of the *fast* component;
+#' @param B A numeric parameter for the asymptote of the *fast* component;
 #'   the value the fast response alone would approach.
-#' @param tau1 A numeric parameter for the *fast* time constant (\eqn{\tau_1}),
+#' @param tau A numeric parameter for the *fast* time constant (\eqn{\tau_1}),
 #'   in units of the predictor variable `t`. Dominates the initial steep
 #'   response.
 #' @param B2 A numeric parameter for the asymptote of the *slow* component;
 #'   the stable plateau the response recovers toward as `t` approaches
 #'   infinity.
 #' @param tau2 A numeric parameter for the *slow* time constant (\eqn{\tau_2}),
-#'   in units of the predictor variable `t`. Typically `tau2 >> tau1`.
+#'   in units of the predictor variable `t`. Typically `tau2 >> tau`.
 #' @param TD A numeric parameter for the time delay before the onset of the
 #'   response, in units of the predictor variable `t`. If `NULL` (*default*),
 #'   a 5-parameter model without time delay is used.
@@ -29,27 +29,27 @@
 #' ## Model equations
 #'
 #' 5-parameter model:
-#'   `A + (B1 - A) * (1 - exp(-t / tau1)) + (B2 - B1) * (1 - exp(-t / tau2))`
+#'   `A + (B - A) * (1 - exp(-t / tau)) + (B2 - B) * (1 - exp(-t / tau2))`
 #'
 #' 6-parameter model (with time delay), where `ts = pmax(t - TD, 0)`:
-#'   `A + (B1 - A) * (1 - exp(-ts / tau1)) +
-#'   (B2 - B1) * (1 - exp(-ts / tau2))`
+#'   `A + (B - A) * (1 - exp(-ts / tau)) +
+#'   (B2 - B) * (1 - exp(-ts / tau2))`
 #'
-#' `A`, `B1`, and `B2` are all values on the response scale. The fast
-#' component is a [monoexponential()] response from `A` toward `B1` with
-#' amplitude `B1 - A`; the slow component runs concurrently from the same
-#' onset with amplitude `B2 - B1`. The curve starts at `A`, approaches `B2`
+#' `A`, `B`, and `B2` are all values on the response scale. The fast
+#' component is a [monoexponential()] response from `A` toward `B` with
+#' amplitude `B - A`; the slow component runs concurrently from the same
+#' onset with amplitude `B2 - B`. The curve starts at `A`, approaches `B2`
 #' as `t` grows, and is smooth throughout.
 #'
 #' The expected response is a *fast* excursion toward a minimum or maximum
-#' short of `B1`, followed by a *slow* recovery back to a stable plateau at
+#' short of `B`, followed by a *slow* recovery back to a stable plateau at
 #' `B2`. The turning point occurs where the two phase rates cancel:
-#' `texc = TD + log(r) / (1 / tau1 - 1 / tau2)` with
-#' `ratio = -(B1 - A) * tau2 / ((B2 - B1) * tau1)`, which exists only when
+#' `texc = TD + log(r) / (1 / tau - 1 / tau2)` with
+#' `ratio = -(B - A) * tau2 / ((B2 - B) * tau)`, which exists only when
 #' the amplitudes oppose in sign and the fast phase dominates at the onset
-#' (`ratio > 1`). If `B1` is between `A` and `B2`, the response is monotonic
-#' but still two-phase. If `B1 = B2`, the curve reduces to a
-#' [monoexponential()] with single time constant `tau1` and asymptote `B2`.
+#' (`ratio > 1`). If `B` is between `A` and `B2`, the response is monotonic
+#' but still two-phase. If `B = B2`, the curve reduces to a
+#' [monoexponential()] with single time constant `tau` and asymptote `B2`.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -61,12 +61,12 @@
 #' ## create a biexponential excursion-recovery curve with random noise
 #' set.seed(1)
 #' t <- 0:120
-#' x <- biexponential(t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40) +
+#' x <- biexponential(t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40) +
 #'     rnorm(length(t), 0, 0.8)
 #' data <- data.frame(t, x)
 #'
 #' model <- nls(
-#'     x ~ SSbiexponential(t, A, B1, tau1, B2, tau2),
+#'     x ~ SSbiexponential(t, A, B, tau, B2, tau2),
 #'     data = data,
 #'     algorithm = "port",
 #'     lower = c(-Inf, -Inf, 0, -Inf, 0),
@@ -86,12 +86,12 @@
 #' }
 #'
 #' @export
-biexponential <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
+biexponential <- function(t, A, B, tau, B2, tau2, TD = NULL) {
     ## both phases clocked from the onset; the slow term carries the
-    ## response from B1 toward B2
+    ## response from B toward B2
     ts <- if (is.null(TD)) t else pmax(t - TD, 0)
     return(
-        A + (B1 - A) * (1 - exp(-ts / tau1)) + (B2 - B1) * (1 - exp(-ts / tau2))
+        A + (B - A) * (1 - exp(-ts / tau)) + (B2 - B) * (1 - exp(-ts / tau2))
     )
 }
 
@@ -99,12 +99,12 @@ biexponential <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
 ## time of the curve turning point, elapsed from the fit origin; NA when
 ## the amplitudes share a sign or the slow phase dominates from the onset
 ## (monotonic response), or the time constants coincide
-biexp_texc <- function(A, B1, tau1, B2, tau2, TD = NULL) {
-    r <- -((B1 - A) * tau2) / ((B2 - B1) * tau1)
-    if (!is.finite(r) || r <= 1 || tau1 == tau2) {
+biexp_texc <- function(A, B, tau, B2, tau2, TD = NULL) {
+    r <- -((B - A) * tau2) / ((B2 - B) * tau)
+    if (!is.finite(r) || r <= 1 || tau == tau2) {
         return(NA_real_)
     }
-    return(sum(TD, log(r) / (1 / tau1 - 1 / tau2)))
+    return(sum(TD, log(r) / (1 / tau - 1 / tau2)))
 }
 
 
@@ -132,7 +132,7 @@ biexp_init <- function(mCall, data, LHS, ...) {
 
 
 
-## biexponential phase separation: the largest admissible tau1 / tau2,
+## biexponential phase separation: the largest admissible tau / tau2,
 ## shared by the start grid and the fit bounds
 tau_ratio <- 0.98
 
@@ -140,17 +140,17 @@ tau_ratio <- 0.98
 #' Grid-profiled starting estimates for the biexponential model
 #'
 #' Vector-level initialiser behind [biexp_init()], called directly by the
-#' kinetics worker with `tau1` and `TD` held at their stage-1 values to
+#' kinetics worker with `tau` and `TD` held at their stage-1 values to
 #' seed the slow phase. Profiles the time constants (and
 #' `TD`) on a coarse grid and keeps the RSS-minimising start (cf.
-#' [expdrift_start()]). The model is linear in `A`, `B1`, and `B2` once
-#' `tau1`, `tau2`, and `TD` are held, so those are solved by least squares
+#' [expdrift_start()]). The model is linear in `A`, `B`, and `B2` once
+#' `tau`, `tau2`, and `TD` are held, so those are solved by least squares
 #' at every grid point at once: the Gram entries of the bases `e1`,
-#' `e2 - e1`, `1 - e2` for every `(tau1, tau2)` pair follow from the
+#' `e2 - e1`, `1 - e2` for every `(tau, tau2)` pair follow from the
 #' column products of the two exponential matrices, and [solve_grid3()]
 #' solves the pairs in one pass. User-fixed values narrow the grids; the
 #' amplitudes are always solved free, as this is only a seed. Pairs with
-#' `tau1 / tau2 > 0.98` are dropped as their bases are near-collinear,
+#' `tau / tau2 > 0.98` are dropped as their bases are near-collinear,
 #' unless both time constants are fixed.
 #'
 #' @inheritParams monoexp_start
@@ -164,7 +164,7 @@ biexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
     if (!is.finite(span) || span <= 0) {
         span <- 1
     }
-    tau1_grid <- fixed$tau1 %||%
+    tau_grid <- fixed$tau %||%
         exp(seq(log(span / 100), log(span / 2), length.out = 13L))
     tau2_grid <- fixed$tau2 %||%
         exp(seq(log(span / 20), log(span * 10), length.out = 9L))
@@ -173,13 +173,13 @@ biexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
     } else {
         fixed$TD %||% seq(0, span / 3, length.out = 11L)
     }
-    n1 <- length(tau1_grid)
+    n1 <- length(tau_grid)
     n2 <- length(tau2_grid)
-    ok <- outer(tau1_grid, tau2_grid, \(.a, .b) .b >= .a / tau_ratio)
-    if (!is.null(fixed$tau1) && !is.null(fixed$tau2)) {
+    ok <- outer(tau_grid, tau2_grid, \(.a, .b) .b >= .a / tau_ratio)
+    if (!is.null(fixed$tau) && !is.null(fixed$tau2)) {
         ok[] <- TRUE
     }
-    ## expand tau1- and tau2-indexed vectors over the (tau1, tau2) grid
+    ## expand tau- and tau2-indexed vectors over the (tau, tau2) grid
     by1 <- \(v) matrix(v, n1, n2)
     by2 <- \(v) matrix(v, n1, n2, byrow = TRUE)
 
@@ -191,7 +191,7 @@ biexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
     xx <- sum(xc^2)
     blocks <- lapply(td_grid, \(.td) {
         ts <- if (has_TD) pmax(t - .td, 0) else t
-        E1 <- exp(-outer(ts, tau1_grid, `/`))
+        E1 <- exp(-outer(ts, tau_grid, `/`))
         E2 <- exp(-outer(ts, tau2_grid, `/`))
         P <- crossprod(E1, E2)
         d1 <- colSums(E1^2)
@@ -224,8 +224,8 @@ biexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
 
     return(c(
         A = b$c1[ij] + xm,
-        B1 = b$c2[ij] + xm,
-        tau1 = tau1_grid[[ij[[1L]]]],
+        B = b$c2[ij] + xm,
+        tau = tau_grid[[ij[[1L]]]],
         B2 = b$c3[ij] + xm,
         tau2 = tau2_grid[[ij[[2L]]]],
         TD = if (has_TD) td_grid[[k]]
@@ -249,20 +249,20 @@ biexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
 #'   free.
 #'
 #' @keywords internal
-biexp_core <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
+biexp_core <- function(t, A, B, tau, B2, tau2, TD = NULL) {
     has_TD <- !is.null(TD)
     ts <- if (has_TD) pmax(t - TD, 0) else t
-    e1 <- exp(-ts / tau1)
+    e1 <- exp(-ts / tau)
     e2 <- exp(-ts / tau2)
     return(list(
-        val = A + (B1 - A) * (1 - e1) + (B2 - B1) * (1 - e2),
+        val = A + (B - A) * (1 - e1) + (B2 - B) * (1 - e2),
         A = e1,
-        B1 = e2 - e1,
-        tau1 = -(B1 - A) * e1 * ts / tau1^2,
+        B = e2 - e1,
+        tau = -(B - A) * e1 * ts / tau^2,
         B2 = 1 - e2,
-        tau2 = -(B2 - B1) * e2 * ts / tau2^2,
+        tau2 = -(B2 - B) * e2 * ts / tau2^2,
         TD = if (has_TD) {
-            -(t > TD) * ((B1 - A) * e1 / tau1 + (B2 - B1) * e2 / tau2)
+            -(t > TD) * ((B - A) * e1 / tau + (B2 - B) * e2 / tau2)
         }
     ))
 }
@@ -270,12 +270,12 @@ biexp_core <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
 
 #' @rdname biexp_core
 #' @keywords internal
-biexp_model <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
-    g <- biexp_core(t, A, B1, tau1, B2, tau2, TD)
+biexp_model <- function(t, A, B, tau, B2, tau2, TD = NULL) {
+    g <- biexp_core(t, A, B, tau, B2, tau2, TD)
     val <- g$val
     free <- free_params(
         match.call(),
-        c("A", "B1", "tau1", "B2", "tau2", if (!is.null(TD)) "TD")
+        c("A", "B", "tau", "B2", "tau2", if (!is.null(TD)) "TD")
     )
     if (length(free) > 0L) {
         attr(val, "gradient") <- do.call(cbind, g[free])
@@ -288,23 +288,23 @@ biexp_model <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
 #'
 #' Creates initial coefficient estimates for a `selfStart` wrapper around
 #' [biexponential()], for use with [stats::nls()]. Supports both the
-#' 5-parameter form (A, B1, tau1, B2, tau2) and the 6-parameter form adding
+#' 5-parameter form (A, B, tau, B2, tau2) and the 6-parameter form adding
 #' a time delay TD; arity is inferred from the formula passed to
 #' [stats::nls()].
 #'
 #' @usage
-#' SSbiexponential(t, A, B1, tau1, B2, tau2, TD)
+#' SSbiexponential(t, A, B, tau, B2, tau2, TD)
 #'
 #' @inheritParams biexponential
 #'
 #' @details
 #' 5-parameter model:
-#' `x ~ SSbiexponential(t, A, B1, tau1, B2, tau2)`
+#' `x ~ SSbiexponential(t, A, B, tau, B2, tau2)`
 #'
 #' 6-parameter model:
-#' `x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, TD)`
+#' `x ~ SSbiexponential(t, A, B, tau, B2, tau2, TD)`
 #'
-#' The two phases are weakly identified when `tau1` and `tau2` are close, so
+#' The two phases are weakly identified when `tau` and `tau2` are close, so
 #' `algorithm = "port"` with the time constants bounded non-negative and
 #' `control = nls.control(warnOnly = TRUE)` is recommended.
 #' [analyse_kinetics()] instead fits the phases sequentially, holding the
@@ -324,7 +324,7 @@ biexp_model <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
 #'
 #' Any parameter may be held constant by writing a value in place of its
 #'   name in the formula, e.g.
-#'   `x ~ SSbiexponential(t, A, B1, tau1 = 5, B2, tau2)`
+#'   `x ~ SSbiexponential(t, A, B, tau = 5, B2, tau2)`
 #'   holds the fast time constant at `5`. Fixed parameters are excluded from
 #'   estimation and are not returned by [stats::coef()].
 #'
@@ -338,12 +338,12 @@ biexp_model <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
 #' ## create a biexponential excursion-recovery curve with random noise
 #' set.seed(13)
 #' t <- 0:120
-#' x <- biexponential(t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40) +
+#' x <- biexponential(t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40) +
 #'     rnorm(length(t), 0, 0.8)
 #' data <- data.frame(t, x)
 #'
 #' model <- nls(
-#'     x ~ SSbiexponential(t, A, B1, tau1, B2, tau2),
+#'     x ~ SSbiexponential(t, A, B, tau, B2, tau2),
 #'     data = data,
 #'     algorithm = "port",
 #'     lower = c(-Inf, -Inf, 0, -Inf, 0),
@@ -353,7 +353,7 @@ biexp_model <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
 #'
 #' ## fix the fast time constant
 #' model_fixed <- nls(
-#'     x ~ SSbiexponential(t, A, B1, tau1 = 5, B2, tau2),
+#'     x ~ SSbiexponential(t, A, B, tau = 5, B2, tau2),
 #'     data = data,
 #'     algorithm = "port",
 #'     lower = c(-Inf, -Inf, -Inf, 0),
@@ -366,9 +366,9 @@ SSbiexponential <- selfStart(
     model = biexp_model,
     initial = init_fixed(
         biexp_init,
-        c("A", "B1", "tau1", "B2", "tau2", "TD")
+        c("A", "B", "tau", "B2", "tau2", "TD")
     ),
-    parameters = c("A", "B1", "tau1", "B2", "tau2", "TD")
+    parameters = c("A", "B", "tau", "B2", "tau2", "TD")
 )
 
 
@@ -380,25 +380,25 @@ SSbiexponential <- selfStart(
 #' data frame in two stages: the fast phase as a monoexponential on the
 #' `end_window` window ([fit_monoexponential()]; `Inf` resolves to 30
 #' time units past the first extreme), then the full
-#' [SSbiexponential()] model on the whole response with `A`, `tau1`, and
-#' `TD` box-bounded about their stage-1 values and `B1`, `B2`, `tau2`
+#' [SSbiexponential()] model on the whole response with `A`, `tau`, and
+#' `TD` box-bounded about their stage-1 values and `B`, `B2`, `tau2`
 #' free. See [analyse_kinetics()] for user-facing documentation.
 #'
 #' @param use_TD Logical; `TRUE` attempts to fit the fast phase with a
-#'   time delay, giving a 6-parameter [SSbiexponential()] model (A, B1,
-#'   tau1, B2, tau2, TD). If that fit fails, or if `use_TD = FALSE`, the
+#'   time delay, giving a 6-parameter [SSbiexponential()] model (A, B,
+#'   tau, B2, tau2, TD). If that fit fails, or if `use_TD = FALSE`, the
 #'   reduced 5-parameter model without `TD` is fit.
-#' @param fix An *optional* named list of model parameters (`A`, `B1`,
-#'   `tau1`, `B2`, `tau2`, `TD`) to hold constant during fitting, e.g.
+#' @param fix An *optional* named list of model parameters (`A`, `B`,
+#'   `tau`, `B2`, `tau2`, `TD`) to hold constant during fitting, e.g.
 #'   `fix = list(A = 0)`. Fixed parameters are excluded from estimation and
 #'   reported at their fixed values. Applied to every channel, or
 #'   per-channel as a list of lists keyed by channel name, e.g.
 #'   `fix = list(smo2 = list(A = 0))`. `TD` is fixable for channels where
 #'   `use_TD = TRUE`; a fixed `TD` disables the 5-parameter fallback.
-#' @param tau1_flex Numeric; multiplicative half-width of the stage-2
-#'   `tau1` bounds about the stage-1 value,
-#'   `tau1 * [1 / (1 + tau1_flex), 1 + tau1_flex]`. `tau2` is floored at
-#'   the `tau1` ceiling divided by `0.98` and capped at ten times the span.
+#' @param tau_flex Numeric; multiplicative half-width of the stage-2
+#'   `tau` bounds about the stage-1 value,
+#'   `tau * [1 / (1 + tau_flex), 1 + tau_flex]`. `tau2` is floored at
+#'   the `tau` ceiling divided by `0.98` and capped at ten times the span.
 #' @param TD_flex Numeric; additive half-width of the stage-2 `TD` bounds
 #'   in units of `time_channel`, floored at `0`.
 #' @param A_flex Numeric; additive half-width of the stage-2 `A` bounds on
@@ -408,7 +408,7 @@ SSbiexponential <- selfStart(
 #' @inheritParams analyse_kinetics
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
-#'   `nirs_channels`, `A`, `B1`, `tau1`, `MRT`, `texc`, `B2`, `tau2`, `TD`,
+#'   `nirs_channels`, `A`, `B`, `tau`, `MRT`, `texc`, `B2`, `tau2`, `TD`,
 #'   `MRT_fitted`, `texc_fitted`. Per-channel metadata are attached as
 #'   attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
@@ -434,7 +434,7 @@ analyse_biexponential <- function(
     end_window = Inf,
     verbose = TRUE,
     ...,
-    tau1_flex = 1 / 3,
+    tau_flex = 1 / 3,
     TD_flex = 2,
     A_flex = NULL,
     env = rlang::caller_env()
@@ -452,12 +452,12 @@ analyse_biexponential <- function(
         enquo(time_channel),
         arg_list = mget(c(
             "use_TD", "fix", "start_time", "direction", "end_window",
-            "tau1_flex", "TD_flex", "A_flex"
+            "tau_flex", "TD_flex", "A_flex"
         )),
         choices = list(direction = c("auto", "positive", "negative")),
         ## TD is only fixable where that channel fits the 6-parameter model
         fix_params = \(.a) {
-            c("A", "B1", "tau1", "B2", "tau2", if (.a$use_TD) "TD")
+            c("A", "B", "tau", "B2", "tau2", if (.a$use_TD) "TD")
         },
         verbose = verbose,
         env = env
@@ -478,16 +478,16 @@ analyse_biexponential <- function(
 
     ## method-specific fit in two stages. stage 1: the fast phase as a
     ## monoexponential on the `end_window` window (`x_fit`, `t_fit`).
-    ## stage 2: the biexponential on the full response, with A, tau1, and
+    ## stage 2: the biexponential on the full response, with A, tau, and
     ## TD box-bounded around their stage-1 values by the `*_flex`
-    ## half-widths; B1, B2, and tau2 free. a failed stage returns NA, and
+    ## half-widths; B, B2, and tau2 free. a failed stage returns NA, and
     ## the fallback chain resolves the row upstream
     biexp_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
         fix <- .a$fix %||% list()
 
-        ## stage 1: fixed parameters map onto the fast phase
+        ## stage 1: fixed parameters shared with the fast phase carry over
         a1 <- .a
-        a1$fix <- map_fix(fix, c(A = "A", B1 = "B", tau1 = "tau", TD = "TD"))
+        a1$fix <- keep_fix(fix, c("A", "B", "tau", "TD"))
         fast <- fit_monoexponential(
             .nirs, x_fit, t_fit, a1, valid, time_channel, interval_name, env
         )
@@ -496,7 +496,7 @@ analyse_biexponential <- function(
         }
         cf1 <- fast$coefs
         has_TD <- is.finite(cf1$TD)
-        params <- c("A", "B1", "tau1", "B2", "tau2", if (has_TD) "TD")
+        params <- c("A", "B", "tau", "B2", "tau2", if (has_TD) "TD")
         free <- setdiff(params, names(fix))
 
         ## stage 2 window: the full response; the TD model is flat at A
@@ -533,28 +533,28 @@ analyse_biexponential <- function(
         }
 
         ## fast phase from stage 1 (user-fixed values already merged in)
-        prior <- c(list(A = cf1$A, tau1 = cf1$tau), if (has_TD) list(TD = cf1$TD))
+        prior <- c(list(A = cf1$A, tau = cf1$tau), if (has_TD) list(TD = cf1$TD))
         A_flex <- .a$A_flex %||% (2 * stats::sd(stats::residuals(fast$model)))
-        tau1_flex <- .a$tau1_flex
+        tau_flex <- .a$tau_flex
         lower <- c(
             A = prior$A - A_flex,
-            B1 = -Inf,
-            tau1 = prior$tau1 / (1 + tau1_flex),
+            B = -Inf,
+            tau = prior$tau / (1 + tau_flex),
             B2 = -Inf,
             ## the slow phase separates above the fast-phase ceiling
-            tau2 = prior$tau1 * (1 + tau1_flex) / tau_ratio,
+            tau2 = prior$tau * (1 + tau_flex) / tau_ratio,
             TD = if (has_TD) max(0, prior$TD - .a$TD_flex)
         )
         upper <- c(
             A = prior$A + A_flex,
-            B1 = Inf,
-            tau1 = prior$tau1 * (1 + tau1_flex),
+            B = Inf,
+            tau = prior$tau * (1 + tau_flex),
             B2 = Inf,
             ## a slow tail far beyond the record identifies only its rate
             tau2 = 10 * span,
             TD = if (has_TD) prior$TD + .a$TD_flex
         )
-        ## B1, B2, tau2 seeded by the start grid with the fast phase held
+        ## B, B2, tau2 seeded by the start grid with the fast phase held
         model <- tryCatch(
             {
                 start <- biexp_start(
@@ -591,15 +591,15 @@ analyse_biexponential <- function(
         ## TD is already elapsed from start_time, matching the fit time base
         TD_arg <- if (has_TD) coefs[["TD"]] else NULL
         ## fast-phase mean response time, as for the monoexponential
-        MRT_val <- sum(TD_arg, coefs[["tau1"]])
+        MRT_val <- sum(TD_arg, coefs[["tau"]])
 
         ## excursion time (texc) is the fitted turning point, reported
         ## elapsed from start_time, mirroring MRT = TD + tau; NA when the
         ## fitted response is monotonic
         texc_val <- biexp_texc(
             A = coefs[["A"]],
-            B1 = coefs[["B1"]],
-            tau1 = coefs[["tau1"]],
+            B = coefs[["B"]],
+            tau = coefs[["tau"]],
             B2 = coefs[["B2"]],
             tau2 = coefs[["tau2"]],
             TD = TD_arg
@@ -609,8 +609,8 @@ analyse_biexponential <- function(
         fitted_params <- biexponential(
             t = c(MRT_val, texc_val),
             A = coefs[["A"]],
-            B1 = coefs[["B1"]],
-            tau1 = coefs[["tau1"]],
+            B = coefs[["B"]],
+            tau = coefs[["tau"]],
             B2 = coefs[["B2"]],
             tau2 = coefs[["tau2"]],
             TD = TD_arg
@@ -619,8 +619,8 @@ analyse_biexponential <- function(
         build_fit_results(
             data.frame(
                 A = coefs[["A"]],
-                B1 = coefs[["B1"]],
-                tau1 = coefs[["tau1"]],
+                B = coefs[["B"]],
+                tau = coefs[["tau"]],
                 MRT = MRT_val,
                 texc = texc_val,
                 B2 = coefs[["B2"]],

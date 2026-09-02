@@ -2,7 +2,7 @@
 test_that("biexponential() returns correct vector length", {
     t <- 0:120
     result <- biexponential(
-        t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40
+        t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40
     )
 
     expect_length(result, length(t))
@@ -12,10 +12,10 @@ test_that("biexponential() returns correct vector length", {
 test_that("biexponential() starts at A and approaches the plateau", {
     t <- 0:500
     A <- 70
-    B1 <- 40
+    B <- 40
     B2 <- 60
     result <- biexponential(
-        t, A = A, B1 = B1, tau1 = 5, B2 = B2, tau2 = 40
+        t, A = A, B = B, tau = 5, B2 = B2, tau2 = 40
     )
 
     expect_equal(result[1], A)
@@ -28,29 +28,29 @@ test_that("biexponential() starts at A and approaches the plateau", {
 test_that("biexponential() slow component is active from the onset", {
     t <- 0:120
     A <- 70
-    B1 <- 40
-    tau1 <- 5
+    B <- 40
+    tau <- 5
     B2 <- 60
     tau2 <- 40
-    result <- biexponential(t, A = A, B1 = B1, tau1 = tau1, B2 = B2, tau2 = tau2)
+    result <- biexponential(t, A = A, B = B, tau = tau, B2 = B2, tau2 = tau2)
 
     ## the fast and slow terms run concurrently from t = 0, so the curve
     ## differs from the pure fast monoexponential for every t > 0
-    fast_only <- monoexponential(t, A = A, B = B1, tau = tau1)
+    fast_only <- monoexponential(t, A = A, B = B, tau = tau)
     expect_true(all(result[t > 0] != fast_only[t > 0]))
     expect_equal(
         result,
-        fast_only + (B2 - B1) * (1 - exp(-t / tau2))
+        fast_only + (B2 - B) * (1 - exp(-t / tau2))
     )
 })
 
 test_that("biexponential() drops to a nadir below A and below the plateau", {
     t <- 0:120
     A <- 70
-    B1 <- 40
+    B <- 40
     B2 <- 60
     result <- biexponential(
-        t, A = A, B1 = B1, tau1 = 5, B2 = B2, tau2 = 40
+        t, A = A, B = B, tau = 5, B2 = B2, tau2 = 40
     )
 
     ## interior minimum below both endpoints (nadir-recovery shape)
@@ -63,7 +63,7 @@ test_that("biexponential() TD form is flat before the delay", {
     t <- 0:120
     TD <- 15
     result <- biexponential(
-        t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40,
+        t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40,
         TD = TD
     )
 
@@ -71,12 +71,12 @@ test_that("biexponential() TD form is flat before the delay", {
     expect_equal(result[t == TD], 70)
 })
 
-test_that("biexponential() reduces to the monoexponential when B1 = B2", {
+test_that("biexponential() reduces to the monoexponential when B = B2", {
     t <- 0:120
     ## the slow term vanishes and the model is the exact monoexponential
     expect_equal(
         biexponential(
-            t, A = 70, B1 = 40, tau1 = 5, B2 = 40, tau2 = 50
+            t, A = 70, B = 40, tau = 5, B2 = 40, tau2 = 50
         ),
         monoexponential(t, A = 70, B = 40, tau = 5)
     )
@@ -88,12 +88,12 @@ test_that("SSbiexponential() converges on known parameters", {
     set.seed(1)
     t <- 0:120
     x <- biexponential(
-        t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40
+        t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40
     ) + rnorm(length(t), 0, 0.5)
     data <- data.frame(t, x)
 
     model <- nls(
-        x ~ SSbiexponential(t, A, B1, tau1, B2, tau2),
+        x ~ SSbiexponential(t, A, B, tau, B2, tau2),
         data = data,
         algorithm = "port",
         lower = c(-Inf, -Inf, 0, -Inf, 0),
@@ -101,13 +101,13 @@ test_that("SSbiexponential() converges on known parameters", {
     )
 
     expect_s3_class(model, "nls")
-    expect_named(coef(model), c("A", "B1", "tau1", "B2", "tau2"))
+    expect_named(coef(model), c("A", "B", "tau", "B2", "tau2"))
 
     coefs <- coef(model)
     expect_true(all.equal(coefs[["A"]], 70, tolerance = 2, scale = 1))
-    expect_true(all.equal(coefs[["B1"]], 40, tolerance = 4, scale = 1))
+    expect_true(all.equal(coefs[["B"]], 40, tolerance = 4, scale = 1))
     expect_true(all.equal(coefs[["B2"]], 60, tolerance = 4, scale = 1))
-    expect_true(all.equal(coefs[["tau1"]], 5, tolerance = 2, scale = 1))
+    expect_true(all.equal(coefs[["tau"]], 5, tolerance = 2, scale = 1))
     expect_true(all.equal(coefs[["tau2"]], 40, tolerance = 15, scale = 1))
 })
 
@@ -115,13 +115,13 @@ test_that("SSbiexponential() fits the 6-parameter TD form", {
     set.seed(4)
     t <- 0:120
     x <- biexponential(
-        t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40,
+        t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40,
         TD = 10
     ) + rnorm(length(t), 0, 0.5)
     data <- data.frame(t, x)
 
     model <- nls(
-        x ~ SSbiexponential(t, A, B1, tau1, B2, tau2, TD),
+        x ~ SSbiexponential(t, A, B, tau, B2, tau2, TD),
         data = data,
         algorithm = "port",
         lower = c(-Inf, -Inf, 0, -Inf, 0, 0),
@@ -129,7 +129,7 @@ test_that("SSbiexponential() fits the 6-parameter TD form", {
     )
 
     expect_named(
-        coef(model), c("A", "B1", "tau1", "B2", "tau2", "TD")
+        coef(model), c("A", "B", "tau", "B2", "tau2", "TD")
     )
     expect_true(all.equal(coef(model)[["TD"]], 10, tolerance = 3, scale = 1))
 })
@@ -141,7 +141,7 @@ test_that("SSbiexponential() predict() returns correct length", {
     data <- data.frame(t, x)
 
     model <- nls(
-        x ~ SSbiexponential(t, A, B1, tau1, B2, tau2),
+        x ~ SSbiexponential(t, A, B, tau, B2, tau2),
         data = data,
         algorithm = "port",
         lower = c(-Inf, -Inf, 0, -Inf, 0),
@@ -155,13 +155,13 @@ test_that("SSbiexponential() fixes A at a constant", {
     set.seed(3)
     t <- 0:120
     x <- biexponential(
-        t, A = 0, B1 = -25, tau1 = 5, B2 = -10, tau2 = 40
+        t, A = 0, B = -25, tau = 5, B2 = -10, tau2 = 40
     ) + rnorm(length(t), 0, 0.5)
     data <- data.frame(t, x)
 
     suppressWarnings(
         model <- nls(
-            x ~ SSbiexponential(t, A = 0, B1, tau1, B2, tau2),
+            x ~ SSbiexponential(t, A = 0, B, tau, B2, tau2),
             data = data,
             algorithm = "port",
             lower = c(-Inf, 0, -Inf, 0),
@@ -169,14 +169,14 @@ test_that("SSbiexponential() fixes A at a constant", {
         )
     )
 
-    expect_named(coef(model), c("B1", "tau1", "B2", "tau2"))
+    expect_named(coef(model), c("B", "tau", "B2", "tau2"))
     expect_equal(unname(predict(model, data.frame(t = 0))[1]), 0)
 })
 
 test_that("SSbiexponential() gradient matches numericDeriv for the free parameters", {
     t <- seq(-10, 120, by = 0.5)
     env <- list2env(list(
-        t = t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40, TD = 3
+        t = t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40, TD = 3
     ))
     chk <- function(expr, pars) {
         an <- attr(eval(expr, env), "gradient")
@@ -185,13 +185,13 @@ test_that("SSbiexponential() gradient matches numericDeriv for the free paramete
         expect_equal(unname(an), unname(nd), tolerance = 1e-5)
     }
     chk(
-        quote(SSbiexponential(t, A, B1, tau1, B2, tau2, TD)),
-        c("A", "B1", "tau1", "B2", "tau2", "TD")
+        quote(SSbiexponential(t, A, B, tau, B2, tau2, TD)),
+        c("A", "B", "tau", "B2", "tau2", "TD")
     )
     ## a constant in the formula contributes no column
     chk(
-        quote(SSbiexponential(t, A, B1, tau1 = 5, B2, tau2)),
-        c("A", "B1", "B2", "tau2")
+        quote(SSbiexponential(t, A, B, tau = 5, B2, tau2)),
+        c("A", "B", "B2", "tau2")
     )
     ## no free parameter, no gradient; the exported fn stays plain
     expect_null(attr(SSbiexponential(t, 70, 40, 5, 60, 40), "gradient"))
@@ -201,38 +201,38 @@ test_that("SSbiexponential() gradient matches numericDeriv for the free paramete
 test_that("biexp_start() matches a per-point least-squares grid search", {
     set.seed(8)
     t <- 0:120
-    x <- biexponential(t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40) +
+    x <- biexponential(t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40) +
         rnorm(length(t), 0, 0.5)
     start <- biexp_start(x, t, has_TD = TRUE)
-    expect_named(start, c("A", "B1", "tau1", "B2", "tau2", "TD"))
+    expect_named(start, c("A", "B", "tau", "B2", "tau2", "TD"))
 
     ## the linear coefficients at the chosen grid point are the lm solution
     ts <- pmax(t - start[["TD"]], 0)
-    e1 <- exp(-ts / start[["tau1"]])
+    e1 <- exp(-ts / start[["tau"]])
     e2 <- exp(-ts / start[["tau2"]])
     cf <- lm.fit(cbind(e1, e2 - e1, 1 - e2), x)$coefficients
-    expect_equal(unname(start[c("A", "B1", "B2")]), unname(cf), tolerance = 1e-8)
-    expect_true(start[["tau2"]] >= start[["tau1"]] / tau_ratio)
+    expect_equal(unname(start[c("A", "B", "B2")]), unname(cf), tolerance = 1e-8)
+    expect_true(start[["tau2"]] >= start[["tau"]] / tau_ratio)
 })
 
-test_that("SSbiexponential() fixes tau1 in the formula", {
+test_that("SSbiexponential() fixes tau in the formula", {
     set.seed(5)
     t <- 0:120
     x <- biexponential(
-        t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40
+        t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40
     ) + rnorm(length(t), 0, 0.5)
     data <- data.frame(t, x)
 
     model <- nls(
-        x ~ SSbiexponential(t, A, B1, tau1 = 5, B2, tau2),
+        x ~ SSbiexponential(t, A, B, tau = 5, B2, tau2),
         data = data,
         algorithm = "port",
         lower = c(-Inf, -Inf, -Inf, 0),
         control = nls.control(warnOnly = TRUE)
     )
 
-    expect_named(coef(model), c("A", "B1", "B2", "tau2"))
-    expect_true(all.equal(coef(model)[["B1"]], 40, tolerance = 4, scale = 1))
+    expect_named(coef(model), c("A", "B", "B2", "tau2"))
+    expect_true(all.equal(coef(model)[["B"]], 40, tolerance = 4, scale = 1))
 })
 
 
@@ -241,8 +241,8 @@ test_that("SSbiexponential() fixes tau1 in the formula", {
 ## helper: create excursion-recovery test data with known parameters
 create_biexp_data <- function(
     A = 70,
-    B1 = 40,
-    tau1 = 5,
+    B = 40,
+    tau = 5,
     B2 = 60,
     tau2 = 40,
     n = 120,
@@ -253,14 +253,14 @@ create_biexp_data <- function(
 ) {
     set.seed(seed)
     t <- seq(0, (n - 1) / sample_rate, length.out = n)
-    x <- biexponential(t, A, B1, tau1, B2, tau2) +
+    x <- biexponential(t, A, B, tau, B2, tau2) +
         rnorm(n, 0, noise_sd)
 
     df <- setNames(data.frame(t, x), c("time", channels[1]))
     if (length(channels) > 1) {
         for (ch in channels[-1]) {
             df[[ch]] <- biexponential(
-                t, A + 5, B1 + 5, tau1, B2 + 5, tau2
+                t, A + 5, B + 5, tau, B2 + 5, tau2
             ) + rnorm(n, 0, noise_sd)
         }
     }
@@ -284,7 +284,7 @@ test_that("analyse_biexponential() returns correct structure", {
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
-        "interval", "nirs_channels", "A", "B1", "tau1",
+        "interval", "nirs_channels", "A", "B", "tau",
         "MRT", "texc", "B2", "tau2", "TD", "MRT_fitted", "texc_fitted"
     ))
     expect_equal(nrow(result), 1L)
@@ -301,9 +301,9 @@ test_that("analyse_biexponential() returns correct structure", {
 
 test_that("analyse_biexponential() recovers known parameters", {
     A <- 70
-    B1 <- 40
+    B <- 40
     B2 <- 60
-    data <- create_biexp_data(A = A, B1 = B1, B2 = B2, noise_sd = 0.3)
+    data <- create_biexp_data(A = A, B = B, B2 = B2, noise_sd = 0.3)
     
     result <- analyse_biexponential(
         data,
@@ -314,10 +314,10 @@ test_that("analyse_biexponential() recovers known parameters", {
 
     expect_true(all.equal(result$A, A, tolerance = 3, scale = 1))
     ## the fast asymptote absorbs some slow phase over the stage-1 window
-    expect_true(all.equal(result$B1, B1, tolerance = 5, scale = 1))
+    expect_true(all.equal(result$B, B, tolerance = 5, scale = 1))
     expect_true(all.equal(result$B2, B2, tolerance = 3, scale = 1))
     ## no TD: MRT is the fast time constant
-    expect_equal(result$MRT, result$tau1)
+    expect_equal(result$MRT, result$tau)
     ## excursion sits inside the window, below the starting value
     expect_true(result$texc > 0)
     expect_true(result$texc_fitted < result$A)
@@ -337,48 +337,48 @@ test_that("analyse_biexponential() texc is the fitted turning point", {
     expect_equal(
         result$texc_fitted,
         biexponential(
-            result$texc, result$A, result$B1, result$tau1,
+            result$texc, result$A, result$B, result$tau,
             result$B2, result$tau2
         )
     )
     expect_true(result$texc > 0)
-    expect_true(result$tau1 < result$tau2)
+    expect_true(result$tau < result$tau2)
     ## the turning point sits near the fitted-curve minimum
     fitted <- attr(result, "fitted_data")$smo2$fitted
     expect_true(all.equal(result$texc_fitted, min(fitted), tolerance = 1,
         scale = 1))
 })
 
-test_that("analyse_biexponential() reports tau1 <= tau2", {
+test_that("analyse_biexponential() reports tau <= tau2", {
     result <- analyse_biexponential(
         create_biexp_data(noise_sd = 0.3),
         nirs_channels = "smo2",
         use_TD = FALSE,
         verbose = FALSE
     )
-    expect_lte(result$tau1, result$tau2)
+    expect_lte(result$tau, result$tau2)
 
     set.seed(6)
     t <- 0:120
-    x <- biexponential(t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40) +
+    x <- biexponential(t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40) +
         rnorm(length(t), 0, 0.3)
     data <- data.frame(t, x)
     model <- nls(
-        x ~ SSbiexponential(t, A, B1, tau1, B2, tau2),
+        x ~ SSbiexponential(t, A, B, tau, B2, tau2),
         data = data,
         algorithm = "port",
         lower = c(-Inf, -Inf, 0, -Inf, 0),
         control = nls.control(warnOnly = TRUE)
     )
-    expect_true(coef(model)[["tau1"]] < coef(model)[["tau2"]])
+    expect_true(coef(model)[["tau"]] < coef(model)[["tau2"]])
 })
 
 test_that("analyse_biexponential() reports NA texc for a monotonic fit", {
-    ## B1 between A and B2: the fitted curve is monotonic, so there is no
+    ## B between A and B2: the fitted curve is monotonic, so there is no
     ## interior turning point
     set.seed(7)
     t <- 0:120
-    x <- biexponential(t, A = 70, B1 = 55, tau1 = 5, B2 = 40, tau2 = 40) +
+    x <- biexponential(t, A = 70, B = 55, tau = 5, B2 = 40, tau2 = 40) +
         rnorm(length(t), 0, 0.3)
     data <- create_mnirs_data(
         data.frame(time = t, smo2 = x),
@@ -395,8 +395,8 @@ test_that("analyse_biexponential() reports NA texc for a monotonic fit", {
     expect_true(is.na(result$texc))
     expect_true(is.na(result$texc_fitted))
     expect_false(is.na(result$A))
-    expect_false(is.na(result$B1))
-    expect_false(is.na(result$tau1))
+    expect_false(is.na(result$B))
+    expect_false(is.na(result$tau))
     expect_false(is.na(result$B2))
     expect_false(is.na(result$tau2))
 })
@@ -448,7 +448,7 @@ test_that("analyse_biexponential() returns NA for failed fit", {
     )
 
     expect_true(is.na(result$A))
-    expect_true(is.na(result$tau1))
+    expect_true(is.na(result$tau))
     expect_true(is.na(result$MRT))
     expect_true(is.na(result$texc_fitted))
 })
@@ -481,11 +481,11 @@ test_that("analyse_biexponential() end_window bounds the fast phase only", {
     expect_equal(nrow(fitted_data), nrow(data))
     expect_equal(attr(result, "diagnostics")$n_obs, nrow(data))
 
-    ## the stage-1 window drives tau1
+    ## the stage-1 window drives tau
     full <- analyse_biexponential(
         data, nirs_channels = "smo2", use_TD = FALSE, verbose = FALSE
     )
-    expect_false(isTRUE(all.equal(result$tau1, full$tau1)))
+    expect_false(isTRUE(all.equal(result$tau, full$tau)))
 })
 
 test_that("analyse_biexponential() bounds the fast phase about the stage-1 fit", {
@@ -501,13 +501,13 @@ test_that("analyse_biexponential() bounds the fast phase about the stage-1 fit",
         nirs_channels = "smo2",
         end_window = 20,
         use_TD = FALSE,
-        tau1_flex = 0.1,
+        tau_flex = 0.1,
         A_flex = 0.5,
         verbose = FALSE
     )
 
-    expect_true(result$tau1 >= fast$tau / 1.1 - 1e-8)
-    expect_true(result$tau1 <= fast$tau * 1.1 + 1e-8)
+    expect_true(result$tau >= fast$tau / 1.1 - 1e-8)
+    expect_true(result$tau <= fast$tau * 1.1 + 1e-8)
     expect_true(abs(result$A - fast$A) <= 0.5 + 1e-8)
     ## the slow phase separates above the fast-phase ceiling
     expect_true(result$tau2 >= fast$tau * 1.1 / tau_ratio - 1e-8)
@@ -518,28 +518,28 @@ test_that("analyse_biexponential() bounds the fast phase about the stage-1 fit",
         nirs_channels = "smo2",
         method = "biexponential",
         end_window = 20,
-        tau1_flex = list(smo2 = 0.1),
+        tau_flex = list(smo2 = 0.1),
         TD_flex = 1,
         verbose = FALSE
     )$channel_args
-    expect_equal(ca$tau1_flex, 0.1)
+    expect_equal(ca$tau_flex, 0.1)
     expect_equal(ca$TD_flex, 1)
     expect_true(is.na(ca$A_flex))
     ca <- analyse_kinetics(
         data, nirs_channels = "smo2", method = "biexponential", verbose = FALSE
     )$channel_args
-    expect_equal(ca$tau1_flex, 1 / 3)
+    expect_equal(ca$tau_flex, 1 / 3)
     expect_equal(ca$TD_flex, 2)
 })
 
 test_that("analyse_biexponential() fits a mirrored rise-overshoot response", {
     ## inverted kinetics: the response rises to a peak before settling back.
-    ## the asymptote ordering flips (B1 above A, B2 below B1) and is
+    ## the asymptote ordering flips (B above A, B2 below B) and is
     ## recovered from the data
     set.seed(31)
     t <- 0:119
     x <- biexponential(
-        t, A = 30, B1 = 55, tau1 = 10, B2 = 40, tau2 = 50
+        t, A = 30, B = 55, tau = 10, B2 = 40, tau2 = 50
     ) + rnorm(120, 0, 0.3)
     data <- create_mnirs_data(
         data.frame(time = t, smo2 = x),
@@ -553,7 +553,7 @@ test_that("analyse_biexponential() fits a mirrored rise-overshoot response", {
         verbose = FALSE
     )
 
-    expect_true(all.equal(result$B1, 55, tolerance = 5, scale = 1))
+    expect_true(all.equal(result$B, 55, tolerance = 5, scale = 1))
     expect_true(all.equal(result$B2, 40, tolerance = 5, scale = 1))
     expect_true(attr(result, "diagnostics")$r2 > 0.9)
     ## a mirrored response reports a genuine interior excursion: a maximum
@@ -576,7 +576,7 @@ test_that("analyse_biexponential() use_TD = FALSE forces the 5-param fit", {
     )
 
     expect_named(coef(attr(result, "model")$smo2),
-        c("A", "B1", "tau1", "B2", "tau2"))
+        c("A", "B", "tau", "B2", "tau2"))
     expect_true(is.na(result$TD))
 })
 
@@ -607,7 +607,7 @@ test_that("analyse_biexponential() texc is elapsed from start_time", {
     TD <- 8
     t <- start_time + 0:119
     x <- biexponential(
-        t - start_time, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40,
+        t - start_time, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40,
         TD = TD
     ) + rnorm(120, 0, 0.15)
     data <- create_mnirs_data(
@@ -625,10 +625,10 @@ test_that("analyse_biexponential() texc is elapsed from start_time", {
 
     ## must fit the 6-param model, not fall back to the 5-param form
     expect_named(coef(attr(result, "model")$smo2),
-        c("A", "B1", "tau1", "B2", "tau2", "TD"))
+        c("A", "B", "tau", "B2", "tau2", "TD"))
 
     ## MRT is the fast-phase mean response time from the fit onset
-    expect_equal(result$MRT, result$TD + result$tau1)
+    expect_equal(result$MRT, result$TD + result$tau)
     ## texc includes the TD offset from the fit onset
     expect_true(result$texc > TD)
 })
@@ -673,7 +673,7 @@ test_that("analyse_biexponential() direction = 'negative' matches auto on fallin
     ## matching direction leaves the unconstrained fit untouched
     expect_equal(result_auto$A, result_neg$A)
     expect_equal(result_auto$B2, result_neg$B2)
-    expect_equal(result_auto$tau1, result_neg$tau1)
+    expect_equal(result_auto$tau, result_neg$tau)
     expect_true(result_auto$B2 < result_auto$A)
 })
 
@@ -696,7 +696,7 @@ test_that("analyse_biexponential() direction = 'positive' rejects a negative res
     ## never returns a within-span negative fit against requested direction
     expect_true(is.na(result$A))
     expect_true(is.na(result$B2))
-    expect_true(is.na(result$tau1))
+    expect_true(is.na(result$tau))
 })
 
 test_that("analyse_biexponential() suppresses direction warning when verbose = FALSE", {
@@ -732,7 +732,7 @@ test_that("analyse_biexponential() direction with both asymptotes fixed returns 
     )
 
     expect_true(is.na(result$A))
-    expect_true(is.na(result$tau1))
+    expect_true(is.na(result$tau))
 })
 
 test_that("analyse_kinetics() passes direction to biexponential method", {
@@ -756,7 +756,7 @@ test_that("analyse_kinetics() passes direction to biexponential method", {
 ## fixed parameters =================================================
 
 test_that("analyse_biexponential() fix holds parameters constant", {
-    data <- create_biexp_data(A = 0, B1 = -20, B2 = -10, noise_sd = 0.3)
+    data <- create_biexp_data(A = 0, B = -20, B2 = -10, noise_sd = 0.3)
 
     result <- analyse_biexponential(
         data,
@@ -771,26 +771,26 @@ test_that("analyse_biexponential() fix holds parameters constant", {
     ## fixed A excluded from the fitted model coefficients
     expect_named(
         coef(attr(result, "model")$smo2),
-        c("B1", "tau1", "B2", "tau2")
+        c("B", "tau", "B2", "tau2")
     )
     expect_equal(attr(result, "channel_args")$fix, "list(A = 0)")
     expect_false(is.na(attr(result, "diagnostics")$adj_r2))
 })
 
-test_that("analyse_biexponential() fix holds tau1 constant", {
+test_that("analyse_biexponential() fix holds tau constant", {
     data <- create_biexp_data(noise_sd = 0.3)
 
     result <- analyse_biexponential(
         data,
         nirs_channels = "smo2",
-        fix = list(tau1 = 12),
+        fix = list(tau = 12),
         use_TD = FALSE,
         verbose = FALSE
     )
 
-    expect_equal(result$tau1, 12)
+    expect_equal(result$tau, 12)
     expect_named(
-        coef(attr(result, "model")$smo2), c("A", "B1", "B2", "tau2")
+        coef(attr(result, "model")$smo2), c("A", "B", "B2", "tau2")
     )
 })
 
@@ -807,9 +807,9 @@ test_that("analyse_biexponential() fix holds tau2 constant on the sequential fit
 
     expect_equal(result$tau2, 40)
     expect_named(
-        coef(attr(result, "model")$smo2), c("A", "B1", "tau1", "B2")
+        coef(attr(result, "model")$smo2), c("A", "B", "tau", "B2")
     )
-    expect_true(all.equal(result$tau1, 5, tolerance = 2, scale = 1))
+    expect_true(all.equal(result$tau, 5, tolerance = 2, scale = 1))
 })
 
 test_that("analyse_biexponential() returned model is canonical and converged", {
@@ -822,11 +822,11 @@ test_that("analyse_biexponential() returned model is canonical and converged", {
     )
     model <- attr(result, "model")$smo2
 
-    expect_named(coef(model), c("A", "B1", "tau1", "B2", "tau2", "TD"))
+    expect_named(coef(model), c("A", "B", "tau", "B2", "tau2", "TD"))
     expect_true(model$convInfo$isConv)
-    expect_true(result$tau2 >= result$tau1 / tau_ratio)
+    expect_true(result$tau2 >= result$tau / tau_ratio)
     ## coefficient table mirrors the model
-    expect_equal(result$tau1, coef(model)[["tau1"]])
+    expect_equal(result$tau, coef(model)[["tau"]])
     ## the self-start model predicts with a gradient attribute
     pred <- predict(model, newdata = data.frame(time = c(0, 10)))
     expect_length(pred, 2L)
@@ -857,7 +857,7 @@ test_that("analyse_biexponential() fix holds TD constant", {
     TD <- 8
     t <- 0:119
     x <- biexponential(
-        t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40,
+        t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40,
         TD = TD
     ) + rnorm(120, 0, 0.2)
     data <- create_mnirs_data(
@@ -877,7 +877,7 @@ test_that("analyse_biexponential() fix holds TD constant", {
     ## a fixed TD is excluded from estimation and disables the 5-param retry
     expect_named(
         coef(attr(result, "model")$smo2),
-        c("A", "B1", "tau1", "B2", "tau2")
+        c("A", "B", "tau", "B2", "tau2")
     )
 })
 
@@ -898,7 +898,7 @@ test_that("analyse_biexponential() TD is only fixable when use_TD = TRUE", {
 test_that("analyse_biexponential() fix resolves per channel", {
     ## ch2 asymptotes are each + 5 by construction
     data <- create_biexp_data(
-        A = 0, B1 = -20, B2 = -10, noise_sd = 0.3,
+        A = 0, B = -20, B2 = -10, noise_sd = 0.3,
         channels = c("ch1", "ch2")
     )
 
@@ -913,8 +913,8 @@ test_that("analyse_biexponential() fix resolves per channel", {
     expect_equal(result$A, c(0, 5))
 
     models <- attr(result, "model")
-    expect_named(coef(models$ch1), c("B1", "tau1", "B2", "tau2"))
-    expect_named(coef(models$ch2), c("B1", "tau1", "B2", "tau2"))
+    expect_named(coef(models$ch1), c("B", "tau", "B2", "tau2"))
+    expect_named(coef(models$ch2), c("B", "tau", "B2", "tau2"))
 
     ca <- attr(result, "channel_args")
     expect_equal(ca$fix, c("list(A = 0)", "list(A = 5)"))
@@ -940,7 +940,7 @@ test_that("analyse_biexponential() validates fix argument", {
             nirs_channels = "smo2",
             use_TD = TRUE,
             fix = list(
-                A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40, TD = 0
+                A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40, TD = 0
             )
         ),
         "Nothing to estimate"
@@ -964,7 +964,7 @@ test_that("analyse_kinetics() dispatches to the biexponential method", {
     expect_s3_class(result, "mnirs_kinetics")
     expect_equal(result$method, "biexponential")
     expect_true(all(
-        c("B1", "tau1", "B2", "tau2", "texc") %in%
+        c("B", "tau", "B2", "tau2", "texc") %in%
             names(result$coefficients)
     ))
 })
@@ -984,7 +984,7 @@ test_that("analyse_kinetics() resolves the 'biexp' alias", {
 })
 
 test_that("analyse_kinetics() passes fix to the biexponential method", {
-    data <- create_biexp_data(A = 0, B1 = -20, B2 = -10, noise_sd = 0.3)
+    data <- create_biexp_data(A = 0, B = -20, B2 = -10, noise_sd = 0.3)
 
     result <- analyse_kinetics(
         data,
@@ -998,17 +998,17 @@ test_that("analyse_kinetics() passes fix to the biexponential method", {
     expect_equal(result$coefficients$A, 0)
     expect_named(
         coef(result$model[[1L]]$smo2),
-        c("B1", "tau1", "B2", "tau2")
+        c("B", "tau", "B2", "tau2")
     )
 })
 
 
 ## model fallback chain =============================================
 
-## monotonic two-phase response: B1 between A and B2, no turning point
+## monotonic two-phase response: B between A and B2, no turning point
 create_monotonic_data <- function(seed = 7, TD = NULL, t = 0:119) {
     set.seed(seed)
-    x <- biexponential(t, A = 70, B1 = 55, tau1 = 5, B2 = 40, tau2 = 40, TD) +
+    x <- biexponential(t, A = 70, B = 55, tau = 5, B2 = 40, tau2 = 40, TD) +
         rnorm(length(t), 0, 0.3)
     create_mnirs_data(
         data.frame(time = t, smo2 = x),
@@ -1028,7 +1028,7 @@ create_linear_tail_data <- function(seed = 5, t = 0:119) {
 }
 
 fallback_models <- c("exponential_drift", "monoexponential")
-biexp_only <- c("B1", "tau1", "B2", "tau2")
+biexp_only <- c("B2", "tau2")
 
 test_that("analyse_kinetics() falls back from a monotonic biexponential fit", {
     data <- create_monotonic_data()
@@ -1113,10 +1113,12 @@ test_that("analyse_kinetics() keeps a supported excursion-recovery fit", {
 
     expect_equal(cf$model, "biexponential")
     expect_true(is.finite(cf$texc))
-    expect_true(all(is.na(cf[c("B", "tau", "slope")])))
+    expect_true(is.na(cf$slope))
+    ## the fast phase shares the primary-phase columns, not its own pair
+    expect_false(any(c("B1", "tau1") %in% names(cf)))
     expect_named(
         coef(result$model[[1L]]$smo2),
-        c("A", "B1", "tau1", "B2", "tau2", "TD")
+        c("A", "B", "tau", "B2", "tau2", "TD")
     )
     expect_false(any(grepl("fell back to", result$warnings$message)))
     ## the raw fit is unchanged by the triggers
@@ -1140,7 +1142,7 @@ test_that("model_fallback = FALSE keeps a monotonic fit", {
     expect_equal(cf$model, "biexponential")
     expect_true(is.na(cf$texc))
     expect_false(is.na(cf$tau2))
-    expect_false(cf$B1 == cf$B2)
+    expect_false(cf$B == cf$B2)
     expect_false(any(grepl("fell back to", result$warnings$message)))
 })
 
@@ -1198,7 +1200,7 @@ test_that("fallback carries fixed parameters over", {
         nirs_channels = "smo2",
         method = "biexponential",
         use_TD = FALSE,
-        fix = list(A = 70, B1 = 55),
+        fix = list(A = 70, B = 55),
         verbose = FALSE
     )
     cf <- result$coefficients
@@ -1241,7 +1243,7 @@ test_that("fallback resolves per interval", {
     expect_equal(cf$model[[1L]], "biexponential")
     expect_true(cf$model[[2L]] %in% fallback_models)
     expect_named(
-        coef(result$model$excursion$smo2), c("A", "B1", "tau1", "B2", "tau2")
+        coef(result$model$excursion$smo2), c("A", "B", "tau", "B2", "tau2")
     )
     expect_true(is.finite(cf$texc[[1L]]))
     expect_true(is.na(cf$tau2[[2L]]))
@@ -1303,13 +1305,13 @@ test_that("a row where every fit fails reports the last method", {
     expect_equal(sum(grepl("fell back to", result$warnings$message)), 2L)
 })
 
-test_that("map_fix() renames through nested maps", {
-    fix_map <- kinetics_fallbacks$biexponential$fix_map
+test_that("keep_fix() filters through nested maps", {
+    keep <- kinetics_fallbacks$biexponential$fix_keep
 
-    expect_equal(map_fix(list(A = 1, B1 = 2, tau2 = 3), fix_map), list(A = 1, B = 2))
-    expect_equal(map_fix(list(tau2 = 3), fix_map), setNames(list(), character()))
+    expect_equal(keep_fix(list(A = 1, B = 2, tau2 = 3), keep), list(A = 1, B = 2))
+    expect_equal(keep_fix(list(tau2 = 3), keep), setNames(list(), character()))
     expect_equal(
-        map_fix(list(smo2 = list(B1 = 2), hhb = list(tau2 = 4)), fix_map),
+        keep_fix(list(smo2 = list(B = 2), hhb = list(tau2 = 4)), keep),
         list(smo2 = list(B = 2), hhb = setNames(list(), character()))
     )
 })
@@ -1365,7 +1367,7 @@ test_that("analyse_biexponential() converges on real dataset", {
     # plot(results, components = TRUE, scales = "free")
 
     coefs <- results$coefficients
-    (success <- mean(!is.na(coefs$tau1)))
+    (success <- mean(!is.na(coefs$tau)))
     expect_true(all(success >= 1.0))
 
     (texc_success <- mean(!is.na(coefs$texc)))

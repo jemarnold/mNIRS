@@ -58,15 +58,15 @@ make_monoexp <- function(A = 50, B = 80, channels = "smo2", n = 60) {
 }
 
 ## biexponential excursion-recovery (per test-analyse_biexponential.R)
-make_biexp <- function(A = 70, B1 = 45, B2 = 60, channels = "smo2", n = 121) {
+make_biexp <- function(A = 70, B = 45, B2 = 60, channels = "smo2", n = 121) {
     set.seed(1)
     t <- seq(0, n - 1, length.out = n)
     df <- setNames(
-        data.frame(t, biexponential(t, A, B1, 5, B2, 40) + rnorm(n, 0, 0.5)),
+        data.frame(t, biexponential(t, A, B, 5, B2, 40) + rnorm(n, 0, 0.5)),
         c("time", channels[1])
     )
     for (ch in channels[-1]) {
-        df[[ch]] <- biexponential(t, A + 5, B1 + 5, 5, B2 + 5, 40) +
+        df[[ch]] <- biexponential(t, A + 5, B + 5, 5, B2 + 5, 40) +
             rnorm(n, 0, 0.5)
     }
     create_mnirs_data(
@@ -154,13 +154,13 @@ kin_monoexp <- function(A = 50, B = 80, channels = "smo2", faceted = FALSE) {
 
 kin_biexp <- function(
     A = 70,
-    B1 = 45,
+    B = 45,
     B2 = 60,
     channels = "smo2",
     faceted = FALSE
 ) {
     analyse_kinetics(
-        as_input(make_biexp(A, B1, B2, channels), faceted),
+        as_input(make_biexp(A, B, B2, channels), faceted),
         nirs_channels = channels,
         method = "biexponential",
         use_TD = FALSE,
@@ -292,7 +292,7 @@ test_that("kinetics_annotations formats method-specific labels", {
     )
     ## one row per line, in coefficient order
     biexp <- ann_labels(kinetics_annotations(kin_biexp()))$label
-    expect_equal(sub(" = .*", "", biexp), c("tau1", "texc", "tau2"))
+    expect_equal(sub(" = .*", "", biexp), c("tau", "texc", "tau2"))
     expect_match(biexp, " s$")
     sigm <- ann_labels(kinetics_annotations(kin_sigmoidal()))$label
     expect_equal(sub(" = .*", "", sigm), c("slope", "xmid"))
@@ -362,12 +362,12 @@ test_that("kinetics_annotations biexponential corner follows the plateau", {
     ## net trend is the plateau B2 against the baseline A
 
     ## fall-recover: plateau below baseline -> falls -> top corner (Inf)
-    fall <- kin_biexp(B1 = 45, B2 = 55)
+    fall <- kin_biexp(B = 45, B2 = 55)
     expect_true(all(fall$coefficients$B2 < fall$coefficients$A))
     expect_true(all(ann_labels(kinetics_annotations(fall))$yval == Inf))
 
     ## rise-overshoot: plateau above baseline -> rises -> bottom corner (-Inf)
-    rise <- kin_biexp(B1 = 95, B2 = 85)
+    rise <- kin_biexp(B = 95, B2 = 85)
     expect_true(all(rise$coefficients$B2 > rise$coefficients$A))
     expect_true(all(ann_labels(kinetics_annotations(rise))$yval == -Inf))
 })
@@ -588,11 +588,11 @@ test_that("components overlays the biexponential model terms", {
     comps <- comp_layers(p)
     expect_length(comps, 2L)
 
-    ## fast (A -> B1) and slow (B1 -> B2) terms sum to the fitted curve
+    ## fast (A -> B) and slow (B -> B2) terms sum to the fitted curve
     d <- comps[[1L]]$data
     fitted <- x$data[[1L]]$smo2_fitted
     expect_true(all.equal(
-        d$comp1 + d$comp2 - x$coefficients$B1,
+        d$comp1 + d$comp2 - x$coefficients$B,
         fitted[is.finite(fitted)],
         tolerance = 1e-6,
         scale = 1

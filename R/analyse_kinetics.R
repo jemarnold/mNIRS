@@ -80,7 +80,7 @@
 #'   Logical; default is
 #'   `TRUE`, attempts to fit the model with a "time-delay" parameter `TD`
 #'   before the response onset. i.e., a 4-parameter [SSmonoexponential()] model
-#'   (A, B, tau, TD); or a 6-parameter [biexponential()] model (A, B1, tau1,
+#'   (A, B, tau, TD); or a 6-parameter [biexponential()] model (A, B, tau,
 #'   B2, tau2, TD). If `use_TD = FALSE` or the fit fails (with a
 #'   warning), attempts to fall back to a reduced model without `TD`.
 #' @param shape **sigmoidal**: Character; the 4-parameter sigmoidal shape
@@ -192,7 +192,7 @@
 #' *"sigmoidal"* methods,
 #' `direction` also constrains the sign of the fitted amplitude `B - A`, and
 #' the sigmoidal `slope`. For the *"biexponential"* method, `direction`
-#' constrains the sign of the fast-phase amplitude `B1 - A`. A fit that
+#' constrains the sign of the fast-phase amplitude `B - A`. A fit that
 #' cannot satisfy the requested direction returns `NA` coefficients with a
 #' warning.
 #'
@@ -344,7 +344,7 @@
 #'
 #' A parametric approach fitting a self-starting biexponential
 #' excursion-recovery function to the response curve using [stats::nls()] with
-#' [SSbiexponential()]. A *fast* component (`B1`, `tau1`) drives the initial
+#' [SSbiexponential()]. A *fast* component (`B`, `tau`) drives the initial
 #' excursion while a concurrent *slow* component (`B2`, `tau2`), clocked
 #' from the same onset, recovers the response toward a stable plateau. The
 #' fitted turning point of the curve is reported as `texc` and
@@ -352,29 +352,29 @@
 #'
 #' Model equations:
 #'
-#' - 5-parameter: `A + (B1 - A) * (1 - exp(-t / tau1)) +
-#'   (B2 - B1) * (1 - exp(-t / tau2))`
+#' - 5-parameter: `A + (B - A) * (1 - exp(-t / tau)) +
+#'   (B2 - B) * (1 - exp(-t / tau2))`
 #' - 6-parameter, where `ts = pmax(t - TD, 0)`:
-#'   `A + (B1 - A) * (1 - exp(-ts / tau1)) +
-#'   (B2 - B1) * (1 - exp(-ts / tau2))`
+#'   `A + (B - A) * (1 - exp(-ts / tau)) +
+#'   (B2 - B) * (1 - exp(-ts / tau2))`
 #'
-#' `A` is the starting value. `B1` & `tau1` are the asymptote and time
+#' `A` is the starting value. `B` & `tau` are the asymptote and time
 #' constant of the fast response. `B2` & `tau2` are the asymptote and time
 #' constant of the slower response plateau as time approaches `Inf` (typically
-#' `tau2 >> tau1`). All three of `A`, `B1`, and `B2` are values on the response
+#' `tau2 >> tau`). All three of `A`, `B`, and `B2` are values on the response
 #' scale, consistent with the [monoexponential()] and sigmoidal asymptotes.
 #' Set `use_TD = TRUE` (*default*) to specify the time-delay parameter `TD`.
-#' The fast-phase mean response time `MRT = TD + tau1` is reported as for
+#' The fast-phase mean response time `MRT = TD + tau` is reported as for
 #' *"monoexponential"*.
 #' See [biexponential()] for the model family and [SSbiexponential()] for
 #' self-start initialisation.
 #'
 #' The two phases are fit sequentially. Stage 1 fits the fast phase as a
 #' *"monoexponential"* on the `end_window` window (to the first
-#' peak/trough plus `end_window`), giving `A`, `tau1`, and `TD`. Stage 2
-#' fits the full model to the whole response with `A`, `tau1`, and `TD`
-#' held within a tight range of their stage-1 values and `B1`, `B2`,
-#' `tau2` free. `tau2` is floored above the `tau1` range so the phases
+#' peak/trough plus `end_window`), giving `A`, `tau`, and `TD`. Stage 2
+#' fits the full model to the whole response with `A`, `tau`, and `TD`
+#' held within a tight range of their stage-1 values and `B`, `B2`,
+#' `tau2` free. `tau2` is floored above the `tau` range so the phases
 #' stay separated, and capped at ten times the record span: a slow tail
 #' far beyond the record identifies only its rate, not `tau2` and `B2`
 #' separately. `end_window` should be set to isolate the fast phase; the
@@ -383,17 +383,18 @@
 #'
 #' The biexponential fit is kept only when the data support both phases.
 #' A channel falls back to the *"exponential_drift"* model (fit on the
-#' whole response, with `A`, `B1` as `B`, `tau1` as `tau`, and `TD`
-#' carried over from `fix`) when the fit fails (e.g. phases not
+#' whole response, with `A`, `B`, `tau`, and `TD` carried over from
+#' `fix`) when the fit fails (e.g. phases not
 #' separable), the fitted response is monotonic (no turning point
 #' `texc`), `tau2` exceeds twice the fitted time span (a slow phase the
 #' record cannot tell from a linear drift), or the slow-phase amplitude
-#' `|B2 - B1|` is below twice the fit RMSE. The exponential-drift fit is
+#' `|B2 - B|` is below twice the fit RMSE. The exponential-drift fit is
 #' in turn subject to its own fallback to *"monoexponential"* (see
 #' below). Each fallback is warned about and recorded in `warnings`. The
 #' `model` coefficient column names the method each row comes from, and
-#' the coefficient columns are the union of the three models' parameters,
-#' `NA` where a row's model has no such parameter.
+#' the coefficient columns are the union of the three models' parameters:
+#' `A`, `B`, `tau`, `TD`, and `MRT` are shared, the rest `NA` where a
+#' row's model has no such parameter.
 #'
 #' Any parameter may be held constant with `fix`, e.g. `fix = list(A = 0)`, as
 #' above.
@@ -755,7 +756,7 @@ analyse_kinetics.biexponential <- function(
     ...,
     use_TD = TRUE,
     fix = NULL,
-    tau1_flex = 1 / 3,
+    tau_flex = 1 / 3,
     TD_flex = 2,
     A_flex = NULL
 ) {
@@ -765,7 +766,7 @@ analyse_kinetics.biexponential <- function(
     }
     ## unsupported fits fall back down the chain in `kinetics_fallbacks`;
     ## the undocumented `model_fallback = FALSE` keeps the raw fit for
-    ## troubleshooting. `tau1_flex`, `TD_flex`, `A_flex` are the stage-2
+    ## troubleshooting. `tau_flex`, `TD_flex`, `A_flex` are the stage-2
     ## half-widths about the stage-1 fast phase (see
     ## `analyse_biexponential()`), undocumented
     return(analyse_kinetics_intervals(

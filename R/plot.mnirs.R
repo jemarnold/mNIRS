@@ -323,7 +323,7 @@ plot.mnirs_kinetics <- function(
     ## undocumented `components = TRUE`: reconstruct the model terms from
     ## natural-scale coefficients over the fitted rows. comp1 is the
     ## primary monoexponential; comp2 is the secondary term: the
-    ## biexponential slow phase (B1 to B2) clocked from the onset, or the
+    ## biexponential slow phase (B to B2) clocked from the onset, or the
     ## exponential_drift linear drift from (texc, texc_fitted)
     comp_methods <- c("biexponential", "exponential_drift")
     if (isTRUE(list(...)[["components"]]) && x$method %in% comp_methods) {
@@ -350,15 +350,10 @@ plot.mnirs_kinetics <- function(
             ## absent from the schema reads as NA
             model <- co$model %||% rep(x$method, nrow(co))
             g <- \(.nm) co[[.nm]] %||% NA_real_
-            biexp <- model == "biexponential"
-            cd$comp1 <- ifelse(
-                biexp,
-                monoexponential(t_rel, g("A"), g("B1"), g("tau1"), TD),
-                monoexponential(t_rel, g("A"), g("B"), g("tau"), TD)
-            )
+            cd$comp1 <- monoexponential(t_rel, g("A"), g("B"), g("tau"), TD)
             cd$comp2 <- ifelse(
-                biexp,
-                monoexponential(t_rel, g("B1"), g("B2"), g("tau2"), TD),
+                model == "biexponential",
+                monoexponential(t_rel, g("B"), g("B2"), g("tau2"), TD),
                 ifelse(
                     model == "exponential_drift" & t_rel >= g("texc"),
                     g("texc_fitted") + g("slope") * (t_rel - g("texc")),
@@ -538,35 +533,30 @@ kinetics_annotations <- function(x) {
                 line("time = %s s", coefs$peak_slope_time)
             )
         ),
-        monoexponential = list(
-            offset = "MRT",
-            y = "MRT_fitted",
-            label = label(
-                line("TD = %s s", coefs$TD),
-                line("tau = %s s", coefs$tau),
-                line("MRT = %s s", coefs$MRT, keep = !is.na(coefs$TD))
+        ## the nls models share `A`, `B`, `tau`, `TD`, `MRT`; a parameter a
+        ## model lacks reads NA and its line is dropped. `MRT` is redundant
+        ## with `tau` without `TD`, and with a marked `texc`
+        monoexponential = ,
+        biexponential = ,
+        exponential_drift = {
+            g <- \(.nm) coefs[[.nm]] %||% NA_real_
+            offset <- intersect(c("MRT", "texc"), names(coefs))
+            list(
+                offset = offset,
+                y = paste0(offset, "_fitted"),
+                label = label(
+                    line("TD = %s s", g("TD")),
+                    line("tau = %s s", g("tau")),
+                    line(
+                        "MRT = %s s", g("MRT"),
+                        keep = !is.na(g("TD")) & is.na(g("texc"))
+                    ),
+                    line("texc = %s s", g("texc")),
+                    line("tau2 = %s s", g("tau2")),
+                    line("slope = %s /s", g("slope"), decimals = Inf)
+                )
             )
-        ),
-        biexponential = list(
-            offset = c("MRT", "texc"),
-            y = c("MRT_fitted", "texc_fitted"),
-            label = label(
-                line("TD = %s s", coefs$TD),
-                line("tau1 = %s s", coefs$tau1),
-                line("texc = %s s", coefs$texc),
-                line("tau2 = %s s", coefs$tau2)
-            )
-        ),
-        exponential_drift = list(
-            offset = c("MRT", "texc"),
-            y = c("MRT_fitted", "texc_fitted"),
-            label = label(
-                line("TD = %s s", coefs$TD),
-                line("tau = %s s", coefs$tau),
-                line("texc = %s s", coefs$texc),
-                line("slope = %s /s", coefs$slope, decimals = Inf)
-            )
-        ),
+        },
         sigmoidal = list(
             offset = "xmid",
             y = "xmid_fitted",

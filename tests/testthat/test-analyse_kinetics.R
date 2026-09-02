@@ -35,13 +35,13 @@ test_that("detect_direction detects dominant excursion from baseline", {
     ## rising limb occupies most of the record but primary direction is down
     t <- 0:120
     x <- biexponential(
-        t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40
+        t, A = 70, B = 40, tau = 5, B2 = 60, tau2 = 40
     )
     expect_equal(detect_direction(x, t), "negative")
 
     ## mirrored rise-decay overshoot
     x <- biexponential(
-        t, A = 40, B1 = 70, tau1 = 5, B2 = 50, tau2 = 40
+        t, A = 40, B = 70, tau = 5, B2 = 50, tau2 = 40
     )
     expect_equal(detect_direction(x, t), "positive")
 })
