@@ -378,7 +378,7 @@ SSbiexponential <- selfStart(
 #' `analyse_kinetics(method = "biexponential")`. Fits a biexponential
 #' excursion-recovery curve to each `nirs_channel` within a single *"mnirs"*
 #' data frame in two stages: the fast phase as a monoexponential on the
-#' `end_window` window ([fit_monoexponential()]; `Inf` resolves to 20
+#' `end_window` window ([fit_monoexponential()]; `Inf` resolves to 30
 #' time units past the first extreme), then the full
 #' [SSbiexponential()] model on the whole response with `A`, `tau1`, and
 #' `TD` box-bounded about their stage-1 values and `B1`, `B2`, `tau2`
@@ -408,7 +408,7 @@ SSbiexponential <- selfStart(
 #' @inheritParams analyse_kinetics
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
-#'   `nirs_channels`, `A`, `B1`, `tau1`, `B2`, `tau2`, `TD`, `texc`,
+#'   `nirs_channels`, `A`, `B1`, `tau1`, `MRT`, `texc`, `B2`, `tau2`, `TD`,
 #'   `texc_fitted`. Per-channel metadata are attached as attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
 #'     where fitting failed.
@@ -464,16 +464,18 @@ analyse_biexponential <- function(
 
     time_channel <- setup$time_channel
     ## `end_window` bounds the stage-1 fast phase only, so the global
-    ## default `Inf` (the whole response) is replaced by 20 time units past
+    ## default `Inf` (the whole response) is replaced by 30 time units past
     ## the first extreme
     per_channel <- lapply(setup$per_channel, \(.a) {
         if (is.infinite(.a$end_window)) {
-            .a$end_window <- 20
+            .a$end_window <- 30
         }
         .a
     })
     ## NA scaffold (method columns only) for convergence failure
-    na_cols <- c("A", "B1", "tau1", "B2", "tau2", "TD", "texc", "texc_fitted")
+    na_cols <- c(
+        "A", "B1", "tau1", "MRT", "texc", "B2", "tau2", "TD", "texc_fitted"
+    )
 
     ## method-specific fit in two stages. stage 1: the fast phase as a
     ## monoexponential on the `end_window` window (`x_fit`, `t_fit`).
@@ -589,6 +591,8 @@ analyse_biexponential <- function(
 
         ## TD is already elapsed from start_time, matching the fit time base
         TD_arg <- if (has_TD) coefs[["TD"]] else NULL
+        ## fast-phase mean response time, as for the monoexponential
+        MRT_val <- sum(TD_arg, coefs[["tau1"]])
 
         ## excursion time (texc) is the fitted turning point, reported
         ## elapsed from start_time, mirroring MRT = TD + tau; NA when the
@@ -620,10 +624,11 @@ analyse_biexponential <- function(
                 A = coefs[["A"]],
                 B1 = coefs[["B1"]],
                 tau1 = coefs[["tau1"]],
+                MRT = MRT_val,
+                texc = texc_val,
                 B2 = coefs[["B2"]],
                 tau2 = coefs[["tau2"]],
                 TD = TD_arg %||% NA_real_,
-                texc = texc_val,
                 texc_fitted = texc_fitted_val
             ),
             model,

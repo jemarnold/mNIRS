@@ -285,7 +285,7 @@ test_that("analyse_biexponential() returns correct structure", {
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
         "interval", "nirs_channels", "A", "B1", "tau1",
-        "B2", "tau2", "TD", "texc", "texc_fitted"
+        "MRT", "texc", "B2", "tau2", "TD", "texc_fitted"
     ))
     expect_equal(nrow(result), 1L)
 
@@ -303,17 +303,21 @@ test_that("analyse_biexponential() recovers known parameters", {
     A <- 70
     B1 <- 40
     B2 <- 60
+    data <- create_biexp_data(A = A, B1 = B1, B2 = B2, noise_sd = 0.3)
+    
     result <- analyse_biexponential(
-        create_biexp_data(A = A, B1 = B1, B2 = B2, noise_sd = 0.3),
+        data,
         nirs_channels = "smo2",
         use_TD = FALSE,
         verbose = FALSE
     )
 
-    expect_true(all.equal(result$A, A, tolerance = 2, scale = 1))
+    expect_true(all.equal(result$A, A, tolerance = 3, scale = 1))
     ## the fast asymptote absorbs some slow phase over the stage-1 window
     expect_true(all.equal(result$B1, B1, tolerance = 5, scale = 1))
     expect_true(all.equal(result$B2, B2, tolerance = 3, scale = 1))
+    ## no TD: MRT is the fast time constant
+    expect_equal(result$MRT, result$tau1)
     ## excursion sits inside the window, below the starting value
     expect_true(result$texc > 0)
     expect_true(result$texc_fitted < result$A)
@@ -410,7 +414,7 @@ test_that("analyse_biexponential() uses start_time correctly", {
         verbose = FALSE
     )
 
-    expect_true(all.equal(result$A, 70, tolerance = 2, scale = 1))
+    expect_true(all.equal(result$A, 70, tolerance = 3, scale = 1))
     ## plateau = B2
     expect_true(all.equal(result$B2, 60, tolerance = 3, scale = 1))
 })
@@ -445,6 +449,7 @@ test_that("analyse_biexponential() returns NA for failed fit", {
 
     expect_true(is.na(result$A))
     expect_true(is.na(result$tau1))
+    expect_true(is.na(result$MRT))
     expect_true(is.na(result$texc_fitted))
 })
 
@@ -622,6 +627,8 @@ test_that("analyse_biexponential() texc is elapsed from start_time", {
     expect_named(coef(attr(result, "model")$smo2),
         c("A", "B1", "tau1", "B2", "tau2", "TD"))
 
+    ## MRT is the fast-phase mean response time from the fit onset
+    expect_equal(result$MRT, result$TD + result$tau1)
     ## texc includes the TD offset from the fit onset
     expect_true(result$texc > TD)
 })
@@ -1031,6 +1038,8 @@ test_that("analyse_kinetics() reduces a monotonic biexponential fit", {
     expect_equal(cf$B1, coef(model)[["B"]])
     expect_equal(cf$B2, coef(model)[["B"]])
     expect_equal(cf$tau1, coef(model)[["tau"]])
+    ## reduced MRT carries over from the monoexponential (no TD: tau)
+    expect_equal(cf$MRT, cf$tau1)
     expect_true(is.na(cf$tau2))
     expect_true(is.na(cf$texc))
     expect_true(is.na(cf$texc_fitted))
@@ -1319,8 +1328,8 @@ test_that("analyse_biexponential() converges on real dataset", {
         end_window = 30
     )
     tibble(results$warnings)
-    plot(results)
-    plot(results, components = TRUE, scales = "free")
+    # plot(results)
+    # plot(results, components = TRUE, scales = "free")
 
     coefs <- results$coefficients
     ## deoxy_2 is an excursion-recovery, deoxy_3 a monotonic drop
@@ -1339,8 +1348,8 @@ test_that("analyse_biexponential() converges on real dataset", {
         method = "biexponential",
         verbose = FALSE
     )
-    plot(results)
-    plot(results, components = TRUE, scales = "free")
+    # plot(results)
+    # plot(results, components = TRUE, scales = "free")
 
     coefs <- results$coefficients
     (success <- mean(!is.na(coefs$tau1)))

@@ -76,7 +76,9 @@ kinetics_workers <- c(
 kinetics_reductions <- list(
     biexponential = list(
         to = "monoexponential",
-        coef_map = c(A = "A", B1 = "B", B2 = "B", tau1 = "tau", TD = "TD"),
+        coef_map = c(
+            A = "A", B1 = "B", B2 = "B", tau1 = "tau", TD = "TD", MRT = "MRT"
+        ),
         fix_map = c(A = "A", B2 = "B", TD = "TD"),
         ## the biexponential `end_window` bounds its fast phase only; the
         ## full model spans the whole response

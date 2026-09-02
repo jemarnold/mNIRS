@@ -96,7 +96,7 @@ print.mnirs_kinetics <- function(x, ...) {
         response_time = "Fractional Response Time",
         peak_slope = "Peak Linear Response Rate",
         monoexponential = "Monoexponential One-Phase Kinetics",
-        exponential_drift = "Exponential-Linear Two-Phase Kinetics",
+        exponential_drift = "Exponential-Linear Drift Two-Phase Kinetics",
         biexponential = "Biexponential Two-Phase Kinetics",
         sigmoidal = "Sigmoidal Inflection Kinetics"
     )
@@ -133,8 +133,6 @@ print.mnirs_kinetics <- function(x, ...) {
         cat(top_lines, sep = "\n")
         cat(spacer, "\n")
         cat(bottom_lines, sep = "\n")
-
-        ## TODO add instructions how to retrieve returned object?
     }
     cat("\n\n")
 

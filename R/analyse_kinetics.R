@@ -38,7 +38,7 @@
 #'   extreme value. `end_window = Inf` (*default*) returns the global extreme
 #'   from the full sample range (see *Details*). For *"biexponential"*,
 #'   `end_window` bounds the fast-phase (stage 1) window only, and `Inf`
-#'   resolves to `20` time units past the first extreme; the full model is
+#'   resolves to `30` time units past the first extreme; the full model is
 #'   fit to the whole response.
 #' @param group_intervals Either `"ensemble"` (*default*) to analyse all
 #'   samples of each data frame together, or a non-empty `list()` of
@@ -364,6 +364,8 @@
 #' `tau2 >> tau1`). All three of `A`, `B1`, and `B2` are values on the response
 #' scale, consistent with the [monoexponential()] and sigmoidal asymptotes.
 #' Set `use_TD = TRUE` (*default*) to specify the time-delay parameter `TD`.
+#' The fast-phase mean response time `MRT = TD + tau1` is reported as for
+#' *"monoexponential"*.
 #' See [biexponential()] for the model family and [SSbiexponential()] for
 #' self-start initialisation.
 #'
@@ -376,7 +378,7 @@
 #' stay separated, and capped at ten times the record span: a slow tail
 #' far beyond the record identifies only its rate, not `tau2` and `B2`
 #' separately. `end_window` should be set to isolate the fast phase; the
-#' default `Inf` resolves to `20` time units past the first peak/trough
+#' default `Inf` resolves to `30` time units past the first peak/trough
 #' (recorded in `channel_args`).
 #'
 #' The biexponential model is nested over the monoexponential (`B1 = B2`),
