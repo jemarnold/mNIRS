@@ -56,8 +56,8 @@
 #' `nirs_channels` and `time_channel` can be retrieved automatically from
 #'   `data` of class *"mnirs"* which has been processed with `{mnirs}`,
 #'   if not defined explicitly.
-#' 
-#' When `position` is *"min"* or *"max"*, only full windows of `width` or 
+#'
+#' When `position` is *"min"* or *"max"*, only full windows of `width` or
 #'   `span` are considered, to avoid bias from noise at edge conditions with
 #'   partial samples.
 #'
@@ -135,7 +135,7 @@ shift_mnirs <- function(
     position = c("min", "max", "first"),
     verbose = TRUE
 ) {
-    ## list or grouped input → normalise to named list, recurse per interval
+    ## list or grouped input -> normalise to named list, recurse per interval
     if (inherits(data, "grouped_df") || !is.data.frame(data)) {
         return(map_mnirs_intervals(data, match.call(), parent.frame()))
     }

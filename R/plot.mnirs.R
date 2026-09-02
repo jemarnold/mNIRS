@@ -513,59 +513,62 @@ kinetics_annotations <- function(x) {
     ## per-method: time offsets (x), fitted values (y), and label lines.
     ## `offset`/`y` are parallel vectors of coefficient names, one marker
     ## point per pair
-    annotation_spec <- \(method, coefs) switch(
-        method,
-        response_time = list(
-            offset = "response_time",
-            y = "fitted",
-            ## fraction-specific labels, e.g. "50% response = 7.9 s";
-            ## outer sprintf resolves the percentage, leaving `%s` for line()
-            label = label(line(
-                sprintf("%g%%%% response = %%s s", coefs$fraction * 100),
-                coefs$response_time
-            ))
-        ),
-        peak_slope = list(
-            offset = "peak_slope_time",
-            y = "fitted",
-            label = label(
-                line("slope = %s /s", coefs$slope, decimals = Inf),
-                line("time = %s s", coefs$peak_slope_time)
-            )
-        ),
-        ## the nls models share `A`, `B`, `tau`, `TD`, `MRT`; a parameter a
-        ## model lacks reads NA and its line is dropped. `MRT` is redundant
-        ## with `tau` without `TD`, and with a marked `texc`
-        monoexponential = ,
-        biexponential = ,
-        exponential_drift = {
-            g <- \(.nm) coefs[[.nm]] %||% NA_real_
-            offset <- intersect(c("MRT", "texc"), names(coefs))
-            list(
-                offset = offset,
-                y = paste0(offset, "_fitted"),
+    annotation_spec <- \(method, coefs) {
+        switch(
+            method,
+            response_time = list(
+                offset = "response_time",
+                y = "fitted",
+                ## fraction-specific labels, e.g. "50% response = 7.9 s";
+                ## outer sprintf resolves the percentage, leaving `%s` for line()
+                label = label(line(
+                    sprintf("%g%%%% response = %%s s", coefs$fraction * 100),
+                    coefs$response_time
+                ))
+            ),
+            peak_slope = list(
+                offset = "peak_slope_time",
+                y = "fitted",
                 label = label(
-                    line("TD = %s s", g("TD")),
-                    line("tau = %s s", g("tau")),
-                    line(
-                        "MRT = %s s", g("MRT"),
-                        keep = !is.na(g("TD")) & is.na(g("texc"))
-                    ),
-                    line("texc = %s s", g("texc")),
-                    line("tau2 = %s s", g("tau2")),
-                    line("slope = %s /s", g("slope"), decimals = Inf)
+                    line("slope = %s /s", coefs$slope, decimals = Inf),
+                    line("time = %s s", coefs$peak_slope_time)
+                )
+            ),
+            ## the nls models share `A`, `B`, `tau`, `TD`, `MRT`; a parameter a
+            ## model lacks reads NA and its line is dropped. `MRT` is redundant
+            ## with `tau` without `TD`, and with a marked `texc`
+            monoexponential = ,
+            biexponential = ,
+            exponential_drift = {
+                g <- \(.nm) coefs[[.nm]] %||% NA_real_
+                offset <- intersect(c("MRT", "texc"), names(coefs))
+                list(
+                    offset = offset,
+                    y = paste0(offset, "_fitted"),
+                    label = label(
+                        line("TD = %s s", g("TD")),
+                        line("tau = %s s", g("tau")),
+                        line(
+                            "MRT = %s s",
+                            g("MRT"),
+                            keep = !is.na(g("TD")) & is.na(g("texc"))
+                        ),
+                        line("texc = %s s", g("texc")),
+                        line("tau2 = %s s", g("tau2")),
+                        line("slope = %s /s", g("slope"), decimals = Inf)
+                    )
+                )
+            },
+            sigmoidal = list(
+                offset = "xmid",
+                y = "xmid_fitted",
+                label = label(
+                    line("slope = %s /s", coefs$slope, decimals = Inf),
+                    line("xmid = %s s", coefs$xmid)
                 )
             )
-        },
-        sigmoidal = list(
-            offset = "xmid",
-            y = "xmid_fitted",
-            label = label(
-                line("slope = %s /s", coefs$slope, decimals = Inf),
-                line("xmid = %s s", coefs$xmid)
-            )
         )
-    )
+    }
 
     ## rows are annotated by the model that fit them: the per-row `model`
     ## where the method has a fallback chain, else the method. marker rows
@@ -645,6 +648,7 @@ kinetics_annotations <- function(x) {
         lab <- ann[is_lab, ]
         idx <- stats::ave(seq_along(lab$label), lab$interval, FUN = seq_along)
         rev_idx <- stats::ave(idx, lab$interval, FUN = rev)
+        # fmt: skip
         ann$vjust[is_lab] <- ifelse(
             lab$yval < 0, 0.8 - 1.6 * rev_idx, 0.2 + 1.6 * idx
         )
@@ -661,7 +665,7 @@ kinetics_annotations <- function(x) {
 #' @returns For a single-element list, that element unchanged. Otherwise a
 #'   row-bound `data.frame` with an `interval` factor column, carrying
 #'   attributes `nirs_channels` (the union across elements), `time_channel`,
-#'   and `channel_map` — a named list mapping each channel to the interval
+#'   and `channel_map` -- a named list mapping each channel to the interval
 #'   names whose source element declares it, so [plot.mnirs()] draws each
 #'   channel only in its own panels.
 #'

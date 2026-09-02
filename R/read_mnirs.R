@@ -76,7 +76,7 @@
 #' - `"(Sample number)"` column is renamed `sample`, and a `time` column
 #'   in seconds is derived from the export sample rate (see *Time parsing*).
 #' - `"(Event)"` column is renamed `event` and set as `event_channel`.
-#' - *Oxysoft* exports a trailing un-numbered column containing optional 
+#' - *Oxysoft* exports a trailing un-numbered column containing optional
 #'   event label text. This is renamed `labels` if present, or dropped when
 #'   empty. It can be selected as the event column explicitly with
 #'   `event_channel = c(event = "labels")`.

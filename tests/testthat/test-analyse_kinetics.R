@@ -2370,6 +2370,7 @@ create_expdrift_data <- function(
     )
     if (length(channels) > 1) {
         for (ch in channels[-1]) {
+            # fmt: skip
             df[[ch]] <- exponential_drift(
                 t, A + 5, B + 5, tau, slope, tau_mult, TD
             ) +

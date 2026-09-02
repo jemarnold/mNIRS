@@ -205,7 +205,7 @@ warn_map_keys <- function(
 #'
 #' @param nirs_channels Character vector of resolved channel names.
 #' @param group_channels A quosure from `rlang::enquo()`, a character
-#'   string (`"ensemble"` or `"distinct"`), or a `list()` of (optionally named) 
+#'   string (`"ensemble"` or `"distinct"`), or a `list()` of (optionally named)
 #'   channel-name vectors.
 #' @param data A data frame for parsing bare-symbol group members.
 #' @param env Environment for symbol evaluation.

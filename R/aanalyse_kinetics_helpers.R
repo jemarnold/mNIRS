@@ -65,6 +65,7 @@ kinetics_workers <- c(
 
 ## coefficient columns of the nls methods; workers build their NA scaffolds
 ## from these and fallback chains report their union
+# fmt: skip
 kinetics_coef_cols <- list(
     monoexponential = c(
         "A", "B", "TD", "tau", "k", "MRT", "HRT", "MRT_fitted", "HRT_fitted"
@@ -98,23 +99,30 @@ kinetics_fallbacks <- list(
         ## the biexponential `end_window` bounds its fast phase only; the
         ## drift model spans the whole response
         args = list(end_window = Inf),
-        trigger = \(cf, rmse, span, t_end) first_reason(
-            "Fit failed." = is.na(cf$A),
-            "Fitted response is monotonic (texc is NA)." = !is.finite(cf$texc),
-            "tau2 exceeds twice the fitted time span." = cf$tau2 >= 2 * span,
-            "Slow-phase amplitude is below 2 RMSE." =
-                abs(cf$B2 - cf$B) < fallback_gate * rmse
-        )
+        trigger = \(cf, rmse, span, t_end) {
+            first_reason(
+                "Fit failed." = is.na(cf$A),
+                "Fitted response is monotonic (texc is NA)." = !is.finite(
+                    cf$texc
+                ),
+                "tau2 exceeds twice the fitted time span." = cf$tau2 >=
+                    2 * span,
+                "Slow-phase amplitude is below 2 RMSE." = abs(cf$B2 - cf$B) <
+                    fallback_gate * rmse
+            )
+        }
     ),
     exponential_drift = list(
         to = "monoexponential",
         fix_keep = c("A", "B", "tau", "TD"),
         args = list(),
-        trigger = \(cf, rmse, span, t_end) first_reason(
-            "Fit failed." = is.na(cf$A),
-            "Drift amplitude is below 2 RMSE." = !is.finite(cf$slope) ||
-                abs(cf$slope) * (t_end - cf$texc) < fallback_gate * rmse
-        )
+        trigger = \(cf, rmse, span, t_end) {
+            first_reason(
+                "Fit failed." = is.na(cf$A),
+                "Drift amplitude is below 2 RMSE." = !is.finite(cf$slope) ||
+                    abs(cf$slope) * (t_end - cf$texc) < fallback_gate * rmse
+            )
+        }
     )
 )
 
@@ -387,8 +395,8 @@ build_kinetics_results <- function(
     ## col[1]. result dfs built without `warnings` fall back to zero rows
     ## `channel_args` columns differ between a method and its fallbacks
     bind_attr <- function(attr_name) {
-        return(bind_union(lapply(result_list, attr, attr_name)) %||%
-            kinetics_warnings_df())
+        bind_union(lapply(result_list, attr, attr_name)) %||%
+            kinetics_warnings_df()
     }
     channel_args <- bind_attr("channel_args")
 
@@ -398,7 +406,9 @@ build_kinetics_results <- function(
     ## `nirs_channels`, then `model` where the method has a fallback
     coefs <- do.call(rbind, result_list)
     key <- \(.df) paste(.df$interval, .df$nirs_channels)
-    coefs$start_time <- channel_args$start_time[match(key(coefs), key(channel_args))]
+    coefs$start_time <- channel_args$start_time[
+        match(key(coefs), key(channel_args))
+    ]
     lead_cols <- intersect(
         c("interval", "nirs_channels", "start_time", "model"),
         names(coefs)
@@ -759,7 +769,10 @@ analyse_kinetics_intervals <- function(
     ## interval names (`trial1_hhb`) to the fitted channel names
     ## (`hhb_slope`), so intervals group across source channels
     if (recursive) {
-        src <- rep(src_channels, each = length(data_list) %/% length(src_channels))
+        src <- rep(
+            src_channels,
+            each = length(data_list) %/% length(src_channels)
+        )
         intervals <- mapply(\(.nm, .src) {
             sfx <- paste0("_", .src)
             if (endsWith(.nm, sfx)) substr(.nm, 1L, nchar(.nm) - nchar(sfx)) else .nm
@@ -848,9 +861,10 @@ run_kinetics_worker <- function(
 
     ## split the coefficient rows from the per-channel metadata attributes
     a <- attributes(res)
+    # fmt: skip
     attr_nms <- c(
-        "time_channel", "model", "fitted_data", "diagnostics", "channel_args",
-        "warnings"
+        "time_channel", "model", "fitted_data", 
+        "diagnostics", "channel_args", "warnings"
     )
     cf <- res
     attributes(cf) <- a[c("names", "row.names", "class")]
@@ -908,8 +922,15 @@ run_kinetics_worker <- function(
             if (is_map) .x[names(.x) %in% c("", chans)] else .x
         }, sub_args, names(sub_args)))
         sub <- run_kinetics_worker(
-            spec$to, data, sub_args, chans, time_quo, interval_name, verbose,
-            fallback, env
+            spec$to,
+            data,
+            sub_args,
+            chans,
+            time_quo,
+            interval_name,
+            verbose,
+            fallback,
+            env
         )
 
         ## splice the fallback channels in, keeping channel order: row-wise
@@ -1668,6 +1689,7 @@ clean_cnd_message <- function(cnd) {
     msg <- cli::ansi_strip(conditionMessage(cnd))
     ## bullet glyphs (unicode escaped for ascii source, and ascii fallbacks)
     ## lead unindented lines; wrapped lines are indented so they are untouched
+    # fmt: skip
     msg <- gsub(
         "(^|\n)[!ixv*>\u2139\u2716\u2714\u2022] ", "\\1", msg, perl = TRUE
     )

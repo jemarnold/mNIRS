@@ -225,7 +225,7 @@ extract_intervals <- function(
     verbose = TRUE,
     event_groups = deprecated()
 ) {
-    ## list input → recurse per df, flatten nested interval lists
+    ## list input -> recurse per df, flatten nested interval lists
     if (!is.data.frame(data)) {
         nested <- map_mnirs_intervals(data, match.call(), parent.frame())
         ## rename intervals `interval_<df>.<interval>` before flattening;
@@ -239,7 +239,7 @@ extract_intervals <- function(
             )
             .x
         })
-        
+
         result <- unlist(result, recursive = FALSE)
         class(result) <- class(nested)
         return(result)
@@ -340,13 +340,12 @@ extract_intervals <- function(
     validate_interval_groups(group_intervals, n_events, env)
 
     ## recycle params to match number of intervals
+    # fmt: skip
     group_channels <- recycle_param(
-        group_channels,
-        n_events,
-        group_intervals,
-        verbose,
+        group_channels, n_events, group_intervals, verbose, 
         arg = "group_channels"
     )
+    # fmt: skip
     span <- recycle_param(
         span, n_events, group_intervals, verbose, arg = "span"
     )

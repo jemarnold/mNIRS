@@ -27,7 +27,9 @@ make_ramp <- function(A = 0, B = 20, channels = "smo2") {
     x <- c(rep(A, 5), seq(A, B, length.out = 10), rep(B, 5))
     t <- seq_along(x) - 5 ## t = 0 at end of baseline
     df <- setNames(data.frame(t, x), c("time", channels[1]))
-    for (ch in channels[-1]) df[[ch]] <- x
+    for (ch in channels[-1]) {
+        df[[ch]] <- x
+    }
     create_mnirs_data(
         df,
         nirs_channels = channels,
@@ -104,7 +106,10 @@ make_expdrift <- function(channels = "smo2", n = 120) {
     set.seed(42)
     t <- seq(0, n - 1, length.out = n)
     df <- setNames(
-        data.frame(t, exponential_drift(t, 70, 40, 8, 0.2, 4) + rnorm(n, 0, 0.3)),
+        data.frame(
+            t,
+            exponential_drift(t, 70, 40, 8, 0.2, 4) + rnorm(n, 0, 0.3)
+        ),
         c("time", channels[1])
     )
     for (ch in channels[-1]) {
@@ -195,11 +200,10 @@ layer_geoms <- function(p) {
 
 ## dotted line layers drawn by `components = TRUE` (vline is not GeomLine)
 comp_layers <- function(p) {
-    Filter(
-        \(l) inherits(l$geom, "GeomLine") &&
-            identical(l$aes_params$linetype, "dotted"),
-        p$layers
-    )
+    Filter(\(l) {
+        inherits(l$geom, "GeomLine") &&
+            identical(l$aes_params$linetype, "dotted")
+    }, p$layers)
 }
 
 

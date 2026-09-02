@@ -259,9 +259,8 @@ create_biexp_data <- function(
     df <- setNames(data.frame(t, x), c("time", channels[1]))
     if (length(channels) > 1) {
         for (ch in channels[-1]) {
-            df[[ch]] <- biexponential(
-                t, A + 5, B + 5, tau, B2 + 5, tau2
-            ) + rnorm(n, 0, noise_sd)
+            df[[ch]] <- biexponential(t, A + 5, B + 5, tau, B2 + 5, tau2) +
+                rnorm(n, 0, noise_sd)
         }
     }
 
@@ -1012,7 +1011,9 @@ create_monotonic_data <- function(seed = 7, TD = NULL, t = 0:119) {
         rnorm(length(t), 0, 0.3)
     create_mnirs_data(
         data.frame(time = t, smo2 = x),
-        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+        nirs_channels = "smo2",
+        time_channel = "time",
+        sample_rate = 1
     )
 }
 
@@ -1023,7 +1024,9 @@ create_linear_tail_data <- function(seed = 5, t = 0:119) {
         rnorm(length(t), 0, 0.3)
     create_mnirs_data(
         data.frame(time = t, smo2 = x),
-        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
+        nirs_channels = "smo2",
+        time_channel = "time",
+        sample_rate = 1
     )
 }
 

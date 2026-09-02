@@ -409,6 +409,7 @@ analyse_exponential_drift <- function(
                 ## seed from the grid profile directly on the fit vectors
                 model <- tryCatch(
                     {
+                        # fmt: skip
                         start <- expdrift_start(
                             .data[[1L]], .data[[2L]], .a$fix, "TD" %in% .params
                         )

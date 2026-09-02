@@ -17,7 +17,7 @@ than the validator.}
 For a single-element list, that element unchanged. Otherwise a
 row-bound \code{data.frame} with an \code{interval} factor column, carrying
 attributes \code{nirs_channels} (the union across elements), \code{time_channel},
-and \code{channel_map} — a named list mapping each channel to the interval
+and \code{channel_map} -- a named list mapping each channel to the interval
 names whose source element declares it, so \code{\link[=plot.mnirs]{plot.mnirs()}} draws each
 channel only in its own panels.
 }

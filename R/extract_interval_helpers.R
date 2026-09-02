@@ -192,7 +192,7 @@ as_mnirs_interval <- function(x, arg = "start", env = rlang::caller_env()) {
         }
         return(structure(specs, class = "mnirs_interval_list"))
     }
-    ## integer before numeric — integers are also numeric in R
+    ## integer before numeric -- integers are also numeric in R
     if (is.integer(x)) {
         return(by_lap(x))
     }

@@ -379,6 +379,7 @@ analyse_monoexponential <- function(
         setup$time_channel,
         setup$per_channel,
         \(.nirs, x_fit, t_fit, .a, valid) {
+            # fmt: skip
             fit_monoexponential(
                 .nirs, x_fit, t_fit, .a, valid, time_channel, interval_name, env
             )
@@ -436,6 +437,7 @@ fit_monoexponential <- function(
             ## seed from the grid profile directly on the fit vectors
             tryCatch(
                 {
+                    # fmt: skip
                     start <- monoexp_start(
                         .data[[1L]], .data[[2L]], .a$fix, "TD" %in% .params
                     )

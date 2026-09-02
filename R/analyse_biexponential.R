@@ -131,7 +131,6 @@ biexp_init <- function(mCall, data, LHS, ...) {
 }
 
 
-
 ## biexponential phase separation: the largest admissible tau / tau2,
 ## shared by the start grid and the fit bounds
 tau_ratio <- 0.98
@@ -450,6 +449,7 @@ analyse_biexponential <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
+        # fmt: skip
         arg_list = mget(c(
             "use_TD", "fix", "start_time", "direction", "end_window",
             "tau_flex", "TD_flex", "A_flex"
@@ -488,6 +488,7 @@ analyse_biexponential <- function(
         ## stage 1: fixed parameters shared with the fast phase carry over
         a1 <- .a
         a1$fix <- keep_fix(fix, c("A", "B", "tau", "TD"))
+        # fmt: skip
         fast <- fit_monoexponential(
             .nirs, x_fit, t_fit, a1, valid, time_channel, interval_name, env
         )
@@ -533,7 +534,10 @@ analyse_biexponential <- function(
         }
 
         ## fast phase from stage 1 (user-fixed values already merged in)
-        prior <- c(list(A = cf1$A, tau = cf1$tau), if (has_TD) list(TD = cf1$TD))
+        prior <- c(
+            list(A = cf1$A, tau = cf1$tau),
+            if (has_TD) list(TD = cf1$TD)
+        )
         A_flex <- .a$A_flex %||% (2 * stats::sd(stats::residuals(fast$model)))
         tau_flex <- .a$tau_flex
         lower <- c(
@@ -577,7 +581,10 @@ analyse_biexponential <- function(
                     algorithm = "port",
                     lower = lower[free],
                     upper = upper[free],
-                    control = stats::nls.control(maxiter = 500L, warnOnly = TRUE)
+                    control = stats::nls.control(
+                        maxiter = 500L,
+                        warnOnly = TRUE
+                    )
                 ))
             },
             error = on_error

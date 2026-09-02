@@ -1,8 +1,8 @@
 ## example data ==========================================
 make_df <- function() {
     data.frame(
-        time  = 1:4,
-        oxy   = c(2, 5, 6, 7),
+        time = 1:4,
+        oxy = c(2, 5, 6, 7),
         deoxy = c(1, 2, 4, 5),
         total = c(3, 7, 10, 12)
     )

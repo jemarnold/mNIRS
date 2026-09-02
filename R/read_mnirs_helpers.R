@@ -252,7 +252,9 @@ resolve_channels <- function(
             list(time = c(sample = "1"))
         ## user `event_channel = "labels"` aliases the unnumbered label column
         labels_col <- legend$extra[names(legend$extra) == "labels"]
-        if (identical(unname(user$event), "labels") && length(labels_col) == 1L) {
+        if (
+            identical(unname(user$event), "labels") && length(labels_col) == 1L
+        ) {
             user$event[] <- labels_col
         }
         ## drop legend entries for columns the user has already claimed

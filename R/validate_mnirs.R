@@ -118,7 +118,7 @@ validate_numeric <- function(
         abort_validation(name, integer, msg1, msg2, env)
     }
 
-    ## valid elements length — skip NA scan when allow_na = TRUE
+    ## valid elements length -- skip NA scan when allow_na = TRUE
     if (!allow_na) {
         valid <- !is.na(x)
         n_valid <- sum(valid)
@@ -389,7 +389,7 @@ validate_event_channel <- function(
         ), call = env)
     }
 
-    ## check for empty column — character columns also check for empty strings
+    ## check for empty column -- character columns also check for empty strings
     valid_values <- if (is.character(col)) {
         !is.na(col) & nzchar(col)
     } else {
@@ -599,7 +599,9 @@ validate_fix <- function(fix, params, env = rlang::caller_env()) {
     }
 
     nms <- names(fix) %||% rep("", length(fix))
-    valid <- is.list(fix) && all(nzchar(nms)) && anyDuplicated(nms) == 0L &&
+    valid <- is.list(fix) &&
+        all(nzchar(nms)) &&
+        anyDuplicated(nms) == 0L &&
         all(vapply(fix, \(.x) {
             is.numeric(.x) && length(.x) == 1L && is.finite(.x)
         }, logical(1)))

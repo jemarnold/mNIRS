@@ -163,7 +163,7 @@ replace_mnirs <- function(
     method = c("linear", "median", "locf", "none"),
     verbose = TRUE
 ) {
-    ## list or grouped input → normalise to named list, recurse per interval
+    ## list or grouped input -> normalise to named list, recurse per interval
     if (inherits(data, "grouped_df") || !is.data.frame(data)) {
         return(map_mnirs_intervals(data, match.call(), parent.frame()))
     }
