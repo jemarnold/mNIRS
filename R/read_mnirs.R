@@ -5,7 +5,7 @@
 #' metadata.
 #'
 #' @param file_path Path of the data file to import. Supported file extensions
-#'   include `".xlsx"`, `".xls"`, `".csv"`, and `".txt"`.
+#'   include `".xls(x)"`, `".csv"`, `".txt"`, and *PIONIRS* `".ftn(2)"`.
 #'
 #' @param nirs_channels A character vector of one or more column names
 #'   containing mNIRS signals to import. Names must match the file header
@@ -189,6 +189,24 @@ read_mnirs <- function(
     names(data)[col_idx] <- new
     data <- data[c(col_idx, if (keep_all) setdiff(seq_along(data), col_idx))]
     channels <- lapply(channels, names)
+
+    ## pionirs exports a sample index and numeric tag: keep "Iteration"
+    ## beside the time column and "Tag" before the event column when
+    ## retained as extra columns rather than named channels
+    if (identical(nirs_device, "PIONIRS")) {
+        extra <- setdiff(names(data), new)
+        relocate <- \(.df, .col, ...) {
+            tibble::add_column(
+                .df[names(.df) != .col], "{.col}" := .df[[.col]], ...
+            )
+        }
+        if ("Iteration" %in% extra) {
+            data <- relocate(data, "Iteration", .after = channels$time)
+        }
+        if ("Tag" %in% extra && !is.null(channels$event)) {
+            data <- relocate(data, "Tag", .before = channels$event[1L])
+        }
+    }
 
     ## remove empty rows and columns
     ## drop metadata for an empty event column

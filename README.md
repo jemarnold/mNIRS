@@ -353,6 +353,7 @@ the following devices and apps:
   .xlsx)
 - [Moxy](https://www.moxymonitor.com/) direct export (.csv)
 - [PerfPro](https://perfprostudio.com/) PC software (.xlsx)
+- [PIONIRS](https://www.pionirs.com/) software export (.ftn and .ftn2)
 - [Train.Red](https://train.red/) app (.csv)
 - [VO2 Master Manager](https://vo2master.com/features/) app (.xlsx)
 

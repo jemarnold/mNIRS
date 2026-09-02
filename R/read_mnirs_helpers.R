@@ -10,8 +10,15 @@ read_file <- function(file_path, env = rlang::caller_env()) {
         ), call = env)
     }
 
-    ## import data_raw from either excel or csv
-    if (grepl("\\.(csv|tsv|txt)$", file_path, ignore.case = TRUE)) {
+    ## import data_raw from pionirs .ftn(2), csv, or excel
+    if (grepl("\\.ftn2?$", file_path, ignore.case = TRUE)) {
+        ## pionirs tab-separated export: header on row 1, regular columns
+        data_raw <- data.table::fread(
+            file_path,
+            header = FALSE,
+            colClasses = "character"
+        )
+    } else if (grepl("\\.(csv|tsv|txt)$", file_path, ignore.case = TRUE)) {
         ## sample lines for separator and column count detection
         ## strip whitespace inside quoted fields and around line edges
         lines <- trimws(
@@ -66,7 +73,8 @@ read_file <- function(file_path, env = rlang::caller_env()) {
         cli_abort(c(
             "x" = "Unsupported file type.",
             "i" = "{.arg file_path} = {.path {file_path}}",
-            "i" = "Currently only {.var .csv}, {.var .txt}, and {.var .xls(x)} supported."
+            "i" = "Currently only {.var .csv}, {.var .txt}, {.var .xls(x)}, \\
+            and {.var .ftn(2)} supported."
         ), call = env)
     }
 
@@ -100,11 +108,16 @@ device_patterns <- list(
         pattern = c("Time[s]", "SmO2[%]"),
         fixed = TRUE
     ),
-    ## matches `nirs_channels` with "SmO2" below
     PerfPro = list(
         time_channel = "Time",
         pattern = c("Time.*SmO2"),
         fixed = FALSE
+    ),
+    PIONIRS = list(
+        time_channel = "Time",
+        event_channel = "TagLabel",
+        pattern = c("Iteration Time", "StO2", "TagLabel"),
+        fixed = TRUE
     )
 )
 
@@ -263,14 +276,14 @@ resolve_channels <- function(
             if (length(.x) > 0L) .x
         })
     } else {
-        ## header cells starting with "SmO2", ignoring case; drop redundant
-        ## Train.Red unfiltered and Moxy Averaged channels
+        ## header cells starting with "SmO2" or "StO2", ignoring case; drop
+        ## redundant Train.Red unfiltered and Moxy Averaged channels
         header <- Filter(
             Negate(is_empty),
             as.character(raw[device$header_row, ])
         )
         smo2 <- header[
-            startsWith(toupper(header), "SMO2") &
+            grepl("^S[mt]O2", header, ignore.case = TRUE) &
                 !grepl("unfiltered|Averaged", header, ignore.case = TRUE)
         ]
         ## device default event channel only when present in the header
@@ -541,8 +554,9 @@ convert_type <- function(
     ## - other columns  -> integer to numeric, otherwise unopinionated
     data[] <- Map(\(.x, .nm) {
         if (.nm %in% channels$event) {
+            ## "-" is the pionirs placeholder for no event
             .x <- utils::type.convert(
-                .x, na.strings = c("NA", ""), as.is = TRUE
+                .x, na.strings = c("NA", "", "-"), as.is = TRUE
             )
         } else if (.nm %in% channels$nirs) {
             .x <- suppressWarnings(as.numeric(.x))

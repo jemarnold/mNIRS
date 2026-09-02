@@ -86,3 +86,4 @@ reference:
   contents:
   - ends_with("csv")
   - ends_with("xlsx")
+  - matches("ftn2?$")

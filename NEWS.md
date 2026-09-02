@@ -1,5 +1,7 @@
 # mnirs 0.7.2
 
+* `read_mnirs()` now reads *PIONIRS* `.ftn` and `.ftn2` file exports, with automatic channel detection for `StO2`, `Time`, and `TagLabel`.
+
 * `read_mnirs()` now reads channel names automatically from *Artinis Oxysoft* exports.
 
     * *"(Sample number)"* becomes *"sample"* with a derived *"time"* column as previously.

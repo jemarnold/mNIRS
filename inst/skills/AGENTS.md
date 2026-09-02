@@ -4,7 +4,7 @@
 near-infrared spectroscopy (mNIRS) processing & analysis package.
 Website: https://jemarnold.github.io/mnirs/
 
-Read `.xls(x)`/`.csv`/`.txt`/`.tsv` exports → resample → clean → filter → (transform)
+Read `.xls(x)`/`.csv`/`.txt`/`.tsv`/`.ftn(2)` exports → resample → clean → filter → (transform)
 → extract intervals → analyse kinetics → plot.
 
 ---

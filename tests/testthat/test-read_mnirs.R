@@ -127,6 +127,26 @@ test_that("read_file() reads vo2master files correctly", {
     expect_all_true(unlist(lapply(result, is.character)))
 })
 
+test_that("read_file() reads pionirs .ftn2 and .ftn files correctly", {
+    ftn2_path <- test_path("testdata/pionirs_occlusion.ftn2")
+    skip_if_not(file.exists(ftn2_path), "testdata not available")
+
+    result <- read_file(ftn2_path)
+
+    expect_s3_class(result, "data.frame")
+    expect_equal(dim(result), c(701L, 26L))
+    expect_equal(result[1, 1], "Iteration")
+    expect_all_true(unlist(lapply(result, is.character)))
+
+    file_path <- test_path("testdata/pionirs-occlusion.ftn")
+    skip_if_not(file.exists(file_path), "testdata not available")
+
+    result <- read_file(file_path)
+
+    expect_equal(dim(result), c(701L, 15L))
+    expect_equal(result[1, 15], "TagLabel")
+})
+
 test_that("read_file() errors", {
     expect_error(
         read_file("nonexistent_file.xlsx"),
@@ -231,6 +251,26 @@ test_that("detect_mnirs_device works on internal example files", {
             nirs_device = "VO2master",
             header_row = 1
         )
+    )
+})
+
+test_that("detect_mnirs_device works on pionirs files", {
+    ftn2_path <- test_path("testdata/pionirs_occlusion.ftn2")
+    skip_if_not(file.exists(ftn2_path), "testdata not available")
+
+    expect_equal(
+        read_file(ftn2_path) |>
+            detect_mnirs_device(),
+        list(nirs_device = "PIONIRS", header_row = 1L)
+    )
+
+    file_path <- test_path("testdata/pionirs-occlusion.ftn")
+    skip_if_not(file.exists(file_path), "testdata not available")
+
+    expect_equal(
+        read_file(file_path) |>
+            detect_mnirs_device(),
+        list(nirs_device = "PIONIRS", header_row = 1L)
     )
 })
 
@@ -515,6 +555,34 @@ test_that("resolve_channels() detects known channels for PerfPro", {
 
     expect_equal(result$nirs, c("SmO2 (1614)", "SmO2 (1615)"))
     expect_equal(result$time, "Time")
+})
+
+test_that("resolve_channels() detects known channels for PIONIRS", {
+    ftn2_path <- test_path("testdata/pionirs_occlusion.ftn2")
+    skip_if_not(file.exists(ftn2_path), "testdata not available")
+
+    raw <- read_file(ftn2_path)
+    device <- detect_mnirs_device(raw)
+
+    result <- resolve_channels(raw, device, test_user(), verbose = FALSE)
+
+    expect_equal(result$nirs, c("StO2(CH1)", "StO2(CH2)"))
+    expect_equal(result$time, "Time")
+    expect_equal(result$event, "TagLabel")
+})
+
+test_that("resolve_channels() detects StO2 case-insensitively for unknown device", {
+    raw <- data.frame(
+        V1 = c("Time", "0.1"),
+        V2 = c("sto2 left", "65"),
+        stringsAsFactors = FALSE
+    )
+
+    result <- resolve_channels(
+        raw, test_device(NULL), test_user(), verbose = FALSE
+    )
+
+    expect_equal(result$nirs, "sto2 left")
 })
 
 test_that("resolve_channels() errors when no SmO2 columns found", {
@@ -961,6 +1029,46 @@ test_that("read_mnirs() selects, orders, and renames columns", {
     expect_equal(names(df), c("Time", "custom", "HHb", "custom_1", "Extra"))
     expect_equal(df$custom, c(10, 20))
     expect_equal(df$custom_1, c("x", "y"))
+})
+
+test_that("read_mnirs() reads pionirs .ftn2 file with auto-detection", {
+    ftn2_path <- test_path("testdata/pionirs_occlusion.ftn2")
+    skip_if_not(file.exists(ftn2_path), "testdata not available")
+
+    df <- read_mnirs(ftn2_path, verbose = TRUE)
+
+    expect_equal(attr(df, "nirs_device"), "PIONIRS")
+    expect_equal(attr(df, "nirs_channels"), c("StO2(CH1)", "StO2(CH2)"))
+    expect_equal(attr(df, "time_channel"), "Time")
+    expect_equal(attr(df, "event_channel"), "TagLabel")
+    expect_equal(attr(df, "sample_rate"), 1)
+    expect_equal(nrow(df), 700L)
+    expect_equal(
+        names(df)[1:6],
+        c("Time", "Iteration", "Tag", "TagLabel", "StO2(CH1)", "StO2(CH2)")
+    )
+    expect_true(is.numeric(df[["StO2(CH1)"]]))
+
+    ## "-" placeholders become NA, labels retained
+    expect_true(is.character(df$TagLabel))
+    expect_equal(sum(!is.na(df$TagLabel)), 3L)
+    expect_equal(df$TagLabel[12], "Baseline")
+
+    ## Iteration dropped when keep_all = FALSE; user channel order respected
+    df <- read_mnirs(
+        ftn2_path, nirs_channels = "StO2(CH1)", verbose = FALSE
+    )
+    expect_false("Iteration" %in% names(df))
+    df <- read_mnirs(
+        ftn2_path,
+        nirs_channels = c("Iteration", "StO2(CH1)"),
+        keep_all = TRUE,
+        verbose = FALSE
+    )
+    expect_equal(
+        names(df)[1:5],
+        c("Time", "Tag", "TagLabel", "Iteration", "StO2(CH1)")
+    )
 })
 
 
