@@ -336,11 +336,12 @@ test_that("resolve_channels() returns user channels when provided", {
         verbose = FALSE
     )
 
-    expect_named(result, c("time", "event", "extra", "nirs"))
+    expect_named(result, c("time", "extra", "event", "labels", "nirs"))
     expect_equal(result$nirs, c(smo2 = "SmO2 Live"))
     expect_equal(result$time, c(time = "hh:mm:ss"))
     expect_null(result$event)
     expect_null(result$extra)
+    expect_null(result$labels)
 
     ## NULL device
     result <- resolve_channels(
@@ -368,7 +369,7 @@ test_that("resolve_channels() applies device default time with user nirs", {
         verbose = FALSE
     )
 
-    expect_equal(result$time, device_patterns$Moxy$time_channel)
+    expect_equal(result$time, name_channels(device_patterns$Moxy$time_channel))
 
     ## user time_channel overrides device default
     result <- resolve_channels(
@@ -378,7 +379,7 @@ test_that("resolve_channels() applies device default time with user nirs", {
         verbose = FALSE
     )
 
-    expect_equal(result$nirs, "SmO2 Live")
+    expect_equal(result$nirs, name_channels("SmO2 Live"))
     expect_equal(result$time, c(time = "custom_time"))
 })
 
@@ -396,8 +397,8 @@ test_that("resolve_channels() detects known channels for device", {
         verbose = FALSE
     )
 
-    expect_equal(result$nirs, "SmO2 Live")
-    expect_equal(result$time, device_patterns$Moxy$time_channel)
+    expect_equal(result$nirs, name_channels("SmO2 Live"))
+    expect_equal(result$time, name_channels(device_patterns$Moxy$time_channel))
 })
 
 test_that("resolve_channels() detects multiple SmO2 channels", {
@@ -413,7 +414,7 @@ test_that("resolve_channels() detects multiple SmO2 channels", {
         raw, test_device("PerfPro"), test_user(), verbose = FALSE
     )
 
-    expect_equal(result$nirs, c("SmO2 (1)", "SmO2 (2)"))
+    expect_equal(result$nirs, name_channels(c("SmO2 (1)", "SmO2 (2)")))
 })
 
 test_that("resolve_channels() matches SmO2 case-insensitively", {
@@ -428,7 +429,7 @@ test_that("resolve_channels() matches SmO2 case-insensitively", {
         raw, test_device("Moxy"), test_user(), verbose = FALSE
     )
 
-    expect_equal(result$nirs, c("smo2 raw", "SMO2_LIVE"))
+    expect_equal(result$nirs, name_channels(c("smo2 raw", "SMO2_LIVE")))
 })
 
 test_that("resolve_channels() drops redundant unfiltered/Averaged SmO2", {
@@ -445,8 +446,8 @@ test_that("resolve_channels() drops redundant unfiltered/Averaged SmO2", {
         raw, test_device("Train.Red"), test_user(), verbose = FALSE
     )
 
-    expect_equal(result$nirs, "SmO2")
-    expect_equal(result$event, "Lap/Event")
+    expect_equal(result$nirs, name_channels("SmO2"))
+    expect_equal(result$event, name_channels("Lap/Event"))
 
     ## device event default dropped when absent from header
     expect_null(resolve_channels(
@@ -472,22 +473,21 @@ test_that("resolve_channels() parses Artinis legend block", {
     expect_equal(result$nirs, c(vl_o2hb = "2", vl_hhb = "3"))
     expect_equal(result$time, c(sample = "1"))
     expect_equal(result$event, c(event = "4"))
-    ## unnumbered trailing column mapped to "labels"
-    expect_equal(result$extra, c(labels = "col_5"))
+    ## unnumbered trailing "labels" column only with keep_all
+    expect_null(result$labels)
 
-    ## `labels` accompanies an auto-detected event only
     result <- resolve_channels(
-        raw, device, test_user(event = c(ev = "4")), verbose = FALSE
+        raw, device, test_user(), keep_all = TRUE, verbose = FALSE
     )
-    expect_equal(result$event, c(ev = "4"))
-    expect_null(result$extra)
+    expect_equal(result$labels, c(labels = "col_5"))
 
-    ## unless keep_all
+    ## user event does not affect `labels`
     result <- resolve_channels(
         raw, device, test_user(event = c(ev = "4")), keep_all = TRUE,
         verbose = FALSE
     )
-    expect_equal(result$extra, c(labels = "col_5"))
+    expect_equal(result$event, c(ev = "4"))
+    expect_equal(result$labels, c(labels = "col_5"))
 
     ## legend entries for user-claimed columns are dropped
     result <- resolve_channels(
@@ -498,10 +498,11 @@ test_that("resolve_channels() parses Artinis legend block", {
 
     ## `event_channel = "labels"` aliases the unnumbered label column
     result <- resolve_channels(
-        raw, device, test_user(event = c(event = "labels")), verbose = FALSE
+        raw, device, test_user(event = c(event = "labels")), keep_all = TRUE,
+        verbose = FALSE
     )
     expect_equal(result$event, c(event = "col_5"))
-    expect_null(result$extra)
+    expect_null(result$labels)
 })
 
 test_that("resolve_channels() Artinis falls back without legend", {
@@ -537,7 +538,7 @@ test_that("resolve_channels() detects SmO2 for unknown device", {
         raw, test_device(NULL), test_user(), verbose = FALSE
     )
 
-    expect_equal(result$nirs, "SmO2")
+    expect_equal(result$nirs, name_channels("SmO2"))
     expect_null(result$time)
 })
 
@@ -553,8 +554,8 @@ test_that("resolve_channels() detects known channels for PerfPro", {
 
     result <- resolve_channels(raw, device, test_user(), verbose = FALSE)
 
-    expect_equal(result$nirs, c("SmO2 (1614)", "SmO2 (1615)"))
-    expect_equal(result$time, "Time")
+    expect_equal(result$nirs, name_channels(c("SmO2 (1614)", "SmO2 (1615)")))
+    expect_equal(result$time, name_channels("Time"))
 })
 
 test_that("resolve_channels() detects known channels for PIONIRS", {
@@ -566,9 +567,23 @@ test_that("resolve_channels() detects known channels for PIONIRS", {
 
     result <- resolve_channels(raw, device, test_user(), verbose = FALSE)
 
-    expect_equal(result$nirs, c("StO2(CH1)", "StO2(CH2)"))
-    expect_equal(result$time, "Time")
-    expect_equal(result$event, "TagLabel")
+    expect_equal(result$nirs, name_channels(c("StO2(CH1)", "StO2(CH2)")))
+    expect_equal(result$time, name_channels("Time"))
+    expect_equal(result$event, name_channels("TagLabel"))
+    ## companion columns only with keep_all
+    expect_null(result$extra)
+
+    result <- resolve_channels(
+        raw, device, test_user(), keep_all = TRUE, verbose = FALSE
+    )
+    expect_equal(result$extra, name_channels(c("Iteration", "Tag")))
+
+    ## user-claimed companion column dropped from extra
+    result <- resolve_channels(
+        raw, device, test_user(nirs = "Iteration"), keep_all = TRUE,
+        verbose = FALSE
+    )
+    expect_equal(result$extra, name_channels("Tag"))
 })
 
 test_that("resolve_channels() detects StO2 case-insensitively for unknown device", {
@@ -582,7 +597,7 @@ test_that("resolve_channels() detects StO2 case-insensitively for unknown device
         raw, test_device(NULL), test_user(), verbose = FALSE
     )
 
-    expect_equal(result$nirs, "sto2 left")
+    expect_equal(result$nirs, name_channels("sto2 left"))
 })
 
 test_that("resolve_channels() errors when no SmO2 columns found", {
@@ -656,7 +671,7 @@ test_that("parse_oxysoft_legend() parses full legend with labels column", {
 
     result <- parse_oxysoft_legend(data, header_row = 9L)
 
-    expect_named(result, c("time", "event", "extra", "nirs"))
+    expect_named(result, c("time", "extra", "event", "labels", "nirs"))
     expect_equal(result$time, c(sample = "1"))
     expect_equal(
         result$nirs,
@@ -664,7 +679,8 @@ test_that("parse_oxysoft_legend() parses full legend with labels column", {
     )
     expect_equal(result$event, c(event = "5"))
     ## unknown parenthesised trace kept, unnumbered trailing col -> labels
-    expect_equal(result$extra, c(tsi = "4", labels = "col_6"))
+    expect_equal(result$extra, c(tsi = "4"))
+    expect_equal(result$labels, c(labels = "col_6"))
 })
 
 test_that("parse_oxysoft_legend() omits labels without trailing column", {
@@ -681,6 +697,7 @@ test_that("parse_oxysoft_legend() omits labels without trailing column", {
     expect_equal(result$nirs, c(o2hb = "2"))
     expect_equal(result$event, c(event = "3"))
     expect_null(result$extra)
+    expect_null(result$labels)
 })
 
 test_that("parse_oxysoft_legend() returns NULL when legend missing or malformed", {
@@ -909,85 +926,109 @@ test_that("name_channels() coerces numeric ids to character and passes NULL", {
 })
 
 
-## match_channels() ===================================================
-test_that("match_channels() keeps list order and names channels", {
-    result <- match_channels(
+## select_channels() ==================================================
+## helper: character data table with unique names as in read_mnirs()
+test_data <- function(...) {
+    data.frame(..., check.names = FALSE, stringsAsFactors = FALSE)
+}
+
+test_that("select_channels() keeps role order and returns new names", {
+    data <- test_data(O2Hb = "1", HHb = "2", Time = "0", Extra = "x")
+    result <- select_channels(
+        data,
         list(time = c(time = "Time"), nirs = c(oxy = "O2Hb", deoxy = "HHb")),
-        data_names = c("O2Hb", "HHb", "Time"),
         verbose = FALSE
     )
 
-    expect_named(result, c("time", "nirs"))
-    expect_equal(result$time, c(time = "Time"))
-    expect_equal(result$nirs, c(oxy = "O2Hb", deoxy = "HHb"))
-})
+    expect_equal(names(result$data), c("time", "oxy", "deoxy"))
+    expect_named(result$channels, c("time", "nirs"))
+    expect_equal(result$channels$time, "time")
+    expect_equal(result$channels$nirs, c("oxy", "deoxy"))
 
-test_that("match_channels() names unnamed channels and drops NULL", {
-    result <- match_channels(
-        list(time = "Time", event = NULL, nirs = "O2Hb"),
-        data_names = c("O2Hb", "Time"),
+    ## keep_all appends remaining columns; NULL roles dropped
+    result <- select_channels(
+        data,
+        list(time = c(Time = "Time"), event = NULL, nirs = c(O2Hb = "O2Hb")),
+        keep_all = TRUE,
         verbose = FALSE
     )
 
-    expect_named(result, c("time", "nirs"))
-    expect_equal(result$time, c(Time = "Time"))
-    expect_equal(result$nirs, c(O2Hb = "O2Hb"))
+    expect_equal(names(result$data), c("Time", "O2Hb", "HHb", "Extra"))
+    expect_named(result$channels, c("time", "nirs"))
 })
 
-test_that("match_channels() handles un-renamed duplicate channels", {
+test_that("select_channels() channel names win clashing data names", {
+    data <- test_data(O2Hb = "1", Time = "0", custom = "x")
+    result <- select_channels(
+        data,
+        list(time = c(Time = "Time"), nirs = c(custom = "O2Hb")),
+        keep_all = TRUE,
+        verbose = FALSE
+    )
+
+    expect_equal(names(result$data), c("Time", "custom", "custom_1"))
+    expect_equal(result$data$custom, "1")
+})
+
+test_that("select_channels() handles un-renamed duplicate channels", {
+    data <- test_data(O2Hb = "1", O2Hb_1 = "2", Time = "0")
     expect_warning(
-        result <- match_channels(
-            list(time = "Time", nirs = c("O2Hb", "O2Hb")),
-            data_names = c("O2Hb", "O2Hb_1", "Time"),
+        result <- select_channels(
+            data,
+            list(time = c(Time = "Time"), nirs = c(O2Hb = "O2Hb", O2Hb = "O2Hb")),
             verbose = TRUE
         ),
         "Duplicate channel names"
     )
 
-    expect_equal(result$nirs, c(O2Hb = "O2Hb", O2Hb_1 = "O2Hb_1"))
+    expect_equal(result$channels$nirs, c("O2Hb", "O2Hb_1"))
+    expect_equal(names(result$data), c("Time", "O2Hb", "O2Hb_1"))
 })
 
-test_that("match_channels() handles renamed duplicate data columns", {
+test_that("select_channels() handles renamed duplicate data columns", {
+    data <- test_data(O2Hb = "1", O2Hb_1 = "2", Time = "0")
     expect_no_warning(
-        result <- match_channels(
-            list(time = "Time", nirs = c(oxy1 = "O2Hb", oxy2 = "O2Hb")),
-            data_names = c("O2Hb", "O2Hb_1", "Time"),
+        result <- select_channels(
+            data,
+            list(time = c(Time = "Time"), nirs = c(oxy1 = "O2Hb", oxy2 = "O2Hb")),
             verbose = TRUE
         )
     )
 
-    expect_equal(result$nirs, c(oxy1 = "O2Hb", oxy2 = "O2Hb_1"))
+    expect_equal(result$channels$nirs, c("oxy1", "oxy2"))
+    expect_equal(result$data$oxy2, "2")
 })
 
-test_that("match_channels() makes names unique across roles", {
+test_that("select_channels() makes names unique across roles", {
+    data <- test_data(SmO2 = "1", Time = "0")
     expect_warning(
-        result <- match_channels(
+        result <- select_channels(
+            data,
             list(time = c(smo2 = "Time"), nirs = c(smo2 = "SmO2")),
-            data_names = c("SmO2", "Time"),
             verbose = TRUE
         ),
         "smo2 = smo2_1"
     )
 
-    expect_equal(result$time, c(smo2 = "Time"))
-    expect_equal(result$nirs, c(smo2_1 = "SmO2"))
+    expect_equal(result$channels$time, "smo2")
+    expect_equal(result$channels$nirs, "smo2_1")
 })
 
-test_that("match_channels() errors when channel not found", {
+test_that("select_channels() errors when channel not found", {
     expect_error(
-        match_channels(
-            list(time = "Time", nirs = "HHb"),
-            data_names = c("O2Hb", "Time")
+        select_channels(
+            test_data(O2Hb = "1", Time = "0"),
+            list(time = c(Time = "Time"), nirs = c(HHb = "HHb"))
         ),
         "Channel names not detected"
     )
 })
 
-test_that("match_channels() suppresses warnings with verbose", {
+test_that("select_channels() suppresses warnings with verbose", {
     expect_silent(
-        match_channels(
-            list(time = "Time", nirs = c(o2hb = "O2Hb", o2hb = "O2Hb")),
-            data_names = c("O2Hb", "O2Hb_1", "Time"),
+        select_channels(
+            test_data(O2Hb = "1", O2Hb_1 = "2", Time = "0"),
+            list(time = c(Time = "Time"), nirs = c(o2hb = "O2Hb", o2hb = "O2Hb")),
             verbose = FALSE
         )
     )
@@ -1603,6 +1644,52 @@ test_that("read_mnirs() returns local time zone start_timestamp", {
         c("00:00:00.00", "13:52:59.00", "13:17:13.00", "00:29:00.41")
     )
 })
+
+## datetime helpers ===================================================
+test_that("hms_to_seconds() converts H:MM and H:MM:SS.fff strings", {
+    expect_equal(
+        hms_to_seconds(c("1:30", "01:02:03", "13:17:13.5", NA, "", "abc")),
+        c(5400, 3723, 47833.5, NA, NA, NA)
+    )
+})
+
+test_that("detect_dttm_format() finds first matching format from first value", {
+    expect_equal(detect_dttm_format(c(NA, "", "10:00:01")), "%H:%M:%OS")
+    expect_equal(
+        detect_dttm_format("2025-01-01T10:00:00"),
+        "%Y-%m-%dT%H:%M:%OS"
+    )
+    expect_equal(
+        detect_dttm_format("01/01/2025 10:00:00"),
+        "%d/%m/%Y %H:%M:%OS"
+    )
+    expect_null(detect_dttm_format(c("abc", "10:00:01")))
+    expect_null(detect_dttm_format(c(NA, "")))
+})
+
+test_that("parse_dttm() anchors time-only values to local midnight", {
+    midnight <- as.POSIXct(format(Sys.Date()))
+    expect_equal(
+        parse_dttm(c("10:00:00", "10:00:01"), dttm_opts[1L]),
+        midnight + c(36000, 36001)
+    )
+    expect_equal(
+        parse_dttm("2025-01-01 10:00:00", "%Y-%m-%d %H:%M:%OS"),
+        as.POSIXct("2025-01-01 10:00:00")
+    )
+})
+
+test_that("read_file() strips whitespace around csv cells", {
+    file_path <- tempfile(fileext = ".csv")
+    on.exit(unlink(file_path))
+    writeLines(c(" SmO2 , time ", " 55 ,  1"), file_path)
+
+    result <- read_file(file_path)
+
+    expect_equal(unname(unlist(result[1, ])), c("SmO2", "time"))
+    expect_equal(unname(unlist(result[2, ])), c("55", "1"))
+})
+
 
 ## oxysoft_sample_rate() ==============================================
 test_that("oxysoft_sample_rate() reads export sample rate from header", {
@@ -2448,8 +2535,8 @@ test_that("read_mnirs PerfPro", {
         "PerfPro"
     )
 
-    expect_equal(channels$time, "Time")
-    expect_equal(channels$nirs, c("SmO2 (1614)", "SmO2 (1615)"))
+    expect_equal(channels$time, name_channels("Time"))
+    expect_equal(channels$nirs, name_channels(c("SmO2 (1614)", "SmO2 (1615)")))
 
     ## integrated test
     expect_message(

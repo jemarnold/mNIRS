@@ -1,6 +1,7 @@
 # mnirs 0.7.2
 
 * `read_mnirs()` now reads *PIONIRS* `.ftn` and `.ftn2` file exports, with automatic channel detection for `StO2`, `Time`, and `TagLabel`.
+* `read_mnirs()` is faster and allocates less memory. Per-device auto-detected columns (e.g. *Artinis "labels"*, *PIONIRS "Iteration"* and *"Tag"*) are now returned more consistently when `keep_all = TRUE` (and when `nirs_channels = NULL` returns the full data table for known NIRS device file formats).
 
 * `read_mnirs()` now reads channel names automatically from *Artinis Oxysoft* exports.
 

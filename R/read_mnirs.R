@@ -85,12 +85,18 @@
 #'   in seconds is automatically derived from the export sample rate.
 #' - `"(Event)"` column is renamed `event` and set as `event_channel`.
 #' - *Oxysoft* exports a trailing un-numbered column containing optional
-#'   event label text. This is renamed `labels` if present, or dropped when
-#'   empty. It can be selected as the event column explicitly with
-#'   `event_channel = c(event = "labels")`.
+#'   event label text. This is renamed `labels` and returned with
+#'   `keep_all = TRUE`, or dropped when empty. It can be selected as the
+#'   event column explicitly with `event_channel = c(event = "labels")`.
 #'
 #' Explicit `nirs_channels`, `time_channel`, and `event_channel` renaming
 #' (as above) overrides automatically detected names.
+#'
+#' ## PIONIRS exports
+#' *PIONIRS* `.ftn(2)` files are detected with `"Time"` as `time_channel`,
+#' `"TagLabel"` as `event_channel`, and `StO2` channels as `nirs_channels`.
+#' The `"Iteration"` sample index and numeric `"Tag"` companion columns are
+#' returned beside `time_channel` and `event_channel` with `keep_all = TRUE`.
 #'
 #' ## Time parsing
 #' If `time_channel` is left as `NULL`, it can be resolved from a known
@@ -173,8 +179,10 @@ read_mnirs <- function(
     keep_all <- keep_all || is.null(nirs_channels)
 
     ## resolve channels from user input, device defaults, or Oxysoft legend
+    ## as named `c(new = "original")` by role; role order = column order
     channels <- resolve_channels(raw, device, user, keep_all, verbose)
     header_row <- find_header_row(raw, channels$nirs, device$header_row)
+    header <- raw[seq_len(header_row), ]
 
     ## name data table by header row
     ## blank/duplicate names made unique
@@ -182,36 +190,13 @@ read_mnirs <- function(
         raw[-seq_len(header_row), ],
         rename_duplicates(as.character(raw[header_row, ]))
     )
-    channels$time <- channels$time %||% detect_time_channel(data, verbose)
+    channels$time <- channels$time %||%
+        name_channels(detect_time_channel(data, verbose))
 
-    ## select and rename channels
-    ## names take priority over clashing data names
-    channels <- match_channels(channels, names(data), verbose)
-    original <- unlist(channels, use.names = FALSE)
-    new <- unlist(lapply(channels, names), use.names = FALSE)
-    col_idx <- match(original, names(data))
-    names(data) <- rename_duplicates(c(new, names(data)))[-seq_along(new)]
-    names(data)[col_idx] <- new
-    data <- data[c(col_idx, if (keep_all) setdiff(seq_along(data), col_idx))]
-    channels <- lapply(channels, names)
-
-    ## pionirs exports a sample index and numeric tag: keep "Iteration"
-    ## beside the time column and "Tag" before the event column when
-    ## retained as extra columns rather than named channels
-    if (identical(nirs_device, "PIONIRS")) {
-        extra <- setdiff(names(data), new)
-        relocate <- \(.df, .col, ...) {
-            tibble::add_column(
-                .df[names(.df) != .col], "{.col}" := .df[[.col]], ...
-            )
-        }
-        if ("Iteration" %in% extra) {
-            data <- relocate(data, "Iteration", .after = channels$time)
-        }
-        if ("Tag" %in% extra && !is.null(channels$event)) {
-            data <- relocate(data, "Tag", .before = channels$event[1L])
-        }
-    }
+    ## select, rename, and order channel columns
+    selected <- select_channels(data, channels, keep_all, verbose)
+    data <- selected$data
+    channels <- selected$channels
 
     ## remove empty rows and columns
     ## drop metadata for an empty event column
@@ -226,7 +211,7 @@ read_mnirs <- function(
     ## time series lacks an absolute date-time
     time_list <- parse_time_channel(
         data[[channels$time]],
-        extract_start_timestamp(raw[seq_len(header_row), ]),
+        extract_start_timestamp(header),
         zero_time
     )
     data[[channels$time]] <- time_list$time
@@ -241,7 +226,7 @@ read_mnirs <- function(
     ## Oxysoft exports a sample index: derive a "time" column in seconds
     ## from the export sample rate, placed in front of the sample column
     if (identical(nirs_device, "Artinis")) {
-        sample_rate <- oxysoft_sample_rate(raw[seq_len(header_row), ])
+        sample_rate <- oxysoft_sample_rate(header)
         time_new <- make.unique(c(names(data), "time"), sep = "_")[
             ncol(data) + 1L
         ]
