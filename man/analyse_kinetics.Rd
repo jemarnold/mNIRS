@@ -123,9 +123,9 @@ i.e. each data frame or each \code{group_intervals} sample group. Any
 \code{interval_times} metadata is shifted by the same offset so \code{start_time}
 retrieved from metadata stays aligned.}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
+silence warnings and information messages helpful for troubleshooting.
+Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Additional arguments passed to the underlying method function.
 See \emph{Details}.}
@@ -341,7 +341,7 @@ warning.
 
 Arguments apply globally to all \code{nirs_channels} by default. Arguments can
 instead be uniquely supplied per-channel as a named \code{list()} with names
-matching \code{nirs_channels}, e.g.:
+matching \code{nirs_channels}, e.g.
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{analyse_kinetics(
     data,
@@ -381,7 +381,7 @@ fix = list(smo2_left = list(A = 0), smo2_right = list(A = 5, B = 100))
 For multi-interval input (a list of data frames or a grouped data frame),
 the same arguments can also be supplied per-interval as a named \code{list()}
 keyed by interval name (the list names, group keys, or \verb{interval_<n>}),
-e.g.:
+e.g.
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{analyse_kinetics(
     data_list,

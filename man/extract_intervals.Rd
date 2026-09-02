@@ -105,9 +105,9 @@ boundaries:
 numeric \code{time_channel} values to start from zero within each interval
 data frame.}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
+silence warnings and information messages helpful for troubleshooting.
+Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{event_groups}{\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} Renamed to
 \code{group_intervals} for naming consistency across the package.}

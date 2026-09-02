@@ -21,9 +21,9 @@ resolve_channels(
 \item{user}{A list of user-specified \code{time}, \code{event}, and \code{nirs} channels,
 each a named character vector \code{c(new = "original")} or \code{NULL}.}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
+silence warnings and information messages helpful for troubleshooting.
+Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{env}{The calling environment or a defused call, used to report
 errors and warnings as coming from the user-facing function rather

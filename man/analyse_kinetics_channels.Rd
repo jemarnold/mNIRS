@@ -35,9 +35,9 @@ returning a list with \code{coefs} (1-row data frame of method coefficients,
 \code{start_time}, so time coefficients need no further offset, and
 \code{window_idx} must index the original data frame rows.}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
+silence warnings and information messages helpful for troubleshooting.
+Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{interval_name}{Character; the interval name recorded in the \code{interval}
 column of the returned coefficients, \code{diagnostics}, and \code{channel_args}.}

@@ -36,9 +36,9 @@ vectors; see \code{\link[=split_kinetics_groups]{split_kinetics_groups()}}.}
 \code{time_channel} to start from zero, shifting \code{interval_times} metadata
 by the same offset.}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
+silence warnings and information messages helpful for troubleshooting.
+Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{call}{The matched call from the user-facing method.}
 

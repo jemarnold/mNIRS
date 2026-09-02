@@ -66,7 +66,7 @@
 #' Arguments apply globally to all `nirs_channels` by default. Relevant
 #' arguments can instead be supplied uniquely per-channel as a named `list()`,
 #' with names matching either `nirs_channels` or list names in
-#' `group_channels`, e.g.:
+#' `group_channels`, e.g.
 #'
 #' ```r
 #' shift_mnirs(

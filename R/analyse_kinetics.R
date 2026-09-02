@@ -200,7 +200,7 @@
 #'
 #' Arguments apply globally to all `nirs_channels` by default. Arguments can
 #' instead be uniquely supplied per-channel as a named `list()` with names
-#' matching `nirs_channels`, e.g.:
+#' matching `nirs_channels`, e.g.
 #'
 #' ```r
 #' analyse_kinetics(
@@ -240,7 +240,7 @@
 #' For multi-interval input (a list of data frames or a grouped data frame),
 #' the same arguments can also be supplied per-interval as a named `list()`
 #' keyed by interval name (the list names, group keys, or `interval_<n>`),
-#' e.g.:
+#' e.g.
 #'
 #' ```r
 #' analyse_kinetics(

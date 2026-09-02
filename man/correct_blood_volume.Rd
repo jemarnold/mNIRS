@@ -28,9 +28,9 @@ match exactly.}
 haemoglobin and myoglobin, \emph{THb}; proxy for blood volume) column in \code{data}.
 Must match exactly.}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
+silence warnings and information messages helpful for troubleshooting.
+Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 A \link[tibble:tibble-package]{tibble} of class \emph{"mnirs"} with blood

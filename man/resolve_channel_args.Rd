@@ -38,9 +38,9 @@ needed for arguments whose formal default is not \code{NULL} (e.g.
 Resolved values are matched per channel; a full default vector
 resolves to its first element, matching \code{\link[=match.arg]{match.arg()}} behaviour.}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
+silence warnings and information messages helpful for troubleshooting.
+Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{env}{The calling environment, used to report errors as coming
 from the user-facing function (e.g. \code{\link[=rescale_mnirs]{rescale_mnirs()}}).}

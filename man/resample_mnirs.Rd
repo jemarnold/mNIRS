@@ -51,9 +51,9 @@ using \code{\link[stats:approx]{stats::approx()}}. Suitable for numeric columns 
 columns will fall back to \code{"locf"} behaviour.}
 }}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
+silence warnings and information messages helpful for troubleshooting.
+Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 }
 \value{
 A \link[tibble:tibble-package]{tibble} of class \code{"mnirs"}. Metadata are

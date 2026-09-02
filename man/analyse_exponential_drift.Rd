@@ -73,9 +73,9 @@ from the full sample range (see \emph{Details}). For \emph{"biexponential"},
 resolves to \code{30} time units past the first extreme; the full model is
 fit to the whole response.}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
+silence warnings and information messages helpful for troubleshooting.
+Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Additional arguments passed to the underlying method function.
 See \emph{Details}.}

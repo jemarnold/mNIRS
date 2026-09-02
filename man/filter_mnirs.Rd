@@ -61,9 +61,9 @@ returned vector. If \code{TRUE}, ignores \code{NA}s and processes available vali
 samples within the local window. May return errors or warnings. (see
 \emph{Details}).}
 
-\item{verbose}{Logical. Default is \code{TRUE}. Display or silence (if \code{FALSE})
-warnings and information messages helpful for troubleshooting. Ad
-global default can be set via \code{options(mnirs.verbose = FALSE)}.}
+\item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
+silence warnings and information messages helpful for troubleshooting.
+Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Additional arguments passed to the underlying method function.
 See \emph{Details}.}
@@ -217,7 +217,7 @@ a separate interval, returned as a named list.
 
 Arguments apply globally to all \code{nirs_channels} by default. Relevant
 arguments can instead be supplied uniquely per-channel as a named \code{list()},
-with names matching \code{nirs_channels}, e.g.:
+with names matching \code{nirs_channels}, e.g.
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{replace_mnirs(
     data,
