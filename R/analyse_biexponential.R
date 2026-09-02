@@ -140,7 +140,8 @@ tau_ratio <- 0.98
 #' Grid-profiled starting estimates for the biexponential model
 #'
 #' Vector-level initialiser behind [biexp_init()], called directly by the
-#' kinetics worker on the fit window. Profiles the time constants (and
+#' kinetics worker with `tau1` and `TD` held at their stage-1 values to
+#' seed the slow phase. Profiles the time constants (and
 #' `TD`) on a coarse grid and keeps the RSS-minimising start (cf.
 #' [expdrift_start()]). The model is linear in `A`, `B1`, and `B2` once
 #' `tau1`, `tau2`, and `TD` are held, so those are solved by least squares
@@ -238,19 +239,14 @@ biexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
 #' canonical parameters. [biexp_model()] is the model function of
 #' [SSbiexponential()]: [biexponential()] plus the gradient for the
 #' parameters written as bare symbols in the call (see [free_params()]),
-#' so [stats::nls()] skips [stats::numericDeriv()]. [biexp_ratio()] is
-#' the internal fitting model on `(r = tau1 / tau2, tau2)`: the phase
-#' separation becomes the box bound `r <= 0.98`, closing the
-#' non-identifiable valley at `tau1 -> tau2` that stalls the canonical
-#' fit with a runaway `B1`.
+#' so [stats::nls()] skips [stats::numericDeriv()].
 #'
-#' @param r A numeric parameter for the time-constant ratio `tau1 / tau2`.
 #' @inheritParams biexponential
 #'
 #' @returns [biexp_core()]: a list of the curve `val` and the partial
-#'   derivatives by parameter name. [biexp_model()], [biexp_ratio()]: a
-#'   numeric vector of predicted values with a `"gradient"` attribute when
-#'   any parameter is free.
+#'   derivatives by parameter name. [biexp_model()]: a numeric vector of
+#'   predicted values with a `"gradient"` attribute when any parameter is
+#'   free.
 #'
 #' @keywords internal
 biexp_core <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
@@ -288,25 +284,6 @@ biexp_model <- function(t, A, B1, tau1, B2, tau2, TD = NULL) {
 }
 
 
-#' @rdname biexp_core
-#' @keywords internal
-biexp_ratio <- function(t, A, B1, r, B2, tau2, TD = NULL) {
-    g <- biexp_core(t, A, B1, r * tau2, B2, tau2, TD)
-    val <- g$val
-    free <- free_params(
-        match.call(),
-        c("A", "B1", "r", "B2", "tau2", if (!is.null(TD)) "TD")
-    )
-    if (length(free) > 0L) {
-        ## chain rule through tau1 = r * tau2
-        g$r <- g$tau1 * tau2
-        g$tau2 <- g$tau2 + g$tau1 * r
-        attr(val, "gradient") <- do.call(cbind, g[free])
-    }
-    return(val)
-}
-
-
 #' Self-starting biexponential model
 #'
 #' Creates initial coefficient estimates for a `selfStart` wrapper around
@@ -330,8 +307,8 @@ biexp_ratio <- function(t, A, B1, r, B2, tau2, TD = NULL) {
 #' The two phases are weakly identified when `tau1` and `tau2` are close, so
 #' `algorithm = "port"` with the time constants bounded non-negative and
 #' `control = nls.control(warnOnly = TRUE)` is recommended.
-#' [analyse_kinetics()] additionally fits on the ratio `tau1 / tau2` to
-#' hold the phases apart.
+#' [analyse_kinetics()] instead fits the phases sequentially, holding the
+#' fast phase near a monoexponential estimate.
 #'
 #' The model function returns the analytic gradient for the free
 #' parameters as a `"gradient"` attribute, so [stats::nls()] does not
@@ -400,12 +377,17 @@ SSbiexponential <- selfStart(
 #' Internal channel-level dispatch for
 #' `analyse_kinetics(method = "biexponential")`. Fits a biexponential
 #' excursion-recovery curve to each `nirs_channel` within a single *"mnirs"*
-#' data frame. See [analyse_kinetics()] for user-facing documentation.
+#' data frame in two stages: the fast phase as a monoexponential on the
+#' `end_window` window ([fit_monoexponential()]; `Inf` resolves to 20
+#' time units past the first extreme), then the full
+#' [SSbiexponential()] model on the whole response with `A`, `tau1`, and
+#' `TD` box-bounded about their stage-1 values and `B1`, `B2`, `tau2`
+#' free. See [analyse_kinetics()] for user-facing documentation.
 #'
-#' @param use_TD Logical; `TRUE` attempts to fit a 6-parameter
-#'   [SSbiexponential()] model (A, B1, tau1, B2, tau2, TD) with a time
-#'   delay. If the 6-parameter fit fails, or if `use_TD = FALSE`, attempts
-#'   to fit a reduced 5-parameter [SSbiexponential()] model without `TD`.
+#' @param use_TD Logical; `TRUE` attempts to fit the fast phase with a
+#'   time delay, giving a 6-parameter [SSbiexponential()] model (A, B1,
+#'   tau1, B2, tau2, TD). If that fit fails, or if `use_TD = FALSE`, the
+#'   reduced 5-parameter model without `TD` is fit.
 #' @param fix An *optional* named list of model parameters (`A`, `B1`,
 #'   `tau1`, `B2`, `tau2`, `TD`) to hold constant during fitting, e.g.
 #'   `fix = list(A = 0)`. Fixed parameters are excluded from estimation and
@@ -413,6 +395,15 @@ SSbiexponential <- selfStart(
 #'   per-channel as a list of lists keyed by channel name, e.g.
 #'   `fix = list(smo2 = list(A = 0))`. `TD` is fixable for channels where
 #'   `use_TD = TRUE`; a fixed `TD` disables the 5-parameter fallback.
+#' @param tau1_flex Numeric; multiplicative half-width of the stage-2
+#'   `tau1` bounds about the stage-1 value,
+#'   `tau1 * [1 / (1 + tau1_flex), 1 + tau1_flex]`. `tau2` is floored at
+#'   the `tau1` ceiling divided by `0.98` and capped at ten times the span.
+#' @param TD_flex Numeric; additive half-width of the stage-2 `TD` bounds
+#'   in units of `time_channel`, floored at `0`.
+#' @param A_flex Numeric; additive half-width of the stage-2 `A` bounds on
+#'   the response scale. `NULL` (*default*) uses twice the stage-1
+#'   residual standard deviation.
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
 #'
@@ -442,6 +433,9 @@ analyse_biexponential <- function(
     end_window = Inf,
     verbose = TRUE,
     ...,
+    tau1_flex = 1 / 3,
+    TD_flex = 2,
+    A_flex = NULL,
     env = rlang::caller_env()
 ) {
     ## validation ==================================================
@@ -455,9 +449,10 @@ analyse_biexponential <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = mget(
-            c("use_TD", "fix", "start_time", "direction", "end_window")
-        ),
+        arg_list = mget(c(
+            "use_TD", "fix", "start_time", "direction", "end_window",
+            "tau1_flex", "TD_flex", "A_flex"
+        )),
         choices = list(direction = c("auto", "positive", "negative")),
         ## TD is only fixable where that channel fits the 6-parameter model
         fix_params = \(.a) {
@@ -468,206 +463,132 @@ analyse_biexponential <- function(
     )
 
     time_channel <- setup$time_channel
+    ## `end_window` bounds the stage-1 fast phase only, so the global
+    ## default `Inf` (the whole response) is replaced by 20 time units past
+    ## the first extreme
+    per_channel <- lapply(setup$per_channel, \(.a) {
+        if (is.infinite(.a$end_window)) {
+            .a$end_window <- 20
+        }
+        .a
+    })
     ## NA scaffold (method columns only) for convergence failure
     na_cols <- c("A", "B1", "tau1", "B2", "tau2", "TD", "texc", "texc_fitted")
 
-    ## the phases separate at tau1 / tau2 <= `r_max`, matching the start
-    ## grid; a fit pinned at the bound wants the non-identifiable
-    ## tau1 = tau2 valley and is reported as such
-    r_max <- tau_ratio
-    pinned <- \(cf) isTRUE(cf[["r"]] >= r_max * (1 - 1e-6))
-    not_separable <- "Fast and slow phases are not separable (tau1 approaches tau2)."
+    ## method-specific fit in two stages. stage 1: the fast phase as a
+    ## monoexponential on the `end_window` window (`x_fit`, `t_fit`).
+    ## stage 2: the biexponential on the full response, with A, tau1, and
+    ## TD box-bounded around their stage-1 values by the `*_flex`
+    ## half-widths; B1, B2, and tau2 free. a failed stage returns NA, and
+    ## the nested monoexponential comparator resolves the row upstream
+    biexp_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
+        fix <- .a$fix %||% list()
 
-    ## canonical <-> ratio coefficient vectors, keeping parameter order
-    to_ratio <- \(cf) {
-        cf[["tau1"]] <- cf[["tau1"]] / cf[["tau2"]]
-        names(cf) <- sub("^tau1$", "r", names(cf))
-        cf
-    }
-    to_canon <- \(cf) {
-        cf[["r"]] <- cf[["r"]] * cf[["tau2"]]
-        names(cf) <- sub("^r$", "tau1", names(cf))
-        cf
-    }
-
-    ## fit bounds. ratio space: taus floored as degeneracy markers, r
-    ## capped at the separation, tau2 capped so a runaway slow component
-    ## cannot diverge with B2. canonical space: the separation is the box
-    ## bound tau2 >= tau1 / r_max when tau1 is user-fixed, else only the floor
-    ## (the canonical refit starts at a separated optimum)
-    bounds <- \(span, ratio, fix) {
-        if (ratio) {
-            list(
-                lower = c(r = 1e-6, tau2 = span * 1e-6, TD = 0),
-                upper = c(r = r_max, tau2 = 10 * span)
-            )
-        } else {
-            list(
-                lower = c(
-                    tau1 = span * 1e-6,
-                    tau2 = max(span * 1e-6, fix$tau1 / r_max),
-                    TD = 0
-                ),
-                upper = c(tau2 = 10 * span)
-            )
+        ## stage 1: fixed parameters map onto the fast phase
+        a1 <- .a
+        a1$fix <- map_fix(fix, c(A = "A", B1 = "B", tau1 = "tau", TD = "TD"))
+        fast <- fit_monoexponential(
+            .nirs, x_fit, t_fit, a1, valid, time_channel, interval_name, env
+        )
+        if (is.null(fast$model)) {
+            return(build_na_results(na_cols))
         }
-    }
-    ## named box over the free parameters, unbounded where unset
-    box <- \(bnd, free, fill) {
-        b <- setNames(bnd[free], free)
-        b[is.na(b)] <- fill
-        b
-    }
-    port_fit <- \(formula, .data, start, bnd, on_error) {
-        lower <- box(bnd$lower, names(start), -Inf)
-        upper <- box(bnd$upper, names(start), Inf)
-        tryCatch(
-            suppressWarnings(nls(
-                formula,
-                .data,
-                ## a grid edge can overshoot its cap by rounding
-                start = pmin(pmax(start, lower), upper),
-                algorithm = "port",
-                lower = lower,
-                upper = upper,
-                control = stats::nls.control(maxiter = 500L, warnOnly = TRUE)
-            )),
+        cf1 <- fast$coefs
+        has_TD <- is.finite(cf1$TD)
+        params <- c("A", "B1", "tau1", "B2", "tau2", if (has_TD) "TD")
+        free <- setdiff(params, names(fix))
+
+        ## stage 2 window: the full response; the TD model is flat at A
+        ## before TD so the pre-onset baseline is kept, as in
+        ## `fit_td_fallback()`
+        t_rel <- data[[time_channel]] - .a$start_time
+        idx <- which(is.finite(data[[.nirs]]) & is.finite(t_rel))
+        x_full <- data[[.nirs]][idx]
+        t_full <- t_rel[idx]
+        keep <- has_TD | t_full >= 0
+        fit_data <- setNames(
+            data.frame(x_full[keep], t_full[keep]),
+            fit_names(.nirs, time_channel, params)
+        )
+        span <- diff(range(fit_data[[2L]]))
+        on_error <- \(e) {
+            warn_fit_failed(
+                quote(SSbiexponential),
+                e,
+                .nirs,
+                interval_name,
+                length(params),
+                env = env
+            )
+            NULL
+        }
+        if (nrow(fit_data) <= length(free)) {
+            on_error(simpleError(sprintf(
+                "%d observations for %d free parameters.",
+                nrow(fit_data),
+                length(free)
+            )))
+            return(build_na_results(na_cols))
+        }
+
+        ## fast phase from stage 1 (user-fixed values already merged in)
+        prior <- c(list(A = cf1$A, tau1 = cf1$tau), if (has_TD) list(TD = cf1$TD))
+        A_flex <- .a$A_flex %||% (2 * stats::sd(stats::residuals(fast$model)))
+        tau1_flex <- .a$tau1_flex
+        lower <- c(
+            A = prior$A - A_flex,
+            B1 = -Inf,
+            tau1 = prior$tau1 / (1 + tau1_flex),
+            B2 = -Inf,
+            ## the slow phase separates above the fast-phase ceiling
+            tau2 = prior$tau1 * (1 + tau1_flex) / tau_ratio,
+            TD = if (has_TD) max(0, prior$TD - .a$TD_flex)
+        )
+        upper <- c(
+            A = prior$A + A_flex,
+            B1 = Inf,
+            tau1 = prior$tau1 * (1 + tau1_flex),
+            B2 = Inf,
+            ## a slow tail far beyond the record identifies only its rate
+            tau2 = 10 * span,
+            TD = if (has_TD) prior$TD + .a$TD_flex
+        )
+        ## B1, B2, tau2 seeded by the start grid with the fast phase held
+        model <- tryCatch(
+            {
+                start <- biexp_start(
+                    fit_data[[1L]],
+                    fit_data[[2L]],
+                    utils::modifyList(fix, prior[names(prior) != "A"]),
+                    has_TD
+                )
+                start[names(prior)] <- unlist(prior)
+                suppressWarnings(nls(
+                    build_ss_formula(
+                        quote(SSbiexponential),
+                        params,
+                        fix,
+                        names(fit_data)[[1L]],
+                        names(fit_data)[[2L]]
+                    ),
+                    fit_data,
+                    start = pmin(pmax(start[free], lower[free]), upper[free]),
+                    algorithm = "port",
+                    lower = lower[free],
+                    upper = upper[free],
+                    control = stats::nls.control(maxiter = 500L, warnOnly = TRUE)
+                ))
+            },
             error = on_error
         )
-    }
-
-    ## method-specific fit: biexponential via nls port on the ratio
-    ## parameterisation, or canonical when tau1 is user-fixed (r is then
-    ## not a box bound); a failed 6-param fit falls back to the 5-param
-    ## model. the returned model is always canonical
-    biexp_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
-        fix <- .a$fix
-        ratio <- !"tau1" %in% names(fix)
-        space <- \(.params) if (ratio) sub("^tau1$", "r", .params) else .params
-
-        ## port often stops short of its certificate on usable
-        ## coefficients, which are kept with a warning
-        fitter <- \(.data, .params, on_error) {
-            params <- space(.params)
-            free <- setdiff(params, names(fix))
-            start <- tryCatch(
-                biexp_start(.data[[1L]], .data[[2L]], fix, "TD" %in% .params),
-                error = on_error
-            )
-            if (is.null(start)) {
-                return(NULL)
-            }
-            if (ratio) {
-                start <- to_ratio(start)
-            }
-            formula <- build_ss_formula(
-                if (ratio) quote(biexp_ratio) else quote(SSbiexponential),
-                params,
-                fix,
-                names(.data)[[1L]],
-                names(.data)[[2L]]
-            )
-            bnd <- bounds(diff(range(.data[[2L]])), ratio, fix)
-            model <- accept_port_fit(
-                port_fit(formula, .data, start[free], bnd, on_error),
-                on_error
-            )
-            ## a property of the data, so the reduced model is not retried
-            if (!is.null(model) && ratio && pinned(coef(model))) {
-                return(on_error(fit_final_error(not_separable)))
-            }
-            model
-        }
-
-        fit <- fit_td_fallback(
-            x_fit,
-            t_fit,
-            params = c("A", "B1", "tau1", "B2", "tau2", if (.a$use_TD) "TD"),
-            .a,
-            fitter,
-            fn = quote(SSbiexponential),
-            .nirs = .nirs,
-            time_channel = time_channel,
-            interval_name = interval_name,
-            env = env
-        )
-        if (is.null(fit$model)) {
+        model <- accept_port_fit(model, on_error)
+        if (is.null(model)) {
             return(build_na_results(na_cols))
         }
-        params <- fit$params
-        coefs <- full_coefs(fit$model, space(params), fix)
-        span <- diff(range(fit$data[[time_channel]]))
-        bnd <- bounds(span, ratio, fix)
-
-        ## enforce direction: bounded refit on the fast-phase amplitude
-        ## D = B1 - A when inverted. the fit bounds are carried over; TD
-        ## >= 0 and the separation are structural, so only D and the
-        ## floors mark a degenerate fit
-        free <- setdiff(space(params), names(fix))
-        enforced <- enforce_direction(
-            fit$model,
-            coefs,
-            fit$data,
-            direction = .a$direction,
-            amp_fn = if (ratio) quote(biexp_ratio) else quote(SSbiexponential),
-            fn = "SSbiexponential",
-            lower = bnd$lower[intersect(names(bnd$lower), free)],
-            upper = bnd$upper[intersect(names(bnd$upper), free)],
-            floor_params = c("D", if (ratio) c("r", "tau2")),
-            fix = fix,
-            .nirs = .nirs,
-            interval_name = interval_name,
-            env = env
-        )
-        if (is.null(enforced)) {
-            return(build_na_results(na_cols))
-        }
-        model <- enforced$model
-        coefs <- enforced$coefs
-
-        ## canonical re-expression from the ratio optimum, so the returned
-        ## model reports (tau1, tau2): an interior stationary point
-        ## converges at once, a pinned one is not separable
-        if (ratio) {
-            degenerate <- pinned(coefs)
-            model <- if (!degenerate) {
-                accept_port_fit(
-                    port_fit(
-                        build_ss_formula(
-                            quote(SSbiexponential),
-                            params,
-                            fix,
-                            names(fit$data)[[1L]],
-                            names(fit$data)[[2L]]
-                        ),
-                        fit$data,
-                        to_canon(coefs)[setdiff(params, names(fix))],
-                        bounds(span, FALSE, fix),
-                        \(e) NULL
-                    ),
-                    \(e) NULL
-                )
-            }
-            if (is.null(model)) {
-                warn_fit_failed(
-                    quote(SSbiexponential),
-                    simpleError(if (degenerate) {
-                        not_separable
-                    } else {
-                        "Canonical re-expression of the fit failed."
-                    }),
-                    .nirs,
-                    interval_name,
-                    length(params),
-                    env = env
-                )
-                return(build_na_results(na_cols))
-            }
-            coefs <- full_coefs(model, params, fix)
-        }
+        coefs <- full_coefs(model, params, fix)
 
         ## TD is already elapsed from start_time, matching the fit time base
-        TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL
+        TD_arg <- if (has_TD) coefs[["TD"]] else NULL
 
         ## excursion time (texc) is the fitted turning point, reported
         ## elapsed from start_time, mirroring MRT = TD + tau; NA when the
@@ -706,10 +627,10 @@ analyse_biexponential <- function(
                 texc_fitted = texc_fitted_val
             ),
             model,
-            x_fit,
-            t_fit,
-            valid,
-            fit$keep,
+            x_full,
+            t_full,
+            utils::modifyList(valid, list(idx = idx)),
+            keep,
             env
         )
     }
@@ -718,7 +639,7 @@ analyse_biexponential <- function(
         data,
         setup$nirs_channels,
         setup$time_channel,
-        setup$per_channel,
+        per_channel,
         biexp_fit,
         verbose,
         interval_name,

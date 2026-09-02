@@ -38,7 +38,7 @@ kinetics_dispatch <- list(
     response_time = c("fraction"),
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
     monoexponential = c("use_TD", "fix"),
-    biexponential = c("use_TD", "fix"),
+    biexponential = c("use_TD", "fix", "tau1_flex", "TD_flex", "A_flex"),
     exponential_drift = c("use_TD", "tau_mult", "fix"),
     sigmoidal = c("shape", "fix")
 )
@@ -69,13 +69,18 @@ kinetics_workers <- c(
 ## into the full schema (full column <- reduced column); unmapped full
 ## columns are NA. `fix_map` carries user-fixed parameters over to the
 ## reduced fit (full parameter -> reduced parameter); unmapped are
-## dropped. `accept` is a vectorised shape test on the full coefficient
-## data frame (NULL for the F-test alone), explained by `reject_msg`
+## dropped. `args` overrides reduced worker arguments so the comparator
+## fits the same window as the full model. `accept` is a vectorised
+## shape test on the full coefficient data frame (NULL for the F-test
+## alone), explained by `reject_msg`
 kinetics_reductions <- list(
     biexponential = list(
         to = "monoexponential",
         coef_map = c(A = "A", B1 = "B", B2 = "B", tau1 = "tau", TD = "TD"),
         fix_map = c(A = "A", B2 = "B", TD = "TD"),
+        ## the biexponential `end_window` bounds its fast phase only; the
+        ## full model spans the whole response
+        args = list(end_window = Inf),
         ## excursion-recovery only: the fitted turning point must exist
         accept = \(cf) is.finite(cf$texc),
         reject_msg = "Fitted response is monotonic ({.field texc} is \\
@@ -795,7 +800,8 @@ add_model_col <- function(coefs, model) {
 #' resolved to (`TD` finite), as a per-interval map of per-channel
 #' values; a channel whose full fit failed keeps the user's setting.
 #' `fix` is carried over through `spec$fix_map`, recursing into
-#' per-interval and per-channel maps.
+#' per-interval and per-channel maps. `spec$args` overrides arguments
+#' outright (e.g. the comparator window).
 #'
 #' @param full The full method's *"mnirs_kinetics"* result.
 #' @param worker_args Named list of the full method's arguments.
@@ -809,6 +815,7 @@ reduced_worker_args <- function(full, worker_args, spec) {
     names(worker_args) <- unname(names(worker_args))
     keep <- unlist(kinetics_dispatch[c("common", spec$to)], use.names = FALSE)
     args <- worker_args[intersect(names(worker_args), keep)]
+    args[names(spec$args)] <- spec$args
 
     coefs <- full$coefficients
     intervals <- names(full$data)

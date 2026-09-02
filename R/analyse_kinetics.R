@@ -36,7 +36,10 @@
 #'   window in which to look for the end of the kinetics fit; returns the
 #'   window with no greater/lesser values within `end_window` after the first
 #'   extreme value. `end_window = Inf` (*default*) returns the global extreme
-#'   from the full sample range (see *Details*).
+#'   from the full sample range (see *Details*). For *"biexponential"*,
+#'   `end_window` bounds the fast-phase (stage 1) window only, and `Inf`
+#'   resolves to `20` time units past the first extreme; the full model is
+#'   fit to the whole response.
 #' @param group_intervals Either `"ensemble"` (*default*) to analyse all
 #'   samples of each data frame together, or a non-empty `list()` of
 #'   integer-valued numeric vectors of sample (row) numbers, each analysed as
@@ -189,7 +192,7 @@
 #' *"sigmoidal"* methods,
 #' `direction` also constrains the sign of the fitted amplitude `B - A`, and
 #' the sigmoidal `slope`. For the *"biexponential"* method, `direction`
-#' constrains the sign of the overall fitted amplitude `B2 - A`. A fit that
+#' constrains the sign of the fast-phase amplitude `B1 - A`. A fit that
 #' cannot satisfy the requested direction returns `NA` coefficients with a
 #' warning.
 #'
@@ -364,18 +367,24 @@
 #' See [biexponential()] for the model family and [SSbiexponential()] for
 #' self-start initialisation.
 #'
-#' The two phases are separated by fitting on the ratio `tau1 / tau2`
-#' bounded at `0.98`, which closes the non-identifiable region at
-#' `tau1 = tau2` where the two terms collapse into one with runaway
-#' amplitudes. The slow time constant `tau2` is capped at ten times the
-#' record span: a slow tail far beyond the record identifies only its rate,
-#' not `tau2` and `B2` separately.
+#' The two phases are fit sequentially. Stage 1 fits the fast phase as a
+#' *"monoexponential"* on the `end_window` window (to the first
+#' peak/trough plus `end_window`), giving `A`, `tau1`, and `TD`. Stage 2
+#' fits the full model to the whole response with `A`, `tau1`, and `TD`
+#' held within a tight range of their stage-1 values and `B1`, `B2`,
+#' `tau2` free. `tau2` is floored above the `tau1` range so the phases
+#' stay separated, and capped at ten times the record span: a slow tail
+#' far beyond the record identifies only its rate, not `tau2` and `B2`
+#' separately. `end_window` should be set to isolate the fast phase; the
+#' default `Inf` resolves to `20` time units past the first peak/trough
+#' (recorded in `channel_args`).
 #'
 #' The biexponential model is nested over the monoexponential (`B1 = B2`),
 #' so every channel is also fit with the *"monoexponential"* method on the
-#' same window and time-delay structure (with `A`, `B2` as `B`, and `TD`
-#' carried over from `fix`). The biexponential fit is kept only when it is
-#' an excursion-recovery (its turning point `texc` exists) and the
+#' whole response with the same time-delay structure (with `A`, `B2` as
+#' `B`, and `TD` carried over from `fix`). The biexponential fit is kept
+#' only when it is an excursion-recovery (its turning point `texc` exists)
+#' and the
 #' extra-sum-of-squares F-test rejects the monoexponential at `p < 0.05`.
 #' Otherwise -- a monotonic fit, a second phase the data do not support, or
 #' a failed biexponential fit (e.g. phases not separable) -- the
@@ -736,7 +745,10 @@ analyse_kinetics.biexponential <- function(
     verbose = TRUE,
     ...,
     use_TD = TRUE,
-    fix = NULL
+    fix = NULL,
+    tau1_flex = 1 / 3,
+    TD_flex = 2,
+    A_flex = NULL
 ) {
     ## TODO: pass additional stats::nls() args
     if (missing(verbose)) {
@@ -744,7 +756,9 @@ analyse_kinetics.biexponential <- function(
     }
     ## the biexponential fit is resolved against a nested monoexponential
     ## comparator (see `kinetics_reductions`); the undocumented
-    ## `force_biexponential = TRUE` keeps the raw fit for troubleshooting
+    ## `force_biexponential = TRUE` keeps the raw fit for troubleshooting.
+    ## `tau1_flex`, `TD_flex`, `A_flex` are the stage-2 half-widths about
+    ## the stage-1 fast phase (see `analyse_biexponential()`), undocumented
     return(analyse_kinetics_reduced(
         data,
         "biexponential",

@@ -176,7 +176,7 @@ test_that("SSbiexponential() fixes A at a constant", {
 test_that("SSbiexponential() gradient matches numericDeriv for the free parameters", {
     t <- seq(-10, 120, by = 0.5)
     env <- list2env(list(
-        t = t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40, r = 0.125, TD = 3
+        t = t, A = 70, B1 = 40, tau1 = 5, B2 = 60, tau2 = 40, TD = 3
     ))
     chk <- function(expr, pars) {
         an <- attr(eval(expr, env), "gradient")
@@ -192,10 +192,6 @@ test_that("SSbiexponential() gradient matches numericDeriv for the free paramete
     chk(
         quote(SSbiexponential(t, A, B1, tau1 = 5, B2, tau2)),
         c("A", "B1", "B2", "tau2")
-    )
-    chk(
-        quote(biexp_ratio(t, A, B1, r, B2, tau2, TD)),
-        c("A", "B1", "r", "B2", "tau2", "TD")
     )
     ## no free parameter, no gradient; the exported fn stays plain
     expect_null(attr(SSbiexponential(t, 70, 40, 5, 60, 40), "gradient"))
@@ -315,7 +311,8 @@ test_that("analyse_biexponential() recovers known parameters", {
     )
 
     expect_true(all.equal(result$A, A, tolerance = 2, scale = 1))
-    expect_true(all.equal(result$B1, B1, tolerance = 3, scale = 1))
+    ## the fast asymptote absorbs some slow phase over the stage-1 window
+    expect_true(all.equal(result$B1, B1, tolerance = 5, scale = 1))
     expect_true(all.equal(result$B2, B2, tolerance = 3, scale = 1))
     ## excursion sits inside the window, below the starting value
     expect_true(result$texc > 0)
@@ -463,7 +460,7 @@ test_that("analyse_biexponential() suppresses fit-failure warning when verbose =
     )
 })
 
-test_that("analyse_biexponential() end_window truncates the fit window", {
+test_that("analyse_biexponential() end_window bounds the fast phase only", {
     data <- create_biexp_data(noise_sd = 0.3)
 
     result <- analyse_biexponential(
@@ -474,9 +471,60 @@ test_that("analyse_biexponential() end_window truncates the fit window", {
         verbose = FALSE
     )
 
+    ## stage 2 spans the full response regardless of end_window
     fitted_data <- attr(result, "fitted_data")$smo2
-    expect_true(nrow(fitted_data) < nrow(data))
-    expect_equal(attr(result, "diagnostics")$n_obs, nrow(fitted_data))
+    expect_equal(nrow(fitted_data), nrow(data))
+    expect_equal(attr(result, "diagnostics")$n_obs, nrow(data))
+
+    ## the stage-1 window drives tau1
+    full <- analyse_biexponential(
+        data, nirs_channels = "smo2", use_TD = FALSE, verbose = FALSE
+    )
+    expect_false(isTRUE(all.equal(result$tau1, full$tau1)))
+})
+
+test_that("analyse_biexponential() bounds the fast phase about the stage-1 fit", {
+    data <- create_biexp_data(noise_sd = 0.3)
+
+    ## stage 1 is the monoexponential fit on the same window
+    fast <- analyse_monoexponential(
+        data, nirs_channels = "smo2", end_window = 20, use_TD = FALSE,
+        verbose = FALSE
+    )
+    result <- analyse_biexponential(
+        data,
+        nirs_channels = "smo2",
+        end_window = 20,
+        use_TD = FALSE,
+        tau1_flex = 0.1,
+        A_flex = 0.5,
+        verbose = FALSE
+    )
+
+    expect_true(result$tau1 >= fast$tau / 1.1 - 1e-8)
+    expect_true(result$tau1 <= fast$tau * 1.1 + 1e-8)
+    expect_true(abs(result$A - fast$A) <= 0.5 + 1e-8)
+    ## the slow phase separates above the fast-phase ceiling
+    expect_true(result$tau2 >= fast$tau * 1.1 / tau_ratio - 1e-8)
+
+    ## flex args pass through `...` of analyse_kinetics() and are recorded
+    ca <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        end_window = 20,
+        tau1_flex = list(smo2 = 0.1),
+        TD_flex = 1,
+        verbose = FALSE
+    )$channel_args
+    expect_equal(ca$tau1_flex, 0.1)
+    expect_equal(ca$TD_flex, 1)
+    expect_true(is.na(ca$A_flex))
+    ca <- analyse_kinetics(
+        data, nirs_channels = "smo2", method = "biexponential", verbose = FALSE
+    )$channel_args
+    expect_equal(ca$tau1_flex, 1 / 3)
+    expect_equal(ca$TD_flex, 2)
 })
 
 test_that("analyse_biexponential() fits a mirrored rise-overshoot response", {
@@ -528,8 +576,8 @@ test_that("analyse_biexponential() use_TD = FALSE forces the 5-param fit", {
 })
 
 test_that("analyse_biexponential() falls back to the 5-parameter fit", {
-    ## seven observations under-determine the 6-parameter model but not the
-    ## 5-parameter model, so the TD fit is rejected and the retry announced
+    ## the stage-1 TD fit fails on seven observations and retries without
+    ## TD, so stage 2 fits the 5-parameter model
     data <- create_biexp_data(n = 7, noise_sd = 0.1)
 
     warns <- capture_warnings(
@@ -540,7 +588,7 @@ test_that("analyse_biexponential() falls back to the 5-parameter fit", {
         )
     )
 
-    expect_match(warns[[1L]], "6-parameter")
+    expect_match(warns[[1L]], "4-parameter `SSmonoexponential")
     expect_match(warns[[1L]], "Attempting")
     ## TD is absent from the reduced model whether or not the retry converges
     expect_true(is.na(result$TD))
@@ -644,94 +692,6 @@ test_that("analyse_biexponential() direction = 'positive' rejects a negative res
     expect_true(is.na(result$tau1))
 })
 
-test_that("enforce_direction() refits an inverted biexponential on B1 - A", {
-    ## genuinely rising data, but the supplied coefs are the mirror-image
-    ## falling fit: forces the direction-mismatch branch; the bounded
-    ## refit recovers the true positive response with consistent coef names
-    t <- seq(0, 119)
-    span <- diff(range(t))
-    x <- biexponential(
-        t, A = 70, B1 = 90, tau1 = 5, B2 = 80, tau2 = 40
-    )
-    fit_data <- data.frame(.x = x, .t = t)
-    ## inverted fit: asymptotes reflected about the baseline A
-    coefs <- c(A = 70, B1 = 50, tau1 = 5, B2 = 60, tau2 = 40)
-
-    result <- enforce_direction(
-        model = NULL,
-        coefs = coefs,
-        fit_data = fit_data,
-        direction = "positive",
-        amp_fn = quote(biexponential),
-        lower = c(tau1 = span * 1e-6, tau2 = span * 1e-6),
-        upper = c(tau2 = 10 * span),
-        floor_params = c("D", "tau1", "tau2"),
-        .nirs = "smo2",
-        interval_name = "test"
-    )
-
-    expect_named(result, c("model", "coefs"))
-    expect_named(result$coefs, c("A", "B1", "tau1", "B2", "tau2"))
-    ## returned model re-expressed in original parameterisation, not D
-    expect_named(
-        coef(result$model), c("A", "B1", "tau1", "B2", "tau2")
-    )
-    expect_gt(result$coefs[["B1"]], result$coefs[["A"]])
-    expect_true(
-        all.equal(result$coefs[["A"]], 70, tolerance = 1e-2, scale = 1)
-    )
-    expect_true(
-        all.equal(result$coefs[["B2"]], 80, tolerance = 1e-2, scale = 1)
-    )
-})
-
-test_that("enforce_direction() accepts a PORT false-convergence stall", {
-    ## the biexponential onset kink can stall PORT with false convergence
-    ## (8) at an otherwise good optimum; a finite-coefficient stall must
-    ## be accepted rather than failing the direction refit
-    t <- seq(0, 119)
-    span <- diff(range(t))
-    x <- biexponential(
-        t, A = 70, B1 = 90, tau1 = 5, B2 = 80, tau2 = 40
-    )
-    fit_data <- data.frame(.x = x, .t = t)
-    coefs <- c(A = 70, B1 = 50, tau1 = 5, B2 = 60, tau2 = 40)
-
-    ## every refit reports a stall; without `warnOnly` nls would error
-    local_mocked_bindings(
-        nls = function(...) {
-            m <- stats::nls(...)
-            m$convInfo$isConv <- FALSE
-            m$convInfo$stopCode <- 8L
-            m$convInfo$stopMessage <- "false convergence (8)"
-            m
-        },
-        .package = "mnirs"
-    )
-
-    result <- enforce_direction(
-        model = NULL,
-        coefs = coefs,
-        fit_data = fit_data,
-        direction = "positive",
-        amp_fn = quote(biexponential),
-        lower = c(tau1 = span * 1e-6, tau2 = span * 1e-6),
-        upper = c(tau2 = 10 * span),
-        floor_params = c("D", "tau1", "tau2"),
-        .nirs = "smo2",
-        interval_name = "test"
-    )
-
-    expect_named(result, c("model", "coefs"))
-    expect_false(result$model$convInfo$isConv)
-    expect_true(
-        all.equal(result$coefs[["A"]], 70, tolerance = 1e-2, scale = 1)
-    )
-    expect_true(
-        all.equal(result$coefs[["B2"]], 80, tolerance = 1e-2, scale = 1)
-    )
-})
-
 test_that("analyse_biexponential() suppresses direction warning when verbose = FALSE", {
     data <- create_biexp_data(noise_sd = 0.3)
 
@@ -827,7 +787,7 @@ test_that("analyse_biexponential() fix holds tau1 constant", {
     )
 })
 
-test_that("analyse_biexponential() fix holds tau2 constant on the ratio fit", {
+test_that("analyse_biexponential() fix holds tau2 constant on the sequential fit", {
     data <- create_biexp_data(noise_sd = 0.3)
 
     result <- analyse_biexponential(
@@ -843,33 +803,6 @@ test_that("analyse_biexponential() fix holds tau2 constant on the ratio fit", {
         coef(attr(result, "model")$smo2), c("A", "B1", "tau1", "B2")
     )
     expect_true(all.equal(result$tau1, 5, tolerance = 2, scale = 1))
-})
-
-test_that("analyse_biexponential() returns NA when the phases are not separable", {
-    ## a gamma-like shape t * exp(-t / tau) is the tau1 -> tau2 limit of the
-    ## model: the fit pins at the ratio bound rather than collapsing the
-    ## phases with runaway amplitudes
-    set.seed(9)
-    t <- 0:120
-    x <- 70 - 30 * (t / 10) * exp(1 - t / 10) + rnorm(121, 0, 0.3)
-    data <- create_mnirs_data(
-        data.frame(time = t, smo2 = x),
-        nirs_channels = "smo2", time_channel = "time", sample_rate = 1
-    )
-
-    warns <- capture_warnings(
-        result <- analyse_biexponential(data, nirs_channels = "smo2")
-    )
-
-    failed <- grep("fit failed", warns, value = TRUE)
-    expect_length(failed, 1L)
-    expect_match(failed, "6-parameter")
-    expect_match(failed, "not separable")
-    ## the reduced model cannot resolve it either, so no retry is announced
-    expect_no_match(failed, "Attempting")
-    expect_true(is.na(result$A))
-    expect_true(is.na(result$tau1))
-    expect_null(attr(result, "model")$smo2)
 })
 
 test_that("analyse_biexponential() returned model is canonical and converged", {
@@ -1206,6 +1139,22 @@ test_that("reduced fit matches the time-delay structure and window", {
     expect_equal(result$diagnostics$n_params, length(coef(model)))
 })
 
+test_that("reduced comparator fits the full response, not end_window", {
+    data <- create_monotonic_data(seed = 11, TD = 10, t = -20:120)
+
+    result <- analyse_kinetics(
+        data,
+        nirs_channels = "smo2",
+        method = "biexponential",
+        end_window = 30,
+        verbose = FALSE
+    )
+
+    expect_equal(result$coefficients$model, "monoexponential")
+    expect_gte(result$diagnostics$n_obs, sum(data$time >= 0))
+    expect_equal(result$channel_args$end_window, 30)
+})
+
 test_that("reduction carries fixed parameters over", {
     data <- create_monotonic_data()
 
@@ -1366,7 +1315,8 @@ test_that("analyse_biexponential() converges on real dataset", {
     results <- analyse_kinetics(
         deoxy,
         # nirs_channels = c(smo2_left_vl, smo2_right_vl),
-        method = "biexponential"
+        method = "biexponential",
+        end_window = 30
     )
     tibble(results$warnings)
     plot(results)

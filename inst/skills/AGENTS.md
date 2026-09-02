@@ -310,7 +310,7 @@ analyse_kinetics(
 - **`"response_time"`**: `fraction` (default `0.5`; `0.632` ≈ MRT; vectorised, e.g. `c(0.5, 0.632)` → one coefficient row per fraction).
 - **`"peak_slope"`**: `width` XOR `span`; `align` (`"centre"`/`"left"`/`"right"`); `partial`, `na.rm` (default `FALSE`).
 - **`"monoexponential"`**: `use_TD` (default `TRUE`; 4-param → 3-param fallback), `fix`.
-- **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `fix`. Phases exchangeable; reported with `tau1 <= tau2`.
+- **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `fix`. Sequential fit: fast monoexp on `end_window` window (`Inf` → first extreme + 20 time units) → full biexp with `A`/`tau1`/`TD` held near stage-1 values, `B1`/`B2`/`tau2` free. Reduces to monoexp (`model` column) by F-test / monotonic `texc`.
 - **`"exponential_drift"`**: `use_TD`, `tau_mult` (default `3`; drift onset `texc = TD + tau_mult * tau`, always held constant), `fix`.
 - **`"sigmoidal"`**: `shape` (`"symmetric"` default = `SSlogistic()`; `"gompertz"` early-inflection (right); `"gompertz_left"` late-inflection), `fix`.
 
@@ -470,7 +470,7 @@ format_hmmss(x)         # numeric seconds → "mm:ss" or "h:mm:ss"
 | `group_intervals = "ensemble"` needs regularised time grid | `resample → extract_intervals`; warns if irregular |
 | `monoexponential`/`biexponential` convergence fallback | Weak fits (certain convergence errors) return fit with warnings |
 | `direction`-bounded fit | return `NA` coefficients if unsatisfiable; verify `biexponential` in particular |
-| `biexponential` identifiability | phases weakly identified when `tau1 ≈ tau2` or amplitudes small; check `warnings` + `diagnostics`, consider reduced `method` |
+| `biexponential` identifiability | fast phase fixed by stage-1 monoexp on `end_window`; a window too long past the extreme gives a slow stage 1 and reduction to monoexp; check `warnings` + `model` column |
 
 ---
 
