@@ -882,7 +882,8 @@ run_kinetics_worker <- function(
         heads <- vapply(chans, \(.ch) {
             cli::format_inline(
                 "{.fn {fn_full}} fit for {.field {(.ch)}} in \\
-                {.field {interval_name}} fell back to {.fn {fn_to}}."
+                {.field {interval_name}} fell back to {.fn {fn_to}}.",
+                keep_whitespace = FALSE
             )
         }, character(1))
         if (verbose) {
@@ -934,7 +935,7 @@ run_kinetics_worker <- function(
                 interval = interval_name,
                 nirs_channels = chans,
                 type = "warning",
-                message = cli::ansi_strip(paste(heads, reasons[idx], sep = " - "))
+                message = cli::ansi_strip(paste(heads, reasons[idx]))
             ),
             b$warnings
         )
@@ -1134,7 +1135,7 @@ analyse_kinetics_channels <- function(
             interval = interval_name,
             nirs_channels = .nirs_active,
             type = if (inherits(w, "mnirs_fit_error")) "error" else "warning",
-            message = gsub("\n", " - ", cli::ansi_strip(conditionMessage(w)))
+            message = clean_cnd_message(w)
         )
     }
 
@@ -1650,6 +1651,27 @@ kinetics_warnings_df <- function() {
         type = character(),
         message = character()
     ))
+}
+
+
+#' Flatten a captured condition message
+#'
+#' Drops cli bullet glyphs and console-width wrapping from a condition
+#' message so the stored `warnings` text reads as plain sentences.
+#'
+#' @param cnd A condition object.
+#'
+#' @returns A single character string.
+#'
+#' @keywords internal
+clean_cnd_message <- function(cnd) {
+    msg <- cli::ansi_strip(conditionMessage(cnd))
+    ## bullet glyphs (unicode escaped for ascii source, and ascii fallbacks)
+    ## lead unindented lines; wrapped lines are indented so they are untouched
+    msg <- gsub(
+        "(^|\n)[!ixv*>\u2139\u2716\u2714\u2022] ", "\\1", msg, perl = TRUE
+    )
+    return(trimws(gsub("[[:space:]]+", " ", msg)))
 }
 
 
