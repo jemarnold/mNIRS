@@ -285,7 +285,7 @@ test_that("analyse_biexponential() returns correct structure", {
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
         "interval", "nirs_channels", "A", "B1", "tau1",
-        "MRT", "texc", "B2", "tau2", "TD", "texc_fitted"
+        "MRT", "texc", "B2", "tau2", "TD", "MRT_fitted", "texc_fitted"
     ))
     expect_equal(nrow(result), 1L)
 

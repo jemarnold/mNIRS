@@ -77,7 +77,8 @@ kinetics_reductions <- list(
     biexponential = list(
         to = "monoexponential",
         coef_map = c(
-            A = "A", B1 = "B", B2 = "B", tau1 = "tau", TD = "TD", MRT = "MRT"
+            A = "A", B1 = "B", B2 = "B", tau1 = "tau", TD = "TD", MRT = "MRT",
+            MRT_fitted = "MRT_fitted"
         ),
         fix_map = c(A = "A", B2 = "B", TD = "TD"),
         ## the biexponential `end_window` bounds its fast phase only; the

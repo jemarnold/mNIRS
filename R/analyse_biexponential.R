@@ -409,7 +409,8 @@ SSbiexponential <- selfStart(
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
 #'   `nirs_channels`, `A`, `B1`, `tau1`, `MRT`, `texc`, `B2`, `tau2`, `TD`,
-#'   `texc_fitted`. Per-channel metadata are attached as attributes:
+#'   `MRT_fitted`, `texc_fitted`. Per-channel metadata are attached as
+#'   attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
 #'     where fitting failed.
 #'   - `"fitted_data"`: a named list of per-channel data frames with
@@ -474,7 +475,8 @@ analyse_biexponential <- function(
     })
     ## NA scaffold (method columns only) for convergence failure
     na_cols <- c(
-        "A", "B1", "tau1", "MRT", "texc", "B2", "tau2", "TD", "texc_fitted"
+        "A", "B1", "tau1", "MRT", "texc", "B2", "tau2", "TD", "MRT_fitted",
+        "texc_fitted"
     )
 
     ## method-specific fit in two stages. stage 1: the fast phase as a
@@ -605,19 +607,17 @@ analyse_biexponential <- function(
             tau2 = coefs[["tau2"]],
             TD = TD_arg
         )
-        texc_fitted_val <- if (is.na(texc_val)) {
-            NA_real_
-        } else {
-            biexponential(
-                t = texc_val,
-                A = coefs[["A"]],
-                B1 = coefs[["B1"]],
-                tau1 = coefs[["tau1"]],
-                B2 = coefs[["B2"]],
-                tau2 = coefs[["tau2"]],
-                TD = TD_arg
-            )
-        }
+        ## predict response at MRT and texc using the full fitted model; an
+        ## NA texc (monotonic fit) propagates to NA
+        fitted_params <- biexponential(
+            t = c(MRT_val, texc_val),
+            A = coefs[["A"]],
+            B1 = coefs[["B1"]],
+            tau1 = coefs[["tau1"]],
+            B2 = coefs[["B2"]],
+            tau2 = coefs[["tau2"]],
+            TD = TD_arg
+        )
 
         build_fit_results(
             data.frame(
@@ -629,7 +629,8 @@ analyse_biexponential <- function(
                 B2 = coefs[["B2"]],
                 tau2 = coefs[["tau2"]],
                 TD = TD_arg %||% NA_real_,
-                texc_fitted = texc_fitted_val
+                MRT_fitted = fitted_params[[1L]],
+                texc_fitted = fitted_params[[2L]]
             ),
             model,
             x_full,

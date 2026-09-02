@@ -2672,7 +2672,9 @@ test_that("print.mnirs_kinetics shows exponential_drift header", {
         method = "exponential_drift"
     )
     output <- capture.output(print(x))
-    expect_true(any(grepl("Exponential-Linear Two-Phase Kinetics", output)))
+    expect_true(any(
+        grepl("Exponential-Linear Drift Two-Phase Kinetics", output)
+    ))
 })
 
 test_that("print.mnirs_kinetics shows response_time header", {

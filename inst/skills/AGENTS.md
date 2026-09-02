@@ -368,7 +368,7 @@ Times are elapsed from `start_time`; `*_fitted` = predicted value at that point.
 | `"response_time"` | `fraction` (one row per value), `A` baseline mean, `B` extreme (peak/trough) value, `response_time`, `response_value` (observed), `fitted` (target `A + (B-A)*fraction`), `idx` (sample/row number at `response_value`) |
 | `"peak_slope"` | `slope` (`x/t`), `intercept`, `fitted`, `peak_slope_time`, `idx` (sample/row number at `align` position) |
 | `"monoexponential"` | `A` baseline, `B` asymptote, `tau`, `k` (`1/tau`), `TD` delay (if `use_TD`), `MRT` (`TD+tau`), `HRT` (`TD+tau·ln2`), `MRT_fitted`, `HRT_fitted` |
-| `"biexponential"` | `A` start, `B1` & `tau1` fast component, `MRT` (`TD+tau1`), `texc` (fitted turning point; `NA` if monotonic), `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `texc_fitted` |
+| `"biexponential"` | `A` start, `B1` & `tau1` fast component, `MRT` (`TD+tau1`), `texc` (fitted turning point; `NA` if monotonic), `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `MRT_fitted`, `texc_fitted` |
 | `"sigmoidal"` | `A` & `B` start + end asymptotes, `xmid` inflection time (only literally *"middle"* for `shape = "symmetric"`), `slope` (`dx/dt` at `xmid`), `xmid_fitted` |
 
 **Diagnostics:** `n_obs`, `n_params`, `r2`, `adj_r2`, `rmse`, `snr`, `cv_rmse`,

@@ -204,6 +204,10 @@ comp_layers <- function(p) {
 
 
 ## kinetics_annotations() ================================================
+## marker rows have finite `xval`; label rows have non-empty `label`
+ann_markers <- function(ann) ann[is.finite(ann$xval), ]
+ann_labels <- function(ann) ann[nzchar(ann$label), ]
+
 test_that("kinetics_annotations returns expected structure", {
     x <- kin_peak_slope(
         channels = c("smo2_left", "smo2_right"),
@@ -213,80 +217,145 @@ test_that("kinetics_annotations returns expected structure", {
 
     expect_s3_class(ann, "data.frame")
     expect_named(ann, c(
-        "interval", "nirs_channels",
-        "xval", "yval", "label", "yval_corner", "vjust"
+        "interval", "nirs_channels", "xval", "yval", "label", "vjust"
     ))
-    ## one row per channel per interval (2 channels x 2 intervals)
-    expect_equal(nrow(ann), 4L)
+    ## one marker row per channel per interval (2 channels x 2 intervals)
+    markers <- ann_markers(ann)
+    expect_equal(nrow(markers), 4L)
+    expect_true(all(markers$label == ""))
+    expect_true(all(is.na(markers$vjust)))
+    ## one label row per line (slope + time) per channel per interval
+    labels <- ann_labels(ann)
+    expect_equal(nrow(labels), 8L)
+    expect_true(all(is.infinite(labels$xval)))
+    expect_true(all(is.infinite(labels$yval)))
 })
 
 test_that("kinetics_annotations xval is onset plus method offset", {
     ## offset column differs by method
     ps <- kin_peak_slope()
     expect_equal(
-        kinetics_annotations(ps)$xval,
+        ann_markers(kinetics_annotations(ps))$xval,
         ps$interval_times$start_times + ps$coefficients$peak_slope_time
     )
 
     me <- kin_monoexp()
     expect_equal(
-        kinetics_annotations(me)$xval,
+        ann_markers(kinetics_annotations(me))$xval,
         me$interval_times$start_times + me$coefficients$MRT
     )
 
     be <- kin_biexp()
     expect_equal(
-        kinetics_annotations(be)$xval,
-        be$interval_times$start_times + be$coefficients$texc
+        ann_markers(kinetics_annotations(be))$xval,
+        c(
+            be$interval_times$start_times + be$coefficients$MRT,
+            be$interval_times$start_times + be$coefficients$texc
+        )
+    )
+
+    ed <- kin_expdrift()
+    expect_equal(
+        ann_markers(kinetics_annotations(ed))$xval,
+        c(
+            ed$interval_times$start_times + ed$coefficients$MRT,
+            ed$interval_times$start_times + ed$coefficients$texc
+        )
     )
 
     sg <- kin_sigmoidal()
     expect_equal(
-        kinetics_annotations(sg)$xval,
+        ann_markers(kinetics_annotations(sg))$xval,
         sg$interval_times$start_times + sg$coefficients$xmid
     )
 
     rt <- kin_response_time()
     expect_equal(
-        kinetics_annotations(rt)$xval,
+        ann_markers(kinetics_annotations(rt))$xval,
         rt$interval_times$start_times + rt$coefficients$response_time
     )
 })
 
 test_that("kinetics_annotations formats method-specific labels", {
     expect_match(
-        kinetics_annotations(kin_response_time())$label,
+        ann_labels(kinetics_annotations(kin_response_time()))$label,
         "\\% response = .+ s$"
     )
-    expect_match(kinetics_annotations(kin_peak_slope())$label, "^slope = ")
-    ## `use_TD = FALSE` -> `MRT` is redundant with `tau` and is omitted
-    expect_match(kinetics_annotations(kin_monoexp())$label, "^tau = .+ s$")
     expect_match(
-        kinetics_annotations(kin_biexp())$label,
-        "tau1 = .+\ntexc = .+ s\ntau2 = "
+        ann_labels(kinetics_annotations(kin_peak_slope()))$label[[1L]],
+        "^slope = "
     )
+    ## `use_TD = FALSE` -> `MRT` is redundant with `tau` and is omitted
     expect_match(
-        kinetics_annotations(kin_sigmoidal())$label,
-        "slope = .+ /s\nxmid = .+ s"
+        ann_labels(kinetics_annotations(kin_monoexp()))$label,
+        "^tau = .+ s$"
+    )
+    ## one row per line, in coefficient order
+    biexp <- ann_labels(kinetics_annotations(kin_biexp()))$label
+    expect_equal(sub(" = .*", "", biexp), c("tau1", "texc", "tau2"))
+    expect_match(biexp, " s$")
+    sigm <- ann_labels(kinetics_annotations(kin_sigmoidal()))$label
+    expect_equal(sub(" = .*", "", sigm), c("slope", "xmid"))
+    expect_match(sigm[[1L]], " /s$")
+})
+
+test_that("kinetics_annotations rounds time to 1 decimal, slope to 3 sigfig", {
+    ## `kinetics_annotations()` reads only `method` and `coefficients`
+    coefs <- data.frame(
+        interval = "a",
+        nirs_channels = "smo2",
+        start_time = 0,
+        A = 0,
+        B = 1,
+        TD = 6.58,
+        tau = 2494.4,
+        MRT = 2500.98,
+        MRT_fitted = 1
+    )
+    ann <- kinetics_annotations(list(
+        method = "monoexponential",
+        coefficients = coefs
+    ))
+    expect_equal(
+        ann_labels(ann)$label,
+        c("TD = 6.6 s", "tau = 2494 s", "MRT = 2501 s")
+    )
+
+    coefs <- data.frame(
+        interval = "a",
+        nirs_channels = "smo2",
+        start_time = 0,
+        slope = 0.012345,
+        peak_slope_time = 12.345,
+        fitted = 1
+    )
+    ann <- kinetics_annotations(list(method = "peak_slope", coefficients = coefs))
+    expect_equal(
+        ann_labels(ann)$label,
+        c("slope = 0.0123 /s", "time = 12.3 s")
     )
 })
 
-test_that("kinetics_annotations biexponential marks the fitted excursion", {
+test_that("kinetics_annotations biexponential marks MRT and the fitted excursion", {
     x <- kin_biexp()
-    ann <- kinetics_annotations(x)
-    expect_equal(ann$yval, x$coefficients$texc_fitted)
-    ## excursion sits below the baseline for a downward response
-    expect_true(all(ann$yval < x$coefficients$A))
+    markers <- ann_markers(kinetics_annotations(x))
+    expect_equal(nrow(markers), 2L)
+    expect_equal(
+        markers$yval,
+        c(x$coefficients$MRT_fitted, x$coefficients$texc_fitted)
+    )
+    ## both points sit below the baseline for a downward response
+    expect_true(all(markers$yval < x$coefficients$A))
 })
 
 test_that("kinetics_annotations places label in the vacated corner", {
     ## rising signal (B > A) -> bottom corner (-Inf)
     rise <- kin_monoexp(A = 50, B = 80)
-    expect_true(all(kinetics_annotations(rise)$yval_corner == -Inf))
+    expect_true(all(ann_labels(kinetics_annotations(rise))$yval == -Inf))
 
     ## falling signal (A > B) -> top corner (Inf)
     fall <- kin_monoexp(A = 80, B = 50)
-    expect_true(all(kinetics_annotations(fall)$yval_corner == Inf))
+    expect_true(all(ann_labels(kinetics_annotations(fall))$yval == Inf))
 })
 
 test_that("kinetics_annotations biexponential corner follows the plateau", {
@@ -295,22 +364,19 @@ test_that("kinetics_annotations biexponential corner follows the plateau", {
     ## fall-recover: plateau below baseline -> falls -> top corner (Inf)
     fall <- kin_biexp(B1 = 45, B2 = 55)
     expect_true(all(fall$coefficients$B2 < fall$coefficients$A))
-    expect_true(all(kinetics_annotations(fall)$yval_corner == Inf))
+    expect_true(all(ann_labels(kinetics_annotations(fall))$yval == Inf))
 
     ## rise-overshoot: plateau above baseline -> rises -> bottom corner (-Inf)
     rise <- kin_biexp(B1 = 95, B2 = 85)
     expect_true(all(rise$coefficients$B2 > rise$coefficients$A))
-    expect_true(all(kinetics_annotations(rise)$yval_corner == -Inf))
+    expect_true(all(ann_labels(kinetics_annotations(rise))$yval == -Inf))
 })
 
 test_that("kinetics_annotations peak_slope corner follows the slope sign", {
     ## no asymptote to trend on, so direction comes from the fitted slope
     x <- kin_peak_slope()
-    ann <- kinetics_annotations(x)
-    expect_equal(
-        ann$yval_corner,
-        ifelse(x$coefficients$slope > 0, -Inf, Inf)
-    )
+    labels <- ann_labels(kinetics_annotations(x))
+    expect_true(all(labels$yval == ifelse(x$coefficients$slope > 0, -Inf, Inf)))
 })
 
 test_that("kinetics_annotations mixed-direction channels share one corner", {
@@ -337,17 +403,24 @@ test_that("kinetics_annotations mixed-direction channels share one corner", {
         use_TD = FALSE,
         verbose = FALSE
     )
-    ann <- kinetics_annotations(x)
-    expect_true(all(ann$yval_corner == Inf))
-    expect_equal(ann$vjust, c(1.2, 2.4))
+    labels <- ann_labels(kinetics_annotations(x))
+    expect_true(all(labels$yval == Inf))
+    expect_equal(labels$vjust, c(1.8, 3.4))
 })
 
-test_that("kinetics_annotations staggers stacked labels by channel rank", {
-    ## two rising channels share the bottom corner -> distinct vjust per rank
+test_that("kinetics_annotations stacks label lines inward from the corner", {
+    ## two rising channels share the bottom corner; single-line labels stack
+    ## 1.6 text heights apart in channel order, half a gap above the border,
+    ## first channel on top
     x <- kin_monoexp(channels = c("smo2_left", "smo2_right"))
-    ann <- kinetics_annotations(x)
-    expect_equal(length(unique(ann$vjust)), 2L)
-    expect_equal(ann$vjust, c(-0.2, -1.4))
+    labels <- ann_labels(kinetics_annotations(x))
+    expect_equal(labels$nirs_channels, c("smo2_left", "smo2_right"))
+    expect_equal(labels$vjust, c(-2.4, -0.8))
+
+    ## multi-line labels continue the same stack across channels
+    x <- kin_biexp(channels = c("smo2_left", "smo2_right"))
+    labels <- ann_labels(kinetics_annotations(x))
+    expect_equal(labels$vjust, 0.2 + 1.6 * seq_len(nrow(labels)))
 })
 
 test_that("kinetics_annotations omits NA coefficients from labels", {
@@ -361,28 +434,28 @@ test_that("kinetics_annotations omits NA coefficients from labels", {
         verbose = FALSE
     ))
     ann <- kinetics_annotations(x)
+    expect_equal(nrow(ann_labels(ann)), 0L)
+    ## the marker row remains with an NA position
     expect_equal(ann$label, "")
+    expect_true(is.na(ann$xval))
 })
 
-test_that("kinetics_annotations appends marker-only rows for extra key points", {
-    ## exponential_drift: labelled MRT row plus a texc marker per channel
+test_that("kinetics_annotations adds a marker row per key point", {
+    ## exponential_drift: MRT and texc markers per channel
     x <- kin_expdrift(channels = c("smo2_left", "smo2_right"))
-    ann <- kinetics_annotations(x)
-    expect_equal(nrow(ann), 4L)
+    markers <- ann_markers(kinetics_annotations(x))
+    expect_equal(nrow(markers), 4L)
 
-    extra <- ann[!nzchar(ann$label), ]
-    expect_equal(extra$nirs_channels, x$coefficients$nirs_channels)
+    texc <- markers[3:4, ]
+    expect_equal(texc$nirs_channels, x$coefficients$nirs_channels)
     expect_equal(
-        extra$xval,
+        texc$xval,
         x$interval_times$start_times + x$coefficients$texc
     )
-    expect_equal(extra$yval, x$coefficients$texc_fitted)
-    ## no label anchor: corner and stagger are NA
-    expect_true(all(is.na(extra$yval_corner)))
-    expect_true(all(is.na(extra$vjust)))
+    expect_equal(texc$yval, x$coefficients$texc_fitted)
 
-    ## single key-point methods add no marker-only rows
-    expect_true(all(nzchar(kinetics_annotations(kin_monoexp())$label)))
+    ## single key-point methods have one marker per channel
+    expect_equal(nrow(ann_markers(kinetics_annotations(kin_monoexp()))), 1L)
 })
 
 

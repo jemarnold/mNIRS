@@ -438,18 +438,18 @@ plot.mnirs_kinetics <- function(
     }
 
     if (labels) {
-        ## anchor to the top or bottom-right corner per row; staggered
-        ## vjust keeps multi-channel labels from overlapping
+        ## one text row per label line anchored at the panel corner;
+        ## `vjust` stacks lines inward so channels do not overlap
         p <- p +
             ggplot2::geom_text(
                 ggplot2::aes(
-                    y = .data$yval_corner,
+                    x = .data$xval,
+                    y = .data$yval,
                     label = .data$label,
                     colour = .data$nirs_channels,
                     vjust = .data$vjust
                 ),
                 data = ann[nzchar(ann$label), , drop = FALSE],
-                x = Inf,
                 hjust = 1.05,
                 size = list(...)[["label_size"]] %||% 3.5,
                 show.legend = FALSE,
@@ -463,19 +463,20 @@ plot.mnirs_kinetics <- function(
 
 #' Build per-panel kinetics marker and label annotations
 #'
-#' Maps a fitted `mnirs_kinetics` method to its key coefficient marker
-#' (`xval`, `yval`) and formatted `label`, one row per `nirs_channel`
-#' per interval, for [plot.mnirs_kinetics()]. Marker x-coordinates are the
-#' resolved onset plus the method's time coefficient. Labels sit in the corner
-#' at the panel's right edge vacated by the fitted data, judged from the
-#' coefficient direction. `vjust` staggers stacked labels by channel rank
-#' within each interval.
+#' Maps a fitted `mnirs_kinetics` method to its key coefficient markers
+#' (`xval`, `yval`) and formatted label lines for [plot.mnirs_kinetics()].
+#' Marker rows are one per `nirs_channel` per key point per interval, with
+#' x-coordinates the resolved onset plus the method's time coefficient.
+#' Label rows are one per label line, anchored (`xval = Inf`,
+#' `yval = -Inf` or `Inf`) at the corner of the panel's right edge vacated by
+#' the fitted data, judged from the coefficient direction. `vjust` stacks
+#' the lines inward from the corner in channel order within each interval.
 #'
 #' @param x An *"mnirs_kinetics"* object from [analyse_kinetics()].
 #'
 #' @returns A `data.frame` with columns `interval`, `nirs_channels`,
-#'   `xval`, `yval`, `label`, `yval_corner`, and `vjust`. Methods with
-#'   multiple key points append marker-only rows with an empty `label`.
+#'   `xval`, `yval`, `label`, and `vjust`. Marker rows have an empty `label`
+#'   and `NA` `vjust`; label rows have infinite `xval`/`yval`.
 #'   `NULL` for a method with no annotation spec, in which case
 #'   [plot.mnirs_kinetics()] draws the fitted curve alone.
 #'
@@ -485,23 +486,26 @@ kinetics_annotations <- function(x) {
 
     ## one label line per coefficient, `NA` when missing (e.g. `TD` for
     ## channels fitted without a time delay). `keep` drops lines that are
-    ## redundant, e.g. `MRT` equals `tau` without `TD`
-    line <- \(f, v, keep = TRUE) {
+    ## redundant, e.g. `MRT` equals `tau` without `TD`. values show 1 decimal
+    ## at most and 3 significant figures below that, whole numbers in full;
+    ## "fg" without the "#" flag drops trailing zeros
+    line <- \(f, v, keep = TRUE, decimals = 1L) {
+        v <- signif_whole(round(v, decimals), 3L)
         ifelse(
             is.na(v) | !keep,
             NA_character_,
-            sprintf(f, signif_trailing(v, 3L, "signif"))
+            sprintf(f, trimws(formatC(v, digits = 3L, format = "fg")))
         )
     }
 
-    ## join per-channel lines, omitting `NA` lines
+    ## per-channel list of label lines, omitting `NA` lines
     label <- \(...) {
-        apply(cbind(...), 1L, \(l) paste(l[!is.na(l)], collapse = "\n"))
+        apply(cbind(...), 1L, \(l) l[!is.na(l)], simplify = FALSE)
     }
 
     ## per-method: time offsets (x), fitted values (y), and label lines.
-    ## `offset`/`y` are parallel vectors of coefficient names; the first pair
-    ## anchors the label, later pairs add marker-only points
+    ## `offset`/`y` are parallel vectors of coefficient names, one marker
+    ## point per pair
     spec <- switch(
         x$method,
         response_time = list(
@@ -518,7 +522,7 @@ kinetics_annotations <- function(x) {
             offset = "peak_slope_time",
             y = "fitted",
             label = label(
-                line("slope = %s /s", coefs$slope),
+                line("slope = %s /s", coefs$slope, decimals = Inf),
                 line("time = %s s", coefs$peak_slope_time)
             )
         ),
@@ -532,8 +536,8 @@ kinetics_annotations <- function(x) {
             )
         ),
         biexponential = list(
-            offset = "texc",
-            y = "texc_fitted",
+            offset = c("MRT", "texc"),
+            y = c("MRT_fitted", "texc_fitted"),
             label = label(
                 line("TD = %s s", coefs$TD),
                 line("tau1 = %s s", coefs$tau1),
@@ -547,16 +551,15 @@ kinetics_annotations <- function(x) {
             label = label(
                 line("TD = %s s", coefs$TD),
                 line("tau = %s s", coefs$tau),
-                line("MRT = %s s", coefs$MRT, keep = !is.na(coefs$TD)),
                 line("texc = %s s", coefs$texc),
-                line("slope = %s /s", coefs$slope)
+                line("slope = %s /s", coefs$slope, decimals = Inf)
             )
         ),
         sigmoidal = list(
             offset = "xmid",
             y = "xmid_fitted",
             label = label(
-                line("slope = %s /s", coefs$slope),
+                line("slope = %s /s", coefs$slope, decimals = Inf),
                 line("xmid = %s s", coefs$xmid)
             )
         )
@@ -578,8 +581,9 @@ kinetics_annotations <- function(x) {
         ))
     }
 
-    ann <- marker_rows(spec$offset[[1L]], spec$y[[1L]])
-    ann$label <- spec$label
+    ## marker rows carry no label or stacking
+    ann <- do.call(rbind, Map(marker_rows, spec$offset, spec$y))
+    ann[c("label", "vjust")] <- list("", NA_real_)
 
     ## signed response direction: fitted slope sign (peak_slope, sigmoidal),
     ## otherwise plateau minus baseline
@@ -598,25 +602,28 @@ kinetics_annotations <- function(x) {
         coefs$interval,
         FUN = \(s) sum(s, na.rm = TRUE)
     ) > 0
-    ann$yval_corner <- ifelse(rises, -Inf, Inf)
 
-    ## stack labels inward from the corner, 0.2 lines apart. `vjust` is in
-    ## label heights, so convert line offsets by each label's line count
-    nlines <- nchar(gsub("[^\n]", "", ann$label)) + 1L
-    offset <- stats::ave(nlines + 0.2, ann$interval, FUN = \(n) cumsum(n) - n)
-    gap <- (offset + 0.2) / nlines
-    ann$vjust <- ifelse(rises, -gap, 1 + gap)
+    ## one text row per label line anchored at the corner; channels with
+    ## all-NA fits contribute none
+    n <- lengths(spec$label)
+    lab <- data.frame(
+        interval = rep(coefs$interval, n),
+        nirs_channels = rep(coefs$nirs_channels, n),
+        xval = rep(Inf, sum(n)),
+        yval = rep(ifelse(rises, -Inf, Inf), n),
+        label = as.character(unlist(spec$label)),
+        stringsAsFactors = FALSE
+    )
 
-    ## marker-only rows for the remaining offset/y pairs: no label or corner
-    extra <- Map(marker_rows, spec$offset[-1L], spec$y[-1L])
-    if (length(extra)) {
-        extra <- do.call(rbind, c(extra, list(make.row.names = FALSE)))
-        extra[c("label", "yval_corner", "vjust")] <-
-            list("", NA_real_, NA_real_)
-        ann <- rbind(ann, extra)
-    }
+    ## stack lines inward from the corner, half a line-gap from the border,
+    ## keeping top-to-bottom order in both corners. `vjust` is in single-line
+    ## text heights (~0.7 font size), so 1.6 approximates geom_text's 1.2
+    ## lineheight
+    idx <- stats::ave(seq_along(lab$label), lab$interval, FUN = seq_along)
+    rev_idx <- stats::ave(idx, lab$interval, FUN = rev)
+    lab$vjust <- ifelse(lab$yval < 0, 0.8 - 1.6 * rev_idx, 0.2 + 1.6 * idx)
 
-    return(ann)
+    return(rbind(ann, lab))
 }
 
 
