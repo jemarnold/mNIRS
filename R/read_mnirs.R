@@ -64,7 +64,7 @@
 #'   `nirs_channels = c(smo2_left = "smo2", smo2_right = "smo2_1")`.
 #' - Unnamed columns containing data in the source file will be renamed to
 #'   `col_n`, where `n` is the ordered column number in the file (e.g.
-#'   `col_6`). *Artinis Oxysoft* files are the exception to this renaming
+#'   `col_6`). *Artinis Oxysoft* files are an exception to this renaming
 #'   convention. See *Artinis Oxysoft exports* below).
 #' 
 #' ## Renaming channels

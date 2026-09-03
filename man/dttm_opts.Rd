@@ -7,7 +7,7 @@
 dttm_opts
 }
 \description{
-Time-only format must stay first: \code{parse_time_channel()} splits on
-\code{dttm_opts[1L]} vs \code{dttm_opts[-1L]} to detect an absolute date-time series.
+Time-only format must stay first: \code{parse_dttm()} treats \code{dttm_opts[1L]}
+as a relative time of day and the rest as absolute date-times.
 }
 \keyword{internal}

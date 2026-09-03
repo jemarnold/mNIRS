@@ -90,7 +90,7 @@ suffix (e.g. \verb{*_1}), and can be renamed accordingly:
 \code{nirs_channels = c(smo2_left = "smo2", smo2_right = "smo2_1")}.
 \item Unnamed columns containing data in the source file will be renamed to
 \code{col_n}, where \code{n} is the ordered column number in the file (e.g.
-\code{col_6}). \emph{Artinis Oxysoft} files are the exception to this renaming
+\code{col_6}). \emph{Artinis Oxysoft} files are an exception to this renaming
 convention. See \emph{Artinis Oxysoft exports} below).
 }
 }
@@ -116,13 +116,21 @@ should still be explicitly renamed pointing to their number, e.g.
 in seconds is automatically derived from the export sample rate.
 \item \code{"(Event)"} column is renamed \code{event} and set as \code{event_channel}.
 \item \emph{Oxysoft} exports a trailing un-numbered column containing optional
-event label text. This is renamed \code{labels} if present, or dropped when
-empty. It can be selected as the event column explicitly with
-\code{event_channel = c(event = "labels")}.
+event label text. This is renamed \code{labels} and returned with
+\code{keep_all = TRUE}, or dropped when empty. It can be selected as the
+event column explicitly with \code{event_channel = c(event = "labels")}.
 }
 
 Explicit \code{nirs_channels}, \code{time_channel}, and \code{event_channel} renaming
 (as above) overrides automatically detected names.
+}
+
+\subsection{PIONIRS exports}{
+
+\emph{PIONIRS} \code{.ftn(2)} files are detected with \code{"Time"} as \code{time_channel},
+\code{"TagLabel"} as \code{event_channel}, and \code{StO2} channels as \code{nirs_channels}.
+The \code{"Iteration"} sample index and numeric \code{"Tag"} companion columns are
+returned beside \code{time_channel} and \code{event_channel} with \code{keep_all = TRUE}.
 }
 
 \subsection{Time parsing}{

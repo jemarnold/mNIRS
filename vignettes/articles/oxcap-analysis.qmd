@@ -133,7 +133,7 @@ It can be accessed by calling `example_mnirs("portamon-oxcap")`.
 
 The included example file has three NIRS channels and a sample-number column, automatically converted to a time value by `read_mnirs()`. The file needs no other pre-processing steps.
 
-Note: by default, *Artinis Oxysoft* exports an event label column without a named header — this is the column we will use to identify occlusion events by the label *"Occlusion"*. In *{mnirs}*, an unnamed column is coerced to name *"col_\*"* with a numeric suffix for the column position in the data file. In our example file, this event column is therefore *"col_6"*. Not the most elegant solution, but it works for now.
+Note: by default, *Artinis Oxysoft* exports an event label column without a named header. `read_mnirs()` renames this to *"labels"*. This is the column we will use to identify occlusion events by the label *"Occlusion"*.
 
 
 ```{r}
@@ -143,7 +143,7 @@ Note: by default, *Artinis Oxysoft* exports an event label column without a name
 df <- read_mnirs(
     file_path     = example_mnirs("portamon-oxcap.xlsx"),
     nirs_channels = c(thb = 2, hhb = 3, o2hb = 4),
-    event_channel = c(event = "col_6")
+    event_channel = c(event = "labels")
 )
 
 ## view the structure of our data frame
@@ -565,7 +565,7 @@ This article demonstrates how muscle oxidative capacity analysis can be performe
 read_mnirs(
     file_path       = example_mnirs("portamon-oxcap.xlsx"),
     nirs_channels   = c(thb = 2, hhb = 3, o2hb = 4),
-    event_channel   = c(event = "col_6")
+    event_channel   = c(event = "labels")
 ) |>
     correct_blood_volume(
         oxy_channel     = o2hb,
@@ -586,7 +586,7 @@ read_mnirs(
         time_channel    = peak_slope_time,
         method          = "monoexponential",
         use_TD          = FALSE,
-        group_intervals = list(trial1 = 1:16, trial2 = 17:32),
+        group_intervals = list(1:16, 17:32),
         zero_time       = TRUE
     ) |> 
     print() |> 

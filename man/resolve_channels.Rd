@@ -30,14 +30,16 @@ errors and warnings as coming from the user-facing function rather
 than the validator.}
 }
 \value{
-A list of \code{time}, \code{event}, \code{extra}, and \code{nirs} channel mappings.
-List order sets output column order.
+A list of \code{time}, \code{extra}, \code{event}, \code{labels}, and \code{nirs} channel
+mappings, each a named \code{c(new = "original")} vector or \code{NULL}. List
+order sets output column order.
 }
 \description{
 User-specified channels take priority. Otherwise \code{nirs} channels are read
 from the Oxysoft legend (Artinis) or header cells starting with \code{SmO2};
 \code{time} falls back to the device default, and is detected later by
 \code{detect_time_channel()} when still \code{NULL}; \code{event} falls back to the
-device default when present in the header row.
+device default when present in the header row. Device companion columns
+(\code{extra}, \code{labels}) are returned only with \code{keep_all = TRUE}.
 }
 \keyword{internal}

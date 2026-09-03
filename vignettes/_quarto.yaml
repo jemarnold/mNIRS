@@ -5,5 +5,3 @@ project:
 filters:
   - fontawesome
   - academicons
-
-csl: vancouver.csl

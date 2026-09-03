@@ -7,6 +7,9 @@
 device_patterns
 }
 \description{
-Known channel names and detection patterns for supported mNIRS devices
+Per device: \code{pattern} strings which must all match one header row
+(\code{fixed} regex flag); default \code{time_channel} and \code{event_channel} names;
+\code{extra_channels} companion columns (e.g. sample index, numeric tag)
+returned with \code{keep_all = TRUE}.
 }
 \keyword{internal}

@@ -4,7 +4,7 @@
 \alias{detect_mnirs_device}
 \title{Detect mnirs device from file metadata}
 \usage{
-detect_mnirs_device(data)
+detect_mnirs_device(data, chunk = 200L)
 }
 \description{
 Detect mnirs device from file metadata

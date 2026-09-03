@@ -78,7 +78,7 @@ read_mnirs(
     file_path,
     nirs_channels = NULL,   # char vec; (required) rename: c(new = "old")
     time_channel  = NULL,   # char(1); (required) rename: c(time = "Timestamp")
-    event_channel = NULL,   # char(1); optional; rename: c(lap = "col_6")
+    event_channel = NULL,   # char(1); optional; rename: c(lap = "Lap/Event")
     sample_rate   = NULL,   # numeric(1) Hz; estimated if NULL
     add_timestamp = FALSE,  # add POSIXct "timestamp" column
     zero_time     = FALSE,  # rebase time[1] to 0
