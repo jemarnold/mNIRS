@@ -503,6 +503,20 @@ test_that("fitted overlay densifies to 100 points only when < 100 samples", {
     expect_equal(nrow(dashed_data(p)), sum(is.finite(x$data[[1L]]$smo2_fitted)))
 })
 
+test_that("fitted overlay and key points use a darker shade of the channel colour", {
+    x <- kin_peak_slope()
+    ## layers: observed line, dashed fitted line, onset vline, key point
+    p <- plot(x, labels = FALSE)
+    lum <- \(i) sum(grDevices::col2rgb(ggplot2::layer_data(p, i)$colour[1L]))
+    expect_lt(lum(2L), lum(1L))
+    expect_lt(lum(4L), lum(1L))
+    ## legend keys keep the observed channel colour
+    expect_equal(
+        ggplot2::layer_data(p, 1L)$colour[1L],
+        unname(palette_mnirs(1L))
+    )
+})
+
 test_that("fitted = FALSE drops the parametric fitted layers", {
     x <- kin_sigmoidal()
     n_on <- length(plot(x, markers = FALSE, labels = FALSE)$layers)

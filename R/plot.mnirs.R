@@ -177,9 +177,11 @@ plot.mnirs <- function(
 #' @param x An *"mnirs_kinetics"* object from [analyse_kinetics()].
 #' @param fitted Logical. Default is `TRUE`; overlays a dashed fitted curve for
 #'   parametric methods (`"peak_slope"`, `"monoexponential"`,
-#'   `"biexponential"`, `"sigmoidal"`). `"response_time"` has no fitted curve.
+#'   `"biexponential"`, `"sigmoidal"`) in a darker shade of the channel
+#'   colour. `"response_time"` has no fitted curve.
 #' @param markers Logical. Default is `TRUE`; draws a dotted vertical line at
-#'   the response onset (`start_time`) and key coefficient points.
+#'   the response onset (`start_time`) and key coefficient points in a darker
+#'   shade of the channel colour.
 #' @param labels Logical. Default is `TRUE`; annotates each panel with the key
 #'   coefficient value(s) for the fitted method.
 #' @param ... Additional arguments.
@@ -229,6 +231,13 @@ plot.mnirs_kinetics <- function(
     ...
 ) {
     check_installed("ggplot2", reason = "to plot mNIRS data")
+
+    ## darker shade of the channel colour for fitted overlays; applied
+    ## after the colour scale so channel mapping stays scale-driven
+    darken <- function(col, amount = 0.65) {
+        m <- grDevices::col2rgb(col) * amount
+        return(grDevices::rgb(t(m), maxColorValue = 255))
+    }
 
     ## open white marker for every kinetics key point
     key_point <- function(mapping, data, ...) {
@@ -310,7 +319,10 @@ plot.mnirs_kinetics <- function(
                 }, sp, mods))
             }
             ggplot2::geom_line(
-                ggplot2::aes(y = .data[[fcol]], colour = .ch),
+                ggplot2::aes(
+                    y = .data[[fcol]],
+                    colour = ggplot2::stage(.ch, after_scale = darken(colour))
+                ),
                 data = d,
                 linetype = "dashed",
                 linewidth = 1,
@@ -362,7 +374,10 @@ plot.mnirs_kinetics <- function(
             )
 
             comp_line <- \(.col, .d = cd) ggplot2::geom_line(
-                ggplot2::aes(y = .data[[.col]], colour = .ch),
+                ggplot2::aes(
+                    y = .data[[.col]],
+                    colour = ggplot2::stage(.ch, after_scale = darken(colour))
+                ),
                 data = .d,
                 linetype = "dotted",
                 linewidth = 0.5,
@@ -405,7 +420,10 @@ plot.mnirs_kinetics <- function(
                 post <- is.finite(plot_data[[fcol]]) &
                     plot_data[[time_channel]] > plot_data$start_times
                 key_point(
-                    ggplot2::aes(y = .data[[fcol]], colour = .ch),
+                    ggplot2::aes(
+                        y = .data[[fcol]],
+                        colour = ggplot2::stage(.ch, after_scale = darken(colour))
+                    ),
                     plot_data[post, , drop = FALSE]
                 )
             })
@@ -422,7 +440,10 @@ plot.mnirs_kinetics <- function(
                     ggplot2::aes(
                         x = .data$start_time,
                         y = .data$A,
-                        colour = .data$nirs_channels
+                        colour = ggplot2::stage(
+                            .data$nirs_channels,
+                            after_scale = darken(colour)
+                        )
                     ),
                     base_pts,
                     inherit.aes = FALSE
@@ -434,7 +455,10 @@ plot.mnirs_kinetics <- function(
                     ggplot2::aes(
                         x = .data$xval,
                         y = .data$yval,
-                        colour = .data$nirs_channels
+                        colour = ggplot2::stage(
+                            .data$nirs_channels,
+                            after_scale = darken(colour)
+                        )
                     ),
                     ann[is.finite(ann$xval), , drop = FALSE],
                     inherit.aes = FALSE
