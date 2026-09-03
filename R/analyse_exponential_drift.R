@@ -413,14 +413,14 @@ analyse_exponential_drift <- function(
                         start <- expdrift_start(
                             .data[[1L]], .data[[2L]], .a$fix, "TD" %in% .params
                         )
-                        suppressWarnings(nls(
+                        embed_fit_call(suppressWarnings(nls(
                             formula,
                             .data,
                             start = start[free],
                             algorithm = "port",
                             lower = lower,
                             control = stats::nls.control(warnOnly = TRUE)
-                        ))
+                        )))
                     },
                     error = on_error
                 )

@@ -630,10 +630,10 @@ analyse_logistic <- function(
 
         ## build nls formula with any fixed params as constants
         model <- tryCatch(
-            nls(
+            embed_fit_call(nls(
                 build_ss_formula(ch_fn, params, .a$fix, nm[[1L]], nm[[2L]]),
                 fit_data
-            ),
+            )),
             error = \(e) {
                 warn_fit_failed(ch_fn, e, .nirs, interval_name, env = env)
             }

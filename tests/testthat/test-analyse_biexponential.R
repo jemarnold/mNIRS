@@ -966,6 +966,12 @@ test_that("analyse_kinetics() dispatches to the biexponential method", {
         c("B", "tau", "B2", "tau2", "texc") %in%
             names(result$coefficients)
     ))
+    ## the model carries its fit data in the call for update()/insight
+    model <- result$model[[1L]]$smo2
+    fit_data <- eval(model$call$data, envir = baseenv())
+    expect_s3_class(fit_data, "data.frame")
+    expect_named(fit_data, c("smo2", "time"))
+    expect_equal(nrow(fit_data), length(stats::fitted(model)))
 })
 
 test_that("analyse_kinetics() resolves the 'biexp' alias", {

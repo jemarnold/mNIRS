@@ -2908,6 +2908,8 @@ test_that("enforce_direction() uses the self-start gradient on the D refit", {
     )
     expect_named(coef(result_B$model), c("A", "tau"))
     expect_equal(result_B$coefs[["A"]], 50, tolerance = 1e-3)
+    ## refit models carry the fit data in the call
+    expect_s3_class(eval(result_B$model$call$data, baseenv()), "data.frame")
 })
 
 
@@ -2927,6 +2929,8 @@ test_that("fix_coefs() fixes single parameter correctly", {
     expect_true(all(c("A", "B", "tau") %in% names(coef(model_fixed))))
     ## 15 should be in the model formula
     expect_true(any(grepl("15", model_fixed$call$formula)))
+    ## updated model carries the fit data in the call
+    expect_s3_class(eval(model_fixed$call$data, baseenv()), "data.frame")
 })
 
 test_that("fix_coefs() fixes multiple parameters", {
@@ -3389,4 +3393,50 @@ test_that("analyse_kinetics aliases channel names that collide with model parame
     expect_true(all(is.finite(pred)))
     ## smooth fitted overlay re-predicts on the aliased model
     expect_no_error(ggplot2::ggplot_build(plot(result, fitted = TRUE)))
+})
+
+
+## model data embedding ==============================================
+test_that("analyse_kinetics models carry their fit data in the call", {
+    ## `nls()` stores `call$data` as the fitter's local symbol, so the
+    ## data frame is embedded for update()/confint()/insight::get_data()
+    fits <- list(
+        monoexponential = create_monoexp_data(),
+        exponential_drift = create_expdrift_data(),
+        sigmoidal = create_sigmoidal_data()
+    )
+    for (method in names(fits)) {
+        result <- analyse_kinetics(
+            fits[[method]],
+            nirs_channels = "smo2",
+            method = method,
+            verbose = FALSE
+        )
+        model <- result$model[[1L]]$smo2
+        fit_data <- eval(model$call$data, envir = baseenv())
+        expect_s3_class(fit_data, "data.frame")
+        expect_named(fit_data, c("smo2", "time"))
+        expect_equal(nrow(fit_data), length(stats::fitted(model)))
+        ## refits resolve from the call alone, outside the fitting frame
+        refit <- eval(
+            call("update", model),
+            envir = new.env(parent = globalenv())
+        )
+        expect_equal(coef(refit), coef(model))
+    }
+})
+
+test_that("analyse_kinetics monoexponential model supports confint()", {
+    ## profiling refits from the stored call; the TD hinge is non-smooth
+    ## and does not profile reliably, so the reduced model is used
+    result <- analyse_kinetics(
+        create_monoexp_data(),
+        nirs_channels = "smo2",
+        method = "monoexponential",
+        use_TD = FALSE,
+        verbose = FALSE
+    )
+    ci <- suppressWarnings(stats::confint(result$model[[1L]]$smo2))
+    expect_equal(rownames(ci), c("A", "B", "tau"))
+    expect_true(all(is.finite(ci)))
 })

@@ -1836,6 +1836,27 @@ build_ss_formula <- function(fn, params, fix = list(), x, t) {
 }
 
 
+#' Make an nls model call self-contained
+#'
+#' [stats::nls()] stores its call arguments as the expressions it was
+#' called with (`formula`, `.data`, `start[free]`), resolvable only in
+#' the fitting frame. Evaluating them in that frame and storing the
+#' values lets [stats::update()], [stats::profile()], and
+#' `insight::get_data()`.
+#'
+#' @param model An [nls][stats::nls] model.
+#' @param env The fitting frame the call arguments resolve in; *default*
+#'   the caller of this function.
+#'
+#' @returns `model` with every `call` argument replaced by its value.
+#'
+#' @keywords internal
+embed_fit_call <- function(model, env = parent.frame()) {
+    model$call[-1L] <- lapply(as.list(model$call[-1L]), eval, envir = env)
+    return(model)
+}
+
+
 #' Alias fit column names that collide with model parameters
 #'
 #' [stats::nls()] formula symbols must be disjoint: a name cannot be
@@ -1993,15 +2014,18 @@ enforce_direction <- function(
         l[is.na(l)] <- -Inf
         u[is.na(u)] <- Inf
         model <- tryCatch(
-            suppressWarnings(nls(
+            embed_fit_call(suppressWarnings(nls(
                 stats::as.formula(call("~", x_sym, rhs)),
                 fit_data,
                 start = start,
                 lower = l,
                 upper = u,
                 algorithm = "port",
-                control = stats::nls.control(maxiter = 500L, warnOnly = TRUE)
-            )),
+                control = stats::nls.control(
+                    maxiter = 500L,
+                    warnOnly = TRUE
+                )
+            ))),
             error = \(e) NULL
         )
         return(accept_port_fit(model, \(e) NULL))
@@ -2312,10 +2336,10 @@ fix_coefs <- function(
     new_formula <- do.call(substitute, list(stats::formula(model), fixed_coefs))
 
     ## update the model
-    return(stats::update(
+    return(embed_fit_call(stats::update(
         model,
         formula = new_formula,
         start = start_coefs,
         data = data
-    ))
+    )))
 }

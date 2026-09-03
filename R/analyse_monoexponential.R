@@ -441,11 +441,11 @@ fit_monoexponential <- function(
                     start <- monoexp_start(
                         .data[[1L]], .data[[2L]], .a$fix, "TD" %in% .params
                     )
-                    nls(
+                    embed_fit_call(nls(
                         formula,
                         .data,
                         start = start[setdiff(.params, names(.a$fix))]
-                    )
+                    ))
                 },
                 error = on_error
             )

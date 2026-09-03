@@ -568,7 +568,7 @@ analyse_biexponential <- function(
                     has_TD
                 )
                 start[names(prior)] <- unlist(prior)
-                suppressWarnings(nls(
+                embed_fit_call(suppressWarnings(nls(
                     build_ss_formula(
                         quote(SSbiexponential),
                         params,
@@ -577,7 +577,10 @@ analyse_biexponential <- function(
                         names(fit_data)[[2L]]
                     ),
                     fit_data,
-                    start = pmin(pmax(start[free], lower[free]), upper[free]),
+                    start = pmin(
+                        pmax(start[free], lower[free]),
+                        upper[free]
+                    ),
                     algorithm = "port",
                     lower = lower[free],
                     upper = upper[free],
@@ -585,7 +588,7 @@ analyse_biexponential <- function(
                         maxiter = 500L,
                         warnOnly = TRUE
                     )
-                ))
+                )))
             },
             error = on_error
         )
