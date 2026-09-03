@@ -1,0 +1,110 @@
+---
+title: "Reading PIONIRS data with mnirs"
+author:
+    - name: Jem Arnold
+date: last-modified
+format:
+    html:
+        embed-resources: true
+        toc: true
+csl: ../apa.csl
+knitr:
+    opts_chunk:
+        collapse: true
+        comment: '#>'
+        dpi: 300
+        out.width: "100%"
+        fig.align: "center"
+
+---
+
+
+
+```{r}
+library(ggplot2)
+library(mnirs)
+
+PIONIRS_ftn <- r"(C:\R-Projects\mnirs\tests\testthat\testdata\pionirs_occlusion.ftn)"
+PIONIRS_ftn2 <- r"(C:\R-Projects\mnirs\tests\testthat\testdata\pionirs_occlusion.ftn2)"
+```
+
+```{r}
+
+df_sto2 <- read_mnirs(
+    file_path = PIONIRS_ftn2,
+)
+
+df_sto2
+
+
+df_filt <- filter_mnirs(
+    df_sto2,
+    method = "butterworth",
+    order = 2,
+    fc = 0.05
+)
+
+plot(df_filt) +
+    geom_line(
+        data = df_sto2,
+        aes(y = `StO2(CH1)`, colour = "StO2(CH1)"),
+        alpha = 0.3
+    ) +
+    geom_line(
+        data = df_sto2,
+        aes(y = `StO2(CH2)`, colour = "StO2(CH2)"),
+        alpha = 0.3
+    )
+```
+
+```{r}
+
+df_raw <- read_mnirs(
+    file_path = PIONIRS_ftn,
+    nirs_channels = c(o2hb = "O2Hb", hhb = "HHb", thb = "THb"),
+    time_channel = c(time = "Time"),
+    event_channel = c(labels = "TagLabel")
+)
+
+plot(df_raw)
+
+df_corr <- correct_blood_volume(
+    df_raw,
+    oxy_channel = o2hb,
+    deoxy_channel = hhb,
+    total_channel = thb
+)
+
+plot(df_corr)
+
+df_reoxy <- extract_intervals(
+    df_corr,
+    nirs_channels = c(o2hb, hhb),
+    start = by_label("Recovery"),
+    end = by_time(600),
+    span = c(-10, 0)
+)
+
+result_monoexp <- analyse_kinetics(
+    df_reoxy,
+    method = "monoexponential",
+    end_window = 30
+) |>
+    print()
+
+plot(result_monoexp, time_labels = TRUE)
+
+result_drift <- analyse_kinetics(
+    df_reoxy,
+    method = "exponential-linear"
+) |>
+    print()
+
+plot(result_drift, time_labels = TRUE)
+
+
+rbind(
+    monoexponential = result_monoexp$diagnostics[2L, ],
+    exponential_drift = result_drift$diagnostics[2L, ]
+)
+```
