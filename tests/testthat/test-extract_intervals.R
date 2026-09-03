@@ -2153,6 +2153,23 @@ test_that("extract_intervals returns a list of class mnirs", {
     expect_false(any(grepl('attr\\(,"class"\\)', output)))
 })
 
+test_that("print.mnirs forwards `n` to each tibble in a list", {
+    data <- create_mock_mnirs(n = 100, sample_rate = 10)
+
+    result <- extract_intervals(
+        data = data,
+        nirs_channels = "smo2_left",
+        group_intervals = "distinct",
+        start = by_time(1, 5),
+        span = c(-1, 1),
+        verbose = FALSE
+    )
+
+    output <- capture.output(print(result, n = 2))
+    expect_true(all(paste0("$", names(result)) %in% trimws(output)))
+    expect_true(any(grepl("more rows", output)))
+})
+
 ## integration tests ===================================
 
 test_that("extract_intervals works on Moxy data", {

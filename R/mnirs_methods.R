@@ -3,7 +3,8 @@
 #' Generic methods for objects of class `"mnirs"`.
 #'
 #' @param x Object of class `"mnirs"`.
-#' @param ... Additional arguments passed to [print()].
+#' @param ... Additional arguments passed to [print()] methods of `x` or
+#'   each list element, e.g. `n` rows for [tibbles][tibble::tibble-package].
 #'
 #' @returns
 #' \item{`print`}{Returns `x` without class attributes.}
@@ -27,7 +28,18 @@
 #' @export
 print.mnirs <- function(x, ...) {
     class(x) <- setdiff(class(x), "mnirs")
-    print(x, ...)
+    if (is.data.frame(x)) {
+        print(x, ...)
+        return(invisible(x))
+    }
+    ## list of data frames: print each element so `...` (e.g. `n`) reach
+    ## element print methods; mimic base `$name` / `[[i]]` headers
+    nms <- names(x) %||% rep("", length(x))
+    invisible(Map(\(.x, .nm, .i) {
+        cat(if (nzchar(.nm)) paste0("$", .nm) else paste0("[[", .i, "]]"), "\n")
+        print(.x, ...)
+        cat("\n")
+    }, x, nms, seq_along(x)))
     return(invisible(x))
 }
 
