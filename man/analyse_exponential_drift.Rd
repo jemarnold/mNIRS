@@ -9,7 +9,7 @@ analyse_exponential_drift(
   nirs_channels = NULL,
   time_channel = NULL,
   use_TD = TRUE,
-  tau_mult = 3,
+  drift_frac = 0.95,
   fix = NULL,
   control = NULL,
   start_time = NULL,
@@ -43,11 +43,10 @@ used.
 fails, or if \code{use_TD = FALSE}, attempts to fit a reduced 5-parameter
 model without \code{TD}.}
 
-\item{tau_mult}{A numeric multiple of \code{tau} after \code{TD} at which the drift
-onset is held (\code{TD + tau_mult * tau}; default is \code{3},
-~95\% of the primary amplitude). Applied to every channel, or
-per-channel as a list keyed by channel name, e.g.
-\code{tau_mult = list(smo2 = 2)}.}
+\item{drift_frac}{A numeric fraction of the amplitude in \verb{(0.5, 1)} at
+which the drift onset is held (\emph{default} \code{0.95}; \code{TD + 3 * tau}).
+Always held constant. Applied to every channel, or per-channel as a
+list keyed by channel name, e.g. \code{drift_frac = list(smo2 = 0.9)}.}
 
 \item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B}, \code{tau},
 \code{slope}, \code{TD}) to hold constant during fitting, e.g. \code{fix = list(A = 0)}.
@@ -100,9 +99,9 @@ than the validator.}
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns
 \code{nirs_channels}, \code{A}, \code{B}, \code{TD}, \code{tau}, \code{k}, \code{MRT}, \code{HRT}, \code{texc},
-\code{slope}, \code{tau_mult}, \code{MRT_fitted}, \code{HRT_fitted}, \code{texc_fitted}. \code{texc}
+\code{slope}, \code{drift_frac}, \code{MRT_fitted}, \code{HRT_fitted}, \code{texc_fitted}. \code{texc}
 is the excursion point where the drift rate overtakes the decaying
-primary rate, never before the drift onset \code{TD + tau_mult * tau}.
+primary rate, never before the drift onset (see \code{\link[=expdrift_onset]{expdrift_onset()}}).
 Per-channel metadata are attached as attributes:
 \itemize{
 \item \code{"model"}: an \link[stats:nls]{nls} model object, or \code{NULL} for channels

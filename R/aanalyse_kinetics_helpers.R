@@ -34,6 +34,7 @@ method_aliases <- c(
     gompertz_drift = "sigmoidal_drift",
     sigmoidal_linear = "sigmoidal_drift",
     sigmoid_linear = "sigmoidal_drift",
+    sig_linear = "sigmoidal_drift",
     sig_lin = "sigmoidal_drift",
     logistic_linear = "sigmoidal_drift",
     gompertz_linear = "sigmoidal_drift"
@@ -50,7 +51,7 @@ kinetics_dispatch <- list(
     biexponential = c(
         "use_TD", "fix", "tau_flex", "TD_flex", "A_flex", "control"
     ),
-    exponential_drift = c("use_TD", "tau_mult", "fix", "control"),
+    exponential_drift = c("use_TD", "drift_frac", "fix", "control"),
     sigmoidal = c("shape", "fix", "control"),
     sigmoidal_drift = c("shape", "drift_frac", "fix", "control")
 )
@@ -85,8 +86,8 @@ kinetics_coef_cols <- list(
         "A", "B", "TD", "tau", "k", "MRT", "HRT", "MRT_fitted", "HRT_fitted"
     ),
     exponential_drift = c(
-        "A", "B", "TD", "tau", "k", "MRT", "HRT", "texc", "slope", 
-        "tau_mult", "MRT_fitted", "HRT_fitted", "texc_fitted"
+        "A", "B", "TD", "tau", "k", "MRT", "HRT", "texc", "slope",
+        "drift_frac", "MRT_fitted", "HRT_fitted", "texc_fitted"
     ),
     biexponential = c(
         "A", "B", "TD", "tau", "MRT", "texc", 
@@ -143,7 +144,10 @@ kinetics_fallbacks <- list(
         args = list(),
         trigger = \(cf, rmse, span, t_end) {
             ## drift amplitude over the record from the drift onset
-            onset <- sum(cf$TD[is.finite(cf$TD)], cf$tau_mult * cf$tau)
+            # fmt: skip
+            onset <- expdrift_onset(
+                cf$tau, cf$drift_frac, if (is.finite(cf$TD)) cf$TD
+            )
             first_reason(
                 "Fit failed." = is.na(cf$A),
                 !!paste0(
@@ -1173,6 +1177,24 @@ setup_kinetics_worker <- function(
         time_channel = time_channel,
         per_channel = per_channel
     ))
+}
+
+
+## resolve each channel's `drift_frac` for the drift models: a channel
+## omitted from a per-channel map takes the default; the fraction must
+## leave a primary response ahead of the drift region
+resolve_drift_frac <- function(per_channel, env = rlang::caller_env()) {
+    return(lapply(per_channel, \(.a) {
+        drift_frac <- .a$drift_frac %||% 0.95
+        validate_numeric(
+            drift_frac, 1, c(0.5, 1), FALSE,
+            msg1 = "one-element",
+            msg2 = "between 0.5 and 1 (exclusive).",
+            env = env
+        )
+        .a$drift_frac <- drift_frac
+        .a
+    }))
 }
 
 

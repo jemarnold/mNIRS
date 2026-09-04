@@ -4,7 +4,7 @@
 \alias{expdrift_model}
 \title{Exponential-drift model with gradient}
 \usage{
-expdrift_model(t, A, B, tau, slope, tau_mult, TD = NULL)
+expdrift_model(t, A, B, tau, slope, drift_frac, TD = NULL)
 }
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
@@ -22,8 +22,10 @@ of the exponential curve, in units of the predictor variable \code{t}.}
 of the secondary phase, in response units per unit of the predictor
 variable \code{t}.}
 
-\item{tau_mult}{A numeric multiple of \code{tau} after \code{TD} at which the linear
-drift begins: drift onset \code{TD + tau_mult * tau} (\code{TD = 0} when absent).}
+\item{drift_frac}{A numeric fraction of the amplitude \code{B - A} in
+\verb{(0.5, 1)} at which the linear drift begins: the drift onset is where
+the primary response reaches \code{A + drift_frac * (B - A)}, at
+\code{TD - tau * log(1 - drift_frac)} (\code{TD = 0} when absent).}
 
 \item{TD}{A numeric parameter for the time delay before the onset of
 exponential response, in units of the predictor variable \code{t}. If \code{NULL}

@@ -86,7 +86,6 @@ print.mnirs_kinetics <- function(x, ...) {
     drop_start_time <- isTRUE(all(coefs$start_time == 0))
     drop_cols <- c(
         "HRT",
-        "tau_mult",
         "drift_frac",
         "idx",
         if (drop_start_time) "start_time",

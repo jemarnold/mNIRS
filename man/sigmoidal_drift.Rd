@@ -36,10 +36,10 @@ variable at the inflection \code{xmid}.}
 response units per unit of the predictor variable \code{t}.}
 
 \item{drift_frac}{A numeric fraction of the amplitude \code{B - A} in
-\verb{(0, 0.5)} bounding the drift regions: the leading drift applies only
-before the sigmoid reaches \code{A + drift_frac * (B - A)} (at \code{texc_A}),
-the trailing drift only after it reaches \code{A + (1 - drift_frac) * (B - A)}
-(at \code{texc_B}).}
+\verb{(0.5, 1)} bounding the drift regions: the leading drift applies only
+before the sigmoid reaches \code{A + (1 - drift_frac) * (B - A)} (at
+\code{texc_A}), the trailing drift only after it reaches
+\code{A + drift_frac * (B - A)} (at \code{texc_B}).}
 
 \item{shape}{Character; the sigmoidal shape. One of \code{"symmetric"}
 (\emph{default}; \code{\link[=logistic]{logistic()}}), \code{"gompertz"} (\code{\link[=gompertz]{gompertz()}}), or
@@ -64,8 +64,8 @@ leading drift is exactly zero from \code{texc_A} on and the trailing drift
 exactly zero up to \code{texc_B}. The cutoffs never overlap
 (\verb{texc_A < xmid < texc_B}), so the two drifts are independent.
 
-The cutoffs are where the sigmoid reaches the \code{drift_frac} and
-\code{1 - drift_frac} fractions of its amplitude (\code{p = drift_frac}):
+The cutoffs are where the sigmoid reaches the \code{1 - drift_frac} and
+\code{drift_frac} fractions of its amplitude (\code{p = 1 - drift_frac}):
 \itemize{
 \item \code{shape = "symmetric"}: \code{k = 4 * slope / (B - A)};
 \code{texc_A = xmid - log((1 - p) / p) / k},
@@ -86,14 +86,14 @@ set.seed(13)
 t <- 1:120
 x <- sigmoidal_drift(
     t, A = 10, B = 100, xmid = 40, slope = 4,
-    slope_A = 0.3, slope_B = -0.4, drift_frac = 0.05
+    slope_A = 0.3, slope_B = -0.4, drift_frac = 0.95
 ) + rnorm(length(t), 0, 2)
 data <- data.frame(t, x)
 
 ## the cutoff fraction is held constant in the formula
 model <- nls(
     x ~ SSsigmoidal_drift(
-        t, A, B, xmid, slope, slope_A, slope_B, drift_frac = 0.05
+        t, A, B, xmid, slope, slope_A, slope_B, drift_frac = 0.95
     ),
     data = data,
     algorithm = "port",

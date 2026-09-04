@@ -4,7 +4,7 @@
 \alias{SSexponential_drift}
 \title{Self-starting exponential-drift model}
 \usage{
-SSexponential_drift(t, A, B, tau, slope, tau_mult, TD)
+SSexponential_drift(t, A, B, tau, slope, drift_frac, TD)
 }
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
@@ -22,8 +22,10 @@ of the exponential curve, in units of the predictor variable \code{t}.}
 of the secondary phase, in response units per unit of the predictor
 variable \code{t}.}
 
-\item{tau_mult}{A numeric multiple of \code{tau} after \code{TD} at which the linear
-drift begins: drift onset \code{TD + tau_mult * tau} (\code{TD = 0} when absent).}
+\item{drift_frac}{A numeric fraction of the amplitude \code{B - A} in
+\verb{(0.5, 1)} at which the linear drift begins: the drift onset is where
+the primary response reaches \code{A + drift_frac * (B - A)}, at
+\code{TD - tau * log(1 - drift_frac)} (\code{TD = 0} when absent).}
 
 \item{TD}{A numeric parameter for the time delay before the onset of
 exponential response, in units of the predictor variable \code{t}. If \code{NULL}
@@ -36,18 +38,19 @@ predictor variable \code{t}.
 \description{
 Creates initial coefficient estimates for a \code{selfStart} wrapper around
 \code{\link[=exponential_drift]{exponential_drift()}}, for use with \code{\link[stats:nls]{stats::nls()}}. Supports both the
-5-parameter form (A, B, tau, slope, tau_mult) and the
+5-parameter form (A, B, tau, slope, drift_frac) and the
 6-parameter form adding a time delay TD; arity is inferred from the
 formula passed to \code{\link[stats:nls]{stats::nls()}}.
 }
 \details{
 5-parameter model:
-\code{x ~ SSexponential_drift(t, A, B, tau, slope, tau_mult)}
+\code{x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac)}
 
 6-parameter model:
-\code{x ~ SSexponential_drift(t, A, B, tau, slope, tau_mult, TD)}
+\code{x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac, TD)}
 
-The hinge at the drift onset \code{TD + tau_mult * tau} is not differentiable, so
+The hinge at the drift onset \code{TD - tau * log(1 - drift_frac)} is not
+differentiable, so
 \code{algorithm = "port"} with \code{tau} (and \code{TD}) bounded non-negative and
 \code{control = nls.control(warnOnly = TRUE)} is recommended.
 
@@ -60,9 +63,10 @@ with \code{as.vector()}.
 
 Any parameter may be held constant by writing a value in place of its
 name in the formula, e.g.
-\code{x ~ SSexponential_drift(t, A, B, tau, slope, tau_mult = 3)}
-holds the drift onset at \code{3 * tau}. Fixed parameters are excluded from
-estimation and are not returned by \code{\link[stats:coef]{stats::coef()}}.
+\code{x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac = 0.95)}
+holds the drift onset at 95\% of the amplitude (\code{3 * tau}). Fixed
+parameters are excluded from estimation and are not returned by
+\code{\link[stats:coef]{stats::coef()}}.
 }
 }
 \examples{
@@ -70,13 +74,13 @@ estimation and are not returned by \code{\link[stats:coef]{stats::coef()}}.
 set.seed(13)
 t <- 1:180
 x <- exponential_drift(
-    t, A = 10, B = 100, tau = 12, slope = -0.5, tau_mult = 4, TD = 15
+    t, A = 10, B = 100, tau = 12, slope = -0.5, drift_frac = 0.98, TD = 15
 ) + rnorm(length(t), 0, 2)
 data <- data.frame(t, x)
 
-## 6-parameter fit with the drift onset held at 4 tau
+## 6-parameter fit with the drift onset held at 98\% of the amplitude
 model <- nls(
-    x ~ SSexponential_drift(t, A, B, tau, slope, tau_mult = 4, TD),
+    x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac = 0.98, TD),
     data = data,
     algorithm = "port",
     lower = c(-Inf, -Inf, 0, -Inf, 0),

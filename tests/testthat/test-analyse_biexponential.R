@@ -1028,7 +1028,7 @@ create_linear_tail_data <- function(seed = 5, t = 0:119) {
     set.seed(seed)
     # fmt: skip
     x <- exponential_drift(
-        t, A = 70, B = 40, tau = 5, slope = 0.1, tau_mult = 3
+        t, A = 70, B = 40, tau = 5, slope = 0.1, drift_frac = 0.95
     ) +
         rnorm(length(t), 0, 0.3)
     create_mnirs_data(
@@ -1104,7 +1104,7 @@ test_that("analyse_kinetics() falls back to a monoexponential response", {
     expect_true(all.equal(cf$tau, 8, tolerance = 1, scale = 1))
     expect_true(all(is.na(cf[c(biexp_only, "texc")])))
     ## drift-only columns are dropped when no row kept the drift model
-    expect_false(any(c("slope", "tau_mult") %in% names(cf)))
+    expect_false(any(c("slope", "drift_frac") %in% names(cf)))
     expect_true(inherits(result$model[[1L]]$smo2, "nls"))
     ## both fallbacks are recorded
     expect_equal(sum(grepl("fell back to", result$warnings$message)), 2L)
@@ -1339,7 +1339,7 @@ test_that("kinetics_chain_cols() unions the chain with `_fitted` columns last", 
         kinetics_chain_cols("biexponential"),
         c(
             "A", "B", "TD", "tau", "MRT", "texc", "B2", "tau2", "k", "HRT",
-            "slope", "tau_mult", "MRT_fitted", "texc_fitted", "HRT_fitted"
+            "slope", "drift_frac", "MRT_fitted", "texc_fitted", "HRT_fitted"
         )
     )
     expect_equal(

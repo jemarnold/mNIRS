@@ -336,7 +336,7 @@ plot.mnirs_kinetics <- function(
     ## natural-scale coefficients over the fitted rows. comp1 is the
     ## primary monoexponential; comp2 is the secondary term: the
     ## biexponential slow phase (B to B2) clocked from the onset, or the
-    ## exponential_drift linear drift from the onset TD + tau_mult * tau.
+    ## exponential_drift linear drift from the drift onset.
     ## for sigmoidal_drift, comp1 is the primary sigmoid and comp2/comp3
     ## the leading/trailing drift lines outside the cutoffs
     comp_methods <- c("biexponential", "exponential_drift", "sigmoidal_drift")
@@ -376,17 +376,17 @@ plot.mnirs_kinetics <- function(
                     replace(trail, is.na(trail), 0)
                 cd$comp2 <- ifelse(
                     t_rel <= g("texc_A"),
-                    g("A") + g("drift_frac") * amp + lead,
+                    g("A") + (1 - g("drift_frac")) * amp + lead,
                     NA_real_
                 )
                 cd$comp3 <- ifelse(
                     t_rel >= g("texc_B"),
-                    g("A") + (1 - g("drift_frac")) * amp + trail,
+                    g("A") + g("drift_frac") * amp + trail,
                     NA_real_
                 )
             } else {
                 cd$comp1 <- monoexponential(t_rel, g("A"), g("B"), g("tau"), TD)
-                onset <- TD + g("tau_mult") * g("tau")
+                onset <- expdrift_onset(g("tau"), g("drift_frac"), TD)
                 cd$comp2 <- ifelse(
                     model == "biexponential",
                     monoexponential(t_rel, g("B"), g("B2"), g("tau2"), TD),

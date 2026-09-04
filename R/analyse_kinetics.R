@@ -24,7 +24,7 @@
 #'      `control`. See [biexponential()].}
 #'      \item{`"exponential_drift"`}{Monoexponential curve with a secondary
 #'      linear drift, fit via [stats::nls()]. Additional arguments: `use_TD`,
-#'      `tau_mult`, `fix`, `control`. See [exponential_drift()].}
+#'      `drift_frac`, `fix`, `control`. See [exponential_drift()].}
 #'      \item{`"sigmoidal"`}{Logistic or Gompertz-family curve fit via
 #'      [stats::nls()]. Additional arguments: `shape`, `fix`, `control`.
 #'      See [logistic()].}
@@ -108,18 +108,16 @@
 #'   parameters are excluded from estimation and reported at their fixed
 #'   values. Specify per-channel as a list of lists keyed by channel name, e.g.
 #'   `fix = list(smo2 = list(A = 0))`. See *Details*.
-#' @param tau_mult **exponential_drift**: A numeric multiple of the time
-#'   constant after `TD` at which the linear drift begins (drift onset
-#'   `TD + tau_mult * tau`). The default `3` (~95% of the primary amplitude)
-#'   is always held constant. Specify per-channel as a list keyed by channel
-#'   name, e.g. `tau_mult = list(smo2 = 2)`. See *Details*.
-#' @param drift_frac **sigmoidal_drift**: A numeric fraction of the
-#'   amplitude in `(0, 0.5)` bounding the drift regions: the leading drift
-#'   applies only below `A + drift_frac * (B - A)` (before `texc_A`) and the
-#'   trailing drift only above `A + (1 - drift_frac) * (B - A)` (after
-#'   `texc_B`). The default `0.05` is always held constant. Specify
+#' @param drift_frac **exponential_drift, sigmoidal_drift**: A numeric
+#'   fraction of the primary amplitude in `(0.5, 1)` bounding the drift
+#'   regions. For **exponential_drift** the linear drift begins where the
+#'   primary response reaches `A + drift_frac * (B - A)`, at
+#'   `TD - tau * log(1 - drift_frac)`. For **sigmoidal_drift** the leading
+#'   drift applies only below `A + (1 - drift_frac) * (B - A)` (before
+#'   `texc_A`) and the trailing drift only above `A + drift_frac * (B - A)`
+#'   (after `texc_B`). The default `0.95` is always held constant. Specify
 #'   per-channel as a list keyed by channel name, e.g.
-#'   `drift_frac = list(smo2 = 0.1)`. See *Details*.
+#'   `drift_frac = list(smo2 = 0.9)`. See *Details*.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
 #'
@@ -431,12 +429,13 @@
 #' Model equation:
 #'
 #' `A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) +
-#' slope * pmax(t - TD - tau_mult * tau, 0)`
+#' slope * pmax(t - TD + tau * log(1 - drift_frac), 0)`
 #'
 #' `A`, `B`, `tau`, `TD`, and the derived `k`, `MRT`, and `HRT` are as for
 #' *"monoexponential"*. `slope` is the linear drift rate `dx/dt`. The drift
-#' onset is fixed at `tau_mult` multiples of `tau` after `TD` (*default* `3`;
-#' ~95% of the primary amplitude). The excursion point `texc` is where the
+#' onset is fixed where the primary response reaches `drift_frac` of its
+#' amplitude, `TD - tau * log(1 - drift_frac)` (*default* `0.95`;
+#' `TD + 3 * tau`). The excursion point `texc` is where the
 #' drift rate overtakes the decaying primary rate,
 #' `TD + tau * log(|B - A| / (|slope| * tau))`, floored at the drift onset:
 #' the excursion point of the curve when the phases oppose, or where the
@@ -449,10 +448,10 @@
 #' to the *"monoexponential"* model (same window and time-delay structure,
 #' with `A`, `B`, `tau`, and `TD` carried over from `fix`) when the fit
 #' fails or the drift amplitude over the record from the drift onset,
-#' `|slope| * (t_end - (TD + tau_mult * tau))`, is below twice the fit RMSE,
-#' with a warning recorded in `warnings`. The `model` coefficient column names
-#' the method each row comes from; monoexponential rows report `texc`,
-#' `slope`, `tau_mult`, and `texc_fitted` as `NA`.
+#' `|slope| * (t_end - onset)`, is below twice the fit RMSE, with a warning
+#' recorded in `warnings`. The `model` coefficient column names the method
+#' each row comes from; monoexponential rows report `texc`, `slope`,
+#' `drift_frac`, and `texc_fitted` as `NA`.
 #'
 #' `A`, `B`, `tau`, `slope`, and `TD` may be held constant with `fix`, as
 #' above.
@@ -509,9 +508,9 @@
 #' `slope_A` and `slope_B` are the linear drift rates `dx/dt` at the
 #' asymptotes `A` and `B`. Each drift is a hinge line anchored at zero at
 #' its cutoff: the leading drift applies only before `texc_A`, where the
-#' sigmoid reaches `drift_frac` (*default* `0.05`; 5%) of its amplitude,
-#' and the trailing drift only after `texc_B`, where it reaches
-#' `1 - drift_frac` (95%). The cutoffs are the analytic inverse of each
+#' sigmoid reaches `1 - drift_frac` (*default* `0.95`; 5%) of its
+#' amplitude, and the trailing drift only after `texc_B`, where it reaches
+#' `drift_frac` (95%). The cutoffs are the analytic inverse of each
 #' `shape` (see [sigmoidal_drift()]), so a Gompertz form places its cutoff
 #' further out on its slow side. The drift regions never overlap, so the
 #' two drifts are fitted independently. `texc_A` and `texc_B` are reported
@@ -677,7 +676,6 @@ analyse_kinetics <- function(
     na.rm = FALSE,
     use_TD = TRUE,
     shape = c("symmetric", "gompertz", "gompertz_left"),
-    tau_mult = NULL,
     drift_frac = NULL,
     fix = NULL
 ) {
@@ -869,7 +867,7 @@ analyse_kinetics.exponential_drift <- function(
     verbose = TRUE,
     ...,
     use_TD = TRUE,
-    tau_mult = 3,
+    drift_frac = 0.95,
     fix = NULL
 ) {
     if (missing(verbose)) {
@@ -950,7 +948,7 @@ analyse_kinetics.sigmoidal_drift <- function(
     verbose = TRUE,
     ...,
     shape = c("symmetric", "gompertz", "gompertz_left"),
-    drift_frac = 0.05,
+    drift_frac = 0.95,
     fix = NULL
 ) {
     if (missing(verbose)) {

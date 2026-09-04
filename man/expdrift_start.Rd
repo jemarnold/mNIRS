@@ -24,7 +24,7 @@ coarse grid and keeps the RSS-minimising start (cf.
 \code{\link[=monoexp_start]{monoexp_start()}}). The model is linear in \code{A}, \code{B}, and \code{slope} once
 \code{tau} and \code{TD} are held, so those are solved by least squares at every
 grid point at once via \code{\link[=solve_grid3]{solve_grid3()}}. User-fixed \code{tau}, \code{TD}, and
-\code{tau_mult} narrow the grids; the linear parameters are always solved
+\code{drift_frac} narrow the grids; the linear parameters are always solved
 free, as this is only a seed. \code{tau} is capped so the drift onset stays
 inside the record; a grid point whose hinge has no support is singular
 and skipped.

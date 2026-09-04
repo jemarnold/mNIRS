@@ -9,7 +9,7 @@ analyse_sigmoidal_drift(
   nirs_channels = NULL,
   time_channel = NULL,
   shape = c("symmetric", "gompertz", "gompertz_left"),
-  drift_frac = 0.05,
+  drift_frac = 0.95,
   fix = NULL,
   control = NULL,
   start_time = NULL,
@@ -43,12 +43,12 @@ used.
 (early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or \code{"gompertz_left"}
 (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
 
-\item{drift_frac}{A numeric fraction of the amplitude in \verb{(0, 0.5)}
-bounding the drift regions (\emph{default} \code{0.05}): the leading drift
-applies below \code{A + drift_frac * (B - A)} and the trailing drift above
-\code{A + (1 - drift_frac) * (B - A)}. Always held constant. Applied to
+\item{drift_frac}{A numeric fraction of the amplitude in \verb{(0.5, 1)}
+bounding the drift regions (\emph{default} \code{0.95}): the leading drift
+applies below \code{A + (1 - drift_frac) * (B - A)} and the trailing drift
+above \code{A + drift_frac * (B - A)}. Always held constant. Applied to
 every channel, or per-channel as a list keyed by channel name, e.g.
-\code{drift_frac = list(smo2 = 0.1)}.}
+\code{drift_frac = list(smo2 = 0.9)}.}
 
 \item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B},
 \code{xmid}, \code{slope}, \code{slope_A}, \code{slope_B}) to hold constant during fitting,

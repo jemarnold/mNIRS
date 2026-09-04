@@ -2345,13 +2345,13 @@ test_that("analyse_kinetics.monoexponential names only the failing interval", {
 
 ## analyse_kinetics.exponential_drift ==================================
 ## helper: create exponential-drift test data with known parameters; the
-## drift starts at the onset TD + tau_mult * tau = 37
+## drift starts at the onset TD - tau * log(1 - drift_frac) = 36.3
 create_expdrift_data <- function(
     A = 70,
     B = 40,
     tau = 8,
     slope = 0.2,
-    tau_mult = 4,
+    drift_frac = 0.98,
     TD = 5,
     n = 120,
     sample_rate = 1,
@@ -2361,7 +2361,7 @@ create_expdrift_data <- function(
 ) {
     set.seed(seed)
     t <- seq(0, (n - 1) / sample_rate, length.out = n)
-    x <- exponential_drift(t, A, B, tau, slope, tau_mult, TD) +
+    x <- exponential_drift(t, A, B, tau, slope, drift_frac, TD) +
         rnorm(n, 0, noise_sd)
 
     df <- setNames(
@@ -2372,7 +2372,7 @@ create_expdrift_data <- function(
         for (ch in channels[-1]) {
             # fmt: skip
             df[[ch]] <- exponential_drift(
-                t, A + 5, B + 5, tau, slope, tau_mult, TD
+                t, A + 5, B + 5, tau, slope, drift_frac, TD
             ) +
                 rnorm(n, 0, noise_sd)
         }
@@ -2400,7 +2400,7 @@ test_that("analyse_kinetics.exponential_drift dispatches to the method", {
     expect_s3_class(result, "mnirs_kinetics")
     expect_equal(result$method, "exponential_drift")
     expect_true(all(
-        c("tau", "MRT", "slope", "tau_mult", "texc", "texc_fitted") %in%
+        c("tau", "MRT", "slope", "drift_frac", "texc", "texc_fitted") %in%
             names(result$coefficients)
     ))
     expect_named(
@@ -2463,22 +2463,22 @@ test_that("analyse_kinetics.exponential_drift passes use_TD and fix", {
     )
 })
 
-test_that("analyse_kinetics.exponential_drift passes tau_mult", {
+test_that("analyse_kinetics.exponential_drift passes drift_frac", {
     data <- create_expdrift_data()
 
     result <- analyse_kinetics(
         data,
         nirs_channels = "smo2",
         method = "exponential_drift",
-        tau_mult = 2,
+        drift_frac = 0.85,
         verbose = FALSE
     )
 
     coefs <- result$coefficients
-    expect_false("tau_mult" %in% names(coef(result$model[[1L]]$smo2)))
-    expect_equal(coefs$tau_mult, 2)
+    expect_false("drift_frac" %in% names(coef(result$model[[1L]]$smo2)))
+    expect_equal(coefs$drift_frac, 0.85)
     ## texc is the turning point past the drift onset
-    expect_gt(coefs$texc, coefs$TD + 2 * coefs$tau)
+    expect_gt(coefs$texc, expdrift_onset(coefs$tau, 0.85, coefs$TD))
 })
 
 ## analyse_kinetics.sigmoidal ============================================
@@ -3326,7 +3326,7 @@ test_that("analyse_kinetics nls models are built on the input channel names", {
         monoexponential = monoexponential(t, 50, 80, 5, 5) + rnorm(120, 0, 0.5),
         biexponential = biexponential(t, 70, 40, 5, 60, 40) +
             rnorm(120, 0, 0.5),
-        exponential_drift = exponential_drift(t, 70, 40, 8, 0.2, 4) +
+        exponential_drift = exponential_drift(t, 70, 40, 8, 0.2, 0.98) +
             rnorm(120, 0, 0.3),
         sigmoidal = logistic(t, 10, 100, 30, 4) + rnorm(120, 0, 2)
     )

@@ -11,14 +11,14 @@ test_that("sigmoidal_drift() reduces to the sigmoid without drift", {
     t <- seq(0, 100, by = 0.5)
     lapply(shapes, \(.s) {
         expect_equal(
-            sigmoidal_drift(t, 10, 100, 40, 4, 0, 0, 0.05, shape = .s),
+            sigmoidal_drift(t, 10, 100, 40, 4, 0, 0, 0.95, shape = .s),
             sigmoid_fn[[.s]](t, 10, 100, 40, 4)
         )
     })
 })
 
 test_that("sigdrift_cutoffs() are where the sigmoid reaches the fraction", {
-    p <- 0.05
+    p <- 0.95
     check <- \(A, B, slope) {
         lapply(shapes, \(.s) {
             cut <- sigdrift_cutoffs(A, B, 40, slope, p, .s)
@@ -27,7 +27,7 @@ test_that("sigdrift_cutoffs() are where the sigmoid reaches the fraction", {
             expect_gt(cut[[2L]], 40)
             expect_equal(
                 sigmoid_fn[[.s]](cut, A, B, 40, slope),
-                A + c(p, 1 - p) * (B - A),
+                A + c(1 - p, p) * (B - A),
                 ignore_attr = TRUE
             )
         })
@@ -48,11 +48,11 @@ test_that("sigdrift_cutoffs() are where the sigmoid reaches the fraction", {
 test_that("sigmoidal_drift() drifts are hinged at the cutoffs and independent", {
     t <- seq(0, 100, by = 0.5)
     lapply(shapes, \(.s) {
-        cut <- sigdrift_cutoffs(10, 100, 40, 4, 0.05, .s)
-        base <- sigmoidal_drift(t, 10, 100, 40, 4, 0, 0, 0.05, shape = .s)
-        lead <- sigmoidal_drift(t, 10, 100, 40, 4, 0.3, 0, 0.05, shape = .s)
-        trail <- sigmoidal_drift(t, 10, 100, 40, 4, 0, -0.4, 0.05, shape = .s)
-        both <- sigmoidal_drift(t, 10, 100, 40, 4, 0.3, -0.4, 0.05, shape = .s)
+        cut <- sigdrift_cutoffs(10, 100, 40, 4, 0.95, .s)
+        base <- sigmoidal_drift(t, 10, 100, 40, 4, 0, 0, 0.95, shape = .s)
+        lead <- sigmoidal_drift(t, 10, 100, 40, 4, 0.3, 0, 0.95, shape = .s)
+        trail <- sigmoidal_drift(t, 10, 100, 40, 4, 0, -0.4, 0.95, shape = .s)
+        both <- sigmoidal_drift(t, 10, 100, 40, 4, 0.3, -0.4, 0.95, shape = .s)
 
         ## each drift is zero outside its region, linear inside
         expect_equal(lead[t >= cut[[1L]]], base[t >= cut[[1L]]])
@@ -78,13 +78,13 @@ test_that("SSsigmoidal_drift() recovers parameters for every shape", {
     lapply(shapes, \(.s) {
         set.seed(13)
         x <- sigmoidal_drift(
-            t, 10, 100, 40, 4, 0.3, -0.4, 0.05, shape = .s
+            t, 10, 100, 40, 4, 0.3, -0.4, 0.95, shape = .s
         ) + rnorm(length(t), 0, 1)
         data <- data.frame(t, x)
         formula <- substitute(
             x ~ SSsigmoidal_drift(
                 t, A, B, xmid, slope, slope_A, slope_B,
-                drift_frac = 0.05, shape = .s
+                drift_frac = 0.95, shape = .s
             ),
             list(.s = .s)
         )
@@ -108,13 +108,13 @@ test_that("SSsigmoidal_drift() recovers parameters for every shape", {
 test_that("SSsigmoidal_drift() excludes fixed parameters from estimation", {
     set.seed(13)
     t <- seq(0, 119)
-    x <- sigmoidal_drift(t, 10, 100, 40, 4, 0.3, -0.4, 0.05) +
+    x <- sigmoidal_drift(t, 10, 100, 40, 4, 0.3, -0.4, 0.95) +
         rnorm(length(t), 0, 1)
     data <- data.frame(t, x)
 
     model <- suppressWarnings(nls(
         x ~ SSsigmoidal_drift(
-            t, A = 10, B, xmid, slope, slope_A, slope_B, drift_frac = 0.05
+            t, A = 10, B, xmid, slope, slope_A, slope_B, drift_frac = 0.95
         ),
         data = data,
         algorithm = "port",
@@ -127,7 +127,7 @@ test_that("SSsigmoidal_drift() excludes fixed parameters from estimation", {
         as.numeric(predict(model, data.frame(t = 0:5))),
         sigmoidal_drift(0:5, 10, coef(model)[["B"]], coef(model)[["xmid"]],
             coef(model)[["slope"]], coef(model)[["slope_A"]],
-            coef(model)[["slope_B"]], 0.05)
+            coef(model)[["slope_B"]], 0.95)
     )
 })
 
@@ -137,7 +137,7 @@ test_that("SSsigmoidal_drift() excludes fixed parameters from estimation", {
 test_that("sigdrift_start() seeds near the truth and holds fixed values", {
     set.seed(13)
     t <- seq(0, 119)
-    x <- sigmoidal_drift(t, 10, 100, 40, 4, 0.3, -0.4, 0.05) +
+    x <- sigmoidal_drift(t, 10, 100, 40, 4, 0.3, -0.4, 0.95) +
         rnorm(length(t), 0, 1)
 
     start <- sigdrift_start(x, t)
@@ -150,7 +150,7 @@ test_that("sigdrift_start() seeds near the truth and holds fixed values", {
     expect_true(all.equal(start[["xmid"]], 40, tolerance = 5, scale = 1))
     expect_true(all.equal(start[["slope_A"]], 0.3, tolerance = 0.15, scale = 1))
     expect_true(all.equal(start[["slope_B"]], -0.4, tolerance = 0.15, scale = 1))
-    expect_equal(start[["drift_frac"]], 0.05)
+    expect_equal(start[["drift_frac"]], 0.95)
 
     fixed <- sigdrift_start(x, t, fixed = list(A = 12, slope_B = -0.5))
     expect_equal(fixed[["A"]], 12)
@@ -178,7 +178,7 @@ create_sigdrift_data <- function(
     slope = 4,
     slope_A = 0.3,
     slope_B = -0.4,
-    drift_frac = 0.05,
+    drift_frac = 0.95,
     shape = "symmetric",
     n = 120,
     sample_rate = 1,
@@ -225,7 +225,7 @@ test_that("analyse_sigmoidal_drift() returns correct structure and recovers para
     expect_s3_class(model, "nls")
     expect_named(attr(result, "fitted_data")$smo2, c("window_idx", "fitted"))
     expect_equal(nrow(attr(result, "diagnostics")), 1L)
-    expect_equal(attr(result, "channel_args")$drift_frac, 0.05)
+    expect_equal(attr(result, "channel_args")$drift_frac, 0.95)
     expect_equal(attr(result, "channel_args")$shape, "symmetric")
 
     ## the cutoff fraction is held, never estimated
@@ -239,13 +239,13 @@ test_that("analyse_sigmoidal_drift() returns correct structure and recovers para
     expect_true(all.equal(result$slope, 4, tolerance = 1, scale = 1))
     expect_true(all.equal(result$slope_A, 0.3, tolerance = 0.1, scale = 1))
     expect_true(all.equal(result$slope_B, -0.4, tolerance = 0.1, scale = 1))
-    expect_equal(result$drift_frac, 0.05)
+    expect_equal(result$drift_frac, 0.95)
     expect_true(attr(result, "diagnostics")$r2 > 0.99)
     expect_equal(attr(result, "diagnostics")$n_params, 6L)
 
     ## derived columns follow the fitted coefficients
     cut <- sigdrift_cutoffs(
-        result$A, result$B, result$xmid, result$slope, 0.05, "symmetric"
+        result$A, result$B, result$xmid, result$slope, 0.95, "symmetric"
     )
     expect_equal(result$texc_A, cut[[1L]])
     expect_equal(result$texc_B, cut[[2L]])
@@ -275,7 +275,7 @@ test_that("analyse_sigmoidal_drift() fits every shape", {
             as.numeric(predict(model, data.frame(time = c(0, 40, 119)))),
             sigmoidal_drift(
                 c(0, 40, 119), result$A, result$B, result$xmid, result$slope,
-                result$slope_A, result$slope_B, 0.05, shape = .s
+                result$slope_A, result$slope_B, 0.95, shape = .s
             )
         )
     })
@@ -287,12 +287,12 @@ test_that("analyse_sigmoidal_drift() drift_frac resolves per channel", {
     result <- analyse_sigmoidal_drift(
         data,
         nirs_channels = c("smo2", "hhb"),
-        drift_frac = list(smo2 = 0.02, hhb = 0.1),
+        drift_frac = list(smo2 = 0.98, hhb = 0.9),
         verbose = FALSE
     )
-    expect_equal(result$drift_frac, c(0.02, 0.1))
-    expect_equal(attr(result, "channel_args")$drift_frac, c(0.02, 0.1))
-    ## a smaller fraction pushes the cutoffs further from xmid
+    expect_equal(result$drift_frac, c(0.98, 0.9))
+    expect_equal(attr(result, "channel_args")$drift_frac, c(0.98, 0.9))
+    ## a larger fraction pushes the cutoffs further from xmid
     expect_lt(result$texc_A[[1L]] - result$xmid[[1L]],
         result$texc_A[[2L]] - result$xmid[[2L]])
     expect_gt(result$texc_B[[1L]] - result$xmid[[1L]],
@@ -303,15 +303,15 @@ test_that("analyse_sigmoidal_drift() drift_frac resolves per channel", {
     result_part <- analyse_sigmoidal_drift(
         data,
         nirs_channels = c("smo2", "hhb"),
-        drift_frac = list(smo2 = 0.02),
+        drift_frac = list(smo2 = 0.98),
         verbose = FALSE
     )
-    expect_equal(result_part$drift_frac, c(0.02, 0.05))
+    expect_equal(result_part$drift_frac, c(0.98, 0.95))
 })
 
 test_that("analyse_sigmoidal_drift() validates drift_frac", {
     data <- create_sigdrift_data()
-    lapply(list(0, 0.5, -0.1, 1, "0.05", c(0.05, 0.1)), \(.f) {
+    lapply(list(0.5, 1, 0, 1.2, "0.95", c(0.9, 0.95)), \(.f) {
         expect_error(
             analyse_sigmoidal_drift(
                 data, nirs_channels = "smo2", drift_frac = .f, verbose = FALSE
@@ -339,7 +339,7 @@ test_that("analyse_sigmoidal_drift() holds fixed parameters", {
     ## the cutoff fraction is not a fixable parameter
     expect_error(
         analyse_sigmoidal_drift(
-            data, nirs_channels = "smo2", fix = list(drift_frac = 0.1)
+            data, nirs_channels = "smo2", fix = list(drift_frac = 0.9)
         ),
         "not recognised"
     )
@@ -518,16 +518,16 @@ test_that("analyse_kinetics.sigmoidal_drift passes shape, drift_frac, and fix", 
         nirs_channels = "smo2",
         method = "sigmoidal_drift",
         shape = "gompertz_left",
-        drift_frac = 0.1,
+        drift_frac = 0.9,
         fix = list(B = 100),
         verbose = FALSE
     )
     cf <- result$coefficients
     expect_equal(cf$model, "sigmoidal_drift")
     expect_equal(cf$B, 100)
-    expect_equal(cf$drift_frac, 0.1)
+    expect_equal(cf$drift_frac, 0.9)
     expect_equal(result$channel_args$shape, "gompertz_left")
-    expect_equal(result$channel_args$drift_frac, 0.1)
+    expect_equal(result$channel_args$drift_frac, 0.9)
     expect_false("B" %in% names(coef(result$model[[1L]]$smo2)))
 })
 

@@ -100,20 +100,21 @@ make_sigmoidal <- function(channels = "smo2", n = 60) {
     )
 }
 
-## monoexponential plus linear drift from the onset tau_mult * tau = 32 (per
-## create_expdrift_data); no TD so the onset sits at t = 0
+## monoexponential plus linear drift from the onset -tau * log(1 - 0.98) =
+## 31.3 (per create_expdrift_data); no TD so the response sits at t = 0
 make_expdrift <- function(channels = "smo2", n = 120) {
     set.seed(42)
     t <- seq(0, n - 1, length.out = n)
     df <- setNames(
         data.frame(
             t,
-            exponential_drift(t, 70, 40, 8, 0.2, 4) + rnorm(n, 0, 0.3)
+            exponential_drift(t, 70, 40, 8, 0.2, 0.98) + rnorm(n, 0, 0.3)
         ),
         c("time", channels[1])
     )
     for (ch in channels[-1]) {
-        df[[ch]] <- exponential_drift(t, 75, 45, 8, 0.2, 4) + rnorm(n, 0, 0.3)
+        df[[ch]] <- exponential_drift(t, 75, 45, 8, 0.2, 0.98) +
+            rnorm(n, 0, 0.3)
     }
     create_mnirs_data(
         df,
@@ -635,7 +636,7 @@ test_that("components draws the exponential_drift drift line from the drift onse
     expect_lt(nrow(d2), nrow(d1))
     t_rel <- d2$time - x$interval_times$start_times[[1L]]
     cf <- x$coefficients
-    onset <- sum(cf$TD[is.finite(cf$TD)], cf$tau_mult * cf$tau)
+    onset <- expdrift_onset(cf$tau, cf$drift_frac, if (is.finite(cf$TD)) cf$TD)
     expect_true(all(t_rel >= onset))
     expect_equal(diff(d2$comp2), rep(x$coefficients$slope, nrow(d2) - 1L))
 })

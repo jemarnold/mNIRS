@@ -1,18 +1,22 @@
 ## exponential_drift() ==============================================
 test_that("exponential_drift() is monoexponential before the onset and linear after", {
     t <- 0:120
-    onset <- 5 * 8
+    ## the onset is where the primary reaches the fraction of its amplitude
+    onset <- expdrift_onset(8, 0.99)
+    expect_equal(onset, -8 * log(0.01))
+    expect_equal(monoexponential(onset, 70, 40, 8), 70 + 0.99 * (40 - 70))
+    expect_equal(expdrift_onset(8, 0.95, TD = 15), 15 - 8 * log(0.05))
     mono <- monoexponential(t, A = 70, B = 40, tau = 8)
-    result <- exponential_drift(t, 70, 40, 8, slope = 0.05, tau_mult = 5)
+    result <- exponential_drift(t, 70, 40, 8, slope = 0.05, drift_frac = 0.99)
 
-    ## the hinge is exactly zero before the onset tau_mult * tau
+    ## the hinge is exactly zero before the onset
     expect_equal(result[t <= onset], mono[t <= onset])
     expect_equal(
         result[t > onset], mono[t > onset] + 0.05 * (t[t > onset] - onset)
     )
 
     ## TD form: flat at A before TD, hinge shifts by TD
-    result_TD <- exponential_drift(t, 70, 40, 8, 0.05, 5, TD = 15)
+    result_TD <- exponential_drift(t, 70, 40, 8, 0.05, 0.99, TD = 15)
     expect_true(all(result_TD[t < 15] == 70))
     expect_equal(
         result_TD,
@@ -20,7 +24,7 @@ test_that("exponential_drift() is monoexponential before the onset and linear af
     )
 
     ## no drift reduces to the monoexponential
-    expect_equal(exponential_drift(t, 70, 40, 8, 0, 5), mono)
+    expect_equal(exponential_drift(t, 70, 40, 8, 0, 0.99), mono)
 })
 
 
@@ -29,14 +33,14 @@ test_that("SSexponential_drift() fits the 6-parameter TD form", {
     set.seed(13)
     t <- 1:180
     x <- exponential_drift(
-        t, A = 10, B = 100, tau = 12, slope = -0.5, tau_mult = 4, TD = 15
+        t, A = 10, B = 100, tau = 12, slope = -0.5, drift_frac = 0.98, TD = 15
     ) + rnorm(length(t), 0, 2)
     data <- data.frame(t, x)
 
     ## the hinge is non-smooth, so port may stop short of its convergence
     ## certificate on usable coefficients
     model <- nls(
-        x ~ SSexponential_drift(t, A, B, tau, slope, tau_mult = 4, TD),
+        x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac = 0.98, TD),
         data = data,
         algorithm = "port",
         lower = c(-Inf, -Inf, 0, -Inf, 0),
@@ -57,7 +61,7 @@ test_that("SSexponential_drift() gradient matches numericDeriv for the free para
     ## sample points off the hinge, where the one-sided derivative is exact
     t <- seq(-10, 120, by = 0.5) + 0.1
     env <- list2env(list(
-        t = t, A = 70, B = 40, tau = 8, slope = -0.2, tau_mult = 3, TD = 3
+        t = t, A = 70, B = 40, tau = 8, slope = -0.2, drift_frac = 0.95, TD = 3
     ))
     chk <- function(expr, pars) {
         an <- attr(eval(expr, env), "gradient")
@@ -66,15 +70,15 @@ test_that("SSexponential_drift() gradient matches numericDeriv for the free para
         expect_equal(unname(an), unname(nd), tolerance = 1e-5)
     }
     chk(
-        quote(SSexponential_drift(t, A, B, tau, slope, tau_mult = 3, TD)),
+        quote(SSexponential_drift(t, A, B, tau, slope, drift_frac = 0.95, TD)),
         c("A", "B", "tau", "slope", "TD")
     )
     chk(
-        quote(SSexponential_drift(t, A, B, tau, slope, tau_mult)),
-        c("A", "B", "tau", "slope", "tau_mult")
+        quote(SSexponential_drift(t, A, B, tau, slope, drift_frac)),
+        c("A", "B", "tau", "slope", "drift_frac")
     )
     expect_null(
-        attr(exponential_drift(t, 70, 40, 8, -0.2, 3), "gradient")
+        attr(exponential_drift(t, 70, 40, 8, -0.2, 0.95), "gradient")
     )
 })
 
@@ -82,14 +86,14 @@ test_that("expdrift_start() matches a per-point least-squares grid search", {
     set.seed(8)
     t <- 0:150
     x <- exponential_drift(
-        t, A = 10, B = 100, tau = 12, slope = -0.5, tau_mult = 4, TD = 15
+        t, A = 10, B = 100, tau = 12, slope = -0.5, drift_frac = 0.98, TD = 15
     ) + rnorm(length(t), 0, 2)
-    start <- expdrift_start(x, t, fixed = list(tau_mult = 4), has_TD = TRUE)
-    expect_named(start, c("A", "B", "tau", "slope", "tau_mult", "TD"))
+    start <- expdrift_start(x, t, fixed = list(drift_frac = 0.98), has_TD = TRUE)
+    expect_named(start, c("A", "B", "tau", "slope", "drift_frac", "TD"))
 
     ## the linear coefficients at the chosen grid point are the lm solution
     e <- exp(-pmax(t - start[["TD"]], 0) / start[["tau"]])
-    h <- pmax(t - start[["TD"]] - 4 * start[["tau"]], 0)
+    h <- pmax(t - expdrift_onset(start[["tau"]], 0.98, start[["TD"]]), 0)
     cf <- lm.fit(cbind(e, 1 - e, h), x)$coefficients
     expect_equal(
         unname(start[c("A", "B", "slope")]), unname(cf), tolerance = 1e-8
@@ -100,12 +104,12 @@ test_that("SSexponential_drift() fits the 5-parameter form with a fixed A", {
     set.seed(3)
     t <- 0:150
     x <- exponential_drift(
-        t, A = 10, B = 100, tau = 12, slope = -0.5, tau_mult = 4
+        t, A = 10, B = 100, tau = 12, slope = -0.5, drift_frac = 0.98
     ) + rnorm(length(t), 0, 2)
     data <- data.frame(t, x)
 
     model <- nls(
-        x ~ SSexponential_drift(t, A = 10, B, tau, slope, tau_mult = 4),
+        x ~ SSexponential_drift(t, A = 10, B, tau, slope, drift_frac = 0.98),
         data = data,
         algorithm = "port",
         lower = c(-Inf, 0, -Inf),
@@ -121,13 +125,13 @@ test_that("SSexponential_drift() fits the 5-parameter form with a fixed A", {
 ## analyse_exponential_drift() ======================================
 
 ## helper: falling primary response with a late positive drift starting
-## at the onset TD + tau_mult * tau = 37
+## at the onset TD - tau * log(1 - drift_frac) = 36.3
 create_expdrift_data <- function(
     A = 70,
     B = 40,
     tau = 8,
     slope = 0.2,
-    tau_mult = 4,
+    drift_frac = 0.98,
     TD = 5,
     n = 120,
     sample_rate = 1,
@@ -140,7 +144,9 @@ create_expdrift_data <- function(
     df <- data.frame(time = t)
     ## successive channels are offset by 5 units
     df[channels] <- lapply(seq_along(channels) - 1L, \(.i) {
-        exponential_drift(t, A + 5 * .i, B + 5 * .i, tau, slope, tau_mult, TD) +
+        exponential_drift(
+            t, A + 5 * .i, B + 5 * .i, tau, slope, drift_frac, TD
+        ) +
             rnorm(n, 0, noise_sd)
     })
 
@@ -157,14 +163,14 @@ test_that("analyse_exponential_drift() returns correct structure and recovers pa
     result <- analyse_exponential_drift(
         create_expdrift_data(),
         nirs_channels = "smo2",
-        tau_mult = 4,
+        drift_frac = 0.98,
         verbose = FALSE
     )
 
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
         "interval", "nirs_channels", "A", "B", "TD", "tau", "k", "MRT", "HRT",
-        "texc", "slope", "tau_mult", "MRT_fitted", "HRT_fitted", "texc_fitted"
+        "texc", "slope", "drift_frac", "MRT_fitted", "HRT_fitted", "texc_fitted"
     ))
     expect_equal(nrow(result), 1L)
 
@@ -172,9 +178,9 @@ test_that("analyse_exponential_drift() returns correct structure and recovers pa
     expect_s3_class(attr(result, "model")$smo2, "nls")
     expect_named(attr(result, "fitted_data")$smo2, c("window_idx", "fitted"))
     expect_equal(nrow(attr(result, "diagnostics")), 1L)
-    expect_equal(attr(result, "channel_args")$tau_mult, 4)
+    expect_equal(attr(result, "channel_args")$drift_frac, 0.98)
 
-    ## the onset multiple is held, never estimated
+    ## the onset fraction is held, never estimated
     expect_named(
         coef(attr(result, "model")$smo2),
         c("A", "B", "tau", "slope", "TD")
@@ -184,7 +190,7 @@ test_that("analyse_exponential_drift() returns correct structure and recovers pa
     expect_true(all.equal(result$tau, 8, tolerance = 2, scale = 1))
     expect_true(all.equal(result$slope, 0.2, tolerance = 0.05, scale = 1))
     expect_true(all.equal(result$TD, 5, tolerance = 3, scale = 1))
-    expect_equal(result$tau_mult, 4)
+    expect_equal(result$drift_frac, 0.98)
     expect_true(attr(result, "diagnostics")$r2 > 0.9)
 
     ## derived columns follow the fitted coefficients
@@ -192,10 +198,10 @@ test_that("analyse_exponential_drift() returns correct structure and recovers pa
     expect_equal(result$MRT, result$TD + result$tau)
     expect_equal(result$HRT, result$TD + result$tau * log(2))
     ## the drift takes over before the onset, so texc is the onset itself
-    expect_equal(result$texc, result$TD + 4 * result$tau)
+    expect_equal(result$texc, expdrift_onset(result$tau, 0.98, result$TD))
     fitted_at <- \(.t) {
         exponential_drift(
-            .t, result$A, result$B, result$tau, result$slope, 4, result$TD
+            .t, result$A, result$B, result$tau, result$slope, 0.98, result$TD
         )
     }
     expect_equal(result$MRT_fitted, fitted_at(result$MRT))
@@ -213,7 +219,7 @@ test_that("analyse_exponential_drift() use_TD = FALSE fits the 5-param model fro
         nirs_channels = "smo2",
         start_time = start_time,
         use_TD = FALSE,
-        tau_mult = 4,
+        drift_frac = 0.98,
         verbose = FALSE
     )
 
@@ -224,7 +230,7 @@ test_that("analyse_exponential_drift() use_TD = FALSE fits the 5-param model fro
     expect_true(is.na(result$TD))
     expect_equal(result$MRT, result$tau)
     expect_equal(result$HRT, result$tau * log(2))
-    expect_equal(result$texc, 4 * result$tau)
+    expect_equal(result$texc, expdrift_onset(result$tau, 0.98))
     expect_equal(
         attr(result, "diagnostics")$n_obs, sum(data$time >= start_time)
     )
@@ -257,37 +263,38 @@ test_that("analyse_exponential_drift() falls back and then fails on too few obse
     expect_null(attr(result, "model")$smo2)
 })
 
-test_that("analyse_exponential_drift() tau_mult resolves per channel", {
+test_that("analyse_exponential_drift() drift_frac resolves per channel", {
     data <- create_expdrift_data(channels = c("smo2", "hhb"))
 
     result <- analyse_exponential_drift(
         data,
         nirs_channels = c("smo2", "hhb"),
-        tau_mult = list(smo2 = 2, hhb = 4),
+        drift_frac = list(smo2 = 0.85, hhb = 0.98),
         verbose = FALSE
     )
-    expect_equal(result$tau_mult, c(2, 4))
+    expect_equal(result$drift_frac, c(0.85, 0.98))
     ## texc is the turning point when past the onset (smo2), else the onset
+    onset <- expdrift_onset(result$tau, c(0.85, 0.98), result$TD)
     takeover <- result$TD +
         result$tau * log((result$A - result$B) / (result$slope * result$tau))
-    expect_equal(result$texc, pmax(result$TD + c(2, 4) * result$tau, takeover))
-    expect_gt(result$texc[[1L]], result$TD[[1L]] + 2 * result$tau[[1L]])
+    expect_equal(result$texc, pmax(onset, takeover))
+    expect_gt(result$texc[[1L]], onset[[1L]])
     expect_true(all.equal(
         result$texc_fitted[[1L]],
         min(attr(result, "fitted_data")$smo2$fitted),
         tolerance = 1, scale = 1
     ))
-    expect_equal(attr(result, "channel_args")$tau_mult, c(2, 4))
-    expect_false("tau_mult" %in% names(coef(attr(result, "model")$smo2)))
+    expect_equal(attr(result, "channel_args")$drift_frac, c(0.85, 0.98))
+    expect_false("drift_frac" %in% names(coef(attr(result, "model")$smo2)))
 
     ## an omitted channel takes the formal default
     result_part <- analyse_exponential_drift(
         data,
         nirs_channels = c("smo2", "hhb"),
-        tau_mult = list(smo2 = 2),
+        drift_frac = list(smo2 = 0.85),
         verbose = FALSE
     )
-    expect_equal(result_part$tau_mult, c(2, 3))
+    expect_equal(result_part$drift_frac, c(0.85, 0.95))
 })
 
 test_that("analyse_exponential_drift() texc is the takeover point of a monotonic drift", {
@@ -296,11 +303,11 @@ test_that("analyse_exponential_drift() texc is the takeover point of a monotonic
     result <- analyse_exponential_drift(
         create_expdrift_data(slope = -0.2),
         nirs_channels = "smo2",
-        tau_mult = 2,
+        drift_frac = 0.85,
         verbose = FALSE
     )
     expect_true(result$slope < 0)
-    expect_gt(result$texc, result$TD + 2 * result$tau)
+    expect_gt(result$texc, expdrift_onset(result$tau, 0.85, result$TD))
     expect_equal(
         result$texc,
         result$TD +
@@ -308,14 +315,16 @@ test_that("analyse_exponential_drift() texc is the takeover point of a monotonic
     )
 })
 
-test_that("analyse_exponential_drift() validates tau_mult", {
+test_that("analyse_exponential_drift() validates drift_frac", {
     data <- create_expdrift_data()
 
-    ## a zero multiple starts the drift at the response onset
-    for (bad in list(0, -1, "3", c(2, 3))) {
+    ## the drift must start past the half-response and before the asymptote
+    for (bad in list(0.5, 1, 0, -0.1, "0.95", c(0.9, 0.95))) {
         expect_error(
-            analyse_exponential_drift(data, nirs_channels = "smo2", tau_mult = bad),
-            "tau_mult"
+            analyse_exponential_drift(
+                data, nirs_channels = "smo2", drift_frac = bad
+            ),
+            "drift_frac.*must be a valid one-element"
         )
     }
 })
@@ -331,7 +340,7 @@ test_that("analyse_exponential_drift() fix holds parameters constant", {
     expect_equal(result$slope, 0)
     expect_named(coef(attr(result, "model")$smo2), c("A", "B", "tau", "TD"))
     ## no takeover without drift: texc is the onset
-    expect_equal(result$texc, result$TD + 3 * result$tau)
+    expect_equal(result$texc, expdrift_onset(result$tau, 0.95, result$TD))
     expect_equal(
         result$texc_fitted,
         monoexponential(result$texc, result$A, result$B, result$tau, result$TD)
@@ -349,7 +358,7 @@ test_that("analyse_exponential_drift() fix holds parameters constant", {
     expect_named(coef(attr(result, "model")$smo2), c("A", "B", "tau", "slope"))
     expect_equal(result$MRT, 5 + result$tau)
 
-    ## TD is only fixable when use_TD = TRUE; tau_mult is never fixable
+    ## TD is only fixable when use_TD = TRUE; drift_frac is never fixable
     expect_error(
         analyse_exponential_drift(
             data, nirs_channels = "smo2", use_TD = FALSE, fix = list(TD = 0)
@@ -358,7 +367,7 @@ test_that("analyse_exponential_drift() fix holds parameters constant", {
     )
     expect_error(
         analyse_exponential_drift(
-            data, nirs_channels = "smo2", fix = list(tau_mult = 4)
+            data, nirs_channels = "smo2", fix = list(drift_frac = 0.98)
         ),
         "not recognised"
     )
@@ -399,14 +408,14 @@ test_that("analyse_kinetics() keeps a supported drift", {
         data,
         nirs_channels = "smo2",
         method = "exponential_drift",
-        tau_mult = 4,
+        drift_frac = 0.98,
         verbose = FALSE
     )
     forced <- analyse_kinetics(
         data,
         nirs_channels = "smo2",
         method = "exponential_drift",
-        tau_mult = 4,
+        drift_frac = 0.98,
         model_fallback = FALSE,
         verbose = FALSE
     )
@@ -436,7 +445,7 @@ test_that("analyse_kinetics() falls back from a negligible drift", {
     expect_equal(cf$model, "monoexponential")
     expect_named(coef(model), c("A", "B", "tau", "TD"))
     expect_equal(cf$tau, coef(model)[["tau"]])
-    expect_true(all(is.na(cf[c("slope", "tau_mult", "texc", "texc_fitted")])))
+    expect_true(all(is.na(cf[c("slope", "drift_frac", "texc", "texc_fitted")])))
     expect_equal(result$diagnostics$n_params, 4L)
     expect_equal(
         result$data[[1L]]$smo2_fitted,
@@ -465,7 +474,7 @@ test_that("exponential_drift fallback resolves per channel with fix carried", {
         data,
         nirs_channels = c(smo2, hhb),
         method = "exponential_drift",
-        tau_mult = list(smo2 = 4, hhb = 4),
+        drift_frac = list(smo2 = 0.98, hhb = 0.98),
         fix = list(A = 70),
         verbose = FALSE
     )

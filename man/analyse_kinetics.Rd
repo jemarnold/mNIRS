@@ -33,7 +33,6 @@ analyse_kinetics(
   na.rm = FALSE,
   use_TD = TRUE,
   shape = c("symmetric", "gompertz", "gompertz_left"),
-  tau_mult = NULL,
   drift_frac = NULL,
   fix = NULL
 )
@@ -89,7 +88,7 @@ fit via \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_T
 \code{control}. See \code{\link[=biexponential]{biexponential()}}.}
 \item{\code{"exponential_drift"}}{Monoexponential curve with a secondary
 linear drift, fit via \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_TD},
-\code{tau_mult}, \code{fix}, \code{control}. See \code{\link[=exponential_drift]{exponential_drift()}}.}
+\code{drift_frac}, \code{fix}, \code{control}. See \code{\link[=exponential_drift]{exponential_drift()}}.}
 \item{\code{"sigmoidal"}}{Logistic or Gompertz-family curve fit via
 \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{shape}, \code{fix}, \code{control}.
 See \code{\link[=logistic]{logistic()}}.}
@@ -188,19 +187,16 @@ sigmoidal shape to fit. One of \code{"symmetric"} (\emph{default}; calls
 or \code{"gompertz_left"} (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}). For
 \strong{sigmoidal_drift} the shape is passed to \code{\link[=SSsigmoidal_drift]{SSsigmoidal_drift()}}.}
 
-\item{tau_mult}{\strong{exponential_drift}: A numeric multiple of the time
-constant after \code{TD} at which the linear drift begins (drift onset
-\code{TD + tau_mult * tau}). The default \code{3} (~95\% of the primary amplitude)
-is always held constant. Specify per-channel as a list keyed by channel
-name, e.g. \code{tau_mult = list(smo2 = 2)}. See \emph{Details}.}
-
-\item{drift_frac}{\strong{sigmoidal_drift}: A numeric fraction of the
-amplitude in \verb{(0, 0.5)} bounding the drift regions: the leading drift
-applies only below \code{A + drift_frac * (B - A)} (before \code{texc_A}) and the
-trailing drift only above \code{A + (1 - drift_frac) * (B - A)} (after
-\code{texc_B}). The default \code{0.05} is always held constant. Specify
+\item{drift_frac}{\strong{exponential_drift, sigmoidal_drift}: A numeric
+fraction of the primary amplitude in \verb{(0.5, 1)} bounding the drift
+regions. For \strong{exponential_drift} the linear drift begins where the
+primary response reaches \code{A + drift_frac * (B - A)}, at
+\code{TD - tau * log(1 - drift_frac)}. For \strong{sigmoidal_drift} the leading
+drift applies only below \code{A + (1 - drift_frac) * (B - A)} (before
+\code{texc_A}) and the trailing drift only above \code{A + drift_frac * (B - A)}
+(after \code{texc_B}). The default \code{0.95} is always held constant. Specify
 per-channel as a list keyed by channel name, e.g.
-\code{drift_frac = list(smo2 = 0.1)}. See \emph{Details}.}
+\code{drift_frac = list(smo2 = 0.9)}. See \emph{Details}.}
 
 \item{fix}{\strong{monoexponential, biexponential, exponential_drift,
 sigmoidal, sigmoidal_drift}: An \emph{optional}
@@ -580,12 +576,13 @@ a secondary linear drift beginning near the primary asymptote.
 
 Model equation:
 
-\code{A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) + slope * pmax(t - TD - tau_mult * tau, 0)}
+\code{A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) + slope * pmax(t - TD + tau * log(1 - drift_frac), 0)}
 
 \code{A}, \code{B}, \code{tau}, \code{TD}, and the derived \code{k}, \code{MRT}, and \code{HRT} are as for
 \emph{"monoexponential"}. \code{slope} is the linear drift rate \code{dx/dt}. The drift
-onset is fixed at \code{tau_mult} multiples of \code{tau} after \code{TD} (\emph{default} \code{3};
-~95\% of the primary amplitude). The excursion point \code{texc} is where the
+onset is fixed where the primary response reaches \code{drift_frac} of its
+amplitude, \code{TD - tau * log(1 - drift_frac)} (\emph{default} \code{0.95};
+\code{TD + 3 * tau}). The excursion point \code{texc} is where the
 drift rate overtakes the decaying primary rate,
 \verb{TD + tau * log(|B - A| / (|slope| * tau))}, floored at the drift onset:
 the excursion point of the curve when the phases oppose, or where the
@@ -598,10 +595,10 @@ The drift is kept only when the data support it. A channel falls back
 to the \emph{"monoexponential"} model (same window and time-delay structure,
 with \code{A}, \code{B}, \code{tau}, and \code{TD} carried over from \code{fix}) when the fit
 fails or the drift amplitude over the record from the drift onset,
-\verb{|slope| * (t_end - (TD + tau_mult * tau))}, is below twice the fit RMSE,
-with a warning recorded in \code{warnings}. The \code{model} coefficient column names
-the method each row comes from; monoexponential rows report \code{texc},
-\code{slope}, \code{tau_mult}, and \code{texc_fitted} as \code{NA}.
+\verb{|slope| * (t_end - onset)}, is below twice the fit RMSE, with a warning
+recorded in \code{warnings}. The \code{model} coefficient column names the method
+each row comes from; monoexponential rows report \code{texc}, \code{slope},
+\code{drift_frac}, and \code{texc_fitted} as \code{NA}.
 
 \code{A}, \code{B}, \code{tau}, \code{slope}, and \code{TD} may be held constant with \code{fix}, as
 above.
@@ -660,9 +657,9 @@ Model equation:
 \code{slope_A} and \code{slope_B} are the linear drift rates \code{dx/dt} at the
 asymptotes \code{A} and \code{B}. Each drift is a hinge line anchored at zero at
 its cutoff: the leading drift applies only before \code{texc_A}, where the
-sigmoid reaches \code{drift_frac} (\emph{default} \code{0.05}; 5\%) of its amplitude,
-and the trailing drift only after \code{texc_B}, where it reaches
-\code{1 - drift_frac} (95\%). The cutoffs are the analytic inverse of each
+sigmoid reaches \code{1 - drift_frac} (\emph{default} \code{0.95}; 5\%) of its
+amplitude, and the trailing drift only after \code{texc_B}, where it reaches
+\code{drift_frac} (95\%). The cutoffs are the analytic inverse of each
 \code{shape} (see \code{\link[=sigmoidal_drift]{sigmoidal_drift()}}), so a Gompertz form places its cutoff
 further out on its slow side. The drift regions never overlap, so the
 two drifts are fitted independently. \code{texc_A} and \code{texc_B} are reported
