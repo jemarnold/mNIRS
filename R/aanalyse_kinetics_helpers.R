@@ -109,13 +109,18 @@ kinetics_fallbacks <- list(
         trigger = \(cf, rmse, span, t_end) {
             first_reason(
                 "Fit failed." = is.na(cf$A),
-                "Fitted response is monotonic (texc is NA)." = !is.finite(
-                    cf$texc
-                ),
+                !!paste0(
+                    "Fitted response is monotonic (texc is ",
+                    cli::col_blue("NA"),
+                    ")."
+                ) := !is.finite(cf$texc),
                 "tau2 exceeds twice the fitted time span." = cf$tau2 >=
                     2 * span,
-                "Slow-phase amplitude is below 2 RMSE." = abs(cf$B2 - cf$B) <
-                    fallback_gate * rmse
+                !!paste0(
+                    "Slow-phase amplitude is below ",
+                    cli::col_blue(fallback_gate),
+                    " RMSE."
+                ) := abs(cf$B2 - cf$B) < fallback_gate * rmse
             )
         }
     ),
@@ -128,7 +133,11 @@ kinetics_fallbacks <- list(
             onset <- sum(cf$TD[is.finite(cf$TD)], cf$tau_mult * cf$tau)
             first_reason(
                 "Fit failed." = is.na(cf$A),
-                "Drift amplitude is below 2 RMSE." = !is.finite(cf$slope) ||
+                !!paste0(
+                    "Drift amplitude is below ",
+                    cli::col_blue(fallback_gate),
+                    " RMSE."
+                ) := !is.finite(cf$slope) ||
                     abs(cf$slope) * (t_end - onset) < fallback_gate * rmse
             )
         }
@@ -136,9 +145,10 @@ kinetics_fallbacks <- list(
 )
 
 
-## name of the first TRUE condition, else NA
+## name of the first TRUE condition, else NA. names may be injected with
+## `!!name := cond` so styled values are computed at call time
 first_reason <- function(...) {
-    hits <- vapply(list(...), isTRUE, logical(1))
+    hits <- vapply(rlang::list2(...), isTRUE, logical(1))
     return(if (any(hits)) names(hits)[[which(hits)[[1L]]]] else NA_character_)
 }
 
@@ -915,16 +925,18 @@ run_kinetics_worker <- function(
         chans <- chans_all[idx]
         fn_full <- paste0("SS", method)
         fn_to <- paste0("SS", spec$to)
-        heads <- vapply(chans, \(.ch) {
-            cli::format_inline(
-                "{.fn {fn_full}} fit for {.field {(.ch)}} in \\
-                {.field {interval_name}} fell back to {.fn {fn_to}}.",
-                keep_whitespace = FALSE
-            )
-        }, character(1))
+        ## plain strings with direct ansi styling: cli markup formatting
+        ## is too slow per channel
+        heads <- sprintf(
+            "`%s()` fit for %s in %s fell back to `%s()`.",
+            fn_full,
+            cli::col_green(chans),
+            cli::col_green(interval_name),
+            fn_to
+        )
         if (verbose) {
             Map(\(.h, .r) {
-                cli_warn(c("!" = .h, "i" = .r), call = warn_call(env))
+                rlang::warn(c("!" = .h, "i" = .r), call = warn_call(env))
             }, heads, reasons[idx])
         }
 
@@ -1288,14 +1300,21 @@ analyse_kinetics_channels <- function(
         )
 
             if (any(unlist(result[check_cols]) < 0, na.rm = TRUE)) {
-                cli_warn(c(
-                "!" = "Negative {.arg time_channel} coefficients imply the \\
-                response occurred before {.arg start_time}. This may \\
-                indicate a poorly fitted or misparameterised model.",
-                "i" = "Check {.arg time_channel} and {.arg start_time} \\
-                values, or consider using a different \\
-                {.fn analyse_kinetics} method."
-            ), call = warn_call(env))
+                ## plain strings: fires per interval, cli formatting is slow
+                rlang::warn(
+                    c(
+                        "!" = paste(
+                            "Negative `time_channel` coefficients imply the",
+                            "response occurred before `start_time`. This may",
+                            "indicate a poorly fitted or misparameterised model."
+                        ),
+                        "i" = paste(
+                            "Check `time_channel` and `start_time` values, or",
+                            "consider using a different `analyse_kinetics()` method."
+                        )
+                    ),
+                    call = warn_call(env)
+                )
             }
 
             result
@@ -1472,32 +1491,50 @@ warn_fit_failed <- function(
     retry = FALSE,
     env = rlang::caller_env()
 ) {
+    ## plain strings via rlang::warn(): this fires per fit attempt and is
+    ## usually muffled, and cli's eager markup formatting costs more than
+    ## the fit itself. direct ansi styling matches cli's theme cheaply.
     ## optional parameter count prefixes the model fn name
+    fn_lbl <- paste0("`", as.character(fn), "()`")
     label <- paste0(
-        if (!is.null(n_params)) "{n_params}-parameter ",
-        "{.fn {as.character(fn)}}"
+        if (!is.null(n_params)) paste0(n_params, "-parameter "),
+        fn_lbl
     )
-    where <- " for {.field {(.nirs)}} in {.field {interval_name}}:"
+    where <- paste0(
+        " for ",
+        cli::col_green(.nirs),
+        " in ",
+        cli::col_green(interval_name),
+        ":"
+    )
     msg <- if (inherits(e, "warning")) {
         c(
             "!" = paste0(label, " fit warning", where),
-            "i" = "{conditionMessage(e)}",
-            "i" = "Fit accepted. Consider a reduced \\
-            {.fn analyse_kinetics} method."
+            "i" = conditionMessage(e),
+            "i" = paste(
+                "Fit accepted.",
+                "Consider a reduced `analyse_kinetics()` method."
+            )
         )
     } else {
         c(
             "x" = paste0(label, " fit failed", where),
-            "!" = "{conditionMessage(e)}",
+            "!" = conditionMessage(e),
             if (retry) {
-                # fmt: skip
-                c("i" = "Attempting {n_params - 1L}-parameter \\
-                {.fn {as.character(fn)}} fit.")
+                c(
+                    "i" = paste0(
+                        "Attempting ",
+                        n_params - 1L,
+                        "-parameter ",
+                        fn_lbl,
+                        " fit."
+                    )
+                )
             }
         )
     }
     ## classed so the capture handler can distinguish caught fit errors
-    cli_warn(
+    rlang::warn(
         msg,
         class = if (!inherits(e, "warning")) "mnirs_fit_error",
         call = warn_call(env)
@@ -2047,12 +2084,21 @@ enforce_direction <- function(
     }
 
     fail <- \() {
-        cli_warn(c(
-            "x" = "{.fn {fn}} fit for {.field {(.nirs)}} in \\
-            {.field {interval_name}} could not satisfy \\
-            {.code direction = {.val {direction}}}.",
-            "i" = "Returning {.val {NA}} coefficients."
-        ), call = warn_call(env))
+        ## plain strings with direct ansi styling: fires per channel, cli
+        ## markup formatting is slow
+        rlang::warn(
+            c(
+                "x" = sprintf(
+                    "`%s()` fit for %s in %s could not satisfy `direction = %s`.",
+                    fn,
+                    cli::col_green(.nirs),
+                    cli::col_green(interval_name),
+                    cli::col_blue(sprintf("\"%s\"", direction))
+                ),
+                "i" = "Returning NA coefficients."
+            ),
+            call = warn_call(env)
+        )
         return(NULL)
     }
 
