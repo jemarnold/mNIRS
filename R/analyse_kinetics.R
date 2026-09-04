@@ -527,8 +527,9 @@
 #'       are elapsed), and method-specific parameters. For
 #'       `"biexponential"` and `"exponential_drift"`, `model` names the
 #'       method each row's coefficients come from after any fallback, and
-#'       the parameter columns are the union of the method's and its
-#'       fallbacks' (`NA` where a row's model has no such parameter).}
+#'       the parameter columns are the union of the method's and those of
+#'       any fallback model a row resolved to (`NA` where a row's model
+#'       has no such parameter).}
 #'   \item{`data`}{A list of the original input data frames augmented with a
 #'       `*_fitted` column of fitted values for each processed `nirs_channel`.}
 #'   \item{`interval_times`}{A data frame with one row per interval and

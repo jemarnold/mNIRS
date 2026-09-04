@@ -1059,8 +1059,11 @@ test_that("analyse_kinetics() falls back from a monotonic biexponential fit", {
 
     expect_equal(names(cf)[1:4], c("interval", "nirs_channels", "start_time", "model"))
     expect_true(cf$model %in% fallback_models)
-    ## the union schema carries every model's columns, `_fitted` last
-    expect_equal(names(cf)[-(1:4)], kinetics_chain_cols("biexponential"))
+    ## the schema unions the method's columns with the fallback model's
+    expect_setequal(
+        names(cf)[-(1:4)],
+        union(kinetics_coef_cols$biexponential, kinetics_coef_cols[[cf$model]])
+    )
     ## the fallback row reports its own model's coefficients
     expect_true(all(is.na(cf[biexp_only])))
     expect_equal(cf$A, coef(model)[["A"]])
@@ -1099,7 +1102,9 @@ test_that("analyse_kinetics() falls back to a monoexponential response", {
 
     expect_equal(cf$model, "monoexponential")
     expect_true(all.equal(cf$tau, 8, tolerance = 1, scale = 1))
-    expect_true(all(is.na(cf[c(biexp_only, "slope", "texc")])))
+    expect_true(all(is.na(cf[c(biexp_only, "texc")])))
+    ## drift-only columns are dropped when no row kept the drift model
+    expect_false(any(c("slope", "tau_mult") %in% names(cf)))
     expect_true(inherits(result$model[[1L]]$smo2, "nls"))
     ## both fallbacks are recorded
     expect_equal(sum(grepl("fell back to", result$warnings$message)), 2L)
@@ -1125,7 +1130,8 @@ test_that("analyse_kinetics() keeps a supported excursion-recovery fit", {
 
     expect_equal(cf$model, "biexponential")
     expect_true(is.finite(cf$texc))
-    expect_true(is.na(cf$slope))
+    ## only the biexponential's own columns are reported
+    expect_equal(names(cf)[-(1:4)], kinetics_coef_cols$biexponential)
     ## the fast phase shares the primary-phase columns, not its own pair
     expect_false(any(c("B1", "tau1") %in% names(cf)))
     expect_named(

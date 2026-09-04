@@ -605,6 +605,7 @@ analyse_logistic <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
+        # fmt: skip
         arg_list = mget(c(
             "shape", "fix", "control", "start_time", "direction", "end_window"
         )),

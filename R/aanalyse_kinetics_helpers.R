@@ -39,7 +39,12 @@ kinetics_dispatch <- list(
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
     monoexponential = c("use_TD", "fix", "control"),
     biexponential = c(
-        "use_TD", "fix", "tau_flex", "TD_flex", "A_flex", "control"
+        "use_TD",
+        "fix",
+        "tau_flex",
+        "TD_flex",
+        "A_flex",
+        "control"
     ),
     exponential_drift = c("use_TD", "tau_mult", "fix", "control"),
     sigmoidal = c("shape", "fix", "control")
@@ -382,6 +387,8 @@ find_kinetics_idx <- function(
 #' per-interval (per-data frame) kinetics results data frames (each carrying
 #' `"fitted_data"`, `"channel_args"`, and `"diagnostics"` attributes) and the
 #' original `data_list`. Interval names are taken from `names(data_list)`.
+#' Where rows carry a `model` column, coefficient columns owned only by
+#' fallback models no row resolved to are dropped.
 #'
 #' @param data_list Named list of original interval data frames.
 #' @param result_list List of per-interval result data frames with attributes.
@@ -419,6 +426,16 @@ build_kinetics_results <- function(
     )
     coefs <- coefs[, c(lead_cols, setdiff(names(coefs), lead_cols))]
     rownames(coefs) <- NULL
+
+    ## drop fallback parameter columns owned by no model any row resolved to
+    if (!is.null(coefs$model)) {
+        keep <- unlist(
+            kinetics_coef_cols[unique(c(method, coefs$model))],
+            use.names = FALSE
+        )
+        drop <- setdiff(unlist(kinetics_coef_cols, use.names = FALSE), keep)
+        coefs <- coefs[setdiff(names(coefs), drop)]
+    }
 
     ## start_times: resolved fit onset (user value > interval_times metadata
     ## > first time), uniform across channels within an interval;
@@ -823,7 +840,8 @@ analyse_kinetics_intervals <- function(
 #' Methods with a fallback report the fitting method per row in a `model`
 #' coefficient column and the union of the chain's coefficient columns
 #' (`NA` where a model has no such parameter), so intervals bind
-#' regardless of which triggers fire.
+#' regardless of which triggers fire. [build_kinetics_results()] then
+#' drops the columns of fallback models no row resolved to.
 #'
 #' @param method Character; the canonical method name.
 #' @param data A single *"mnirs"* data frame (one interval).
