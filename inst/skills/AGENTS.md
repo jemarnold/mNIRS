@@ -225,11 +225,13 @@ Custom groups nameable (`list(smo2 = c("A", "B"))`); per-channel args can be key
 ```r
 correct_blood_volume(
     data,
-    oxy_channel   = NULL,  # O2Hb/oxy[haem] column name
-    deoxy_channel = NULL,  # HHb/deoxy[haem] column name
-    total_channel = NULL   # THb/total[haem] column name (blood-volume proxy)
+    oxy_channel   = NULL,  # O2Hb/oxy[haem] column name(s); vectors paired by position
+    deoxy_channel = NULL,  # HHb/deoxy[haem] column name(s)
+    total_channel = NULL   # THb/total[haem] column name(s); derived from pair if NULL
 )
 ```
+
+Multiple channel pairs: pass equal-length vectors with paired elements
 
 Normalises blood-volume changes (Ryan et al 2012; Beever & Tripp et al, 2020). Handles negative values via `shift_mnirs`. Returns `total[haem]` → 0 definitionally.
 

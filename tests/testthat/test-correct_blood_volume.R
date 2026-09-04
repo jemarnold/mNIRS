@@ -8,6 +8,11 @@ make_df <- function() {
     )
 }
 
+## two probes: second set of channels suffixed `_2`
+make_df2 <- function() {
+    cbind(make_df(), setNames(make_df()[-1], c("oxy_2", "deoxy_2", "total_2")))
+}
+
 
 test_that("returns mnirs tibble with same dimensions and names", {
     df <- make_df()
@@ -294,6 +299,63 @@ test_that("metadata nirs_channels reflects specified channels only", {
     )
     expect_equal(attr(result, "nirs_channels"), c("oxy", "total"))
 })
+
+## multi-pair input ====================================================
+test_that("two pairs match single-pair results", {
+    df <- make_df2()
+    result <- correct_blood_volume(
+        df,
+        oxy_channel   = c(oxy, oxy_2),
+        deoxy_channel = c(deoxy, deoxy_2),
+        verbose       = FALSE
+    )
+    ## each pair corrected independently to hand-calculated values
+    expect_equal(result$oxy,     c(0,  1/7, -23/35, -173/210))
+    expect_equal(result$oxy_2,   c(0,  1/7, -23/35, -173/210))
+    expect_equal(result$deoxy,   c(0, -1/7,  23/35,  173/210))
+    expect_equal(result$deoxy_2, c(0, -1/7,  23/35,  173/210))
+    ## unspecified total columns pass through unchanged
+    expect_equal(result$total,   df$total)
+    expect_equal(result$total_2, df$total_2)
+    ## metadata in pair-major order
+    expect_equal(
+        attr(result, "nirs_channels"),
+        c("oxy", "deoxy", "oxy_2", "deoxy_2")
+    )
+})
+
+
+test_that("pairing is positional, not by name", {
+    df <- make_df2()
+    df$deoxy_2 <- df$deoxy_2 * 2
+    result <- correct_blood_volume(
+        df,
+        oxy_channel   = c(oxy, oxy_2),
+        deoxy_channel = c(deoxy_2, deoxy),
+        verbose       = FALSE
+    )
+    single <- correct_blood_volume(
+        df,
+        oxy_channel   = oxy,
+        deoxy_channel = deoxy_2,
+        verbose       = FALSE
+    )
+    expect_equal(result$oxy, single$oxy)
+    expect_false(isTRUE(all.equal(result$oxy, c(0, 1/7, -23/35, -173/210))))
+})
+
+
+test_that("errors when channel vectors differ in length", {
+    expect_error(
+        correct_blood_volume(
+            make_df2(),
+            oxy_channel   = c(oxy, oxy_2),
+            deoxy_channel = deoxy
+        ),
+        "same length"
+    )
+})
+
 
 ## multi-interval input ================================================
 test_that("correct_blood_volume processes a named list of data frames", {

@@ -3,14 +3,14 @@
 #' Normalises mNIRS channels for the effects of blood volume changes, following
 #' the sample-wise iterative method of *Beever & Tripp et al, 2020*.
 #'
-#' @param oxy_channel A character string naming the `oxy[haem]` (oxygenated
-#'   haemoglobin and myoglobin, *O2Hb*) column in `data`. Must match exactly.
-#' @param deoxy_channel A character string naming the `deoxy[haem]`
-#'   (deoxygenated haemoglobin and myoglobin, *HHb*) column in `data`. Must
-#'   match exactly.
-#' @param total_channel A character string naming the `total[haem]` (total
-#'   haemoglobin and myoglobin, *THb*; proxy for blood volume) column in `data`.
+#' @param oxy_channel A character vector naming the `oxy[haem]` (oxygenated
+#'   haemoglobin and myoglobin; *O2Hb*) column(s) in `data`. Must match exactly.
+#' @param deoxy_channel A character vector naming the `deoxy[haem]`
+#'   (deoxygenated haemoglobin and myoglobin; *HHb*) column(s) in `data`.
 #'   Must match exactly.
+#' @param total_channel A character vector naming the `total[haem]` (total
+#'   haemoglobin and myoglobin; *THb*; proxy for blood volume) column(s) in
+#'   `data`. Must match exactly.
 #' @inheritParams map_mnirs_intervals
 #' @inheritParams validate_mnirs
 #'
@@ -27,6 +27,10 @@
 #' - `total` = `oxy + deoxy`
 #' - `oxy`   = `total - deoxy`
 #' - `deoxy` = `total - oxy`
+#'
+#' Multiple channel pairs can be corrected in one call by passing equal-length
+#' vectors, with each element number forming a pair (e.g.
+#' `oxy_channel = c(o2hb_1, o2hb_2), deoxy_channel = c(hhb_1, hhb_2)`).
 #'
 #' *NOTE*: the returned data frame will *ONLY* include corrected values for
 #' the specified channels. Non-specified channels will remain uncorrected and
@@ -117,14 +121,20 @@ correct_blood_volume <- function(
     ## check if columns exist in data
     specified <- !vapply(channels, is.null, logical(1))
 
-    ## metadata: over-write `nirs_channels` with user-specified col names
-    nirs_channels <- unlist(channels[specified], use.names = FALSE)
-
     ## require at least two channels to derive the third
     if (sum(specified) < 2L) {
         cli_abort(c(
             "x" = "At least two of {.arg oxy_channel}, {.arg deoxy_channel}, \\
             {.arg total_channel} are required."
+        ))
+    }
+
+    ## channels are paired by position, so specified args must align
+    if (length(unique(lengths(channels[specified]))) > 1L) {
+        cli_abort(c(
+            "x" = "{.arg oxy_channel}, {.arg deoxy_channel}, and \\
+            {.arg total_channel} must have the same length.",
+            "i" = "Channels are paired by position."
         ))
     }
 
@@ -139,39 +149,51 @@ correct_blood_volume <- function(
     }
 
     ## processing ====================================================
-    ## pull specified channels; unspecified channels as NULL
-    oxy <- if (specified[["oxy"]]) data[[channels$oxy]]
-    deoxy <- if (specified[["deoxy"]]) data[[channels$deoxy]]
-    total <- if (specified[["total"]]) data[[channels$total]]
+    ## pair channels by position; ensemble shift applied within each pair
+    pairs <- lapply(seq_along(channels[[which(specified)[1L]]]), \(.i) {
+        vapply(channels[specified], `[[`, "", .i)
+    })
 
-    ## prefer user-specified channels, derive if NULL
-    total <- total %||% (oxy + deoxy)
-    oxy <- oxy %||% (total - deoxy)
-    deoxy <- deoxy %||% (total - oxy)
+    corrected <- lapply(pairs, \(.p) {
+        ## pull specified channels; unspecified channels as NULL
+        oxy <- if (specified[["oxy"]]) data[[.p[["oxy"]]]]
+        deoxy <- if (specified[["deoxy"]]) data[[.p[["deoxy"]]]]
+        total <- if (specified[["total"]]) data[[.p[["total"]]]]
 
-    ## ensemble shift channels to min value == 0
-    ## preserves relative scaling with all positive
-    shift <- max(0, -min(oxy, deoxy, total, na.rm = TRUE)) + .Machine$double.eps
-    oxy <- oxy + shift
-    deoxy <- deoxy + shift
-    total <- total + shift
+        ## prefer user-specified channels, derive if NULL
+        total <- total %||% (oxy + deoxy)
+        oxy <- oxy %||% (total - deoxy)
+        deoxy <- deoxy %||% (total - oxy)
 
-    ## sample-wise blood volume correction factor (Beever & Tripp et al, 2020)
-    ## dropping the first sample to align with incremental diffs
-    beta <- (oxy / total)[-1L]
-    diff_total <- diff(total)
+        ## ensemble shift channels to min value == 0
+        ## preserves relative scaling with all positive
+        shift <- max(0, -min(oxy, deoxy, total, na.rm = TRUE)) +
+            .Machine$double.eps
+        oxy <- oxy + shift
+        deoxy <- deoxy + shift
+        total <- total + shift
 
-    ## corrected signals are the cumulative sum of adjusted incremental diffs
-    ## first sample starts at zero
-    ## total reduces to zero by construction once blood volume is normalised
-    corrected <- list(
-        oxy = cumsum(c(0, diff(oxy) - beta * diff_total)),
-        deoxy = cumsum(c(0, diff(deoxy) - (1 - beta) * diff_total)),
-        total = double(length(total))
-    )
+        ## sample-wise blood volume correction factor
+        ## (Beever & Tripp et al, 2020)
+        ## dropping the first sample to align with incremental diffs
+        beta <- (oxy / total)[-1L]
+        diff_total <- diff(total)
+
+        ## corrected signals are the cumulative sum of adjusted incremental
+        ## diffs; first sample starts at zero
+        ## total reduces to zero by construction once blood volume is
+        ## normalised
+        list(
+            oxy = cumsum(c(0, diff(oxy) - beta * diff_total)),
+            deoxy = cumsum(c(0, diff(deoxy) - (1 - beta) * diff_total)),
+            total = double(length(total))
+        )[specified]
+    })
 
     ## write corrected values back to user-specified columns only
-    data[nirs_channels] <- corrected[specified]
+    ## metadata: over-write `nirs_channels` with user-specified col names
+    nirs_channels <- unlist(pairs, use.names = FALSE)
+    data[nirs_channels] <- unlist(corrected, recursive = FALSE)
 
     if (verbose) {
         cli_inform(c(
