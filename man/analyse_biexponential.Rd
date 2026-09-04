@@ -18,6 +18,7 @@ analyse_biexponential(
   tau_flex = 1/3,
   TD_flex = 2,
   A_flex = NULL,
+  control = NULL,
   env = rlang::caller_env()
 )
 }
@@ -75,7 +76,15 @@ silence warnings and information messages helpful for troubleshooting.
 Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Additional arguments passed to the underlying method function.
-See \emph{Details}.}
+See \emph{Details}. For the \code{\link[stats:nls]{stats::nls()}} methods (\strong{monoexponential,
+biexponential, exponential_drift, sigmoidal, sigmoidal_drift}),
+\code{control} is an
+\emph{optional} \code{list()} or \code{\link[stats:nls.control]{stats::nls.control()}} of convergence settings,
+e.g. \code{control = list(maxiter = 200)}. Values override the internal
+defaults (\code{maxiter = 500}, \code{warnOnly = TRUE} for bounded \code{"port"} fits).
+Applied globally to every channel and interval. \code{warnOnly = FALSE} turns
+a non-converged bounded fit into a fit failure (\code{NA} coefficients with a
+warning).}
 
 \item{tau_flex}{Numeric; multiplicative half-width of the stage-2
 \code{tau} bounds about the stage-1 value,
@@ -88,6 +97,10 @@ in units of \code{time_channel}, floored at \code{0}.}
 \item{A_flex}{Numeric; additive half-width of the stage-2 \code{A} bounds on
 the response scale. \code{NULL} (\emph{default}) uses twice the stage-1
 residual standard deviation.}
+
+\item{control}{An \emph{optional} \code{list()} or \code{\link[stats:nls.control]{stats::nls.control()}} merged
+over each fit's internal defaults by \code{\link[=fit_control]{fit_control()}}. Global to all
+channels.}
 
 \item{env}{The calling environment or a defused call, used to report
 errors and warnings as coming from the user-facing function rather

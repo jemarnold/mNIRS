@@ -8,6 +8,7 @@
 \alias{analyse_kinetics.biexponential}
 \alias{analyse_kinetics.exponential_drift}
 \alias{analyse_kinetics.sigmoidal}
+\alias{analyse_kinetics.sigmoidal_drift}
 \alias{analyze_kinetics}
 \title{Analyse kinetics across mNIRS channels and intervals}
 \usage{
@@ -16,7 +17,7 @@ analyse_kinetics(
   nirs_channels = NULL,
   time_channel = NULL,
   method = c("response_time", "peak_slope", "monoexponential", "biexponential",
-    "exponential_drift", "sigmoidal"),
+    "exponential_drift", "sigmoidal", "sigmoidal_drift"),
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -33,6 +34,7 @@ analyse_kinetics(
   use_TD = TRUE,
   shape = c("symmetric", "gompertz", "gompertz_left"),
   tau_mult = NULL,
+  drift_frac = NULL,
   fix = NULL
 )
 
@@ -41,7 +43,7 @@ analyze_kinetics(
   nirs_channels = NULL,
   time_channel = NULL,
   method = c("response_time", "peak_slope", "monoexponential", "biexponential",
-    "exponential_drift", "sigmoidal"),
+    "exponential_drift", "sigmoidal", "sigmoidal_drift"),
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -80,16 +82,21 @@ time. Additional arguments: \code{fraction}. See \code{\link[=response_time]{res
 arguments: \code{width} or \code{span}, \code{align}, \code{partial}, \code{na.rm}. See
 \code{\link[=peak_slope]{peak_slope()}}.}
 \item{\code{"monoexponential"}}{Monoexponential curve fit via
-\code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_TD}. See
-\code{\link[=monoexponential]{monoexponential()}}.}
+\code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_TD}, \code{fix}, \code{control}.
+See \code{\link[=monoexponential]{monoexponential()}}.}
 \item{\code{"biexponential"}}{Biexponential (fast + slow component) curve
-fit via \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_TD}. See
-\code{\link[=biexponential]{biexponential()}}.}
+fit via \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_TD}, \code{fix},
+\code{control}. See \code{\link[=biexponential]{biexponential()}}.}
 \item{\code{"exponential_drift"}}{Monoexponential curve with a secondary
 linear drift, fit via \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_TD},
-\code{tau_mult}. See \code{\link[=exponential_drift]{exponential_drift()}}.}
+\code{tau_mult}, \code{fix}, \code{control}. See \code{\link[=exponential_drift]{exponential_drift()}}.}
 \item{\code{"sigmoidal"}}{Logistic or Gompertz-family curve fit via
-\code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{shape}. See \code{\link[=logistic]{logistic()}}.}
+\code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{shape}, \code{fix}, \code{control}.
+See \code{\link[=logistic]{logistic()}}.}
+\item{\code{"sigmoidal_drift"}}{Logistic or Gompertz-family curve with
+linear drifts at both asymptotes, fit via \code{\link[stats:nls]{stats::nls()}}. Additional
+arguments: \code{shape}, \code{drift_frac}, \code{fix}, \code{control}. See
+\code{\link[=sigmoidal_drift]{sigmoidal_drift()}}.}
 }}
 
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
@@ -128,7 +135,15 @@ silence warnings and information messages helpful for troubleshooting.
 Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Additional arguments passed to the underlying method function.
-See \emph{Details}.}
+See \emph{Details}. For the \code{\link[stats:nls]{stats::nls()}} methods (\strong{monoexponential,
+biexponential, exponential_drift, sigmoidal, sigmoidal_drift}),
+\code{control} is an
+\emph{optional} \code{list()} or \code{\link[stats:nls.control]{stats::nls.control()}} of convergence settings,
+e.g. \code{control = list(maxiter = 200)}. Values override the internal
+defaults (\code{maxiter = 500}, \code{warnOnly = TRUE} for bounded \code{"port"} fits).
+Applied globally to every channel and interval. \code{warnOnly = FALSE} turns
+a non-converged bounded fit into a fit failure (\code{NA} coefficients with a
+warning).}
 
 \item{fraction}{\strong{response_time}: A numeric vector of values in the range
 \verb{[0, 1]} specifying the fractional response amplitude(s) to detect.
@@ -167,10 +182,11 @@ before the response onset. i.e., a 4-parameter \code{\link[=SSmonoexponential]{S
 B2, tau2, TD). If \code{use_TD = FALSE} or the fit fails (with a
 warning), attempts to fall back to a reduced model without \code{TD}.}
 
-\item{shape}{\strong{sigmoidal}: Character; the 4-parameter sigmoidal shape
-to fit. One of \code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic]{SSlogistic()}}),
-\code{"gompertz"} (early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or
-\code{"gompertz_left"} (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
+\item{shape}{\strong{sigmoidal, sigmoidal_drift}: Character; the 4-parameter
+sigmoidal shape to fit. One of \code{"symmetric"} (\emph{default}; calls
+\code{\link[=SSlogistic]{SSlogistic()}}), \code{"gompertz"} (early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}),
+or \code{"gompertz_left"} (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}). For
+\strong{sigmoidal_drift} the shape is passed to \code{\link[=SSsigmoidal_drift]{SSsigmoidal_drift()}}.}
 
 \item{tau_mult}{\strong{exponential_drift}: A numeric multiple of the time
 constant after \code{TD} at which the linear drift begins (drift onset
@@ -178,8 +194,16 @@ constant after \code{TD} at which the linear drift begins (drift onset
 is always held constant. Specify per-channel as a list keyed by channel
 name, e.g. \code{tau_mult = list(smo2 = 2)}. See \emph{Details}.}
 
+\item{drift_frac}{\strong{sigmoidal_drift}: A numeric fraction of the
+amplitude in \verb{(0, 0.5)} bounding the drift regions: the leading drift
+applies only below \code{A + drift_frac * (B - A)} (before \code{texc_A}) and the
+trailing drift only above \code{A + (1 - drift_frac) * (B - A)} (after
+\code{texc_B}). The default \code{0.05} is always held constant. Specify
+per-channel as a list keyed by channel name, e.g.
+\code{drift_frac = list(smo2 = 0.1)}. See \emph{Details}.}
+
 \item{fix}{\strong{monoexponential, biexponential, exponential_drift,
-sigmoidal}: An \emph{optional}
+sigmoidal, sigmoidal_drift}: An \emph{optional}
 named list of model parameters to hold constant during fitting, e.g.
 \code{fix = list(A = 0)} fixes the starting amplitude at \code{0}. Fixed
 parameters are excluded from estimation and reported at their fixed
@@ -209,8 +233,9 @@ the resolved \code{start_time} (the fit onset from which time coefficients
 are elapsed), and method-specific parameters. For
 \code{"biexponential"} and \code{"exponential_drift"}, \code{model} names the
 method each row's coefficients come from after any fallback, and
-the parameter columns are the union of the method's and its
-fallbacks' (\code{NA} where a row's model has no such parameter).}
+the parameter columns are the union of the method's and those of
+any fallback model a row resolved to (\code{NA} where a row's model
+has no such parameter).}
 \item{\code{data}}{A list of the original input data frames augmented with a
 \verb{*_fitted} column of fitted values for each processed \code{nirs_channel}.}
 \item{\code{interval_times}}{A data frame with one row per interval and
@@ -328,8 +353,8 @@ or trough value (depending on direction) that has no greater/lesser values
 within the subsequent \code{end_window} time span. The curve fitting window
 extends to the end of \code{end_window} beyond the detected peak/trough.
 
-For \emph{"monoexponential"}, \emph{"biexponential"}, \emph{"exponential_drift"}, and
-\emph{"sigmoidal"} methods,
+For \emph{"monoexponential"}, \emph{"biexponential"}, \emph{"exponential_drift"},
+\emph{"sigmoidal"}, and \emph{"sigmoidal_drift"} methods,
 \code{direction} also constrains the sign of the fitted amplitude \code{B - A}, and
 the sigmoidal \code{slope}. For the \emph{"biexponential"} method, \code{direction}
 constrains the sign of the fast-phase amplitude \code{B - A}. A fit that
@@ -363,7 +388,8 @@ ignored.
 }
 
 \code{start_time}, \code{direction}, and \code{end_window} are per-channel capable, along
-with the \code{method}-specific arguments. \code{fix} is itself a named \code{list()} of
+with the \code{method}-specific arguments except \code{control}, which is always
+global. \code{fix} is itself a named \code{list()} of
 model parameters, so a per-channel \code{fix} is supplied as a \code{list()} of
 \code{list()}s keyed by channel name. A plain parameter list applies to every
 channel:
@@ -615,6 +641,45 @@ and \code{\link[=SSgompertz_left]{SSgompertz_left()}} for self-start initialisat
 
 Parameters may be held constant with \code{fix}, e.g. \code{fix = list(A = 0)}, as
 above.
+}
+
+\subsection{method = "sigmoidal_drift"}{
+
+Aliases: \code{method = c("sigmoid_drift", "sig_drift", "logistic_drift", "gompertz_drift", "sigmoidal_linear")}.
+
+A parametric approach fitting a three-phase curve using \code{\link[stats:nls]{stats::nls()}}
+with \code{\link[=SSsigmoidal_drift]{SSsigmoidal_drift()}}: a \emph{"sigmoidal"} primary response of the
+given \code{shape} plus independent linear drifts at the leading and trailing
+asymptotes.
+
+Model equation:
+
+\code{S(t) + slope_A * pmin(t - texc_A, 0) + slope_B * pmax(t - texc_B, 0)}
+
+\code{S(t)} and \code{A}, \code{B}, \code{xmid}, and \code{slope} are as for \emph{"sigmoidal"}.
+\code{slope_A} and \code{slope_B} are the linear drift rates \code{dx/dt} at the
+asymptotes \code{A} and \code{B}. Each drift is a hinge line anchored at zero at
+its cutoff: the leading drift applies only before \code{texc_A}, where the
+sigmoid reaches \code{drift_frac} (\emph{default} \code{0.05}; 5\%) of its amplitude,
+and the trailing drift only after \code{texc_B}, where it reaches
+\code{1 - drift_frac} (95\%). The cutoffs are the analytic inverse of each
+\code{shape} (see \code{\link[=sigmoidal_drift]{sigmoidal_drift()}}), so a Gompertz form places its cutoff
+further out on its slow side. The drift regions never overlap, so the
+two drifts are fitted independently. \code{texc_A} and \code{texc_B} are reported
+elapsed from \code{start_time} (the same frame as \code{xmid}).
+
+The drifts are kept only when the data support them. A channel falls
+back to the \emph{"sigmoidal"} model (same \code{shape} and window, with \code{A}, \code{B},
+\code{xmid}, and \code{slope} carried over from \code{fix}) when the fit fails or both
+drift amplitudes over their support, \verb{|slope_A| * (texc_A - t_start)} and
+\verb{|slope_B| * (t_end - texc_B)}, are below twice the fit RMSE, with a
+warning recorded in \code{warnings}. One supported drift keeps the full
+model. The \code{model} coefficient column names the method each row comes
+from; sigmoidal rows report \code{slope_A}, \code{slope_B}, \code{drift_frac}, \code{texc_A},
+and \code{texc_B} as \code{NA}.
+
+\code{A}, \code{B}, \code{xmid}, \code{slope}, \code{slope_A}, and \code{slope_B} may be held constant
+with \code{fix}, as above.
 }
 
 \subsection{Recursive analysis}{

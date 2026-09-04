@@ -87,6 +87,7 @@ print.mnirs_kinetics <- function(x, ...) {
     drop_cols <- c(
         "HRT",
         "tau_mult",
+        "drift_frac",
         "idx",
         if (drop_start_time) "start_time",
         grep("fitted$", names(coefs), value = TRUE)
@@ -111,7 +112,8 @@ print.mnirs_kinetics <- function(x, ...) {
         monoexponential = "Monoexponential One-Phase Kinetics",
         exponential_drift = "Exponential-Linear Drift Two-Phase Kinetics",
         biexponential = "Biexponential Two-Phase Kinetics",
-        sigmoidal = "Sigmoidal Inflection Kinetics"
+        sigmoidal = "Sigmoidal Inflection Kinetics",
+        sigmoidal_drift = "Sigmoidal-Linear Drift Three-Phase Kinetics"
     )
 
     cat("\n")

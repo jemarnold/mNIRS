@@ -336,8 +336,10 @@ plot.mnirs_kinetics <- function(
     ## natural-scale coefficients over the fitted rows. comp1 is the
     ## primary monoexponential; comp2 is the secondary term: the
     ## biexponential slow phase (B to B2) clocked from the onset, or the
-    ## exponential_drift linear drift from the onset TD + tau_mult * tau
-    comp_methods <- c("biexponential", "exponential_drift")
+    ## exponential_drift linear drift from the onset TD + tau_mult * tau.
+    ## for sigmoidal_drift, comp1 is the primary sigmoid and comp2/comp3
+    ## the leading/trailing drift lines outside the cutoffs
+    comp_methods <- c("biexponential", "exponential_drift", "sigmoidal_drift")
     if (isTRUE(list(...)[["components"]]) && x$method %in% comp_methods) {
         p <- p +
             lapply(fit_ch, \(.ch) {
@@ -362,33 +364,52 @@ plot.mnirs_kinetics <- function(
             ## absent from the schema reads as NA
             model <- co$model %||% rep(x$method, nrow(co))
             g <- \(.nm) co[[.nm]] %||% NA_real_
-            cd$comp1 <- monoexponential(t_rel, g("A"), g("B"), g("tau"), TD)
-            onset <- TD + g("tau_mult") * g("tau")
-            cd$comp2 <- ifelse(
-                model == "biexponential",
-                monoexponential(t_rel, g("B"), g("B2"), g("tau2"), TD),
-                ifelse(
-                    model == "exponential_drift" & t_rel >= onset,
-                    monoexponential(onset, g("A"), g("B"), g("tau"), TD) +
-                        g("slope") * (t_rel - onset),
+            if (x$method == "sigmoidal_drift") {
+                ## the sigmoid is the fit less its drift terms (none on a
+                ## sigmoidal fallback row); each drift line starts from
+                ## the sigmoid height at its cutoff
+                amp <- g("B") - g("A")
+                lead <- g("slope_A") * pmin(t_rel - g("texc_A"), 0)
+                trail <- g("slope_B") * pmax(t_rel - g("texc_B"), 0)
+                cd$comp1 <- d[[fcol]] -
+                    replace(lead, is.na(lead), 0) -
+                    replace(trail, is.na(trail), 0)
+                cd$comp2 <- ifelse(
+                    t_rel <= g("texc_A"),
+                    g("A") + g("drift_frac") * amp + lead,
                     NA_real_
                 )
-            )
+                cd$comp3 <- ifelse(
+                    t_rel >= g("texc_B"),
+                    g("A") + (1 - g("drift_frac")) * amp + trail,
+                    NA_real_
+                )
+            } else {
+                cd$comp1 <- monoexponential(t_rel, g("A"), g("B"), g("tau"), TD)
+                onset <- TD + g("tau_mult") * g("tau")
+                cd$comp2 <- ifelse(
+                    model == "biexponential",
+                    monoexponential(t_rel, g("B"), g("B2"), g("tau2"), TD),
+                    ifelse(
+                        model == "exponential_drift" & t_rel >= onset,
+                        monoexponential(onset, g("A"), g("B"), g("tau"), TD) +
+                            g("slope") * (t_rel - onset),
+                        NA_real_
+                    )
+                )
+            }
 
-            comp_line <- \(.col, .d = cd) ggplot2::geom_line(
+            comp_line <- \(.col) ggplot2::geom_line(
                 ggplot2::aes(
                     y = .data[[.col]],
                     colour = ggplot2::stage(.ch, after_scale = darken(colour))
                 ),
-                data = .d,
+                data = cd[is.finite(cd[[.col]]), , drop = FALSE],
                 linetype = "dotted",
                 linewidth = 0.5,
                 show.legend = FALSE
             )
-            list(
-                comp_line("comp1"),
-                comp_line("comp2", cd[is.finite(cd$comp2), , drop = FALSE])
-            )
+            lapply(grep("^comp", names(cd), value = TRUE), comp_line)
         })
     }
 
@@ -585,14 +606,22 @@ kinetics_annotations <- function(x) {
                     )
                 )
             },
-            sigmoidal = list(
-                offset = "xmid",
-                y = "xmid_fitted",
-                label = label(
-                    line("slope = %s /s", coefs$slope, decimals = Inf),
-                    line("xmid = %s s", coefs$xmid)
+            ## the sigmoidal models share `xmid` and `slope`; the drift
+            ## rates read NA on a sigmoidal row and their lines are dropped
+            sigmoidal = ,
+            sigmoidal_drift = {
+                g <- \(.nm) coefs[[.nm]] %||% NA_real_
+                list(
+                    offset = "xmid",
+                    y = "xmid_fitted",
+                    label = label(
+                        line("slope = %s /s", g("slope"), decimals = Inf),
+                        line("xmid = %s s", g("xmid")),
+                        line("slope_A = %s /s", g("slope_A"), decimals = Inf),
+                        line("slope_B = %s /s", g("slope_B"), decimals = Inf)
+                    )
                 )
-            )
+            }
         )
     }
 

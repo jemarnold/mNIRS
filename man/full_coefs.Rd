@@ -11,7 +11,8 @@ full_coefs(model, params, fix = list())
 
 \item{params}{Character vector of parameter names in model order.}
 
-\item{fix}{Named list of fixed parameter values.}
+\item{fix}{Named list of fixed parameter values. Non-numeric elements
+(e.g. a model \code{shape} riding in the formula) are ignored.}
 }
 \value{
 A named numeric vector ordered by \code{params} containing the

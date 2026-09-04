@@ -15,6 +15,7 @@ enforce_direction(
   upper = NULL,
   floor_params = NULL,
   fix = list(),
+  control = NULL,
   .nirs,
   interval_name,
   env = rlang::caller_env()
@@ -50,6 +51,9 @@ every finite bound; restrict when other bounds are structural
 (e.g. the biexponential time-constant bounds).}
 
 \item{fix}{Named list of user-fixed parameter values.}
+
+\item{control}{User \code{\link[stats:nls.control]{stats::nls.control()}} list merged over the refit
+defaults by \code{\link[=fit_control]{fit_control()}}.}
 
 \item{.nirs}{Character; the channel name.}
 

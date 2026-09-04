@@ -63,7 +63,15 @@ silence warnings and information messages helpful for troubleshooting.
 Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Additional arguments passed to the underlying method function.
-See \emph{Details}.}
+See \emph{Details}. For the \code{\link[stats:nls]{stats::nls()}} methods (\strong{monoexponential,
+biexponential, exponential_drift, sigmoidal, sigmoidal_drift}),
+\code{control} is an
+\emph{optional} \code{list()} or \code{\link[stats:nls.control]{stats::nls.control()}} of convergence settings,
+e.g. \code{control = list(maxiter = 200)}. Values override the internal
+defaults (\code{maxiter = 500}, \code{warnOnly = TRUE} for bounded \code{"port"} fits).
+Applied globally to every channel and interval. \code{warnOnly = FALSE} turns
+a non-converged bounded fit into a fit failure (\code{NA} coefficients with a
+warning).}
 
 \item{env}{The calling environment or a defused call, used to report
 errors and warnings as coming from the user-facing function rather

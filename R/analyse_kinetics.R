@@ -28,6 +28,10 @@
 #'      \item{`"sigmoidal"`}{Logistic or Gompertz-family curve fit via
 #'      [stats::nls()]. Additional arguments: `shape`, `fix`, `control`.
 #'      See [logistic()].}
+#'      \item{`"sigmoidal_drift"`}{Logistic or Gompertz-family curve with
+#'      linear drifts at both asymptotes, fit via [stats::nls()]. Additional
+#'      arguments: `shape`, `drift_frac`, `fix`, `control`. See
+#'      [sigmoidal_drift()].}
 #'   }
 #' @param start_time A numeric value in units of `time_channel` specifying the
 #'   time of response onset (effectively time = `0` of the response). If `NULL`
@@ -54,7 +58,8 @@
 #'   retrieved from metadata stays aligned.
 #' @param ... Additional arguments passed to the underlying method function.
 #'   See *Details*. For the [stats::nls()] methods (**monoexponential,
-#'   biexponential, exponential_drift, sigmoidal**), `control` is an
+#'   biexponential, exponential_drift, sigmoidal, sigmoidal_drift**),
+#'   `control` is an
 #'   *optional* `list()` or [stats::nls.control()] of convergence settings,
 #'   e.g. `control = list(maxiter = 200)`. Values override the internal
 #'   defaults (`maxiter = 500`, `warnOnly = TRUE` for bounded `"port"` fits).
@@ -91,12 +96,13 @@
 #'   (A, B, tau, TD); or a 6-parameter [biexponential()] model (A, B, tau,
 #'   B2, tau2, TD). If `use_TD = FALSE` or the fit fails (with a
 #'   warning), attempts to fall back to a reduced model without `TD`.
-#' @param shape **sigmoidal**: Character; the 4-parameter sigmoidal shape
-#'   to fit. One of `"symmetric"` (*default*; calls [SSlogistic()]),
-#'   `"gompertz"` (early-inflection; calls [SSgompertz()]), or
-#'   `"gompertz_left"` (late-inflection; calls [SSgompertz_left()]).
+#' @param shape **sigmoidal, sigmoidal_drift**: Character; the 4-parameter
+#'   sigmoidal shape to fit. One of `"symmetric"` (*default*; calls
+#'   [SSlogistic()]), `"gompertz"` (early-inflection; calls [SSgompertz()]),
+#'   or `"gompertz_left"` (late-inflection; calls [SSgompertz_left()]). For
+#'   **sigmoidal_drift** the shape is passed to [SSsigmoidal_drift()].
 #' @param fix **monoexponential, biexponential, exponential_drift,
-#'   sigmoidal**: An *optional*
+#'   sigmoidal, sigmoidal_drift**: An *optional*
 #'   named list of model parameters to hold constant during fitting, e.g.
 #'   `fix = list(A = 0)` fixes the starting amplitude at `0`. Fixed
 #'   parameters are excluded from estimation and reported at their fixed
@@ -107,6 +113,13 @@
 #'   `TD + tau_mult * tau`). The default `3` (~95% of the primary amplitude)
 #'   is always held constant. Specify per-channel as a list keyed by channel
 #'   name, e.g. `tau_mult = list(smo2 = 2)`. See *Details*.
+#' @param drift_frac **sigmoidal_drift**: A numeric fraction of the
+#'   amplitude in `(0, 0.5)` bounding the drift regions: the leading drift
+#'   applies only below `A + drift_frac * (B - A)` (before `texc_A`) and the
+#'   trailing drift only above `A + (1 - drift_frac) * (B - A)` (after
+#'   `texc_B`). The default `0.05` is always held constant. Specify
+#'   per-channel as a list keyed by channel name, e.g.
+#'   `drift_frac = list(smo2 = 0.1)`. See *Details*.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
 #'
@@ -196,8 +209,8 @@
 #' within the subsequent `end_window` time span. The curve fitting window
 #' extends to the end of `end_window` beyond the detected peak/trough.
 #'
-#' For *"monoexponential"*, *"biexponential"*, *"exponential_drift"*, and
-#' *"sigmoidal"* methods,
+#' For *"monoexponential"*, *"biexponential"*, *"exponential_drift"*,
+#' *"sigmoidal"*, and *"sigmoidal_drift"* methods,
 #' `direction` also constrains the sign of the fitted amplitude `B - A`, and
 #' the sigmoidal `slope`. For the *"biexponential"* method, `direction`
 #' constrains the sign of the fast-phase amplitude `B - A`. A fit that
@@ -478,6 +491,45 @@
 #' Parameters may be held constant with `fix`, e.g. `fix = list(A = 0)`, as
 #' above.
 #'
+#' ## method = "sigmoidal_drift"
+#'
+#' Aliases: `method = c("sigmoid_drift", "sig_drift", "logistic_drift",
+#' "gompertz_drift", "sigmoidal_linear")`.
+#'
+#' A parametric approach fitting a three-phase curve using [stats::nls()]
+#' with [SSsigmoidal_drift()]: a *"sigmoidal"* primary response of the
+#' given `shape` plus independent linear drifts at the leading and trailing
+#' asymptotes.
+#'
+#' Model equation:
+#'
+#' `S(t) + slope_A * pmin(t - texc_A, 0) + slope_B * pmax(t - texc_B, 0)`
+#'
+#' `S(t)` and `A`, `B`, `xmid`, and `slope` are as for *"sigmoidal"*.
+#' `slope_A` and `slope_B` are the linear drift rates `dx/dt` at the
+#' asymptotes `A` and `B`. Each drift is a hinge line anchored at zero at
+#' its cutoff: the leading drift applies only before `texc_A`, where the
+#' sigmoid reaches `drift_frac` (*default* `0.05`; 5%) of its amplitude,
+#' and the trailing drift only after `texc_B`, where it reaches
+#' `1 - drift_frac` (95%). The cutoffs are the analytic inverse of each
+#' `shape` (see [sigmoidal_drift()]), so a Gompertz form places its cutoff
+#' further out on its slow side. The drift regions never overlap, so the
+#' two drifts are fitted independently. `texc_A` and `texc_B` are reported
+#' elapsed from `start_time` (the same frame as `xmid`).
+#'
+#' The drifts are kept only when the data support them. A channel falls
+#' back to the *"sigmoidal"* model (same `shape` and window, with `A`, `B`,
+#' `xmid`, and `slope` carried over from `fix`) when the fit fails or both
+#' drift amplitudes over their support, `|slope_A| * (texc_A - t_start)` and
+#' `|slope_B| * (t_end - texc_B)`, are below twice the fit RMSE, with a
+#' warning recorded in `warnings`. One supported drift keeps the full
+#' model. The `model` coefficient column names the method each row comes
+#' from; sigmoidal rows report `slope_A`, `slope_B`, `drift_frac`, `texc_A`,
+#' and `texc_B` as `NA`.
+#'
+#' `A`, `B`, `xmid`, `slope`, `slope_A`, and `slope_B` may be held constant
+#' with `fix`, as above.
+#'
 #' ## Recursive analysis
 #'
 #' An *"mnirs_kinetics"* result may be passed back as `data` to analyse how
@@ -607,7 +659,8 @@ analyse_kinetics <- function(
         "monoexponential",
         "biexponential",
         "exponential_drift",
-        "sigmoidal"
+        "sigmoidal",
+        "sigmoidal_drift"
     ),
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
@@ -625,6 +678,7 @@ analyse_kinetics <- function(
     use_TD = TRUE,
     shape = c("symmetric", "gompertz", "gompertz_left"),
     tau_mult = NULL,
+    drift_frac = NULL,
     fix = NULL
 ) {
     ## normalise method aliases before matching
@@ -881,6 +935,49 @@ analyse_kinetics.sigmoidal <- function(
 
 
 #' @rdname analyse_kinetics
+#' @usage NULL
+#' @export
+analyse_kinetics.sigmoidal_drift <- function(
+    data,
+    nirs_channels = NULL,
+    time_channel = NULL,
+    method,
+    start_time = NULL,
+    direction = c("auto", "positive", "negative"),
+    end_window = Inf,
+    group_intervals = "ensemble",
+    zero_time = FALSE,
+    verbose = TRUE,
+    ...,
+    shape = c("symmetric", "gompertz", "gompertz_left"),
+    drift_frac = 0.05,
+    fix = NULL
+) {
+    if (missing(verbose)) {
+        verbose <- getOption("mnirs.verbose", default = TRUE)
+    }
+    ## nls() convergence settings ride in `...`
+    control <- list(...)$control
+    ## unsupported drifts fall back to the sigmoidal (see
+    ## `kinetics_fallbacks`); the undocumented `model_fallback = FALSE`
+    ## keeps the raw fit
+    return(analyse_kinetics_intervals(
+        data,
+        "sigmoidal_drift",
+        mget(unlist(kinetics_dispatch[c("common", "sigmoidal_drift")])),
+        enquo(nirs_channels),
+        enquo(time_channel),
+        group_intervals,
+        zero_time,
+        verbose,
+        match.call(),
+        sys.call(-1),
+        fallback = !isFALSE(list(...)$model_fallback)
+    ))
+}
+
+
+#' @rdname analyse_kinetics
 #' @export
 analyze_kinetics <- function(
     data,
@@ -892,7 +989,8 @@ analyze_kinetics <- function(
         "monoexponential",
         "biexponential",
         "exponential_drift",
-        "sigmoidal"
+        "sigmoidal",
+        "sigmoidal_drift"
     ),
     start_time = NULL,
     direction = c("auto", "positive", "negative"),

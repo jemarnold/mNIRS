@@ -619,7 +619,7 @@ analyse_logistic <- function(
     )
     time_channel <- setup$time_channel
     ## NA scaffold (method columns only) for convergence failure
-    na_cols <- c("A", "B", "xmid", "slope", "xmid_fitted")
+    na_cols <- kinetics_coef_cols$sigmoidal
 
     ## method-specific fit: self-starting sigmoidal via nls
     logistic_fit <- function(.nirs, x_fit, t_fit, .a, valid) {

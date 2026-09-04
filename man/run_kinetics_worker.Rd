@@ -54,6 +54,7 @@ method tried with \code{NA} coefficients.
 Methods with a fallback report the fitting method per row in a \code{model}
 coefficient column and the union of the chain's coefficient columns
 (\code{NA} where a model has no such parameter), so intervals bind
-regardless of which triggers fire.
+regardless of which triggers fire. \code{\link[=build_kinetics_results]{build_kinetics_results()}} then
+drops the columns of fallback models no row resolved to.
 }
 \keyword{internal}

@@ -11,6 +11,7 @@ analyse_exponential_drift(
   use_TD = TRUE,
   tau_mult = 3,
   fix = NULL,
+  control = NULL,
   start_time = NULL,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
@@ -55,6 +56,10 @@ channel name, e.g. \code{fix = list(smo2 = list(A = 0))}. \code{TD} is fixable
 for channels where \code{use_TD = TRUE}; a fixed \code{TD} disables the
 5-parameter fallback.}
 
+\item{control}{An \emph{optional} \code{list()} or \code{\link[stats:nls.control]{stats::nls.control()}} merged
+over each fit's internal defaults by \code{\link[=fit_control]{fit_control()}}. Global to all
+channels.}
+
 \item{start_time}{A numeric value in units of \code{time_channel} specifying the
 time of response onset (effectively time = \code{0} of the response). If \code{NULL}
 (\emph{default}), retrieves \code{interval_times} from \emph{"mnirs"} metadata, or falls
@@ -78,7 +83,15 @@ silence warnings and information messages helpful for troubleshooting.
 Global default can be set via \code{options(mnirs.verbose = FALSE)}.}
 
 \item{...}{Additional arguments passed to the underlying method function.
-See \emph{Details}.}
+See \emph{Details}. For the \code{\link[stats:nls]{stats::nls()}} methods (\strong{monoexponential,
+biexponential, exponential_drift, sigmoidal, sigmoidal_drift}),
+\code{control} is an
+\emph{optional} \code{list()} or \code{\link[stats:nls.control]{stats::nls.control()}} of convergence settings,
+e.g. \code{control = list(maxiter = 200)}. Values override the internal
+defaults (\code{maxiter = 500}, \code{warnOnly = TRUE} for bounded \code{"port"} fits).
+Applied globally to every channel and interval. \code{warnOnly = FALSE} turns
+a non-converged bounded fit into a fit failure (\code{NA} coefficients with a
+warning).}
 
 \item{env}{The calling environment or a defused call, used to report
 errors and warnings as coming from the user-facing function rather

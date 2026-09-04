@@ -2431,8 +2431,7 @@ test_that("analyse_kinetics.exponential_drift dispatches multiple channels", {
 test_that("analyse_kinetics.exponential_drift dispatches via method aliases", {
     data <- create_expdrift_data()
     aliases <- c(
-        "exp_drift", "exp linear", "monoexp-drift", "drift",
-        "exponential_linear"
+        "exp_drift", "exp linear", "monoexp-drift", "exponential_linear"
     )
 
     for (alias in aliases) {

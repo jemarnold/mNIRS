@@ -24,37 +24,43 @@ method_aliases <- c(
     exp_lin = "exponential_drift",
     monoexp_drift = "exponential_drift",
     monoexp_linear = "exponential_drift",
-    linear_drift = "exponential_drift",
-    drift = "exponential_drift",
     logistic = "sigmoidal",
     gompertz = "sigmoidal",
-    xmid = "sigmoidal"
+    xmid = "sigmoidal",
+    sigmoidal_drift = "sigmoidal_drift",
+    sigmoid_drift = "sigmoidal_drift",
+    sig_drift = "sigmoidal_drift",
+    logistic_drift = "sigmoidal_drift",
+    gompertz_drift = "sigmoidal_drift",
+    sigmoidal_linear = "sigmoidal_drift",
+    sigmoid_linear = "sigmoidal_drift",
+    sig_lin = "sigmoidal_drift",
+    logistic_linear = "sigmoidal_drift",
+    gompertz_linear = "sigmoidal_drift"
 )
 
 
 ## canonical method -> method-specific worker arg names.
+# fmt: skip
 kinetics_dispatch <- list(
     common = c("start_time", "direction", "end_window"),
     response_time = c("fraction"),
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
     monoexponential = c("use_TD", "fix", "control"),
     biexponential = c(
-        "use_TD",
-        "fix",
-        "tau_flex",
-        "TD_flex",
-        "A_flex",
-        "control"
+        "use_TD", "fix", "tau_flex", "TD_flex", "A_flex", "control"
     ),
     exponential_drift = c("use_TD", "tau_mult", "fix", "control"),
-    sigmoidal = c("shape", "fix", "control")
+    sigmoidal = c("shape", "fix", "control"),
+    sigmoidal_drift = c("shape", "drift_frac", "fix", "control")
 )
 
 
 ## coefficients reported as time points elapsed from `start_time`
 # fmt: skip
 kinetics_time_coefs <- c(
-    "response_time", "peak_slope_time", "TD", "MRT", "HRT", "texc", "xmid"
+    "response_time", "peak_slope_time", "TD", "MRT", "HRT", 
+    "texc", "xmid", "texc_A", "texc_B"
 )
 
 
@@ -66,7 +72,8 @@ kinetics_workers <- c(
     monoexponential = "analyse_monoexponential",
     biexponential = "analyse_biexponential",
     exponential_drift = "analyse_exponential_drift",
-    sigmoidal = "analyse_logistic"
+    sigmoidal = "analyse_logistic",
+    sigmoidal_drift = "analyse_sigmoidal_drift"
 )
 
 
@@ -78,12 +85,17 @@ kinetics_coef_cols <- list(
         "A", "B", "TD", "tau", "k", "MRT", "HRT", "MRT_fitted", "HRT_fitted"
     ),
     exponential_drift = c(
-        "A", "B", "TD", "tau", "k", "MRT", "HRT", "texc", "slope", "tau_mult",
-        "MRT_fitted", "HRT_fitted", "texc_fitted"
+        "A", "B", "TD", "tau", "k", "MRT", "HRT", "texc", "slope", 
+        "tau_mult", "MRT_fitted", "HRT_fitted", "texc_fitted"
     ),
     biexponential = c(
-        "A", "B", "TD", "tau", "MRT", "texc", "B2", "tau2", "MRT_fitted",
-        "texc_fitted"
+        "A", "B", "TD", "tau", "MRT", "texc", 
+        "B2", "tau2", "MRT_fitted", "texc_fitted"
+    ),
+    sigmoidal = c("A", "B", "xmid", "slope", "xmid_fitted"),
+    sigmoidal_drift = c(
+        "A", "B", "xmid", "slope", "slope_A", "slope_B", 
+        "drift_frac", "texc_A", "texc_B", "xmid_fitted"
     )
 )
 
@@ -98,7 +110,8 @@ fallback_gate <- 2
 ## the fit's `rmse`, fitted time `span`, and last fitted time `t_end`
 ## elapsed from the onset (see `run_kinetics_worker()`). `fix_keep` names
 ## the user-fixed parameters the reduced model shares; others are dropped.
-## `args` overrides reduced worker arguments
+## `args` overrides reduced worker arguments. `to_label` names the reduced
+## model in the warning in place of its `SS<to>()` self-start fn
 kinetics_fallbacks <- list(
     biexponential = list(
         to = "exponential_drift",
@@ -139,6 +152,28 @@ kinetics_fallbacks <- list(
                     " RMSE."
                 ) := !is.finite(cf$slope) ||
                     abs(cf$slope) * (t_end - onset) < fallback_gate * rmse
+            )
+        }
+    ),
+    sigmoidal_drift = list(
+        to = "sigmoidal",
+        to_label = "the sigmoidal model",
+        fix_keep = c("A", "B", "xmid", "slope"),
+        args = list(),
+        trigger = \(cf, rmse, span, t_end) {
+            ## each drift's amplitude over its support: from the first
+            ## fitted time to the leading cutoff, and from the trailing
+            ## cutoff to the last. one supported drift keeps the model
+            amp_A <- abs(cf$slope_A) * max(cf$texc_A - (t_end - span), 0)
+            amp_B <- abs(cf$slope_B) * max(t_end - cf$texc_B, 0)
+            first_reason(
+                "Fit failed." = is.na(cf$A),
+                !!paste0(
+                    "Drift amplitudes are below ",
+                    cli::col_blue(fallback_gate),
+                    " RMSE."
+                ) := !all(is.finite(c(amp_A, amp_B))) ||
+                    max(amp_A, amp_B) < fallback_gate * rmse
             )
         }
     )
@@ -924,11 +959,13 @@ run_kinetics_worker <- function(
         ## warn per channel; recorded alongside the fits' own conditions
         chans <- chans_all[idx]
         fn_full <- paste0("SS", method)
-        fn_to <- paste0("SS", spec$to)
+        ## the reduced model is named by its self-start fn unless the spec
+        ## labels it (a family of self-start fns)
+        fn_to <- spec$to_label %||% sprintf("`SS%s()`", spec$to)
         ## plain strings with direct ansi styling: cli markup formatting
         ## is too slow per channel
         heads <- sprintf(
-            "`%s()` fit for %s in %s fell back to `%s()`.",
+            "`%s()` fit for %s in %s fell back to %s.",
             fn_full,
             cli::col_green(chans),
             cli::col_green(interval_name),
@@ -1979,14 +2016,15 @@ fit_names <- function(x, t, params) {
 #'
 #' @param model An [nls][stats::nls] model of the free parameters.
 #' @param params Character vector of parameter names in model order.
-#' @param fix Named list of fixed parameter values.
+#' @param fix Named list of fixed parameter values. Non-numeric elements
+#'   (e.g. a model `shape` riding in the formula) are ignored.
 #'
 #' @returns A named numeric vector ordered by `params` containing the
 #'   fitted coefficients with fixed values merged in.
 #'
 #' @keywords internal
 full_coefs <- function(model, params, fix = list()) {
-    coefs <- c(stats::coef(model), unlist(fix))
+    coefs <- c(stats::coef(model), unlist(Filter(is.numeric, fix)))
     return(coefs[intersect(params, names(coefs))])
 }
 
