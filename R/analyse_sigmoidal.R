@@ -562,6 +562,7 @@ shape_dispatch <- list(
 #'   `fix = list(smo2 = list(A = 0))`.
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
+#' @inheritParams analyse_monoexponential
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
 #'   `nirs_channels`, `A`, `B`, `xmid`, `slope`, `xmid_fitted`.
@@ -585,6 +586,7 @@ analyse_logistic <- function(
     time_channel = NULL,
     shape = c("symmetric", "gompertz", "gompertz_left"),
     fix = NULL,
+    control = NULL,
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
@@ -603,9 +605,9 @@ analyse_logistic <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = mget(
-            c("shape", "fix", "start_time", "direction", "end_window")
-        ),
+        arg_list = mget(c(
+            "shape", "fix", "control", "start_time", "direction", "end_window"
+        )),
         choices = list(
             shape = c("symmetric", "gompertz", "gompertz_left"),
             direction = c("auto", "positive", "negative")
@@ -632,7 +634,8 @@ analyse_logistic <- function(
         model <- tryCatch(
             embed_fit_call(nls(
                 build_ss_formula(ch_fn, params, .a$fix, nm[[1L]], nm[[2L]]),
-                fit_data
+                fit_data,
+                control = fit_control(.a$control)
             )),
             error = \(e) {
                 warn_fit_failed(ch_fn, e, .nirs, interval_name, env = env)
@@ -663,6 +666,7 @@ analyse_logistic <- function(
                 c(slope = if (want > 0) Inf else -slope_eps)
             },
             fix = .a$fix,
+            control = .a$control,
             .nirs = .nirs,
             interval_name = interval_name,
             env = env

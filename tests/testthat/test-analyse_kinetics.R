@@ -3441,3 +3441,30 @@ test_that("analyse_kinetics monoexponential model supports confint()", {
     expect_equal(rownames(ci), c("A", "B", "tau"))
     expect_true(all(is.finite(ci)))
 })
+
+test_that("analyse_kinetics control reaches nls() and is recorded", {
+    result <- analyse_kinetics(
+        create_monoexp_data(),
+        nirs_channels = "smo2",
+        method = "monoexponential",
+        use_TD = FALSE,
+        control = list(maxiter = 200),
+        verbose = FALSE
+    )
+    ## nls() stores the resolved control in the model call
+    expect_equal(result$model[[1L]]$smo2$call$control$maxiter, 200)
+    expect_match(result$channel_args$control, "maxiter = 200")
+})
+
+test_that("analyse_kinetics control rejects unknown nls.control names", {
+    expect_error(
+        analyse_kinetics(
+            create_monoexp_data(),
+            nirs_channels = "smo2",
+            method = "monoexponential",
+            control = list(max_iter = 7),
+            verbose = FALSE
+        ),
+        "control"
+    )
+})

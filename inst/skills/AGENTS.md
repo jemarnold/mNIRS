@@ -301,6 +301,7 @@ analyse_kinetics(
     partial = FALSE, na.rm = FALSE,
     use_TD = TRUE, shape = c("symmetric", "gompertz", "gompertz_left"),
     tau_mult = 3, fix = NULL
+    ## via `...`: control = NULL (nls methods; see below)
 )
 ## analyze_kinetics(...) alias
 ```
@@ -317,6 +318,7 @@ analyse_kinetics(
 - **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `fix`. Sequential fit: fast monoexp on `end_window` window (`Inf` → first extreme + 20 time units) → full biexp with `A`/`tau`/`TD` held near stage-1 values, `B`/`B2`/`tau2` free. Falls back (warning; `model` column) to exp_drift → monoexp on fit failure, monotonic `texc`, `tau2 >= 2 × span`, or `|B2 - B| < 2 × rmse`. Coef columns = union of the chain (`NA` where n/a). Undocumented `model_fallback = FALSE` keeps raw fit.
 - **`"exponential_drift"`**: `use_TD`, `tau_mult` (default `3`; drift onset `TD + tau_mult * tau`, always held constant), `fix`. `texc` = takeover point `max(onset, TD + tau × log(|B - A| / (|slope| × tau)))` (turning point when phases oppose). Falls back to monoexp on fit failure or `|slope| × (t_end - onset) < 2 × rmse` (`model` column; `model_fallback = FALSE` keeps raw fit).
 - **`"sigmoidal"`**: `shape` (`"symmetric"` default = `SSlogistic()`; `"gompertz"` early-inflection (right); `"gompertz_left"` late-inflection), `fix`.
+- **All nls methods**: `control` via `...` (`list()` or `nls.control()`, e.g. `list(maxiter = 200)`) merged over internal defaults (`maxiter = 500, warnOnly = TRUE` on `"port"` fits) at every `nls()` call incl. direction refits and fallbacks. Global only (not per-channel/interval). Unknown names abort.
 
 Per-channel overrides via inline named `list()` (names must match `nirs_channels`):
 ```r

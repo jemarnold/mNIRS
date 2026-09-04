@@ -303,6 +303,7 @@ SSexponential_drift <- selfStart(
 #'   5-parameter fallback.
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
+#' @inheritParams analyse_monoexponential
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
 #'   `nirs_channels`, `A`, `B`, `TD`, `tau`, `k`, `MRT`, `HRT`, `texc`,
@@ -330,6 +331,7 @@ analyse_exponential_drift <- function(
     use_TD = TRUE,
     tau_mult = 3,
     fix = NULL,
+    control = NULL,
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
@@ -349,10 +351,10 @@ analyse_exponential_drift <- function(
         enquo(nirs_channels),
         enquo(time_channel),
         # fmt: skip
-        arg_list = mget(
-            c("use_TD", "tau_mult", "fix", "start_time", 
-            "direction", "end_window")
-        ),
+        arg_list = mget(c(
+            "use_TD", "tau_mult", "fix", "control", "start_time",
+            "direction", "end_window"
+        )),
         choices = list(direction = c("auto", "positive", "negative")),
         ## TD is only fixable where that channel fits the 6-parameter model
         fix_params = \(.a) c("A", "B", "tau", "slope", if (.a$use_TD) "TD"),
@@ -420,7 +422,11 @@ analyse_exponential_drift <- function(
                             start = start[free],
                             algorithm = "port",
                             lower = lower,
-                            control = stats::nls.control(warnOnly = TRUE)
+                            control = fit_control(
+                                .a$control,
+                                maxiter = 500L,
+                                warnOnly = TRUE
+                            )
                         )))
                     },
                     error = on_error
@@ -452,6 +458,7 @@ analyse_exponential_drift <- function(
                 c(tau = diff(range(t_fit)) * 1e-6)
             },
             fix = .a$fix,
+            control = .a$control,
             .nirs = .nirs,
             interval_name = interval_name,
             env = env

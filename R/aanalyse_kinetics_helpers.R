@@ -37,10 +37,12 @@ kinetics_dispatch <- list(
     common = c("start_time", "direction", "end_window"),
     response_time = c("fraction"),
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
-    monoexponential = c("use_TD", "fix"),
-    biexponential = c("use_TD", "fix", "tau_flex", "TD_flex", "A_flex"),
-    exponential_drift = c("use_TD", "tau_mult", "fix"),
-    sigmoidal = c("shape", "fix")
+    monoexponential = c("use_TD", "fix", "control"),
+    biexponential = c(
+        "use_TD", "fix", "tau_flex", "TD_flex", "A_flex", "control"
+    ),
+    exponential_drift = c("use_TD", "tau_mult", "fix", "control"),
+    sigmoidal = c("shape", "fix", "control")
 )
 
 
@@ -918,8 +920,10 @@ run_kinetics_worker <- function(
         sub_args[names(spec$args)] <- spec$args
         sub_args$fix <- keep_fix(sub_args$fix %||% list(), spec$fix_keep)
         sub_args <- Filter(length, Map(\(.x, .nm) {
-            ## a plain `fix` parameter list is global, not a channel map
-            is_map <- is_arg_map(.x) &&
+            ## a plain `fix` parameter list and `control` are global, not
+            ## channel maps
+            is_map <- .nm != "control" &&
+                is_arg_map(.x) &&
                 (.nm != "fix" || all(vapply(.x, is.list, logical(1))))
             if (is_map) .x[names(.x) %in% c("", chans)] else .x
         }, sub_args, names(sub_args)))
@@ -1042,6 +1046,9 @@ setup_kinetics_worker <- function(
     if (!fix_map) {
         arg_list$fix <- NULL
     }
+    ## `control` is a plain nls.control() list, always global
+    control <- arg_list$control
+    arg_list$control <- NULL
 
     ## broadcast global args (applying per-channel list() overrides), then
     ## validate the resolved args once, before fitting any channel
@@ -1056,6 +1063,9 @@ setup_kinetics_worker <- function(
     if (!fix_map && !is.null(fix)) {
         per_channel <- lapply(per_channel, \(.a) c(.a, list(fix = fix)))
     }
+    ## the key is kept when `NULL` so every channel serialises the same
+    ## `channel_args` columns
+    per_channel <- lapply(per_channel, \(.a) c(.a, list(control = control)))
     per_channel <- validate_kinetics_args(
         per_channel,
         data,
@@ -1329,6 +1339,17 @@ validate_kinetics_args <- function(
                 "x" = "{.arg use_TD} must be a {.cls logical} \\
                 either {.val {TRUE}} or {.val {FALSE}}."
             ), call = env)
+        }
+        ## nls() silently accepts unknown control names, so catch typos
+        if (!is.null(.a$control)) {
+            bad <- setdiff(names(.a$control), names(stats::nls.control()))
+            if (!is.list(.a$control) || length(bad) > 0L) {
+                cli_abort(c(
+                    "x" = "{.arg control} must be a {.cls list} of \\
+                    {.fn stats::nls.control} arguments.",
+                    if (length(bad) > 0L) c("i" = "Unrecognised: {.field {bad}}.")
+                ), call = env)
+            }
         }
         ## always resolve: user value > interval_times metadata > 0
         .a$start_time <- validate_start_time(
@@ -1608,6 +1629,21 @@ accept_port_fit <- function(model, on_error, ok = TRUE) {
         return(model)
     }
     return(on_error(simpleError(msg)))
+}
+
+
+#' Merge user nls control over a fit's internal defaults
+#'
+#' @param control User `control` list (or `NULL`) from the channel args.
+#' @param ... Internal [stats::nls.control()] defaults for the fit.
+#'
+#' @returns A control list for [stats::nls()].
+#'
+#' @keywords internal
+fit_control <- function(control, ...) {
+    ctrl <- stats::nls.control(...)
+    ctrl[names(control)] <- control
+    return(ctrl)
 }
 
 
@@ -1939,6 +1975,8 @@ full_coefs <- function(model, params, fix = list()) {
 #'   every finite bound; restrict when other bounds are structural
 #'   (e.g. the biexponential time-constant bounds).
 #' @param fix Named list of user-fixed parameter values.
+#' @param control User [stats::nls.control()] list merged over the refit
+#'   defaults by [fit_control()].
 #' @param .nirs Character; the channel name.
 #' @param interval_name Character; the interval label.
 #' @inheritParams validate_mnirs
@@ -1960,6 +1998,7 @@ enforce_direction <- function(
     upper = NULL,
     floor_params = NULL,
     fix = list(),
+    control = NULL,
     .nirs,
     interval_name,
     env = rlang::caller_env()
@@ -2023,10 +2062,7 @@ enforce_direction <- function(
                 lower = l,
                 upper = u,
                 algorithm = "port",
-                control = stats::nls.control(
-                    maxiter = 500L,
-                    warnOnly = TRUE
-                )
+                control = fit_control(control, maxiter = 500L, warnOnly = TRUE)
             ))),
             error = \(e) NULL
         )

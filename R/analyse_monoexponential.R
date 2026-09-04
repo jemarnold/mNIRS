@@ -318,6 +318,9 @@ SSmonoexponential <- selfStart(
 #'   channel name, e.g. `fix = list(smo2 = list(A = 0))`. `TD` is fixable
 #'   for channels where `use_TD = TRUE`; a fixed `TD` disables the
 #'   3-parameter fallback.
+#' @param control An *optional* `list()` or [stats::nls.control()] merged
+#'   over each fit's internal defaults by [fit_control()]. Global to all
+#'   channels.
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
 #'
@@ -343,6 +346,7 @@ analyse_monoexponential <- function(
     time_channel = NULL,
     use_TD = TRUE,
     fix = NULL,
+    control = NULL,
     start_time = NULL,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
@@ -362,9 +366,9 @@ analyse_monoexponential <- function(
         enquo(nirs_channels),
         enquo(time_channel),
         # fmt: skip
-        arg_list = mget(
-            c("use_TD", "fix", "start_time", "direction", "end_window")
-        ),
+        arg_list = mget(c(
+            "use_TD", "fix", "control", "start_time", "direction", "end_window"
+        )),
         choices = list(direction = c("auto", "positive", "negative")),
         ## TD is only fixable where that channel fits the 4-parameter model
         fix_params = \(.a) c("A", "B", "tau", if (.a$use_TD) "TD"),
@@ -444,7 +448,8 @@ fit_monoexponential <- function(
                     embed_fit_call(nls(
                         formula,
                         .data,
-                        start = start[setdiff(.params, names(.a$fix))]
+                        start = start[setdiff(.params, names(.a$fix))],
+                        control = fit_control(.a$control)
                     ))
                 },
                 error = on_error
@@ -475,6 +480,7 @@ fit_monoexponential <- function(
             c(tau = diff(range(t_fit)) * 1e-6)
         },
         fix = .a$fix,
+        control = .a$control,
         .nirs = .nirs,
         interval_name = interval_name,
         env = env

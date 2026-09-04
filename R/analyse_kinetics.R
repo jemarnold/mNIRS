@@ -17,16 +17,17 @@
 #'      arguments: `width` or `span`, `align`, `partial`, `na.rm`. See
 #'      [peak_slope()].}
 #'      \item{`"monoexponential"`}{Monoexponential curve fit via
-#'      [stats::nls()]. Additional arguments: `use_TD`. See
-#'      [monoexponential()].}
+#'      [stats::nls()]. Additional arguments: `use_TD`, `fix`, `control`.
+#'      See [monoexponential()].}
 #'      \item{`"biexponential"`}{Biexponential (fast + slow component) curve
-#'      fit via [stats::nls()]. Additional arguments: `use_TD`. See
-#'      [biexponential()].}
+#'      fit via [stats::nls()]. Additional arguments: `use_TD`, `fix`,
+#'      `control`. See [biexponential()].}
 #'      \item{`"exponential_drift"`}{Monoexponential curve with a secondary
 #'      linear drift, fit via [stats::nls()]. Additional arguments: `use_TD`,
-#'      `tau_mult`. See [exponential_drift()].}
+#'      `tau_mult`, `fix`, `control`. See [exponential_drift()].}
 #'      \item{`"sigmoidal"`}{Logistic or Gompertz-family curve fit via
-#'      [stats::nls()]. Additional arguments: `shape`. See [logistic()].}
+#'      [stats::nls()]. Additional arguments: `shape`, `fix`, `control`.
+#'      See [logistic()].}
 #'   }
 #' @param start_time A numeric value in units of `time_channel` specifying the
 #'   time of response onset (effectively time = `0` of the response). If `NULL`
@@ -52,7 +53,14 @@
 #'   `interval_times` metadata is shifted by the same offset so `start_time`
 #'   retrieved from metadata stays aligned.
 #' @param ... Additional arguments passed to the underlying method function.
-#'   See *Details*.
+#'   See *Details*. For the [stats::nls()] methods (**monoexponential,
+#'   biexponential, exponential_drift, sigmoidal**), `control` is an
+#'   *optional* `list()` or [stats::nls.control()] of convergence settings,
+#'   e.g. `control = list(maxiter = 200)`. Values override the internal
+#'   defaults (`maxiter = 500`, `warnOnly = TRUE` for bounded `"port"` fits).
+#'   Applied globally to every channel and interval. `warnOnly = FALSE` turns
+#'   a non-converged bounded fit into a fit failure (`NA` coefficients with a
+#'   warning).
 #' @param fraction **response_time**: A numeric vector of values in the range
 #'   `[0, 1]` specifying the fractional response amplitude(s) to detect.
 #'   Defaults to `0.5` (50% response, i.e. half-response time). Multiple
@@ -222,7 +230,8 @@
 #'   ignored.
 #'
 #' `start_time`, `direction`, and `end_window` are per-channel capable, along
-#' with the `method`-specific arguments. `fix` is itself a named `list()` of
+#' with the `method`-specific arguments except `control`, which is always
+#' global. `fix` is itself a named `list()` of
 #' model parameters, so a per-channel `fix` is supplied as a `list()` of
 #' `list()`s keyed by channel name. A plain parameter list applies to every
 #' channel:
@@ -722,10 +731,11 @@ analyse_kinetics.monoexponential <- function(
     use_TD = TRUE,
     fix = NULL
 ) {
-    ## TODO: pass additional stats::nls() args
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## nls() convergence settings ride in `...`
+    control <- list(...)$control
     return(analyse_kinetics_intervals(
         data,
         "monoexponential",
@@ -762,10 +772,11 @@ analyse_kinetics.biexponential <- function(
     TD_flex = 2,
     A_flex = NULL
 ) {
-    ## TODO: pass additional stats::nls() args
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## nls() convergence settings ride in `...`
+    control <- list(...)$control
     ## unsupported fits fall back down the chain in `kinetics_fallbacks`;
     ## the undocumented `model_fallback = FALSE` keeps the raw fit for
     ## troubleshooting. `tau_flex`, `TD_flex`, `A_flex` are the stage-2
@@ -806,10 +817,11 @@ analyse_kinetics.exponential_drift <- function(
     tau_mult = 3,
     fix = NULL
 ) {
-    ## TODO: pass additional stats::nls() args
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## nls() convergence settings ride in `...`
+    control <- list(...)$control
     ## an unsupported drift falls back to the monoexponential (see
     ## `kinetics_fallbacks`); the undocumented `model_fallback = FALSE`
     ## keeps the raw fit
@@ -847,10 +859,11 @@ analyse_kinetics.sigmoidal <- function(
     shape = c("symmetric", "gompertz", "gompertz_left"),
     fix = NULL
 ) {
-    ## TODO: pass additional stats::nls() args
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
     }
+    ## nls() convergence settings ride in `...`
+    control <- list(...)$control
     return(analyse_kinetics_intervals(
         data,
         "sigmoidal",

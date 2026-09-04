@@ -405,6 +405,7 @@ SSbiexponential <- selfStart(
 #'   residual standard deviation.
 #' @inheritParams validate_mnirs
 #' @inheritParams analyse_kinetics
+#' @inheritParams analyse_monoexponential
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
 #'   `nirs_channels`, `A`, `B`, `TD`, `tau`, `MRT`, `texc`, `B2`, `tau2`,
@@ -436,6 +437,7 @@ analyse_biexponential <- function(
     tau_flex = 1 / 3,
     TD_flex = 2,
     A_flex = NULL,
+    control = NULL,
     env = rlang::caller_env()
 ) {
     ## validation ==================================================
@@ -451,8 +453,8 @@ analyse_biexponential <- function(
         enquo(time_channel),
         # fmt: skip
         arg_list = mget(c(
-            "use_TD", "fix", "start_time", "direction", "end_window",
-            "tau_flex", "TD_flex", "A_flex"
+            "use_TD", "fix", "control", "start_time", "direction",
+            "end_window", "tau_flex", "TD_flex", "A_flex"
         )),
         choices = list(direction = c("auto", "positive", "negative")),
         ## TD is only fixable where that channel fits the 6-parameter model
@@ -584,7 +586,8 @@ analyse_biexponential <- function(
                     algorithm = "port",
                     lower = lower[free],
                     upper = upper[free],
-                    control = stats::nls.control(
+                    control = fit_control(
+                        .a$control,
                         maxiter = 500L,
                         warnOnly = TRUE
                     )
