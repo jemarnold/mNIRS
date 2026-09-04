@@ -66,7 +66,7 @@
 #'   `col_n`, where `n` is the ordered column number in the file (e.g.
 #'   `col_6`). *Artinis Oxysoft* files are an exception to this renaming
 #'   convention. See *Artinis Oxysoft exports* below).
-#' 
+#'
 #' ## Renaming channels
 #' All `channels` can be renamed with a named character vector in the form
 #' `c(renamed = "original_name")`. The `"original_name"` must match
@@ -112,7 +112,7 @@
 #' `time_channel`. When irregular time sampling is detected, the estimated
 #' median `sample_rate` will be approximated as common known recording rate
 #' (e.g. an estimated rate of `11` may be rounded to `10 Hz`).
-#' 
+#'
 #' If `time_channel` is specified as a sample index (e.g.
 #' *Artinis Oxysoft "sample"* or *PIONIRS "Iterations"*), `sample_rate` will
 #' be mis-estimated as `1 Hz`. `sample_rate` should be specified explicitly in

@@ -11,10 +11,12 @@
 
 \item{fitted}{Logical. Default is \code{TRUE}; overlays a dashed fitted curve for
 parametric methods (\code{"peak_slope"}, \code{"monoexponential"},
-\code{"biexponential"}, \code{"sigmoidal"}). \code{"response_time"} has no fitted curve.}
+\code{"biexponential"}, \code{"sigmoidal"}) in a darker shade of the channel
+colour. \code{"response_time"} has no fitted curve.}
 
 \item{markers}{Logical. Default is \code{TRUE}; draws a dotted vertical line at
-the response onset (\code{start_time}) and key coefficient points.}
+the response onset (\code{start_time}) and key coefficient points in a darker
+shade of the channel colour.}
 
 \item{labels}{Logical. Default is \code{TRUE}; annotates each panel with the key
 coefficient value(s) for the fitted method.}

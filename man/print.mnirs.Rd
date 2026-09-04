@@ -9,7 +9,8 @@
 \arguments{
 \item{x}{Object of class \code{"mnirs"}.}
 
-\item{...}{Additional arguments passed to \code{\link[=print]{print()}}.}
+\item{...}{Additional arguments passed to \code{\link[=print]{print()}} methods of \code{x} or
+each list element, e.g. \code{n} rows for \link[tibble:tibble-package]{tibbles}.}
 }
 \value{
 \item{\code{print}}{Returns \code{x} without class attributes.}

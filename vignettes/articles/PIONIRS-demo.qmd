@@ -1,12 +1,14 @@
 ---
 title: "Reading PIONIRS data with mnirs"
 author:
-    - name: "Jem Arnold  [{{< fa brands github >}}](https://github.com/jemarnold/mnirs) [{{< fa brands bluesky >}}](https://bsky.app/profile/jemarnold.bsky.social) [{{< ai researchgate >}}](https://researchgate.net/profile/Jem-Arnold) [{{< ai orcid >}}](https://orcid.org/0000-0003-3908-9447)"
+    - name: "Jem Arnold  [{{< fa brands github >}}](https://github.com/jemarnold/mnirs){target=\"_blank\"} [{{< fa brands bluesky >}}](https://bsky.app/profile/jemarnold.bsky.social){target=\"_blank\"} [{{< ai researchgate >}}](https://researchgate.net/profile/Jem-Arnold){target=\"_blank\"} [{{< ai orcid >}}](https://orcid.org/0000-0003-3908-9447){target=\"_blank\"}"
 date: last-modified
 format:
     html:
         embed-resources: true
         toc: true
+        link-external-newwindow: true
+        link-external-icon: true
 csl: ../apa.csl
 knitr:
     opts_chunk:
@@ -24,7 +26,7 @@ knitr:
 *{mnirs}* can now read *PIONIRS NIRSBOX* `.ftn` and `.ftn2` file exports directly with `read_mnirs()`. This article demonstrates reading both file types and running a short processing and analysis pipeline on an arterial occlusion recording.
 
 ::: {.callout-note}
-This article assumes basic familiarity with the *{mnirs}* package. See [*Reading and Cleaning Data with mnirs*](https://jemarnold.github.io/mnirs/articles/reading-mnirs-data.html) for an overview.
+This article assumes basic familiarity with the *{mnirs}* package. See [*Reading and Cleaning Data with mnirs*](https://jemarnold.github.io/mnirs/articles/reading-mnirs-data.html){target="_blank"} for an overview.
 :::
 
 
@@ -56,9 +58,9 @@ When automatically detecting a known NIRS device file format, all columns are re
 ```{r}
 #| label: read ftn2
 
-df_sto2 <- read_mnirs(
-    file_path = PIONIRS_ftn2,
-)
+## read an example file with no additional parameters
+## file paths are hidden for this example
+df_sto2 <- read_mnirs(PIONIRS_ftn2)
 
 print(df_sto2, n = 5)
 ```
@@ -111,7 +113,12 @@ df_raw <- read_mnirs(
 ) |> 
     filter_mnirs(method = "butterworth", order = 2, fc = 0.05)
 
-plot(df_raw)
+plot(df_raw) + 
+    geom_vline(
+        data = subset(df_raw, !is.na(labels)),
+        aes(xintercept = time), 
+        linetype = "dotted"
+    )
 ```
 
 
@@ -135,11 +142,11 @@ plot(df_corr)
 
 ## Extract deoxygenation & reoxygenation intervals
 
-`extract_intervals()` locates the labels *"Occlusion start"* and *"Recovery"*. A timespan (in units of `time_channel`) can be defined around each detected event, to return the desired interval lengths.
+`extract_intervals()` can locate the labels *"Occlusion start"* and *"Recovery"*. an `end` value can also be specified, or a timespan (in units of `time_channel`) can be defined around each detected event label, to return the desired interval lengths.
 
-*mV̇O<sub>2</sub>* kinetics can be estimated from the peak 60-sec linear slope during the occlusion deoxygenation (*"slope 1"* is typically taken near the start, but we can let the analysis freely find the peak slope).
+O<sub>2</sub> extraction or rate of *mV̇O<sub>2</sub>* can be estimated from the peak 120-sec linear slope during the occlusion deoxygenation (*"slope 1"*).
 
-Reoxygenation kinetics are typically estimated as the peak 10-sec slope during reoxygenation (*"slope 2"*), or by a monoexponential function. We will extract the full reoxygenation and hyperaemia phase for analysis.
+Reoxygenation kinetics or *microvascular responsiveness* is typically estimated as the peak 10-sec slope after occlusion (*"slope 2"*), or with a monoexponential model. We will extract the full reoxygenation and hyperaemia phase for analysis.
 
 We will isolate the *"deoxy[haem]"* channel to analyse, since *"hhb"* and *"o2hb"* are now mirror images of each other.
 
@@ -157,29 +164,35 @@ print(df_list, n = 5)
 ```
 
 
-# Analyse kinetics
+# Analyse microvascular responsiveness
 
 ## Peak linear regression slope
 
 `analyse_kinetics(method = "peak_slope")` fits a rolling linear regression algorithm across the full interval, and returns the greatest (positive or negative, depending on direction) slope centred within the specified time `span`.
 
+We can specify different `span` parameter for each interval with a named `list()`.
+
 ```{r}
 #| label: peak_slope
 
 result_deoxy <- analyse_kinetics(
-    df_list[1],
+    df_list,
     method = "peak_slope",
-    span   = 60
+    span   = list(interval_1 = 120, interval_2 = 10)
 ) |>
     print()
 
-plot(result_deoxy, time_labels = TRUE)
+plot(result_deoxy)
 ```
 
 
+# Analyse reoxygenation kinetics
+
+Now let's look at some of the more advanced kinetics analysis methods we can fit during the reoxygenation and hyperaemia window.
+
 ## Monoexponential
 
-`method = "monoexponential"` fits an exponential curve to the data. `end_window = 30` ends the fit at the first peak or trough (depending on direction) with no more extreme values within 30 sec, avoiding the post-hyperaemic decay toward baseline, which biases the time constant coefficient returned from an exponential fit.
+`method = "monoexponential"` fits an exponential curve to the data. `end_window = 30` dynamically ends the fitting window at the first peak or trough (depending on direction) with no more extreme values within 30 sec, avoiding the post-hyperaemic decay toward baseline which is non-asymptotic and would bias the monoexponential time constant coefficient.
 
 ```{r}
 #| label: monoexponential
@@ -187,19 +200,19 @@ plot(result_deoxy, time_labels = TRUE)
 result_monoexp <- analyse_kinetics(
     df_list[2],
     method     = "monoexponential",
-    end_window = 30
+    end_window = 30  ## includes 30-sec after the first local extrema
 ) |>
     print()
 
 plot(result_monoexp, time_labels = TRUE)
 ```
 
-However, with experimental kinetics analysis methods (still under development and not yet validated), we can avoid this potential for parameterisation bias by modelling the hyperaemic drift as a secondary linear slope component in a two-phase *"exponential-linear"* kinetics response.
+With experimental kinetics analysis methods (still under development and not yet validated), we can avoid this potential for coefficient bias by modelling the hyperaemic drift as a secondary linear slope component in a two-phase *"exponential-linear"* kinetics response.
 
 
 ## Exponential-drift
 
-`method = "exponential_drift"` (or `"exponential_linear"`) fits a linear slope term after the primary monoexponential response, to separate the fast reoxygenation phase from the slow hyperaemic recovery.
+`method = "exponential_drift"` (or `"exponential_linear"`) fits a linear slope term after the primary monoexponential response, to separate the fast reoxygenation phase from the slow hyperaemic drift.
 
 ```{r}
 #| label: exponential drift
@@ -207,7 +220,7 @@ However, with experimental kinetics analysis methods (still under development an
 result_drift <- analyse_kinetics(
     df_list[2],
     method     = "exponential_drift",
-    end_window = 180
+    end_window = 180  ## includes more of the hyperaemic response
 ) |>
     print()
 
@@ -217,7 +230,7 @@ plot(result_drift, time_labels = TRUE)
 
 ## Biexponential
 
-`method = "biexponential"` is another experimental method which fits a two-phase response with overlapping monoexponential curves.
+`method = "biexponential"` is another experimental method which fits a two-phase response with overlapping fast and slow monoexponential curves.
 
 ```{r}
 #| label: biexponential
@@ -225,6 +238,7 @@ plot(result_drift, time_labels = TRUE)
 result_biexp <- analyse_kinetics(
     df_list[2],
     method = "biexponential"
+    ## `end_window = Inf` by default; fitting to the full data available
 ) |>
     print()
 
@@ -238,7 +252,9 @@ Fit diagnostics are stored in `results$diagnostics` and can be used to statistic
 
 Information criteria (`aic`, `aicc`, `bic`) can be used to compare between models with different numbers of parameters (`n_params`). Lower values represent statistically "better" fitting models, after penalising extra parameters (each criterion uses slightly different weights and may disagree on marginal differences).
 
-However, in this case, because each model is fit on a different number of samples (`n_obs`) in addition to parameters, the information criteria cannot be used to statistically conclude better fit. The other model diagnostics can be used as qualitative comparators, and the "best" model can be chosen based on physiological expectations, experimental design, and established validity.
+However, in this case, because each model is fit on a different number of samples (`n_obs`) in addition to parameters, the information criteria *cannot* be used to statistically conclude better fit.
+
+The other model diagnostics can be used as qualitative comparators, and the "best" model can be chosen based on physiological expectations, experimental design, and established validity.
 
 ::: {.callout-caution}
 Two-phase **Exponential-drift** and **Biexponential** kinetics are currently experimental methods and have not yet been validated.
@@ -259,4 +275,4 @@ In this example, `r2`, `rmse`, and `snr` (signal-to-noise ratio) suggest that th
 
 # Acknowledgements
 
-Thanks to *Marianna Neri*, *Dr. Simone Porcelli*, and the developers at *PIONIRS* for providing access to these example files to allow me to integrate this excellent device into *{mnirs}*.
+Thanks to *Marianna Neri*, [*Dr. Simone Porcelli*](https://medicinamolecolare.dip.unipv.it/en/research/research-teams-and-topics/human-physiology/human-integrative-physology-exercise-simone){target="_blank"}, and the developers at [*PIONIRS*](https://www.pionirs.com/wp/){target="_blank"} for providing access to these example files to allow me to integrate this excellent device into *{mnirs}*.

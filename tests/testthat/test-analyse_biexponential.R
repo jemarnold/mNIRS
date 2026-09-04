@@ -1026,7 +1026,10 @@ create_monotonic_data <- function(seed = 7, TD = NULL, t = 0:119) {
 ## fast drop then a linear recovery: a slow phase no record can resolve
 create_linear_tail_data <- function(seed = 5, t = 0:119) {
     set.seed(seed)
-    x <- exponential_drift(t, A = 70, B = 40, tau = 5, slope = 0.1, tau_mult = 3) +
+    # fmt: skip
+    x <- exponential_drift(
+        t, A = 70, B = 40, tau = 5, slope = 0.1, tau_mult = 3
+    ) +
         rnorm(length(t), 0, 0.3)
     create_mnirs_data(
         data.frame(time = t, smo2 = x),

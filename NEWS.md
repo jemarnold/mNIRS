@@ -7,7 +7,7 @@
 
     * *"(Sample number)"* becomes *"sample"* with a derived *"time"* column as previously.
     
-    * *"(Event)"* becomes *"event"* and is set as `event_channel`, and the trailing un-numbered event label column becomes *"labels"* (still has to be explicitly called as e.g. `event_channel = c(labels = "col_6")`).
+    * *"(Event)"* becomes *"event"* and is set as `event_channel`, and the trailing un-numbered event label column becomes *"labels"* (can be explicitly renamed by either: `event_channel = c(labels = "col_6")` or `c(labels = "labels")`).
 
     * All other channels in the legend are renamed and returned as `nirs_channels`, with clean, lower case names (e.g. *"Rx1 - Tx1 O2Hb"* renamed as *"rx1_tx1_o2hb"*).
     
