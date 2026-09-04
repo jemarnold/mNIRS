@@ -43,7 +43,7 @@
 #'
 #' The expected response is a *fast* excursion toward a minimum or maximum
 #' short of `B`, followed by a *slow* recovery back to a stable plateau at
-#' `B2`. The turning point occurs where the two phase rates cancel:
+#' `B2`. The excursion point occurs where the two phase rates cancel:
 #' `texc = TD + log(r) / (1 / tau - 1 / tau2)` with
 #' `ratio = -(B - A) * tau2 / ((B2 - B) * tau)`, which exists only when
 #' the amplitudes oppose in sign and the fast phase dominates at the onset
@@ -96,7 +96,7 @@ biexponential <- function(t, A, B, tau, B2, tau2, TD = NULL) {
 }
 
 
-## time of the curve turning point, elapsed from the fit origin; NA when
+## time of the curve excursion point, elapsed from the fit origin; NA when
 ## the amplitudes share a sign or the slow phase dominates from the onset
 ## (monotonic response), or the time constants coincide
 biexp_texc <- function(A, B, tau, B2, tau2, TD = NULL) {
@@ -603,7 +603,7 @@ analyse_biexponential <- function(
         ## fast-phase mean response time, as for the monoexponential
         MRT_val <- sum(TD_arg, coefs[["tau"]])
 
-        ## excursion time (texc) is the fitted turning point, reported
+        ## excursion time (texc) is the fitted excursion point, reported
         ## elapsed from start_time, mirroring MRT = TD + tau; NA when the
         ## fitted response is monotonic
         texc_val <- biexp_texc(

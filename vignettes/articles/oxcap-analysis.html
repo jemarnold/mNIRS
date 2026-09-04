@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Jem Arnold">
-<meta name="dcterms.date" content="2026-09-02">
+<meta name="dcterms.date" content="2026-09-03">
 
 <title>Analysing muscle oxidative capacity with {mnirs}</title>
 <style>
@@ -2299,7 +2299,7 @@ vertical-align: -.125em;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">September 2, 2026</p>
+      <p class="date">September 3, 2026</p>
     </div>
   </div>
   
@@ -2781,11 +2781,11 @@ Our <code>slope_results</code> has one sample per occlusion, so <code>list(trial
 <li><code>method = &quot;exponential_drift&quot;</code></li>
 </ul>
 <p>The <strong>exponential-drift</strong> method is a <em>parametric</em> two-phase approach: it fits a monoexponential primary response with a secondary linear drift beginning near the primary asymptote, with <code>stats::nls()</code> and <code>SSexponential_drift()</code>. <em>A</em>, <em>B</em>, <em>tau</em>, and the derived <em>k</em>, <em>MRT</em>, and <em>HRT</em> are interpreted the same as for <em>“monoexponential”</em> above. The additional <em>slope</em> coefficient is the linear drift rate (in response units per unit <code>time_channel</code>).</p>
-<p>It fits a <strong>5-parameter</strong> model <code>A + (B − A)(1 − exp(−t / tau)) + slope × max(t − texc, 0)</code>, or a <strong>6-parameter</strong> model adding a time delay <em>TD</em>.</p>
+<p>It fits a <strong>5-parameter</strong> model <code>A + (B − A)(1 − exp(−t / tau)) + slope × max(t − tau_mult × tau, 0)</code>, or a <strong>6-parameter</strong> model adding a time delay <em>TD</em>.</p>
 <p>A slow drift in mV̇O<sub>2</sub> after the primary recovery is physiologically plausible, e.g. from post-occlusion reactive hyperaemia or a slow-component shift in resting metabolic demand. Separating it from the primary response means the exponential phase is no longer forced to absorb the drift into its asymptote. See <code>?exponential_drift</code> and <code>?SSexponential_drift</code> for details.</p>
 <ul>
-<li><p><code>tau_mult</code> (determines where the drift begins at the excursion point; <em>texc</em>)</p>
-<p>The drift onset is not a fitted parameter. It is estimated at a fixed multiple of <em>tau</em> after <em>TD</em>, reported as the excursion point <code>texc = TD + tau_mult × tau</code>. Before <em>texc</em>, the drift term is considered to be zero.<br>
+<li><p><code>tau_mult</code> (determines where the drift begins)</p>
+<p>The drift onset occurs at a fixed multiple of <em>tau</em> after <em>TD</em>, <code>TD + tau_mult × tau</code>. Before the onset, the drift term is considered to be zero. The reported excursion point <em>texc</em> is where the secondary drift rate overtakes the decaying primary rate (the turning point of the curve when the two phases oppose).<br>
 <br>
 The default <code>tau_mult = 3</code> places drift onset at ~95% of the primary amplitude, i.e. where the primary response is effectively complete. It can be manually adjusted, but smaller multiples allow the drift response to encroach on and absorb more of the primary response, biasing the more physiologically relevant <em>tau</em> estimate. We will leave it at the default.</p></li>
 </ul>

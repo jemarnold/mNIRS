@@ -17,16 +17,16 @@ correct_blood_volume(
 and metadata, a list of data frames, or a grouped data frame (see
 \emph{Details}).}
 
-\item{oxy_channel}{A character string naming the \code{oxy[haem]} (oxygenated
-haemoglobin and myoglobin, \emph{O2Hb}) column in \code{data}. Must match exactly.}
+\item{oxy_channel}{A character vector naming the \code{oxy[haem]} (oxygenated
+haemoglobin and myoglobin; \emph{O2Hb}) column(s) in \code{data}. Must match exactly.}
 
-\item{deoxy_channel}{A character string naming the \code{deoxy[haem]}
-(deoxygenated haemoglobin and myoglobin, \emph{HHb}) column in \code{data}. Must
-match exactly.}
-
-\item{total_channel}{A character string naming the \code{total[haem]} (total
-haemoglobin and myoglobin, \emph{THb}; proxy for blood volume) column in \code{data}.
+\item{deoxy_channel}{A character vector naming the \code{deoxy[haem]}
+(deoxygenated haemoglobin and myoglobin; \emph{HHb}) column(s) in \code{data}.
 Must match exactly.}
+
+\item{total_channel}{A character vector naming the \code{total[haem]} (total
+haemoglobin and myoglobin; \emph{THb}; proxy for blood volume) column(s) in
+\code{data}. Must match exactly.}
 
 \item{verbose}{Logical. \code{TRUE} (\emph{default}) will display, and \code{FALSE} will
 silence warnings and information messages helpful for troubleshooting.
@@ -54,6 +54,10 @@ from the specified pair before the correction is applied.
 \item \code{oxy}   = \code{total - deoxy}
 \item \code{deoxy} = \code{total - oxy}
 }
+
+Multiple channel pairs can be corrected in one call by passing equal-length
+vectors, with each element number forming a pair (e.g.
+\verb{oxy_channel = c(o2hb_1, o2hb_2), deoxy_channel = c(hhb_1, hhb_2)}).
 
 \emph{NOTE}: the returned data frame will \emph{ONLY} include corrected values for
 the specified channels. Non-specified channels will remain uncorrected and

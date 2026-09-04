@@ -324,7 +324,7 @@ test_that("analyse_biexponential() recovers known parameters", {
     expect_true(attr(result, "diagnostics")$r2 > 0.9)
 })
 
-test_that("analyse_biexponential() texc is the fitted turning point", {
+test_that("analyse_biexponential() texc is the fitted excursion point", {
     result <- analyse_biexponential(
         create_biexp_data(noise_sd = 0.3),
         nirs_channels = "smo2",
@@ -332,7 +332,7 @@ test_that("analyse_biexponential() texc is the fitted turning point", {
         verbose = FALSE
     )
 
-    ## texc_fitted is the model prediction at the fitted turning point
+    ## texc_fitted is the model prediction at the fitted excursion point
     expect_equal(
         result$texc_fitted,
         biexponential(
@@ -342,7 +342,7 @@ test_that("analyse_biexponential() texc is the fitted turning point", {
     )
     expect_true(result$texc > 0)
     expect_true(result$tau < result$tau2)
-    ## the turning point sits near the fitted-curve minimum
+    ## the excursion point sits near the fitted-curve minimum
     fitted <- attr(result, "fitted_data")$smo2$fitted
     expect_true(all.equal(result$texc_fitted, min(fitted), tolerance = 1,
         scale = 1))
@@ -374,7 +374,7 @@ test_that("analyse_biexponential() reports tau <= tau2", {
 
 test_that("analyse_biexponential() reports NA texc for a monotonic fit", {
     ## B between A and B2: the fitted curve is monotonic, so there is no
-    ## interior turning point
+    ## interior excursion point
     set.seed(7)
     t <- 0:120
     x <- biexponential(t, A = 70, B = 55, tau = 5, B2 = 40, tau2 = 40) +
@@ -1010,7 +1010,7 @@ test_that("analyse_kinetics() passes fix to the biexponential method", {
 
 ## model fallback chain =============================================
 
-## monotonic two-phase response: B between A and B2, no turning point
+## monotonic two-phase response: B between A and B2, no excursion point
 create_monotonic_data <- function(seed = 7, TD = NULL, t = 0:119) {
     set.seed(seed)
     x <- biexponential(t, A = 70, B = 55, tau = 5, B2 = 40, tau2 = 40, TD) +

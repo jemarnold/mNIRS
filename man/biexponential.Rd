@@ -59,7 +59,7 @@ as \code{t} grows, and is smooth throughout.
 
 The expected response is a \emph{fast} excursion toward a minimum or maximum
 short of \code{B}, followed by a \emph{slow} recovery back to a stable plateau at
-\code{B2}. The turning point occurs where the two phase rates cancel:
+\code{B2}. The excursion point occurs where the two phase rates cancel:
 \code{texc = TD + log(r) / (1 / tau - 1 / tau2)} with
 \code{ratio = -(B - A) * tau2 / ((B2 - B) * tau)}, which exists only when
 the amplitudes oppose in sign and the fast phase dominates at the onset

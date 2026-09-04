@@ -7,8 +7,7 @@
 #'   of the secondary phase, in response units per unit of the predictor
 #'   variable `t`.
 #' @param tau_mult A numeric multiple of `tau` after `TD` at which the linear
-#'   drift begins: excursion point; `texc = TD + tau_mult * tau` (`TD = 0`
-#'   when absent).
+#'   drift begins: drift onset `TD + tau_mult * tau` (`TD = 0` when absent).
 #' @inheritParams monoexponential
 #'
 #' @details
@@ -20,8 +19,8 @@
 #' slope * pmax(t - TD - tau_mult * tau, 0)`
 #'
 #' The primary phase is a [monoexponential()] response toward the asymptote
-#' `B`. The secondary linear drift is exactly zero before
-#' `texc = TD + tau_mult * tau`.
+#' `B`. The secondary linear drift is exactly zero before the onset
+#' `TD + tau_mult * tau`.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -62,9 +61,9 @@
 #' @export
 exponential_drift <- function(t, A, B, tau, slope, tau_mult, TD = NULL) {
     ## primary monoexponential phase + hinge-linear secondary drift from
-    ## the excursion point texc = TD + tau_mult * tau
-    texc <- sum(TD, tau_mult * tau)
-    return(monoexponential(t, A, B, tau, TD) + slope * pmax(t - texc, 0))
+    ## the onset TD + tau_mult * tau
+    onset <- sum(TD, tau_mult * tau)
+    return(monoexponential(t, A, B, tau, TD) + slope * pmax(t - onset, 0))
 }
 
 
@@ -182,15 +181,15 @@ expdrift_model <- function(t, A, B, tau, slope, tau_mult, TD = NULL) {
     has_TD <- !is.null(TD)
     ts <- if (has_TD) pmax(t - TD, 0) else t
     e <- exp(-ts / tau)
-    texc <- sum(TD, tau_mult * tau)
-    h <- pmax(t - texc, 0)
+    onset <- sum(TD, tau_mult * tau)
+    h <- pmax(t - onset, 0)
     val <- A + (B - A) * (1 - e) + slope * h
     free <- free_params(
         match.call(),
         c("A", "B", "tau", "slope", "tau_mult", if (has_TD) "TD")
     )
     if (length(free) > 0L) {
-        on <- t > texc
+        on <- t > onset
         grad <- cbind(
             A = e,
             B = 1 - e,
@@ -225,7 +224,7 @@ expdrift_model <- function(t, A, B, tau, slope, tau_mult, TD = NULL) {
 #' 6-parameter model:
 #' `x ~ SSexponential_drift(t, A, B, tau, slope, tau_mult, TD)`
 #'
-#' The hinge at `texc = TD + tau_mult * tau` is not differentiable, so
+#' The hinge at the drift onset `TD + tau_mult * tau` is not differentiable, so
 #' `algorithm = "port"` with `tau` (and `TD`) bounded non-negative and
 #' `control = nls.control(warnOnly = TRUE)` is recommended.
 #'
@@ -292,7 +291,7 @@ SSexponential_drift <- selfStart(
 #'   fails, or if `use_TD = FALSE`, attempts to fit a reduced 5-parameter
 #'   model without `TD`.
 #' @param tau_mult A numeric multiple of `tau` after `TD` at which the drift
-#'   onset is held (`texc = TD + tau_mult * tau`; default is `3`,
+#'   onset is held (`TD + tau_mult * tau`; default is `3`,
 #'   ~95% of the primary amplitude). Applied to every channel, or
 #'   per-channel as a list keyed by channel name, e.g.
 #'   `tau_mult = list(smo2 = 2)`.
@@ -307,7 +306,9 @@ SSexponential_drift <- selfStart(
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
 #'   `nirs_channels`, `A`, `B`, `TD`, `tau`, `k`, `MRT`, `HRT`, `texc`,
-#'   `slope`, `tau_mult`, `MRT_fitted`, `HRT_fitted`, `texc_fitted`.
+#'   `slope`, `tau_mult`, `MRT_fitted`, `HRT_fitted`, `texc_fitted`. `texc`
+#'   is the excursion point where the drift rate overtakes the decaying
+#'   primary rate, never before the drift onset `TD + tau_mult * tau`.
 #'   Per-channel metadata are attached as attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
 #'     where fitting failed.
@@ -464,7 +465,16 @@ analyse_exponential_drift <- function(
         TD_arg <- if ("TD" %in% params) coefs[["TD"]] else NULL
         MRT_val <- sum(TD_arg, coefs[["tau"]])
         HRT_val <- sum(TD_arg, coefs[["tau"]] * log(2))
-        texc_val <- sum(TD_arg, coefs[["tau_mult"]] * coefs[["tau"]])
+        ## excursion point: where the drift rate overtakes the decaying
+        ## primary rate, |B - A| / tau * exp(-(t - TD) / tau) = |slope|; the
+        ## turning point when the phases oppose. never before the drift
+        ## onset TD + tau_mult * tau
+        r <- abs(coefs[["B"]] - coefs[["A"]]) /
+            (abs(coefs[["slope"]]) * coefs[["tau"]])
+        texc_val <- sum(
+            TD_arg,
+            coefs[["tau"]] * max(coefs[["tau_mult"]], log(r)[is.finite(r)])
+        )
 
         ## predict response at MRT, HRT, and texc using the full fitted model
         fitted_params <- exponential_drift(

@@ -117,10 +117,12 @@ kinetics_fallbacks <- list(
         fix_keep = c("A", "B", "tau", "TD"),
         args = list(),
         trigger = \(cf, rmse, span, t_end) {
+            ## drift amplitude over the record from the drift onset
+            onset <- sum(cf$TD[is.finite(cf$TD)], cf$tau_mult * cf$tau)
             first_reason(
                 "Fit failed." = is.na(cf$A),
                 "Drift amplitude is below 2 RMSE." = !is.finite(cf$slope) ||
-                    abs(cf$slope) * (t_end - cf$texc) < fallback_gate * rmse
+                    abs(cf$slope) * (t_end - onset) < fallback_gate * rmse
             )
         }
     )

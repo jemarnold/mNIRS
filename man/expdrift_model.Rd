@@ -23,8 +23,7 @@ of the secondary phase, in response units per unit of the predictor
 variable \code{t}.}
 
 \item{tau_mult}{A numeric multiple of \code{tau} after \code{TD} at which the linear
-drift begins: excursion point; \code{texc = TD + tau_mult * tau} (\code{TD = 0}
-when absent).}
+drift begins: drift onset \code{TD + tau_mult * tau} (\code{TD = 0} when absent).}
 
 \item{TD}{A numeric parameter for the time delay before the onset of
 exponential response, in units of the predictor variable \code{t}. If \code{NULL}

@@ -315,7 +315,7 @@ analyse_kinetics(
 - **`"peak_slope"`**: `width` XOR `span`; `align` (`"centre"`/`"left"`/`"right"`); `partial`, `na.rm` (default `FALSE`).
 - **`"monoexponential"`**: `use_TD` (default `TRUE`; 4-param → 3-param fallback), `fix`.
 - **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `fix`. Sequential fit: fast monoexp on `end_window` window (`Inf` → first extreme + 20 time units) → full biexp with `A`/`tau`/`TD` held near stage-1 values, `B`/`B2`/`tau2` free. Falls back (warning; `model` column) to exp_drift → monoexp on fit failure, monotonic `texc`, `tau2 >= 2 × span`, or `|B2 - B| < 2 × rmse`. Coef columns = union of the chain (`NA` where n/a). Undocumented `model_fallback = FALSE` keeps raw fit.
-- **`"exponential_drift"`**: `use_TD`, `tau_mult` (default `3`; drift onset `texc = TD + tau_mult * tau`, always held constant), `fix`. Falls back to monoexp on fit failure or `|slope| × (t_end - texc) < 2 × rmse` (`model` column; `model_fallback = FALSE` keeps raw fit).
+- **`"exponential_drift"`**: `use_TD`, `tau_mult` (default `3`; drift onset `TD + tau_mult * tau`, always held constant), `fix`. `texc` = takeover point `max(onset, TD + tau × log(|B - A| / (|slope| × tau)))` (turning point when phases oppose). Falls back to monoexp on fit failure or `|slope| × (t_end - onset) < 2 × rmse` (`model` column; `model_fallback = FALSE` keeps raw fit).
 - **`"sigmoidal"`**: `shape` (`"symmetric"` default = `SSlogistic()`; `"gompertz"` early-inflection (right); `"gompertz_left"` late-inflection), `fix`.
 
 Per-channel overrides via inline named `list()` (names must match `nirs_channels`):
@@ -372,8 +372,8 @@ Times are elapsed from `start_time`; `*_fitted` = predicted value at that point.
 | `"response_time"` | `fraction` (one row per value), `A` baseline mean, `B` extreme (peak/trough) value, `response_time`, `response_value` (observed), `fitted` (target `A + (B-A)*fraction`), `idx` (sample/row number at `response_value`) |
 | `"peak_slope"` | `slope` (`x/t`), `intercept`, `fitted`, `peak_slope_time`, `idx` (sample/row number at `align` position) |
 | `"monoexponential"` | `A` baseline, `B` asymptote, `tau`, `k` (`1/tau`), `TD` delay (if `use_TD`), `MRT` (`TD+tau`), `HRT` (`TD+tau·ln2`), `MRT_fitted`, `HRT_fitted` |
-| `"biexponential"` | `A` start, `B` & `tau` fast component, `MRT` (`TD+tau`), `texc` (fitted turning point; `NA` if monotonic), `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `MRT_fitted`, `texc_fitted`; plus `model` and the exp_drift/monoexp columns (`NA` unless fallen back) |
-| `"exponential_drift"` | monoexp columns + `texc` (drift onset `TD + tau_mult·tau`), `slope` (`dx/dt`), `tau_mult`, `texc_fitted`; plus `model` |
+| `"biexponential"` | `A` start, `B` & `tau` fast component, `MRT` (`TD+tau`), `texc` (fitted excursion point; `NA` if monotonic), `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `MRT_fitted`, `texc_fitted`; plus `model` and the exp_drift/monoexp columns (`NA` unless fallen back) |
+| `"exponential_drift"` | monoexp columns + `texc` (excursion point where drift rate overtakes primary rate; ≥ drift onset `TD + tau_mult·tau`), `slope` (`dx/dt`), `tau_mult`, `texc_fitted`; plus `model` |
 | `"sigmoidal"` | `A` & `B` start + end asymptotes, `xmid` inflection time (only literally *"middle"* for `shape = "symmetric"`), `slope` (`dx/dt` at `xmid`), `xmid_fitted` |
 
 **Diagnostics:** `n_obs`, `n_params`, `r2`, `adj_r2`, `rmse`, `snr`, `cv_rmse`,
@@ -402,7 +402,7 @@ nls(x ~ SSmonoexponential(t, A, B, tau, TD), data = df)   # 3- or 4-param
 biexponential(t, A, B, tau, B2, tau2, TD = NULL)
 ## 5-param: A + (B-A)*(1 - exp(-t/tau)) + (B2-B)*(1 - exp(-t/tau2))
 ## 6-param: as above with ts = pmax(t - TD, 0) substituted for t
-## both phases clocked from onset; turning point
+## both phases clocked from onset; excursion point
 ## texc = TD + log(r)/(1/tau - 1/tau2), r = -(B-A)*tau2/((B2-B)*tau), NA if r <= 1
 nls(x ~ SSbiexponential(t, A, B, tau, B2, tau2, TD), data = df,
     algorithm = "port", lower = c(-Inf, -Inf, 0, -Inf, 0, 0))   # 5- or 6-param

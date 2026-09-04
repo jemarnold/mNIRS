@@ -2345,7 +2345,7 @@ test_that("analyse_kinetics.monoexponential names only the failing interval", {
 
 ## analyse_kinetics.exponential_drift ==================================
 ## helper: create exponential-drift test data with known parameters; the
-## drift starts at texc = TD + tau_mult * tau = 37
+## drift starts at the onset TD + tau_mult * tau = 37
 create_expdrift_data <- function(
     A = 70,
     B = 40,
@@ -2478,7 +2478,8 @@ test_that("analyse_kinetics.exponential_drift passes tau_mult", {
     coefs <- result$coefficients
     expect_false("tau_mult" %in% names(coef(result$model[[1L]]$smo2)))
     expect_equal(coefs$tau_mult, 2)
-    expect_equal(coefs$texc, coefs$TD + 2 * coefs$tau)
+    ## texc is the turning point past the drift onset
+    expect_gt(coefs$texc, coefs$TD + 2 * coefs$tau)
 })
 
 ## analyse_kinetics.sigmoidal ============================================

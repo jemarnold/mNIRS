@@ -23,8 +23,7 @@ of the secondary phase, in response units per unit of the predictor
 variable \code{t}.}
 
 \item{tau_mult}{A numeric multiple of \code{tau} after \code{TD} at which the linear
-drift begins: excursion point; \code{texc = TD + tau_mult * tau} (\code{TD = 0}
-when absent).}
+drift begins: drift onset \code{TD + tau_mult * tau} (\code{TD = 0} when absent).}
 
 \item{TD}{A numeric parameter for the time delay before the onset of
 exponential response, in units of the predictor variable \code{t}. If \code{NULL}
@@ -46,8 +45,8 @@ secondary linear drift beginning near the asymptote.
 \code{A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) + slope * pmax(t - TD - tau_mult * tau, 0)}
 
 The primary phase is a \code{\link[=monoexponential]{monoexponential()}} response toward the asymptote
-\code{B}. The secondary linear drift is exactly zero before
-\code{texc = TD + tau_mult * tau}.
+\code{B}. The secondary linear drift is exactly zero before the onset
+\code{TD + tau_mult * tau}.
 }
 \examples{
 ## create an exponential curve with late linear drift and random noise

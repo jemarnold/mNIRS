@@ -1,20 +1,22 @@
 ## exponential_drift() ==============================================
-test_that("exponential_drift() is monoexponential before texc and linear after", {
+test_that("exponential_drift() is monoexponential before the onset and linear after", {
     t <- 0:120
-    texc <- 5 * 8
+    onset <- 5 * 8
     mono <- monoexponential(t, A = 70, B = 40, tau = 8)
     result <- exponential_drift(t, 70, 40, 8, slope = 0.05, tau_mult = 5)
 
-    ## the hinge is exactly zero before texc = tau_mult * tau
-    expect_equal(result[t <= texc], mono[t <= texc])
-    expect_equal(result[t > texc], mono[t > texc] + 0.05 * (t[t > texc] - texc))
+    ## the hinge is exactly zero before the onset tau_mult * tau
+    expect_equal(result[t <= onset], mono[t <= onset])
+    expect_equal(
+        result[t > onset], mono[t > onset] + 0.05 * (t[t > onset] - onset)
+    )
 
     ## TD form: flat at A before TD, hinge shifts by TD
     result_TD <- exponential_drift(t, 70, 40, 8, 0.05, 5, TD = 15)
     expect_true(all(result_TD[t < 15] == 70))
     expect_equal(
         result_TD,
-        monoexponential(t, 70, 40, 8, 15) + 0.05 * pmax(t - 15 - texc, 0)
+        monoexponential(t, 70, 40, 8, 15) + 0.05 * pmax(t - 15 - onset, 0)
     )
 
     ## no drift reduces to the monoexponential
@@ -119,7 +121,7 @@ test_that("SSexponential_drift() fits the 5-parameter form with a fixed A", {
 ## analyse_exponential_drift() ======================================
 
 ## helper: falling primary response with a late positive drift starting
-## at texc = TD + tau_mult * tau = 37
+## at the onset TD + tau_mult * tau = 37
 create_expdrift_data <- function(
     A = 70,
     B = 40,
@@ -189,6 +191,7 @@ test_that("analyse_exponential_drift() returns correct structure and recovers pa
     expect_equal(result$k, 1 / result$tau)
     expect_equal(result$MRT, result$TD + result$tau)
     expect_equal(result$HRT, result$TD + result$tau * log(2))
+    ## the drift takes over before the onset, so texc is the onset itself
     expect_equal(result$texc, result$TD + 4 * result$tau)
     fitted_at <- \(.t) {
         exponential_drift(
@@ -264,7 +267,16 @@ test_that("analyse_exponential_drift() tau_mult resolves per channel", {
         verbose = FALSE
     )
     expect_equal(result$tau_mult, c(2, 4))
-    expect_equal(result$texc, result$TD + c(2, 4) * result$tau)
+    ## texc is the turning point when past the onset (smo2), else the onset
+    takeover <- result$TD +
+        result$tau * log((result$A - result$B) / (result$slope * result$tau))
+    expect_equal(result$texc, pmax(result$TD + c(2, 4) * result$tau, takeover))
+    expect_gt(result$texc[[1L]], result$TD[[1L]] + 2 * result$tau[[1L]])
+    expect_true(all.equal(
+        result$texc_fitted[[1L]],
+        min(attr(result, "fitted_data")$smo2$fitted),
+        tolerance = 1, scale = 1
+    ))
     expect_equal(attr(result, "channel_args")$tau_mult, c(2, 4))
     expect_false("tau_mult" %in% names(coef(attr(result, "model")$smo2)))
 
@@ -276,6 +288,24 @@ test_that("analyse_exponential_drift() tau_mult resolves per channel", {
         verbose = FALSE
     )
     expect_equal(result_part$tau_mult, c(2, 3))
+})
+
+test_that("analyse_exponential_drift() texc is the takeover point of a monotonic drift", {
+    ## drift continues in the direction of the primary response: no turning
+    ## point, so texc is where the drift rate exceeds the primary rate
+    result <- analyse_exponential_drift(
+        create_expdrift_data(slope = -0.2),
+        nirs_channels = "smo2",
+        tau_mult = 2,
+        verbose = FALSE
+    )
+    expect_true(result$slope < 0)
+    expect_gt(result$texc, result$TD + 2 * result$tau)
+    expect_equal(
+        result$texc,
+        result$TD +
+            result$tau * log((result$A - result$B) / (-result$slope * result$tau))
+    )
 })
 
 test_that("analyse_exponential_drift() validates tau_mult", {
@@ -300,6 +330,8 @@ test_that("analyse_exponential_drift() fix holds parameters constant", {
     )
     expect_equal(result$slope, 0)
     expect_named(coef(attr(result, "model")$smo2), c("A", "B", "tau", "TD"))
+    ## no takeover without drift: texc is the onset
+    expect_equal(result$texc, result$TD + 3 * result$tau)
     expect_equal(
         result$texc_fitted,
         monoexponential(result$texc, result$A, result$B, result$tau, result$TD)

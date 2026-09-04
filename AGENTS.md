@@ -1,6 +1,6 @@
 ## Review package functionality
 
-- Review AGENTS files in `/inst/skills/` for package functionality overview.
+- Review AGENTS.md in `/inst/skills/` for package functionality overview.
 - Unit tests live in `tests/testthat/`.
 - Input validation lives in [R/validate_mnirs.R](R/validate_mnirs.R).
 - Roxygen2 with markdown enabled (`Roxygen: list(markdown = TRUE)`) commented with `#'`.

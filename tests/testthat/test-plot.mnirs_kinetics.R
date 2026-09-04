@@ -100,7 +100,7 @@ make_sigmoidal <- function(channels = "smo2", n = 60) {
     )
 }
 
-## monoexponential plus linear drift from texc = tau_mult * tau = 32 (per
+## monoexponential plus linear drift from the onset tau_mult * tau = 32 (per
 ## create_expdrift_data); no TD so the onset sits at t = 0
 make_expdrift <- function(channels = "smo2", n = 120) {
     set.seed(42)
@@ -620,7 +620,7 @@ test_that("components overlays the biexponential model terms", {
     expect_length(comp_layers(plot(x, markers = FALSE, labels = FALSE)), 0L)
 })
 
-test_that("components draws the exponential_drift drift line from texc", {
+test_that("components draws the exponential_drift drift line from the drift onset", {
     x <- kin_expdrift()
     p <- plot(x, components = TRUE, markers = FALSE, labels = FALSE)
     comps <- comp_layers(p)
@@ -630,11 +630,13 @@ test_that("components draws the exponential_drift drift line from texc", {
     d1 <- comps[[1L]]$data
     expect_equal(nrow(d1), sum(is.finite(x$data[[1]]$smo2_fitted)))
 
-    # drift term restricted to t >= texc, linear at the fitted slope
+    # drift term restricted to t >= the drift onset, linear at the fitted slope
     d2 <- comps[[2L]]$data
     expect_lt(nrow(d2), nrow(d1))
     t_rel <- d2$time - x$interval_times$start_times[[1L]]
-    expect_true(all(t_rel >= x$coefficients$texc))
+    cf <- x$coefficients
+    onset <- sum(cf$TD[is.finite(cf$TD)], cf$tau_mult * cf$tau)
+    expect_true(all(t_rel >= onset))
     expect_equal(diff(d2$comp2), rep(x$coefficients$slope, nrow(d2) - 1L))
 })
 

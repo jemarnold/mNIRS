@@ -23,8 +23,7 @@ of the secondary phase, in response units per unit of the predictor
 variable \code{t}.}
 
 \item{tau_mult}{A numeric multiple of \code{tau} after \code{TD} at which the linear
-drift begins: excursion point; \code{texc = TD + tau_mult * tau} (\code{TD = 0}
-when absent).}
+drift begins: drift onset \code{TD + tau_mult * tau} (\code{TD = 0} when absent).}
 
 \item{TD}{A numeric parameter for the time delay before the onset of
 exponential response, in units of the predictor variable \code{t}. If \code{NULL}
@@ -48,7 +47,7 @@ formula passed to \code{\link[stats:nls]{stats::nls()}}.
 6-parameter model:
 \code{x ~ SSexponential_drift(t, A, B, tau, slope, tau_mult, TD)}
 
-The hinge at \code{texc = TD + tau_mult * tau} is not differentiable, so
+The hinge at the drift onset \code{TD + tau_mult * tau} is not differentiable, so
 \code{algorithm = "port"} with \code{tau} (and \code{TD}) bounded non-negative and
 \code{control = nls.control(warnOnly = TRUE)} is recommended.
 

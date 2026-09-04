@@ -95,10 +95,10 @@
 #'   values. Specify per-channel as a list of lists keyed by channel name, e.g.
 #'   `fix = list(smo2 = list(A = 0))`. See *Details*.
 #' @param tau_mult **exponential_drift**: A numeric multiple of the time
-#'   constant after `TD` at which the linear drift begins
-#'   (`texc = TD + tau_mult * tau`). The default `3` (~95% of the primary
-#'   amplitude) is always held constant. Specify per-channel as a list keyed
-#'   by channel name, e.g. `tau_mult = list(smo2 = 2)`. See *Details*.
+#'   constant after `TD` at which the linear drift begins (drift onset
+#'   `TD + tau_mult * tau`). The default `3` (~95% of the primary amplitude)
+#'   is always held constant. Specify per-channel as a list keyed by channel
+#'   name, e.g. `tau_mult = list(smo2 = 2)`. See *Details*.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
 #'
@@ -347,8 +347,7 @@
 #' [SSbiexponential()]. A *fast* component (`B`, `tau`) drives the initial
 #' excursion while a concurrent *slow* component (`B2`, `tau2`), clocked
 #' from the same onset, recovers the response toward a stable plateau. The
-#' fitted turning point of the curve is reported as `texc` and
-#' `texc_fitted`.
+#' fitted excursion point of the curve is reported as `texc` and `texc_fitted`.
 #'
 #' Model equations:
 #'
@@ -385,7 +384,7 @@
 #' A channel falls back to the *"exponential_drift"* model (fit on the
 #' whole response, with `A`, `B`, `tau`, and `TD` carried over from
 #' `fix`) when the fit fails (e.g. phases not
-#' separable), the fitted response is monotonic (no turning point
+#' separable), the fitted response is monotonic (no excursion point
 #' `texc`), `tau2` exceeds twice the fitted time span (a slow phase the
 #' record cannot tell from a linear drift), or the slow-phase amplitude
 #' `|B2 - B|` is below twice the fit RMSE. The exponential-drift fit is
@@ -405,8 +404,7 @@
 #'
 #' A parametric approach fitting a two-phase curve using [stats::nls()] with
 #' [SSexponential_drift()]: a pure [monoexponential()] primary response plus
-#' a secondary linear drift beginning at the excursion point `texc` near the
-#' primary asymptote.
+#' a secondary linear drift beginning near the primary asymptote.
 #'
 #' Model equation:
 #'
@@ -415,18 +413,22 @@
 #'
 #' `A`, `B`, `tau`, `TD`, and the derived `k`, `MRT`, and `HRT` are as for
 #' *"monoexponential"*. `slope` is the linear drift rate `dx/dt`. The drift
-#' onset is not fitted: it is held at `tau_mult` multiples of `tau` after
-#' `TD` (*default* `3`; ~95% of the primary amplitude) and reported as the
-#' excursion point `texc = TD + tau_mult * tau` elapsed from `start_time`
-#' (the same frame as `TD` and `MRT`). Set `use_TD = TRUE` (*default*) to
-#' include the time-delay parameter `TD`.
+#' onset is fixed at `tau_mult` multiples of `tau` after `TD` (*default* `3`;
+#' ~95% of the primary amplitude). The excursion point `texc` is where the
+#' drift rate overtakes the decaying primary rate,
+#' `TD + tau * log(|B - A| / (|slope| * tau))`, floored at the drift onset:
+#' the excursion point of the curve when the phases oppose, or where the
+#' linear trend takes over a monotonic response. It is reported elapsed
+#' from `start_time` (the same frame as `TD` and `MRT`) with the fitted
+#' value `texc_fitted`. Set `use_TD = TRUE` (*default*) to include the
+#' time-delay parameter `TD`.
 #'
 #' The drift is kept only when the data support it. A channel falls back
 #' to the *"monoexponential"* model (same window and time-delay structure,
 #' with `A`, `B`, `tau`, and `TD` carried over from `fix`) when the fit
-#' fails or the drift amplitude over the remaining record,
-#' `|slope| * (t_end - texc)`, is below twice the fit RMSE, with a
-#' warning recorded in `warnings`. The `model` coefficient column names
+#' fails or the drift amplitude over the record from the drift onset,
+#' `|slope| * (t_end - (TD + tau_mult * tau))`, is below twice the fit RMSE,
+#' with a warning recorded in `warnings`. The `model` coefficient column names
 #' the method each row comes from; monoexponential rows report `texc`,
 #' `slope`, `tau_mult`, and `texc_fitted` as `NA`.
 #'

@@ -173,10 +173,10 @@ to fit. One of \code{"symmetric"} (\emph{default}; calls \code{\link[=SSlogistic
 \code{"gompertz_left"} (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
 
 \item{tau_mult}{\strong{exponential_drift}: A numeric multiple of the time
-constant after \code{TD} at which the linear drift begins
-(\code{texc = TD + tau_mult * tau}). The default \code{3} (~95\% of the primary
-amplitude) is always held constant. Specify per-channel as a list keyed
-by channel name, e.g. \code{tau_mult = list(smo2 = 2)}. See \emph{Details}.}
+constant after \code{TD} at which the linear drift begins (drift onset
+\code{TD + tau_mult * tau}). The default \code{3} (~95\% of the primary amplitude)
+is always held constant. Specify per-channel as a list keyed by channel
+name, e.g. \code{tau_mult = list(smo2 = 2)}. See \emph{Details}.}
 
 \item{fix}{\strong{monoexponential, biexponential, exponential_drift,
 sigmoidal}: An \emph{optional}
@@ -493,8 +493,7 @@ excursion-recovery function to the response curve using \code{\link[stats:nls]{s
 \code{\link[=SSbiexponential]{SSbiexponential()}}. A \emph{fast} component (\code{B}, \code{tau}) drives the initial
 excursion while a concurrent \emph{slow} component (\code{B2}, \code{tau2}), clocked
 from the same onset, recovers the response toward a stable plateau. The
-fitted turning point of the curve is reported as \code{texc} and
-\code{texc_fitted}.
+fitted excursion point of the curve is reported as \code{texc} and \code{texc_fitted}.
 
 Model equations:
 \itemize{
@@ -530,7 +529,7 @@ The biexponential fit is kept only when the data support both phases.
 A channel falls back to the \emph{"exponential_drift"} model (fit on the
 whole response, with \code{A}, \code{B}, \code{tau}, and \code{TD} carried over from
 \code{fix}) when the fit fails (e.g. phases not
-separable), the fitted response is monotonic (no turning point
+separable), the fitted response is monotonic (no excursion point
 \code{texc}), \code{tau2} exceeds twice the fitted time span (a slow phase the
 record cannot tell from a linear drift), or the slow-phase amplitude
 \verb{|B2 - B|} is below twice the fit RMSE. The exponential-drift fit is
@@ -551,8 +550,7 @@ Aliases: \code{method = c("exp_linear", "exp_drift", "monoexp_drift", "drift")}.
 
 A parametric approach fitting a two-phase curve using \code{\link[stats:nls]{stats::nls()}} with
 \code{\link[=SSexponential_drift]{SSexponential_drift()}}: a pure \code{\link[=monoexponential]{monoexponential()}} primary response plus
-a secondary linear drift beginning at the excursion point \code{texc} near the
-primary asymptote.
+a secondary linear drift beginning near the primary asymptote.
 
 Model equation:
 
@@ -560,18 +558,22 @@ Model equation:
 
 \code{A}, \code{B}, \code{tau}, \code{TD}, and the derived \code{k}, \code{MRT}, and \code{HRT} are as for
 \emph{"monoexponential"}. \code{slope} is the linear drift rate \code{dx/dt}. The drift
-onset is not fitted: it is held at \code{tau_mult} multiples of \code{tau} after
-\code{TD} (\emph{default} \code{3}; ~95\% of the primary amplitude) and reported as the
-excursion point \code{texc = TD + tau_mult * tau} elapsed from \code{start_time}
-(the same frame as \code{TD} and \code{MRT}). Set \code{use_TD = TRUE} (\emph{default}) to
-include the time-delay parameter \code{TD}.
+onset is fixed at \code{tau_mult} multiples of \code{tau} after \code{TD} (\emph{default} \code{3};
+~95\% of the primary amplitude). The excursion point \code{texc} is where the
+drift rate overtakes the decaying primary rate,
+\verb{TD + tau * log(|B - A| / (|slope| * tau))}, floored at the drift onset:
+the excursion point of the curve when the phases oppose, or where the
+linear trend takes over a monotonic response. It is reported elapsed
+from \code{start_time} (the same frame as \code{TD} and \code{MRT}) with the fitted
+value \code{texc_fitted}. Set \code{use_TD = TRUE} (\emph{default}) to include the
+time-delay parameter \code{TD}.
 
 The drift is kept only when the data support it. A channel falls back
 to the \emph{"monoexponential"} model (same window and time-delay structure,
 with \code{A}, \code{B}, \code{tau}, and \code{TD} carried over from \code{fix}) when the fit
-fails or the drift amplitude over the remaining record,
-\verb{|slope| * (t_end - texc)}, is below twice the fit RMSE, with a
-warning recorded in \code{warnings}. The \code{model} coefficient column names
+fails or the drift amplitude over the record from the drift onset,
+\verb{|slope| * (t_end - (TD + tau_mult * tau))}, is below twice the fit RMSE,
+with a warning recorded in \code{warnings}. The \code{model} coefficient column names
 the method each row comes from; monoexponential rows report \code{texc},
 \code{slope}, \code{tau_mult}, and \code{texc_fitted} as \code{NA}.
 
