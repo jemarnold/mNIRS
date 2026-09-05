@@ -183,18 +183,21 @@ biexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
     by2 <- \(v) matrix(v, n1, n2, byrow = TRUE)
 
     ## the response is centred for conditioning; the constant is carried
-    ## by the bases (they sum to one), so the asymptotes shift back
+    ## by the bases (they sum to one), so the asymptotes shift back. the
+    ## outer products go through matmul and the gram diagonals through
+    ## crossprod, which avoid the n x k temporaries of `outer(FUN)` and
+    ## squares
     xm <- mean(x)
     xc <- x - xm
     sx <- sum(xc)
     xx <- sum(xc^2)
     blocks <- lapply(td_grid, \(.td) {
         ts <- if (has_TD) pmax(t - .td, 0) else t
-        E1 <- exp(-outer(ts, tau_grid, `/`))
-        E2 <- exp(-outer(ts, tau2_grid, `/`))
+        E1 <- exp(outer(-ts, 1 / tau_grid))
+        E2 <- exp(outer(-ts, 1 / tau2_grid))
         P <- crossprod(E1, E2)
-        d1 <- colSums(E1^2)
-        d2 <- colSums(E2^2)
+        d1 <- diag(crossprod(E1))
+        d2 <- diag(crossprod(E2))
         s1 <- colSums(E1)
         s2 <- colSums(E2)
         xe1 <- drop(crossprod(E1, xc))

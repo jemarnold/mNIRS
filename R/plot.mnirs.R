@@ -472,7 +472,10 @@ plot.mnirs_kinetics <- function(
                     inherit.aes = FALSE
                 )
         } else {
-            ## single key-point marker for parametric methods
+            ## single key-point marker for parametric methods, only within
+            ## the observed time range of its panel
+            rng <- vapply(x$data, \(.d) range(.d[[time_channel]]), numeric(2L))
+            i <- if (faceted) match(ann$interval, names(x$data)) else 1L
             p <- p +
                 key_point(
                     ggplot2::aes(
@@ -483,7 +486,7 @@ plot.mnirs_kinetics <- function(
                             after_scale = darken(colour)
                         )
                     ),
-                    ann[is.finite(ann$xval), , drop = FALSE],
+                    ann[which(ann$xval >= rng[1L, i] & ann$xval <= rng[2L, i]), , drop = FALSE],
                     inherit.aes = FALSE
                 )
         }

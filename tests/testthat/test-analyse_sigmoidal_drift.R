@@ -569,3 +569,55 @@ test_that("print and plot methods handle sigmoidal_drift", {
         result$data[[1L]]$smo2_fitted[is.finite(result$data[[1L]]$smo2_fitted)]
     )
 })
+
+
+## integration tests ================================================
+
+test_that("analyse_sigmoidal_drift() converges on real dataset", {
+    skip("Manual fit convergence check")
+
+    intervals <- readRDS("tests/testthat/testdata/5-1_intervals_short.rds")
+    deoxy <- intervals[grepl("^deoxy", names(intervals))]
+    reoxy <- intervals[grepl("^reoxy", names(intervals))]
+
+    deoxy_channels <- c("smo2_left_vl", "smo2_right_vl")
+    reoxy_channels <- c("SmO2 Live")
+
+    results <- analyse_kinetics(
+        deoxy,
+        # nirs_channels = c(smo2_left_vl, smo2_right_vl),
+        method = "sig-lin",
+        # end_window = 30
+    )
+    warnings()
+    plot(results)
+
+    ## end-to-end path: window detection and held drift onset.
+    ## start_time = 0 anchors the fit at the interval onset
+    results <- lapply(intervals, \(df) {
+        analyse_exponential_drift(
+            df,
+            nirs_channels = nirs_channels,
+            start_time = 0,
+            use_TD = TRUE,
+            verbose = FALSE
+        )
+    })
+
+    coefs <- do.call(rbind, results)
+    success <- tapply(!is.na(coefs$tau), coefs$nirs_channels, mean)
+    success
+    expect_true(all(success >= 1.0))
+
+    TD_success <- tapply(!is.na(coefs$TD), coefs$nirs_channels, mean)
+    TD_success
+    expect_true(all(TD_success >= 0.8))
+
+    ## converged fits keep the drift onset inside the record
+    ok <- !is.na(coefs$tau)
+    expect_true(all(coefs$texc[ok] >= 0))
+
+    r2 <- unlist(lapply(results, \(x) attr(x, "diagnostics")$r2))
+    mean(r2, na.rm = TRUE)
+    expect_true(mean(r2 > 0.9, na.rm = TRUE) >= 0.8)
+})

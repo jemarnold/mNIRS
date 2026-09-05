@@ -123,11 +123,11 @@ monoexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
         span <- 1
     }
     tau_grid <- fixed$tau %||%
-        exp(seq(log(span / 100), log(span), length.out = 25L))
+        exp(seq(log(span / 100), log(span), length.out = 13L))
     td_grid <- if (!has_TD) {
         0
     } else {
-        fixed$TD %||% seq(0, 0.5 * span, length.out = 21L)
+        fixed$TD %||% seq(0, 0.5 * span, length.out = 11L)
     }
 
     ## y = A e + B (1 - e): the response is centred so the asymptotes are
@@ -142,12 +142,14 @@ monoexp_start <- function(x, t, fixed = list(), has_TD = FALSE) {
     A_fix <- if (!is.null(fixed$A)) fixed$A - xm
     B_fix <- if (!is.null(fixed$B)) fixed$B - xm
 
-    ## one block per TD: columns of E are the grid taus
+    ## one block per TD: columns of E are the grid taus. the outer product
+    ## goes through matmul and the gram diagonal through crossprod, which
+    ## avoid the n x k temporaries of `outer(FUN)` and squares
     blocks <- lapply(td_grid, \(.td) {
         ts <- if (has_TD) pmax(t - .td, 0) else t
-        E <- exp(-outer(ts, tau_grid, `/`))
+        E <- exp(outer(-ts, 1 / tau_grid))
         s <- colSums(E)
-        d <- colSums(E^2)
+        d <- diag(crossprod(E))
         xe <- drop(crossprod(E, xc))
         g12 <- s - d
         g22 <- n - 2 * s + d

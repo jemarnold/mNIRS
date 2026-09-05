@@ -494,14 +494,21 @@ test_that("exponential_drift fallback resolves per channel with fix carried", {
 test_that("analyse_exponential_drift() converges on real dataset", {
     skip("Manual fit convergence check")
 
-    intervals <- readRDS(test_path("testdata/5-1_intervals_short.rds"))
+    intervals <- readRDS("tests/testthat/testdata/5-1_intervals_short.rds")
     deoxy <- intervals[grepl("^deoxy", names(intervals))]
+    reoxy <- intervals[grepl("^reoxy", names(intervals))]
 
-    analyse_kinetics(
+    deoxy_channels <- c("smo2_left_vl", "smo2_right_vl")
+    reoxy_channels <- c("SmO2 Live")
+
+    results <- analyse_kinetics(
         deoxy,
-        method = "exp-drift",
-    ) |>
-        plot()
+        # nirs_channels = c(smo2_left_vl, smo2_right_vl),
+        method = "exp-lin",
+        # end_window = 30
+    )
+    # warnings()
+    plot(results)
 
     ## end-to-end path: window detection and held drift onset.
     ## start_time = 0 anchors the fit at the interval onset

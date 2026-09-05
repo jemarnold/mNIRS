@@ -138,34 +138,38 @@ expdrift_start <- function(x, t, fixed = list(), has_TD = FALSE) {
     drift_fraction <- fixed$drift_fraction %||% 0.95
     m <- -log1p(-drift_fraction)
     tau_grid <- fixed$tau %||%
-        exp(seq(log(span / 100), log(span / m), length.out = 25L))
+        exp(seq(log(span / 100), log(span / m), length.out = 13L))
     td_grid <- if (!has_TD) {
         0
     } else {
-        fixed$TD %||% seq(0, 0.5 * span, length.out = 21L)
+        fixed$TD %||% seq(0, 0.5 * span, length.out = 11L)
     }
 
     ## bases e, 1 - e, and the hinge from the drift onset; the response is
-    ## centred for conditioning and the asymptotes shifted back
+    ## centred for conditioning and the asymptotes shifted back. the outer
+    ## products go through matmul and the gram diagonals through crossprod,
+    ## which avoid the n x k temporaries of `outer(FUN)` and squares
     xm <- mean(x)
     xc <- x - xm
     sx <- sum(xc)
     xx <- sum(xc^2)
+    onset <- rep(m * tau_grid, each = n)
     blocks <- lapply(td_grid, \(.td) {
         ts <- if (has_TD) pmax(t - .td, 0) else t
-        E <- exp(-outer(ts, tau_grid, `/`))
-        H <- pmax(outer(t - .td, m * tau_grid, `-`), 0)
+        E <- exp(outer(-ts, 1 / tau_grid))
+        H <- pmax(t - .td - onset, 0)
+        dim(H) <- dim(E)
         s <- colSums(E)
-        d <- colSums(E^2)
+        d <- diag(crossprod(E))
         xe <- drop(crossprod(E, xc))
-        eh <- colSums(E * H)
+        eh <- diag(crossprod(E, H))
         solve_grid3(
             g11 = d,
             g12 = s - d,
             g13 = eh,
             g22 = n - 2 * s + d,
             g23 = colSums(H) - eh,
-            g33 = colSums(H^2),
+            g33 = diag(crossprod(H)),
             b1 = xe,
             b2 = sx - xe,
             b3 = drop(crossprod(H, xc)),
