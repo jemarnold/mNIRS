@@ -7,8 +7,6 @@ format:
     html:
         embed-resources: true
         toc: true
-        link-external-newwindow: true
-        link-external-icon: true
 csl: ../apa.csl
 knitr:
     opts_chunk:

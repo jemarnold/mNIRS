@@ -6,25 +6,25 @@
 #' @param slope A numeric parameter for the linear drift rate `dx/dt`
 #'   of the secondary phase, in response units per unit of the predictor
 #'   variable `t`.
-#' @param drift_frac A numeric fraction of the amplitude `B - A` in
+#' @param drift_fraction A numeric fraction of the amplitude `B - A` in
 #'   `(0.5, 1)` at which the linear drift begins: the drift onset is where
-#'   the primary response reaches `A + drift_frac * (B - A)`, at
-#'   `TD - tau * log(1 - drift_frac)` (`TD = 0` when absent).
+#'   the primary response reaches `A + drift_fraction * (B - A)`, at
+#'   `TD - tau * log(1 - drift_fraction)` (`TD = 0` when absent).
 #' @inheritParams monoexponential
 #'
 #' @details
 #' 5-parameter model:
 #' `A + (B - A) * (1 - exp(-t / tau)) +
-#' slope * pmax(t + tau * log(1 - drift_frac), 0)`
+#' slope * pmax(t + tau * log(1 - drift_fraction), 0)`
 #'
 #' 6-parameter model:
 #' `A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) +
-#' slope * pmax(t - TD + tau * log(1 - drift_frac), 0)`
+#' slope * pmax(t - TD + tau * log(1 - drift_fraction), 0)`
 #'
 #' The primary phase is a [monoexponential()] response toward the asymptote
 #' `B`. The secondary linear drift is exactly zero before the onset
-#' `TD - tau * log(1 - drift_frac)` (see [expdrift_onset()]); the default
-#' `drift_frac = 0.95` places it at `TD + 3 * tau`.
+#' `TD - tau * log(1 - drift_fraction)` (see [expdrift_onset()]); the default
+#' `drift_fraction = 0.95` places it at `TD + 3 * tau`.
 #'
 #' @returns A numeric vector of predicted values the same length as the
 #'   predictor variable `t`.
@@ -37,13 +37,13 @@
 #' set.seed(13)
 #' t <- 1:180
 #' x <- exponential_drift(
-#'     t, A = 10, B = 100, tau = 12, slope = -0.5, drift_frac = 0.95, TD = 15
+#'     t, A = 10, B = 100, tau = 12, slope = -0.5, drift_fraction = 0.95, TD = 15
 #' ) + rnorm(length(t), 0, 2)
 #' data <- data.frame(t, x)
 #'
 #' ## the drift onset fraction is held constant in the formula
 #' model <- nls(
-#'     x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac = 0.95, TD),
+#'     x ~ SSexponential_drift(t, A, B, tau, slope, drift_fraction = 0.95, TD),
 #'     data = data,
 #'     algorithm = "port",
 #'     lower = c(-Inf, -Inf, 0, -Inf, 0),
@@ -63,32 +63,32 @@
 #' }
 #'
 #' @export
-exponential_drift <- function(t, A, B, tau, slope, drift_frac, TD = NULL) {
+exponential_drift <- function(t, A, B, tau, slope, drift_fraction, TD = NULL) {
     ## primary monoexponential phase + hinge-linear secondary drift from
     ## the onset
-    onset <- expdrift_onset(tau, drift_frac, TD)
+    onset <- expdrift_onset(tau, drift_fraction, TD)
     return(monoexponential(t, A, B, tau, TD) + slope * pmax(t - onset, 0))
 }
 
 
 #' Drift onset time of the exponential-drift model
 #'
-#' The time at which a monoexponential response reaches the `drift_frac`
+#' The time at which a monoexponential response reaches the `drift_fraction`
 #' fraction of its amplitude, by the analytic inverse
-#' `TD - tau * log(1 - drift_frac)` (see [exponential_drift()]).
+#' `TD - tau * log(1 - drift_fraction)` (see [exponential_drift()]).
 #'
 #' @inheritParams exponential_drift
 #'
 #' @returns A numeric vector of onset times, `TD = 0` when `NULL`.
 #'
 #' @keywords internal
-expdrift_onset <- function(tau, drift_frac, TD = NULL) {
+expdrift_onset <- function(tau, drift_fraction, TD = NULL) {
     ## a fraction outside (0, 1) has no onset; catches a multiple of tau
     ## passed in its place
-    if (any(drift_frac <= 0 | drift_frac >= 1, na.rm = TRUE)) {
-        stop("`drift_frac` must be a fraction of the amplitude in (0, 1).")
+    if (any(drift_fraction <= 0 | drift_fraction >= 1, na.rm = TRUE)) {
+        stop("`drift_fraction` must be a fraction of the amplitude in (0, 1).")
     }
-    return((TD %||% 0) - tau * log1p(-drift_frac))
+    return((TD %||% 0) - tau * log1p(-drift_fraction))
 }
 
 
@@ -118,7 +118,7 @@ expdrift_init <- function(mCall, data, LHS, ...) {
 #' [monoexp_start()]). The model is linear in `A`, `B`, and `slope` once
 #' `tau` and `TD` are held, so those are solved by least squares at every
 #' grid point at once via [solve_grid3()]. User-fixed `tau`, `TD`, and
-#' `drift_frac` narrow the grids; the linear parameters are always solved
+#' `drift_fraction` narrow the grids; the linear parameters are always solved
 #' free, as this is only a seed. `tau` is capped so the drift onset stays
 #' inside the record; a grid point whose hinge has no support is singular
 #' and skipped.
@@ -135,8 +135,8 @@ expdrift_start <- function(x, t, fixed = list(), has_TD = FALSE) {
         span <- 1
     }
     ## the onset in multiples of tau
-    drift_frac <- fixed$drift_frac %||% 0.95
-    m <- -log1p(-drift_frac)
+    drift_fraction <- fixed$drift_fraction %||% 0.95
+    m <- -log1p(-drift_fraction)
     tau_grid <- fixed$tau %||%
         exp(seq(log(span / 100), log(span / m), length.out = 25L))
     td_grid <- if (!has_TD) {
@@ -184,7 +184,7 @@ expdrift_start <- function(x, t, fixed = list(), has_TD = FALSE) {
         B = b$c2[[i]] + xm,
         tau = tau_grid[[i]],
         slope = b$c3[[i]],
-        drift_frac = drift_frac,
+        drift_fraction = drift_fraction,
         TD = if (has_TD) td_grid[[k]]
     ))
 }
@@ -204,25 +204,25 @@ expdrift_start <- function(x, t, fixed = list(), has_TD = FALSE) {
 #'   attribute when any parameter is free.
 #'
 #' @keywords internal
-expdrift_model <- function(t, A, B, tau, slope, drift_frac, TD = NULL) {
+expdrift_model <- function(t, A, B, tau, slope, drift_fraction, TD = NULL) {
     has_TD <- !is.null(TD)
     ts <- if (has_TD) pmax(t - TD, 0) else t
     e <- exp(-ts / tau)
-    onset <- expdrift_onset(tau, drift_frac, TD)
+    onset <- expdrift_onset(tau, drift_fraction, TD)
     h <- pmax(t - onset, 0)
     val <- A + (B - A) * (1 - e) + slope * h
     free <- free_params(
         match.call(),
-        c("A", "B", "tau", "slope", "drift_frac", if (has_TD) "TD")
+        c("A", "B", "tau", "slope", "drift_fraction", if (has_TD) "TD")
     )
     if (length(free) > 0L) {
         on <- t > onset
         grad <- cbind(
             A = e,
             B = 1 - e,
-            tau = -(B - A) * e * ts / tau^2 + slope * log1p(-drift_frac) * on,
+            tau = -(B - A) * e * ts / tau^2 + slope * log1p(-drift_fraction) * on,
             slope = h,
-            drift_frac = -slope * tau / (1 - drift_frac) * on,
+            drift_fraction = -slope * tau / (1 - drift_fraction) * on,
             TD = if (has_TD) -(t > TD) * (B - A) * e / tau - slope * on
         )
         attr(val, "gradient") <- grad[, free, drop = FALSE]
@@ -235,23 +235,23 @@ expdrift_model <- function(t, A, B, tau, slope, drift_frac, TD = NULL) {
 #'
 #' Creates initial coefficient estimates for a `selfStart` wrapper around
 #' [exponential_drift()], for use with [stats::nls()]. Supports both the
-#' 5-parameter form (A, B, tau, slope, drift_frac) and the
+#' 5-parameter form (A, B, tau, slope, drift_fraction) and the
 #' 6-parameter form adding a time delay TD; arity is inferred from the
 #' formula passed to [stats::nls()].
 #'
 #' @usage
-#' SSexponential_drift(t, A, B, tau, slope, drift_frac, TD)
+#' SSexponential_drift(t, A, B, tau, slope, drift_fraction, TD)
 #'
 #' @inheritParams exponential_drift
 #'
 #' @details
 #' 5-parameter model:
-#' `x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac)`
+#' `x ~ SSexponential_drift(t, A, B, tau, slope, drift_fraction)`
 #'
 #' 6-parameter model:
-#' `x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac, TD)`
+#' `x ~ SSexponential_drift(t, A, B, tau, slope, drift_fraction, TD)`
 #'
-#' The hinge at the drift onset `TD - tau * log(1 - drift_frac)` is not
+#' The hinge at the drift onset `TD - tau * log(1 - drift_fraction)` is not
 #' differentiable, so
 #' `algorithm = "port"` with `tau` (and `TD`) bounded non-negative and
 #' `control = nls.control(warnOnly = TRUE)` is recommended.
@@ -266,7 +266,7 @@ expdrift_model <- function(t, A, B, tau, slope, drift_frac, TD = NULL) {
 #'
 #' Any parameter may be held constant by writing a value in place of its
 #'   name in the formula, e.g.
-#'   `x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac = 0.95)`
+#'   `x ~ SSexponential_drift(t, A, B, tau, slope, drift_fraction = 0.95)`
 #'   holds the drift onset at 95% of the amplitude (`3 * tau`). Fixed
 #'   parameters are excluded from estimation and are not returned by
 #'   [stats::coef()].
@@ -282,13 +282,13 @@ expdrift_model <- function(t, A, B, tau, slope, drift_frac, TD = NULL) {
 #' set.seed(13)
 #' t <- 1:180
 #' x <- exponential_drift(
-#'     t, A = 10, B = 100, tau = 12, slope = -0.5, drift_frac = 0.98, TD = 15
+#'     t, A = 10, B = 100, tau = 12, slope = -0.5, drift_fraction = 0.98, TD = 15
 #' ) + rnorm(length(t), 0, 2)
 #' data <- data.frame(t, x)
 #'
 #' ## 6-parameter fit with the drift onset held at 98% of the amplitude
 #' model <- nls(
-#'     x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac = 0.98, TD),
+#'     x ~ SSexponential_drift(t, A, B, tau, slope, drift_fraction = 0.98, TD),
 #'     data = data,
 #'     algorithm = "port",
 #'     lower = c(-Inf, -Inf, 0, -Inf, 0),
@@ -301,9 +301,9 @@ SSexponential_drift <- selfStart(
     model = expdrift_model,
     initial = init_fixed(
         expdrift_init,
-        c("A", "B", "tau", "slope", "drift_frac", "TD")
+        c("A", "B", "tau", "slope", "drift_fraction", "TD")
     ),
-    parameters = c("A", "B", "tau", "slope", "drift_frac", "TD")
+    parameters = c("A", "B", "tau", "slope", "drift_fraction", "TD")
 )
 
 
@@ -319,10 +319,10 @@ SSexponential_drift <- selfStart(
 #'   [SSexponential_drift()] model with a time delay. If the 6-parameter fit
 #'   fails, or if `use_TD = FALSE`, attempts to fit a reduced 5-parameter
 #'   model without `TD`.
-#' @param drift_frac A numeric fraction of the amplitude in `(0.5, 1)` at
+#' @param drift_fraction A numeric fraction of the amplitude in `(0.5, 1)` at
 #'   which the drift onset is held (*default* `0.95`; `TD + 3 * tau`).
 #'   Always held constant. Applied to every channel, or per-channel as a
-#'   list keyed by channel name, e.g. `drift_frac = list(smo2 = 0.9)`.
+#'   list keyed by channel name, e.g. `drift_fraction = list(smo2 = 0.9)`.
 #' @param fix An *optional* named list of model parameters (`A`, `B`, `tau`,
 #'   `slope`, `TD`) to hold constant during fitting, e.g. `fix = list(A = 0)`.
 #'   Applied to every channel, or per-channel as a list of lists keyed by
@@ -335,7 +335,7 @@ SSexponential_drift <- selfStart(
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
 #'   `nirs_channels`, `A`, `B`, `TD`, `tau`, `k`, `MRT`, `HRT`, `texc`,
-#'   `slope`, `drift_frac`, `MRT_fitted`, `HRT_fitted`, `texc_fitted`. `texc`
+#'   `slope`, `drift_fraction`, `MRT_fitted`, `HRT_fitted`, `texc_fitted`. `texc`
 #'   is the excursion point where the drift rate overtakes the decaying
 #'   primary rate, never before the drift onset (see [expdrift_onset()]).
 #'   Per-channel metadata are attached as attributes:
@@ -357,7 +357,7 @@ analyse_exponential_drift <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     use_TD = TRUE,
-    drift_frac = 0.95,
+    drift_fraction = 0.95,
     fix = NULL,
     control = NULL,
     start_time = NULL,
@@ -380,7 +380,7 @@ analyse_exponential_drift <- function(
         enquo(time_channel),
         # fmt: skip
         arg_list = mget(c(
-            "use_TD", "drift_frac", "fix", "control", "start_time",
+            "use_TD", "drift_fraction", "fix", "control", "start_time",
             "direction", "end_window"
         )),
         choices = list(direction = c("auto", "positive", "negative")),
@@ -399,14 +399,14 @@ analyse_exponential_drift <- function(
     ## failed 6-param fit falls back to the 5-param model
     expdrift_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
         ## the drift onset fraction is always held constant
-        .a$fix <- c(.a$fix, list(drift_frac = .a$drift_frac))
+        .a$fix <- c(.a$fix, list(drift_fraction = .a$drift_fraction))
 
         fit <- fit_td_fallback(
             x_fit,
             t_fit,
             # fmt: skip
             params = c(
-                "A", "B", "tau", "slope", "drift_frac", if (.a$use_TD) "TD"
+                "A", "B", "tau", "slope", "drift_fraction", if (.a$use_TD) "TD"
             ),
             .a,
             fitter = \(.data, .params, on_error) {
@@ -493,7 +493,7 @@ analyse_exponential_drift <- function(
         ## primary rate, |B - A| / tau * exp(-(t - TD) / tau) = |slope|; the
         ## turning point when the phases oppose. never before the drift
         ## onset
-        onset <- expdrift_onset(coefs[["tau"]], coefs[["drift_frac"]], TD_arg)
+        onset <- expdrift_onset(coefs[["tau"]], coefs[["drift_fraction"]], TD_arg)
         r <- abs(coefs[["B"]] - coefs[["A"]]) /
             (abs(coefs[["slope"]]) * coefs[["tau"]])
         texc_val <- max(
@@ -508,7 +508,7 @@ analyse_exponential_drift <- function(
             B = coefs[["B"]],
             tau = coefs[["tau"]],
             slope = coefs[["slope"]],
-            drift_frac = coefs[["drift_frac"]],
+            drift_fraction = coefs[["drift_fraction"]],
             TD = TD_arg
         )
 
@@ -523,7 +523,7 @@ analyse_exponential_drift <- function(
                 HRT = HRT_val,
                 texc = texc_val,
                 slope = coefs[["slope"]],
-                drift_frac = coefs[["drift_frac"]],
+                drift_fraction = coefs[["drift_fraction"]],
                 MRT_fitted = fitted_params[[1L]],
                 HRT_fitted = fitted_params[[2L]],
                 texc_fitted = fitted_params[[3L]]

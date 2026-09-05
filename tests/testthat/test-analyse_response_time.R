@@ -3,7 +3,7 @@ test_that("response_time returns correct structure", {
     x <- c(rep(10, 5), seq(10, 60, length.out = 15), rep(60, 5))
     t <- seq_along(x)
 
-    result <- response_time(x, t, start_time = 5, fraction = 0.5)
+    result <- response_time(x, t, start_time = 5, response_fraction = 0.5)
 
     expect_type(result, "list")
     expect_named( result, c(
@@ -26,7 +26,7 @@ test_that("response_time computes correct values", {
     ## baseline idx 0-5, ramp from 6 to 16 plateau 16-20
     x <- c(rep(0, 5), seq(0, 20, length.out = 10), rep(20, 5))
     t <- seq_along(x) - 1  ## t = 0 at index 1
-    result <- response_time(x, t, start_time = 0, fraction = 0.5)
+    result <- response_time(x, t, start_time = 0, response_fraction = 0.5)
 
     ## A = mean baseline (t <= 0 = first element = 0)
     expect_equal(result$A, 0)
@@ -36,7 +36,7 @@ test_that("response_time computes correct values", {
     expect_equal(result$response_time, 10)
     ## response_idx time+1 since time = 0 at idx = 1
     expect_equal(result$response_idx, 11)
-    ## fitted = A + fraction * (B - A) = 10
+    ## fitted = A + response_fraction * (B - A) = 10
     expect_gte(result$response_value, 10) ## 11.1 real x value
     expect_equal(result$fitted, 10)
     ## extreme_idx first plateau idx
@@ -45,12 +45,12 @@ test_that("response_time computes correct values", {
 
 test_that("response_time validates inputs", {
     expect_error(
-        response_time(1:5, fraction = 1.5),
-        "fraction.*valid.*numeric"
+        response_time(1:5, response_fraction = 1.5),
+        "response_fraction.*valid.*numeric"
     )
     expect_error(
-        response_time(1:5, fraction = -0.1),
-        "fraction.*valid.*numeric"
+        response_time(1:5, response_fraction = -0.1),
+        "response_fraction.*valid.*numeric"
     )
     expect_silent(response_time(1:5, t = 0:4, end_window = Inf))
     expect_error(
@@ -81,19 +81,19 @@ test_that("response_time respects `bypass_checks`", {
     
 })
 
-test_that("response_time respects fraction parameter", {
+test_that("response_time respects response_fraction parameter", {
     x <- c(rep(0, 5), seq(0, 100, length.out = 20))
     t <- seq_along(x) - 1
 
-    result_50 <- response_time(x, t, fraction = 0.5)
-    result_25 <- response_time(x, t, fraction = 0.25)
-    result_75 <- response_time(x, t, fraction = 0.75)
+    result_50 <- response_time(x, t, response_fraction = 0.5)
+    result_25 <- response_time(x, t, response_fraction = 0.25)
+    result_75 <- response_time(x, t, response_fraction = 0.75)
 
     ## 50% response time should fall between 25% and 75%
     expect_lt(result_25$response_time, result_50$response_time)
     expect_lt(result_50$response_time, result_75$response_time)
 
-    ## fitted values reflect fraction
+    ## fitted values reflect response_fraction
     expect_equal(result_50$fitted, 50)
     expect_equal(result_25$fitted, 25)
     expect_equal(result_75$fitted, 75)
@@ -212,7 +212,7 @@ test_that("analyse_response_time returns correct structure", {
     expect_s3_class(result, "data.frame")
     expect_equal(nrow(result), 2L)
     expect_named(result, c(
-        "interval", "nirs_channels", "fraction", "A", "B", 
+        "interval", "nirs_channels", "response_fraction", "A", "B", 
         "response_time", "response_value", "fitted", "idx"
     ))
 
@@ -248,7 +248,7 @@ test_that("analyse_response_time computes correct values", {
         nirs_channels = "x",
         time_channel = "t"
     )
-    result <- analyse_response_time(df, start_time = 0, fraction = 0.5)
+    result <- analyse_response_time(df, start_time = 0, response_fraction = 0.5)
 
     ## A = baseline mean ~ 0
     expect_equal(result$A, 0)
@@ -318,19 +318,19 @@ test_that("analyse_response_time channel_args override defaults", {
     result <- analyse_response_time(
         df,
         start_time = 5,
-        fraction = list(0.5, q = 0.25),
+        response_fraction = list(0.5, q = 0.25),
         verbose = FALSE
     )
 
-    ## x: fraction = 0.5; q: fraction = 0.25 → q response time < x response time
+    ## x: response_fraction = 0.5; q: response_fraction = 0.25 → q response time < x response time
     expect_lt(
         result$response_time[result$nirs_channels == "q"],
         result$response_time[result$nirs_channels == "x"]
     )
-    expect_equal(attr(result, "channel_args")$fraction, c(0.5, 0.25))
+    expect_equal(attr(result, "channel_args")$response_fraction, c(0.5, 0.25))
 })
 
-test_that("vector fraction returns one coefficient row per fraction", {
+test_that("vector response_fraction returns one coefficient row per response_fraction", {
     x <- c(rep(0, 5), seq(0, 100, length.out = 20))
     t <- seq_along(x)
 
@@ -343,17 +343,17 @@ test_that("vector fraction returns one coefficient row per fraction", {
         df,
         method = "response_time",
         start_time = 5,
-        fraction = c(0.5, 0.632),
+        response_fraction = c(0.5, 0.632),
         verbose = FALSE
     )
     coefs <- result$coefficients
 
-    expect_equal(coefs$fraction, c(0.5, 0.632))
-    expect_equal(coefs$fitted, coefs$A + (coefs$B - coefs$A) * coefs$fraction)
-    ## higher fraction reached later
+    expect_equal(coefs$response_fraction, c(0.5, 0.632))
+    expect_equal(coefs$fitted, coefs$A + (coefs$B - coefs$A) * coefs$response_fraction)
+    ## higher response_fraction reached later
     expect_lt(coefs$response_time[1], coefs$response_time[2])
     ## vector arg collapsed into the single channel_args row
-    expect_equal(result$channel_args$fraction, "0.5, 0.632")
+    expect_equal(result$channel_args$response_fraction, "0.5, 0.632")
 })
 
 test_that("analyse_response_time fitted_data contains baseline, response, extreme", {
@@ -427,15 +427,15 @@ test_that("analyse_response_time works visually on Moxy", {
 
     t_vec <- data$time
     response_list <- response_time(
-        data$smo2_left, t_vec, 878, fraction = 0.5
+        data$smo2_left, t_vec, 878, response_fraction = 0.5
     )
-    # response_time(data$smo2_right, t_vec, fraction = 0.5)
+    # response_time(data$smo2_right, t_vec, response_fraction = 0.5)
 
     result <- analyse_response_time(
         data, 
         nirs_channels = smo2_right,
         start_time = 878,
-        fraction = 0.5
+        response_fraction = 0.5
     )
 
     # result

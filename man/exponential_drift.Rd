@@ -4,7 +4,7 @@
 \alias{exponential_drift}
 \title{Exponential-drift function}
 \usage{
-exponential_drift(t, A, B, tau, slope, drift_frac, TD = NULL)
+exponential_drift(t, A, B, tau, slope, drift_fraction, TD = NULL)
 }
 \arguments{
 \item{t}{A numeric vector of the predictor variable (time).}
@@ -22,10 +22,10 @@ of the exponential curve, in units of the predictor variable \code{t}.}
 of the secondary phase, in response units per unit of the predictor
 variable \code{t}.}
 
-\item{drift_frac}{A numeric fraction of the amplitude \code{B - A} in
+\item{drift_fraction}{A numeric fraction of the amplitude \code{B - A} in
 \verb{(0.5, 1)} at which the linear drift begins: the drift onset is where
-the primary response reaches \code{A + drift_frac * (B - A)}, at
-\code{TD - tau * log(1 - drift_frac)} (\code{TD = 0} when absent).}
+the primary response reaches \code{A + drift_fraction * (B - A)}, at
+\code{TD - tau * log(1 - drift_fraction)} (\code{TD = 0} when absent).}
 
 \item{TD}{A numeric parameter for the time delay before the onset of
 exponential response, in units of the predictor variable \code{t}. If \code{NULL}
@@ -41,28 +41,28 @@ secondary linear drift beginning near the asymptote.
 }
 \details{
 5-parameter model:
-\code{A + (B - A) * (1 - exp(-t / tau)) + slope * pmax(t + tau * log(1 - drift_frac), 0)}
+\code{A + (B - A) * (1 - exp(-t / tau)) + slope * pmax(t + tau * log(1 - drift_fraction), 0)}
 
 6-parameter model:
-\code{A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) + slope * pmax(t - TD + tau * log(1 - drift_frac), 0)}
+\code{A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) + slope * pmax(t - TD + tau * log(1 - drift_fraction), 0)}
 
 The primary phase is a \code{\link[=monoexponential]{monoexponential()}} response toward the asymptote
 \code{B}. The secondary linear drift is exactly zero before the onset
-\code{TD - tau * log(1 - drift_frac)} (see \code{\link[=expdrift_onset]{expdrift_onset()}}); the default
-\code{drift_frac = 0.95} places it at \code{TD + 3 * tau}.
+\code{TD - tau * log(1 - drift_fraction)} (see \code{\link[=expdrift_onset]{expdrift_onset()}}); the default
+\code{drift_fraction = 0.95} places it at \code{TD + 3 * tau}.
 }
 \examples{
 ## create an exponential curve with late linear drift and random noise
 set.seed(13)
 t <- 1:180
 x <- exponential_drift(
-    t, A = 10, B = 100, tau = 12, slope = -0.5, drift_frac = 0.95, TD = 15
+    t, A = 10, B = 100, tau = 12, slope = -0.5, drift_fraction = 0.95, TD = 15
 ) + rnorm(length(t), 0, 2)
 data <- data.frame(t, x)
 
 ## the drift onset fraction is held constant in the formula
 model <- nls(
-    x ~ SSexponential_drift(t, A, B, tau, slope, drift_frac = 0.95, TD),
+    x ~ SSexponential_drift(t, A, B, tau, slope, drift_fraction = 0.95, TD),
     data = data,
     algorithm = "port",
     lower = c(-Inf, -Inf, 0, -Inf, 0),

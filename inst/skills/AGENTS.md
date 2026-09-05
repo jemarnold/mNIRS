@@ -297,11 +297,11 @@ analyse_kinetics(
     end_window = Inf,   # truncate fit after first extreme; Inf = global extreme
     ...,
     ## method-specific (explicit formals, not via `...`, see below):
-    fraction = 0.5, width = NULL, span = NULL,
+    response_fraction = 0.5, width = NULL, span = NULL,
     align = c("centre", "left", "right"),
     partial = FALSE, na.rm = FALSE,
     use_TD = TRUE, shape = c("symmetric", "gompertz", "gompertz_left"),
-    drift_frac = 0.95, fix = NULL
+    drift_fraction = 0.95, fix = NULL
     ## via `...`: control = NULL (nls methods; see below)
 )
 ## analyze_kinetics(...) alias
@@ -313,13 +313,13 @@ analyse_kinetics(
 `"biexponential"`/`"exponential_drift"`/`"sigmoidal"`/`"sigmoidal_drift"`, resolved per channel, returns `NA` if unsatisfiable.
 
 **Per-method args:**
-- **`"response_time"`**: `fraction` (default `0.5`; `0.632` ≈ MRT; vectorised, e.g. `c(0.5, 0.632)` → one coefficient row per fraction).
+- **`"response_time"`**: `response_fraction` (default `0.5`; `0.632` ≈ MRT; vectorised, e.g. `c(0.5, 0.632)` → one coefficient row per response_fraction).
 - **`"peak_slope"`**: `width` XOR `span`; `align` (`"centre"`/`"left"`/`"right"`); `partial`, `na.rm` (default `FALSE`).
 - **`"monoexponential"`**: `use_TD` (default `TRUE`; 4-param → 3-param fallback), `fix`.
 - **`"biexponential"`**: `use_TD` (default `TRUE`; 6-param → 5-param fallback), `fix`. Sequential fit: fast monoexp on `end_window` window (`Inf` → first extreme + 20 time units) → full biexp with `A`/`tau`/`TD` held near stage-1 values, `B`/`B2`/`tau2` free. Falls back (warning; `model` column) to exp_drift → monoexp on fit failure, monotonic `texc`, `tau2 >= 2 × span`, or `|B2 - B| < 2 × rmse`. Coef columns = union of the chain (`NA` where n/a). Undocumented `model_fallback = FALSE` keeps raw fit.
-- **`"exponential_drift"`**: `use_TD`, `drift_frac` (default `0.95`, range `(0.5, 1)`; drift onset where the primary reaches that fraction of its amplitude, `TD - tau × log(1 - drift_frac)` = `TD + 3 × tau` by default; always held constant; `expdrift_onset()`), `fix`. `texc` = takeover point `max(onset, TD + tau × log(|B - A| / (|slope| × tau)))` (turning point when phases oppose). Falls back to monoexp on fit failure or `|slope| × (t_end - onset) < 2 × rmse` (`model` column; `model_fallback = FALSE` keeps raw fit).
+- **`"exponential_drift"`**: `use_TD`, `drift_fraction` (default `0.95`, range `(0.5, 1)`; drift onset where the primary reaches that fraction of its amplitude, `TD - tau × log(1 - drift_fraction)` = `TD + 3 × tau` by default; always held constant; `expdrift_onset()`), `fix`. `texc` = takeover point `max(onset, TD + tau × log(|B - A| / (|slope| × tau)))` (turning point when phases oppose). Falls back to monoexp on fit failure or `|slope| × (t_end - onset) < 2 × rmse` (`model` column; `model_fallback = FALSE` keeps raw fit).
 - **`"sigmoidal"`**: `shape` (`"symmetric"` default = `SSlogistic()`; `"gompertz"` early-inflection (right); `"gompertz_left"` late-inflection), `fix`.
-- **`"sigmoidal_drift"`**: `shape` (as sigmoidal), `drift_frac` (default `0.95`, range `(0.5, 1)`; always held constant), `fix`. Sigmoid + independent hinge-linear drifts `slope_A` (only before `texc_A`, where the sigmoid reaches `1 - drift_frac` of its amplitude) and `slope_B` (only after `texc_B`, at `drift_frac`); cutoffs are the analytic inverse per `shape`, never overlap. Falls back to sigmoidal (same `shape`; `model` column; warning) on fit failure or when *both* drift amplitudes over their support (`|slope_A| × (texc_A - t_start)`, `|slope_B| × (t_end - texc_B)`) are `< 2 × rmse`; one supported drift keeps the model. `model_fallback = FALSE` keeps raw fit.
+- **`"sigmoidal_drift"`**: `shape` (as sigmoidal), `drift_fraction` (default `0.95`, range `(0.5, 1)`; always held constant), `fix`. Sigmoid + independent hinge-linear drifts `slope_A` (only before `texc_A`, where the sigmoid reaches `1 - drift_fraction` of its amplitude) and `slope_B` (only after `texc_B`, at `drift_fraction`); cutoffs are the analytic inverse per `shape`, never overlap. Falls back to sigmoidal (same `shape`; `model` column; warning) on fit failure or when *both* drift amplitudes over their support (`|slope_A| × (texc_A - t_start)`, `|slope_B| × (t_end - texc_B)`) are `< 2 × rmse`; one supported drift keeps the model. `model_fallback = FALSE` keeps raw fit.
 - **All nls methods**: `control` via `...` (`list()` or `nls.control()`, e.g. `list(maxiter = 200)`) merged over internal defaults (`maxiter = 500, warnOnly = TRUE` on `"port"` fits) at every `nls()` call incl. direction refits and fallbacks. Global only (not per-channel/interval). Unknown names abort.
 
 Per-channel overrides via inline named `list()` (names must match `nirs_channels`):
@@ -373,13 +373,13 @@ Times are elapsed from `start_time`; `*_fitted` = predicted value at that point.
 
 | Method | Columns |
 |---|---|
-| `"response_time"` | `fraction` (one row per value), `A` baseline mean, `B` extreme (peak/trough) value, `response_time`, `response_value` (observed), `fitted` (target `A + (B-A)*fraction`), `idx` (sample/row number at `response_value`) |
+| `"response_time"` | `response_fraction` (one row per value), `A` baseline mean, `B` extreme (peak/trough) value, `response_time`, `response_value` (observed), `fitted` (target `A + (B-A)*response_fraction`), `idx` (sample/row number at `response_value`) |
 | `"peak_slope"` | `slope` (`x/t`), `intercept`, `fitted`, `peak_slope_time`, `idx` (sample/row number at `align` position) |
 | `"monoexponential"` | `A` baseline, `B` asymptote, `tau`, `k` (`1/tau`), `TD` delay (if `use_TD`), `MRT` (`TD+tau`), `HRT` (`TD+tau·ln2`), `MRT_fitted`, `HRT_fitted` |
 | `"biexponential"` | `A` start, `B` & `tau` fast component, `MRT` (`TD+tau`), `texc` (fitted excursion point; `NA` if monotonic), `B2` & `tau2` slow component, `TD` delay (if `use_TD`), `MRT_fitted`, `texc_fitted`; plus `model` and the exp_drift/monoexp columns (`NA` unless fallen back) |
-| `"exponential_drift"` | monoexp columns + `texc` (excursion point where drift rate overtakes primary rate; ≥ drift onset `TD - tau·log(1 - drift_frac)`), `slope` (`dx/dt`), `drift_frac`, `texc_fitted`; plus `model` |
+| `"exponential_drift"` | monoexp columns + `texc` (excursion point where drift rate overtakes primary rate; ≥ drift onset `TD - tau·log(1 - drift_fraction)`), `slope` (`dx/dt`), `drift_fraction`, `texc_fitted`; plus `model` |
 | `"sigmoidal"` | `A` & `B` start + end asymptotes, `xmid` inflection time (only literally *"middle"* for `shape = "symmetric"`), `slope` (`dx/dt` at `xmid`), `xmid_fitted` |
-| `"sigmoidal_drift"` | sigmoidal columns + `slope_A`, `slope_B` (drift `dx/dt` at each asymptote), `drift_frac`, `texc_A`, `texc_B` (drift cutoff times); plus `model` (`NA` drift columns on a sigmoidal fallback row) |
+| `"sigmoidal_drift"` | sigmoidal columns + `slope_A`, `slope_B` (drift `dx/dt` at each asymptote), `drift_fraction`, `texc_A`, `texc_B` (drift cutoff times); plus `model` (`NA` drift columns on a sigmoidal fallback row) |
 
 **Diagnostics:** `n_obs`, `n_params`, `r2`, `adj_r2`, `rmse`, `snr`, `cv_rmse`,
 `aic`, `aicc`, `bic`. `n_params` = free params estimated, excluding `fix`, so
@@ -388,7 +388,7 @@ within matching `n_obs` + `n_params`.
 
 **Vector-level:**
 ```r
-response_time(x, t = seq_along(x), start_time = 0, fraction = 0.5,
+response_time(x, t = seq_along(x), start_time = 0, response_fraction = 0.5,
     direction = c("auto", "positive", "negative"))
 ## → A, B, response_time, response_value, fitted,
 ##   baseline_idx, response_idx, extreme_idx
@@ -419,15 +419,15 @@ nls(x ~ SSlogistic(t, A, B, xmid, slope, asym), data = df) # 4- or 5-param (frag
 nls(x ~ SSgompertz(t, A, B, xmid, slope), data = df)
 nls(x ~ SSgompertz_left(t, A, B, xmid, slope), data = df)
 
-sigmoidal_drift(t, A, B, xmid, slope, slope_A, slope_B, drift_frac,
+sigmoidal_drift(t, A, B, xmid, slope, slope_A, slope_B, drift_fraction,
     shape = c("symmetric", "gompertz", "gompertz_left"))
 ## S(t) + slope_A * pmin(t - texc_A, 0) + slope_B * pmax(t - texc_B, 0)
-## cutoffs (p = 1 - drift_frac): symmetric texc_A/B = xmid -/+ log((1-p)/p)/k,
+## cutoffs (p = 1 - drift_fraction): symmetric texc_A/B = xmid -/+ log((1-p)/p)/k,
 ##   k = 4*slope/(B-A);
 ##   gompertz xmid - log(-log(p))/k, xmid - log(-log(1-p))/k, k = slope*e/(B-A);
 ##   gompertz_left xmid + log(-log(1-p))/k, xmid + log(-log(p))/k
 nls(x ~ SSsigmoidal_drift(t, A, B, xmid, slope, slope_A, slope_B,
-        drift_frac = 0.95, shape = "gompertz"), data = df,
+        drift_fraction = 0.95, shape = "gompertz"), data = df,
     algorithm = "port", control = nls.control(warnOnly = TRUE))
 ```
 

@@ -84,7 +84,7 @@ test_that("SSsigmoidal_drift() recovers parameters for every shape", {
         formula <- substitute(
             x ~ SSsigmoidal_drift(
                 t, A, B, xmid, slope, slope_A, slope_B,
-                drift_frac = 0.95, shape = .s
+                drift_fraction = 0.95, shape = .s
             ),
             list(.s = .s)
         )
@@ -114,7 +114,7 @@ test_that("SSsigmoidal_drift() excludes fixed parameters from estimation", {
 
     model <- suppressWarnings(nls(
         x ~ SSsigmoidal_drift(
-            t, A = 10, B, xmid, slope, slope_A, slope_B, drift_frac = 0.95
+            t, A = 10, B, xmid, slope, slope_A, slope_B, drift_fraction = 0.95
         ),
         data = data,
         algorithm = "port",
@@ -143,14 +143,14 @@ test_that("sigdrift_start() seeds near the truth and holds fixed values", {
     start <- sigdrift_start(x, t)
     expect_named(
         start,
-        c("A", "B", "xmid", "slope", "slope_A", "slope_B", "drift_frac")
+        c("A", "B", "xmid", "slope", "slope_A", "slope_B", "drift_fraction")
     )
     expect_true(all.equal(start[["A"]], 10, tolerance = 5, scale = 1))
     expect_true(all.equal(start[["B"]], 100, tolerance = 5, scale = 1))
     expect_true(all.equal(start[["xmid"]], 40, tolerance = 5, scale = 1))
     expect_true(all.equal(start[["slope_A"]], 0.3, tolerance = 0.15, scale = 1))
     expect_true(all.equal(start[["slope_B"]], -0.4, tolerance = 0.15, scale = 1))
-    expect_equal(start[["drift_frac"]], 0.95)
+    expect_equal(start[["drift_fraction"]], 0.95)
 
     fixed <- sigdrift_start(x, t, fixed = list(A = 12, slope_B = -0.5))
     expect_equal(fixed[["A"]], 12)
@@ -178,7 +178,7 @@ create_sigdrift_data <- function(
     slope = 4,
     slope_A = 0.3,
     slope_B = -0.4,
-    drift_frac = 0.95,
+    drift_fraction = 0.95,
     shape = "symmetric",
     n = 120,
     sample_rate = 1,
@@ -193,7 +193,7 @@ create_sigdrift_data <- function(
     df[channels] <- lapply(seq_along(channels) - 1L, \(.i) {
         sigmoidal_drift(
             t, A + 5 * .i, B + 5 * .i, xmid, slope, slope_A, slope_B,
-            drift_frac, shape
+            drift_fraction, shape
         ) + rnorm(n, 0, noise_sd)
     })
 
@@ -216,7 +216,7 @@ test_that("analyse_sigmoidal_drift() returns correct structure and recovers para
     expect_s3_class(result, "data.frame")
     expect_named(result, c(
         "interval", "nirs_channels", "A", "B", "xmid", "slope", "slope_A",
-        "slope_B", "drift_frac", "texc_A", "texc_B", "xmid_fitted"
+        "slope_B", "drift_fraction", "texc_A", "texc_B", "xmid_fitted"
     ))
     expect_equal(nrow(result), 1L)
 
@@ -225,7 +225,7 @@ test_that("analyse_sigmoidal_drift() returns correct structure and recovers para
     expect_s3_class(model, "nls")
     expect_named(attr(result, "fitted_data")$smo2, c("window_idx", "fitted"))
     expect_equal(nrow(attr(result, "diagnostics")), 1L)
-    expect_equal(attr(result, "channel_args")$drift_frac, 0.95)
+    expect_equal(attr(result, "channel_args")$drift_fraction, 0.95)
     expect_equal(attr(result, "channel_args")$shape, "symmetric")
 
     ## the cutoff fraction is held, never estimated
@@ -239,7 +239,7 @@ test_that("analyse_sigmoidal_drift() returns correct structure and recovers para
     expect_true(all.equal(result$slope, 4, tolerance = 1, scale = 1))
     expect_true(all.equal(result$slope_A, 0.3, tolerance = 0.1, scale = 1))
     expect_true(all.equal(result$slope_B, -0.4, tolerance = 0.1, scale = 1))
-    expect_equal(result$drift_frac, 0.95)
+    expect_equal(result$drift_fraction, 0.95)
     expect_true(attr(result, "diagnostics")$r2 > 0.99)
     expect_equal(attr(result, "diagnostics")$n_params, 6L)
 
@@ -281,42 +281,42 @@ test_that("analyse_sigmoidal_drift() fits every shape", {
     })
 })
 
-test_that("analyse_sigmoidal_drift() drift_frac resolves per channel", {
+test_that("analyse_sigmoidal_drift() drift_fraction resolves per channel", {
     data <- create_sigdrift_data(channels = c("smo2", "hhb"))
 
     result <- analyse_sigmoidal_drift(
         data,
         nirs_channels = c("smo2", "hhb"),
-        drift_frac = list(smo2 = 0.98, hhb = 0.9),
+        drift_fraction = list(smo2 = 0.98, hhb = 0.9),
         verbose = FALSE
     )
-    expect_equal(result$drift_frac, c(0.98, 0.9))
-    expect_equal(attr(result, "channel_args")$drift_frac, c(0.98, 0.9))
+    expect_equal(result$drift_fraction, c(0.98, 0.9))
+    expect_equal(attr(result, "channel_args")$drift_fraction, c(0.98, 0.9))
     ## a larger fraction pushes the cutoffs further from xmid
     expect_lt(result$texc_A[[1L]] - result$xmid[[1L]],
         result$texc_A[[2L]] - result$xmid[[2L]])
     expect_gt(result$texc_B[[1L]] - result$xmid[[1L]],
         result$texc_B[[2L]] - result$xmid[[2L]])
-    expect_false("drift_frac" %in% names(coef(attr(result, "model")$smo2)))
+    expect_false("drift_fraction" %in% names(coef(attr(result, "model")$smo2)))
 
     ## an omitted channel takes the formal default
     result_part <- analyse_sigmoidal_drift(
         data,
         nirs_channels = c("smo2", "hhb"),
-        drift_frac = list(smo2 = 0.98),
+        drift_fraction = list(smo2 = 0.98),
         verbose = FALSE
     )
-    expect_equal(result_part$drift_frac, c(0.98, 0.95))
+    expect_equal(result_part$drift_fraction, c(0.98, 0.95))
 })
 
-test_that("analyse_sigmoidal_drift() validates drift_frac", {
+test_that("analyse_sigmoidal_drift() validates drift_fraction", {
     data <- create_sigdrift_data()
     lapply(list(0.5, 1, 0, 1.2, "0.95", c(0.9, 0.95)), \(.f) {
         expect_error(
             analyse_sigmoidal_drift(
-                data, nirs_channels = "smo2", drift_frac = .f, verbose = FALSE
+                data, nirs_channels = "smo2", drift_fraction = .f, verbose = FALSE
             ),
-            "drift_frac.*must be a valid one-element"
+            "drift_fraction.*must be a valid one-element"
         )
     })
 })
@@ -339,7 +339,7 @@ test_that("analyse_sigmoidal_drift() holds fixed parameters", {
     ## the cutoff fraction is not a fixable parameter
     expect_error(
         analyse_sigmoidal_drift(
-            data, nirs_channels = "smo2", fix = list(drift_frac = 0.9)
+            data, nirs_channels = "smo2", fix = list(drift_fraction = 0.9)
         ),
         "not recognised"
     )
@@ -452,7 +452,7 @@ test_that("analyse_kinetics() falls back from negligible drifts", {
     expect_named(coef(model), c("A", "B", "xmid", "slope"))
     expect_equal(cf$xmid, coef(model)[["xmid"]])
     expect_true(all(is.na(
-        cf[c("slope_A", "slope_B", "drift_frac", "texc_A", "texc_B")]
+        cf[c("slope_A", "slope_B", "drift_fraction", "texc_A", "texc_B")]
     )))
     expect_false(is.na(cf$xmid_fitted))
     expect_equal(result$diagnostics$n_params, 4L)
@@ -512,22 +512,22 @@ test_that("analyse_kinetics.sigmoidal_drift dispatches via method aliases", {
     })
 })
 
-test_that("analyse_kinetics.sigmoidal_drift passes shape, drift_frac, and fix", {
+test_that("analyse_kinetics.sigmoidal_drift passes shape, drift_fraction, and fix", {
     result <- analyse_kinetics(
         create_sigdrift_data(shape = "gompertz_left"),
         nirs_channels = "smo2",
         method = "sigmoidal_drift",
         shape = "gompertz_left",
-        drift_frac = 0.9,
+        drift_fraction = 0.9,
         fix = list(B = 100),
         verbose = FALSE
     )
     cf <- result$coefficients
     expect_equal(cf$model, "sigmoidal_drift")
     expect_equal(cf$B, 100)
-    expect_equal(cf$drift_frac, 0.9)
+    expect_equal(cf$drift_fraction, 0.9)
     expect_equal(result$channel_args$shape, "gompertz_left")
-    expect_equal(result$channel_args$drift_frac, 0.9)
+    expect_equal(result$channel_args$drift_fraction, 0.9)
     expect_false("B" %in% names(coef(result$model[[1L]]$smo2)))
 })
 
@@ -541,7 +541,7 @@ test_that("print and plot methods handle sigmoidal_drift", {
     out <- capture.output(print(result))
     expect_match(out[[2L]], "Sigmoidal-Linear Drift")
     ## the held fraction is not displayed
-    expect_false(any(grepl("drift_frac", out)))
+    expect_false(any(grepl("drift_fraction", out)))
 
     p <- plot(result, components = TRUE)
     expect_s3_class(p, "ggplot")

@@ -4,7 +4,7 @@
 \alias{sigdrift_cutoffs}
 \title{Drift cutoff times of the sigmoidal-drift model}
 \usage{
-sigdrift_cutoffs(A, B, xmid, slope, drift_frac, shape)
+sigdrift_cutoffs(A, B, xmid, slope, drift_fraction, shape)
 }
 \arguments{
 \item{A}{A numeric parameter for the starting asymptote of the response
@@ -19,11 +19,11 @@ variable.}
 \item{slope}{A numeric parameter for the slope \code{dx/dt} of the response
 variable at the inflection \code{xmid}.}
 
-\item{drift_frac}{A numeric fraction of the amplitude \code{B - A} in
+\item{drift_fraction}{A numeric fraction of the amplitude \code{B - A} in
 \verb{(0.5, 1)} bounding the drift regions: the leading drift applies only
-before the sigmoid reaches \code{A + (1 - drift_frac) * (B - A)} (at
+before the sigmoid reaches \code{A + (1 - drift_fraction) * (B - A)} (at
 \code{texc_A}), the trailing drift only after it reaches
-\code{A + drift_frac * (B - A)} (at \code{texc_B}).}
+\code{A + drift_fraction * (B - A)} (at \code{texc_B}).}
 
 \item{shape}{Character; the sigmoidal shape. One of \code{"symmetric"}
 (\emph{default}; \code{\link[=logistic]{logistic()}}), \code{"gompertz"} (\code{\link[=gompertz]{gompertz()}}), or
@@ -34,7 +34,7 @@ A named numeric vector \code{c(texc_A, texc_B)}.
 }
 \description{
 The times at which a sigmoid of the given \code{shape} reaches the
-\code{1 - drift_frac} and \code{drift_frac} fractions of its amplitude, by the
+\code{1 - drift_fraction} and \code{drift_fraction} fractions of its amplitude, by the
 analytic inverse of each shape (see \code{\link[=sigmoidal_drift]{sigmoidal_drift()}}).
 }
 \keyword{internal}

@@ -102,9 +102,9 @@ test_that("analyse_kinetics method errors attribute to the generic", {
 
     err <- expect_error(
         analyse_kinetics(
-            data, method = "response_time", fraction = 10, verbose = FALSE
+            data, method = "response_time", response_fraction = 10, verbose = FALSE
         ),
-        "fraction"
+        "response_fraction"
     )
     expect_equal(rlang::call_name(conditionCall(err)), "analyse_kinetics")
     

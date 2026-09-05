@@ -12,7 +12,7 @@
 #'   Additional arguments must be specified for each method. See *Details*.
 #'   \describe{
 #'      \item{`"response_time"`}{Fractional (e.g. 50%, 63.2%, 90%) response
-#'      time. Additional arguments: `fraction`. See [response_time()].}
+#'      time. Additional arguments: `response_fraction`. See [response_time()].}
 #'      \item{`"peak_slope"`}{Peak rolling linear regression slope. Additional
 #'      arguments: `width` or `span`, `align`, `partial`, `na.rm`. See
 #'      [peak_slope()].}
@@ -24,13 +24,13 @@
 #'      `control`. See [biexponential()].}
 #'      \item{`"exponential_drift"`}{Monoexponential curve with a secondary
 #'      linear drift, fit via [stats::nls()]. Additional arguments: `use_TD`,
-#'      `drift_frac`, `fix`, `control`. See [exponential_drift()].}
+#'      `drift_fraction`, `fix`, `control`. See [exponential_drift()].}
 #'      \item{`"sigmoidal"`}{Logistic or Gompertz-family curve fit via
 #'      [stats::nls()]. Additional arguments: `shape`, `fix`, `control`.
 #'      See [logistic()].}
 #'      \item{`"sigmoidal_drift"`}{Logistic or Gompertz-family curve with
 #'      linear drifts at both asymptotes, fit via [stats::nls()]. Additional
-#'      arguments: `shape`, `drift_frac`, `fix`, `control`. See
+#'      arguments: `shape`, `drift_fraction`, `fix`, `control`. See
 #'      [sigmoidal_drift()].}
 #'   }
 #' @param start_time A numeric value in units of `time_channel` specifying the
@@ -66,10 +66,10 @@
 #'   Applied globally to every channel and interval. `warnOnly = FALSE` turns
 #'   a non-converged bounded fit into a fit failure (`NA` coefficients with a
 #'   warning).
-#' @param fraction **response_time**: A numeric vector of values in the range
+#' @param response_fraction **response_time**: A numeric vector of values in the range
 #'   `[0, 1]` specifying the fractional response amplitude(s) to detect.
 #'   Defaults to `0.5` (50% response, i.e. half-response time). Multiple
-#'   values (e.g. `c(0.5, 0.632)`) return one coefficient row per fraction.
+#'   values (e.g. `c(0.5, 0.632)`) return one coefficient row per response_fraction.
 #' @param width **peak_slope**: An integer defining the local window in
 #'   number of samples around `idx` in which to perform the operation,
 #'   according to `align`. Only one of either `width` or `span` must be defined.
@@ -108,16 +108,16 @@
 #'   parameters are excluded from estimation and reported at their fixed
 #'   values. Specify per-channel as a list of lists keyed by channel name, e.g.
 #'   `fix = list(smo2 = list(A = 0))`. See *Details*.
-#' @param drift_frac **exponential_drift, sigmoidal_drift**: A numeric
+#' @param drift_fraction **exponential_drift, sigmoidal_drift**: A numeric
 #'   fraction of the primary amplitude in `(0.5, 1)` bounding the drift
 #'   regions. For **exponential_drift** the linear drift begins where the
-#'   primary response reaches `A + drift_frac * (B - A)`, at
-#'   `TD - tau * log(1 - drift_frac)`. For **sigmoidal_drift** the leading
-#'   drift applies only below `A + (1 - drift_frac) * (B - A)` (before
-#'   `texc_A`) and the trailing drift only above `A + drift_frac * (B - A)`
+#'   primary response reaches `A + drift_fraction * (B - A)`, at
+#'   `TD - tau * log(1 - drift_fraction)`. For **sigmoidal_drift** the leading
+#'   drift applies only below `A + (1 - drift_fraction) * (B - A)` (before
+#'   `texc_A`) and the trailing drift only above `A + drift_fraction * (B - A)`
 #'   (after `texc_B`). The default `0.95` is always held constant. Specify
 #'   per-channel as a list keyed by channel name, e.g.
-#'   `drift_frac = list(smo2 = 0.9)`. See *Details*.
+#'   `drift_fraction = list(smo2 = 0.9)`. See *Details*.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
 #'
@@ -300,15 +300,15 @@
 #' A non-parametric approach (estimated directly from the observed data without
 #' assuming a specific mathematical shape) to estimate the response time at
 #' which a signal reaches a specified fraction of its total response amplitude
-#' relative to the baseline. e.g. *half-response time* (`fraction = 0.5`) is
+#' relative to the baseline. e.g. *half-response time* (`response_fraction = 0.5`) is
 #' the time from response onset to attain 50% of the total amplitude change
 #' and approximates the inflection point (`xmid` of a symmetrical sigmoid
-#' function). `fraction = 0.632` approximates the time constant (`tau`;
+#' function). `response_fraction = 0.632` approximates the time constant (`tau`;
 #' \eqn{\tau}) parameter from a monoexponential function, or the inflection
-#' point (`xmid`) of an asymmetrical left-Gompertz function. `fraction = 0.368`
+#' point (`xmid`) of an asymmetrical left-Gompertz function. `response_fraction = 0.368`
 #' approximates `xmid` of a right-Gompertz function.
 #'
-#' The target response value is: `fitted = A + (B - A) * fraction`
+#' The target response value is: `fitted = A + (B - A) * response_fraction`
 #'
 #' Where `A` is the mean baseline value (`time_channel <= start_time`) and `B`
 #' is the first local extreme (peak or trough) value with no greater extreme
@@ -429,12 +429,12 @@
 #' Model equation:
 #'
 #' `A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) +
-#' slope * pmax(t - TD + tau * log(1 - drift_frac), 0)`
+#' slope * pmax(t - TD + tau * log(1 - drift_fraction), 0)`
 #'
 #' `A`, `B`, `tau`, `TD`, and the derived `k`, `MRT`, and `HRT` are as for
 #' *"monoexponential"*. `slope` is the linear drift rate `dx/dt`. The drift
-#' onset is fixed where the primary response reaches `drift_frac` of its
-#' amplitude, `TD - tau * log(1 - drift_frac)` (*default* `0.95`;
+#' onset is fixed where the primary response reaches `drift_fraction` of its
+#' amplitude, `TD - tau * log(1 - drift_fraction)` (*default* `0.95`;
 #' `TD + 3 * tau`). The excursion point `texc` is where the
 #' drift rate overtakes the decaying primary rate,
 #' `TD + tau * log(|B - A| / (|slope| * tau))`, floored at the drift onset:
@@ -451,7 +451,7 @@
 #' `|slope| * (t_end - onset)`, is below twice the fit RMSE, with a warning
 #' recorded in `warnings`. The `model` coefficient column names the method
 #' each row comes from; monoexponential rows report `texc`, `slope`,
-#' `drift_frac`, and `texc_fitted` as `NA`.
+#' `drift_fraction`, and `texc_fitted` as `NA`.
 #'
 #' `A`, `B`, `tau`, `slope`, and `TD` may be held constant with `fix`, as
 #' above.
@@ -508,9 +508,9 @@
 #' `slope_A` and `slope_B` are the linear drift rates `dx/dt` at the
 #' asymptotes `A` and `B`. Each drift is a hinge line anchored at zero at
 #' its cutoff: the leading drift applies only before `texc_A`, where the
-#' sigmoid reaches `1 - drift_frac` (*default* `0.95`; 5%) of its
+#' sigmoid reaches `1 - drift_fraction` (*default* `0.95`; 5%) of its
 #' amplitude, and the trailing drift only after `texc_B`, where it reaches
-#' `drift_frac` (95%). The cutoffs are the analytic inverse of each
+#' `drift_fraction` (95%). The cutoffs are the analytic inverse of each
 #' `shape` (see [sigmoidal_drift()]), so a Gompertz form places its cutoff
 #' further out on its slow side. The drift regions never overlap, so the
 #' two drifts are fitted independently. `texc_A` and `texc_B` are reported
@@ -523,7 +523,7 @@
 #' `|slope_B| * (t_end - texc_B)`, are below twice the fit RMSE, with a
 #' warning recorded in `warnings`. One supported drift keeps the full
 #' model. The `model` coefficient column names the method each row comes
-#' from; sigmoidal rows report `slope_A`, `slope_B`, `drift_frac`, `texc_A`,
+#' from; sigmoidal rows report `slope_A`, `slope_B`, `drift_fraction`, `texc_A`,
 #' and `texc_B` as `NA`.
 #'
 #' `A`, `B`, `xmid`, `slope`, `slope_A`, and `slope_B` may be held constant
@@ -668,7 +668,7 @@ analyse_kinetics <- function(
     zero_time = FALSE,
     verbose = TRUE,
     ...,
-    fraction = 0.5,
+    response_fraction = 0.5,
     width = NULL,
     span = NULL,
     align = c("centre", "left", "right"),
@@ -676,7 +676,7 @@ analyse_kinetics <- function(
     na.rm = FALSE,
     use_TD = TRUE,
     shape = c("symmetric", "gompertz", "gompertz_left"),
-    drift_frac = NULL,
+    drift_fraction = NULL,
     fix = NULL
 ) {
     ## normalise method aliases before matching
@@ -707,7 +707,7 @@ analyse_kinetics.response_time <- function(
     zero_time = FALSE,
     verbose = TRUE,
     ...,
-    fraction = 0.5
+    response_fraction = 0.5
 ) {
     if (missing(verbose)) {
         verbose <- getOption("mnirs.verbose", default = TRUE)
@@ -867,7 +867,7 @@ analyse_kinetics.exponential_drift <- function(
     verbose = TRUE,
     ...,
     use_TD = TRUE,
-    drift_frac = 0.95,
+    drift_fraction = 0.95,
     fix = NULL
 ) {
     if (missing(verbose)) {
@@ -948,7 +948,7 @@ analyse_kinetics.sigmoidal_drift <- function(
     verbose = TRUE,
     ...,
     shape = c("symmetric", "gompertz", "gompertz_left"),
-    drift_frac = 0.95,
+    drift_fraction = 0.95,
     fix = NULL
 ) {
     if (missing(verbose)) {

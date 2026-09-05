@@ -9,7 +9,7 @@ analyse_response_time(
   nirs_channels = NULL,
   time_channel = NULL,
   start_time = NULL,
-  fraction = 0.5,
+  response_fraction = 0.5,
   direction = c("auto", "positive", "negative"),
   end_window = Inf,
   verbose = TRUE,
@@ -40,10 +40,10 @@ time of response onset (effectively time = \code{0} of the response). If \code{N
 (\emph{default}), retrieves \code{interval_times} from \emph{"mnirs"} metadata, or falls
 back to \code{0} or the first positive time value (see \emph{Details}).}
 
-\item{fraction}{\strong{response_time}: A numeric vector of values in the range
+\item{response_fraction}{\strong{response_time}: A numeric vector of values in the range
 \verb{[0, 1]} specifying the fractional response amplitude(s) to detect.
 Defaults to \code{0.5} (50\% response, i.e. half-response time). Multiple
-values (e.g. \code{c(0.5, 0.632)}) return one coefficient row per fraction.}
+values (e.g. \code{c(0.5, 0.632)}) return one coefficient row per response_fraction.}
 
 \item{direction}{A character string specifying the response direction
 \code{"positive"}, or \code{"negative"}, or detect with \code{"auto"} (\emph{default}). See
@@ -78,8 +78,8 @@ errors and warnings as coming from the user-facing function rather
 than the validator.}
 }
 \value{
-A \code{data.frame} with one row per \code{nirs_channel} per \code{fraction}
-and columns \code{nirs_channels}, \code{fraction}, \code{A}, \code{B}, \code{response_time},
+A \code{data.frame} with one row per \code{nirs_channel} per \code{response_fraction}
+and columns \code{nirs_channels}, \code{response_fraction}, \code{A}, \code{B}, \code{response_time},
 \code{response_value}, \code{fitted}, \code{idx}. Per-channel metadata are attached
 as attributes:
 \itemize{

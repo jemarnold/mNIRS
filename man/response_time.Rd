@@ -8,7 +8,7 @@ response_time(
   x,
   t = seq_along(x),
   start_time = 0,
-  fraction = 0.5,
+  response_fraction = 0.5,
   direction = c("auto", "positive", "negative"),
   verbose = TRUE,
   ...
@@ -24,10 +24,10 @@ Default is \code{seq_along(x)}.}
 response in units of \code{t}. Observations where \code{t <= start_time} define the
 baseline window. Defaults to \code{0}.}
 
-\item{fraction}{A numeric vector of values in the range \verb{[0, 1]} specifying
+\item{response_fraction}{A numeric vector of values in the range \verb{[0, 1]} specifying
 the fractional response amplitude(s) to detect. Defaults to \code{0.5} (50\%
 response, i.e. half-response time). Multiple values (e.g.
-\code{c(0.5, 0.632)}) return one result per fraction.}
+\code{c(0.5, 0.632)}) return one result per response_fraction.}
 
 \item{direction}{A character string specifying the response direction
 \code{"positive"}, or \code{"negative"}, or detect with \code{"auto"} (\emph{default}). See
@@ -44,11 +44,11 @@ A named list containing:
 \item{\code{A}}{Mean baseline value (mean of \code{x} where \code{t <= start_time}).}
 \item{\code{B}}{Extreme value (maximum or minimum) after \code{start_time}.}
 \item{\code{response_time}}{Elapsed time from \code{start_time} to the fractional
-response, in units of \code{t}; one element per \code{fraction}.}
+response, in units of \code{t}; one element per \code{response_fraction}.}
 \item{\code{response_value}}{The observed signal value at the response index;
-one element per \code{fraction}.}
+one element per \code{response_fraction}.}
 \item{\code{fitted}}{The predicted fractional response value
-(\code{A + (B - A) * fraction}); one element per \code{fraction}.}
+(\code{A + (B - A) * response_fraction}); one element per \code{response_fraction}.}
 \item{\code{baseline_idx}}{Integer indices where \code{t <= start_time}.}
 \item{\code{response_idx}}{Integer index at each \code{response_value}.}
 \item{\code{extreme_idx}}{Integer index at the extreme value (\code{B}).}
@@ -64,7 +64,7 @@ to \code{\link[=analyse_kinetics]{analyse_kinetics()}} when \code{method = "resp
 
 The target response value is computed as:
 
-\code{response_fitted = A + (B - A) * fraction}
+\code{response_fitted = A + (B - A) * response_fraction}
 
 where \code{A} is the mean baseline (\code{t <= start_time}) and \code{B} is the extreme
 (peak or trough) value after \code{start_time}. The response time is the elapsed
@@ -95,7 +95,7 @@ t <- 0:60
 x <- monoexponential(t, A = 20, B = 60, tau = 8, TD = 10) + rnorm(length(t), 0, 1)
 
 ## half-response time (0.5) and mean response time (0.632 ~= tau)
-RT <- response_time(x, t, start_time = 10, fraction = c(0.5, 0.632))
+RT <- response_time(x, t, start_time = 10, response_fraction = c(0.5, 0.632))
 
 plot(t, x, type = "l", col = "grey60", xlab = "t", ylab = "x")
 ## baseline mean across baseline_idx
@@ -104,7 +104,7 @@ segments(
     t[max(RT$baseline_idx)], RT$A,
     col = "red", lwd = 2
 )
-## fraction = 0.5 (red) and 0.632 (blue): response_value, and extreme
+## response_fraction = 0.5 (red) and 0.632 (blue): response_value, and extreme
 points(t[RT$response_idx], RT$response_value, col = c("red", "blue"), pch = 19)
 points(t[RT$extreme_idx], RT$B, col = "red", pch = 19)
 

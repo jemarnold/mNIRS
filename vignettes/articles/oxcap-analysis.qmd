@@ -1,7 +1,7 @@
 ---
 title: "Analysing muscle oxidative capacity with {mnirs}"
 author:
-    - name: Jem Arnold
+    - name: "Jem Arnold  [{{< fa brands github >}}](https://github.com/jemarnold/mnirs){target=\"_blank\"} [{{< fa brands bluesky >}}](https://bsky.app/profile/jemarnold.bsky.social){target=\"_blank\"} [{{< ai researchgate >}}](https://researchgate.net/profile/Jem-Arnold){target=\"_blank\"} [{{< ai orcid >}}](https://orcid.org/0000-0003-3908-9447){target=\"_blank\"}"
 date: last-modified
 format:
     html:
@@ -21,12 +21,12 @@ knitr:
 
 # Introduction
 
-The [`{mnirs}`](https://github.com/jemarnold/mnirs) package is under active development with processing and analysis methods for muscle near-infrared spectroscopy in R.
+The [`{mnirs}`](https://github.com/jemarnold/mnirs){target="_blank"} package is under active development with processing and analysis methods for muscle near-infrared spectroscopy in R.
 
 This article demonstrates recently added functionality in *{mnirs}* can be combined to perform muscle oxidative capacity (OxCap) analysis from a repeated ischaemic occlusion protocol, ensuring reproducibility and adhering to current gold-standard processing methods.
 
 ::: {.callout-note}
-This article assumes basic familiarity with the *{mnirs}* package. For an overview and demonstration of data processing with *{mnirs}*, please see the original package vignette [*Reading and Cleaning Data with mnirs*](https://jemarnold.github.io/mnirs/articles/reading-mnirs-data.html).
+This article assumes basic familiarity with the *{mnirs}* package. For an overview and demonstration of data processing with *{mnirs}*, please see the original package vignette [*Reading and Cleaning Data with mnirs*](https://jemarnold.github.io/mnirs/articles/reading-mnirs-data.html){target="_blank"}.
 :::
 
 ::: {.callout-tip}
@@ -122,7 +122,7 @@ options(mnirs.verbose = FALSE) ## silence mnirs messages
 ::: {.callout-note}
 ## Acknowledgement
 
-I received this example file from [Dr. Thomas Tripp](https://scholar.google.com/citations?user=A9JwQbYAAAAJ&hl=en), currently a postdoctoral fellow in [Dr. Martin MacInnis](https://scholar.google.com/citations?hl=en&user=tJepNIQAAAAJ)' lab at the University of Calgary. They have kindly allowed me to include this file with the *{mnirs}* package for users to examine themselves.
+I received this example file from [Dr. Thomas Tripp](https://scholar.google.com/citations?user=A9JwQbYAAAAJ&hl=en){target="_blank"}, currently a postdoctoral fellow in [Dr. Martin MacInnis](https://scholar.google.com/citations?hl=en&user=tJepNIQAAAAJ){target="_blank"}' lab at the University of Calgary. They have kindly allowed me to include this file with the *{mnirs}* package for users to examine themselves.
 
 It can be accessed by calling `example_mnirs("portamon-oxcap")`.
 :::
@@ -476,15 +476,15 @@ For that, we could use an exploratory third `analyse_kinetics()` method:
 
 The **exponential-drift** method is a *parametric* two-phase approach: it fits a monoexponential primary response with a secondary linear drift beginning near the primary asymptote, with `stats::nls()` and `SSexponential_drift()`. *A*, *B*, *tau*, and the derived *k*, *MRT*, and *HRT* are interpreted the same as for *"monoexponential"* above. The additional *slope* coefficient is the linear drift rate (in response units per unit `time_channel`).
 
-It fits a **5-parameter** model `A + (B − A)(1 − exp(−t / tau)) + slope × max(t + tau × log(1 − drift_frac), 0)`, or a **6-parameter** model adding a time delay *TD*.
+It fits a **5-parameter** model `A + (B − A)(1 − exp(−t / tau)) + slope × max(t + tau × log(1 − drift_fraction), 0)`, or a **6-parameter** model adding a time delay *TD*.
 
 A slow drift in mV̇O<sub>2</sub> after the primary recovery is physiologically plausible, e.g. from post-occlusion reactive hyperaemia or a slow-component shift in resting metabolic demand. Separating it from the primary response means the exponential phase is no longer forced to absorb the drift into its asymptote. See `?exponential_drift` and `?SSexponential_drift` for details.
 
-* `drift_frac` (determines where the drift begins)
+* `drift_fraction` (determines where the drift begins)
 
-    The drift onset occurs where the primary response reaches the specified fraction of its amplitude, `TD − tau × log(1 − drift_frac)`. Before the onset, the drift term is considered to be zero. The reported excursion point *texc* is where the secondary drift rate overtakes the decaying primary rate (the turning point of the curve when the two phases oppose).\
+    The drift onset occurs where the primary response reaches the specified fraction of its amplitude, `TD − tau × log(1 − drift_fraction)`. Before the onset, the drift term is considered to be zero. The reported excursion point *texc* is where the secondary drift rate overtakes the decaying primary rate (the turning point of the curve when the two phases oppose).\
 \
-The default `drift_frac = 0.95` places drift onset at 95% of the primary amplitude (3 × *tau* after *TD*), i.e. where the primary response is effectively complete. It can be manually adjusted, but smaller fractions allow the drift response to encroach on and absorb more of the primary response, biasing the more physiologically relevant *tau* estimate. We will leave it at the default.
+The default `drift_fraction = 0.95` places drift onset at 95% of the primary amplitude (3 × *tau* after *TD*), i.e. where the primary response is effectively complete. It can be manually adjusted, but smaller fractions allow the drift response to encroach on and absorb more of the primary response, biasing the more physiologically relevant *tau* estimate. We will leave it at the default.
 
 ::: {.callout-caution}
 Please note! **Exponential-drift** kinetics is currently experimental based on empirical observation, and remains to be more rigorously validated.
@@ -499,7 +499,7 @@ exp_drift_results <- analyse_kinetics(
     time_channel    = peak_slope_time,
     method          = "exponential_drift",
     use_TD          = FALSE,
-    drift_frac      = 0.95,
+    drift_fraction  = 0.95,
     group_intervals = list(trial1 = 1:16, trial2 = 17:32),
     zero_time       = TRUE
 )
@@ -517,9 +517,9 @@ We will plot the new results using default labels, and displaying the two-phase 
 plot(
     exp_drift_results,
     time_labels = TRUE,
-    points = TRUE,
-    label_size = 5,
-    components = TRUE
+    points      = TRUE,
+    label_size  = 5,
+    components  = TRUE
 ) +
     labs(
         x = "Occlusion Times (mm:ss)",
@@ -538,7 +538,7 @@ We can evaluate the fit diagnostics for this advanced kinetics fit, however we s
 ## bind both fit diagnostics into a single comparison table
 ## compare by trial
 bind_rows(
-    monoexponential = monoexp_results$diagnostics,
+    monoexponential   = monoexp_results$diagnostics,
     exponential_drift = exp_drift_results$diagnostics,
     .id = "model"
 ) |>

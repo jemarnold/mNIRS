@@ -9,7 +9,7 @@ analyse_sigmoidal_drift(
   nirs_channels = NULL,
   time_channel = NULL,
   shape = c("symmetric", "gompertz", "gompertz_left"),
-  drift_frac = 0.95,
+  drift_fraction = 0.95,
   fix = NULL,
   control = NULL,
   start_time = NULL,
@@ -43,12 +43,12 @@ used.
 (early-inflection; calls \code{\link[=SSgompertz]{SSgompertz()}}), or \code{"gompertz_left"}
 (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}).}
 
-\item{drift_frac}{A numeric fraction of the amplitude in \verb{(0.5, 1)}
+\item{drift_fraction}{A numeric fraction of the amplitude in \verb{(0.5, 1)}
 bounding the drift regions (\emph{default} \code{0.95}): the leading drift
-applies below \code{A + (1 - drift_frac) * (B - A)} and the trailing drift
-above \code{A + drift_frac * (B - A)}. Always held constant. Applied to
+applies below \code{A + (1 - drift_fraction) * (B - A)} and the trailing drift
+above \code{A + drift_fraction * (B - A)}. Always held constant. Applied to
 every channel, or per-channel as a list keyed by channel name, e.g.
-\code{drift_frac = list(smo2 = 0.9)}.}
+\code{drift_fraction = list(smo2 = 0.9)}.}
 
 \item{fix}{An \emph{optional} named list of model parameters (\code{A}, \code{B},
 \code{xmid}, \code{slope}, \code{slope_A}, \code{slope_B}) to hold constant during fitting,
@@ -100,7 +100,7 @@ than the validator.}
 \value{
 A \code{data.frame} with one row per \code{nirs_channel} and columns
 \code{nirs_channels}, \code{A}, \code{B}, \code{xmid}, \code{slope}, \code{slope_A}, \code{slope_B},
-\code{drift_frac}, \code{texc_A}, \code{texc_B}, \code{xmid_fitted}. \code{texc_A} and \code{texc_B}
+\code{drift_fraction}, \code{texc_A}, \code{texc_B}, \code{xmid_fitted}. \code{texc_A} and \code{texc_B}
 are the drift cutoff times (see \code{\link[=sigmoidal_drift]{sigmoidal_drift()}}).
 Per-channel metadata are attached as attributes:
 \itemize{

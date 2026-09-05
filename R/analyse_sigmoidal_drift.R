@@ -6,11 +6,11 @@
 #' @param slope_A,slope_B Numeric parameters for the linear drift rates
 #'   `dx/dt` at the starting asymptote `A` and the ending asymptote `B`, in
 #'   response units per unit of the predictor variable `t`.
-#' @param drift_frac A numeric fraction of the amplitude `B - A` in
+#' @param drift_fraction A numeric fraction of the amplitude `B - A` in
 #'   `(0.5, 1)` bounding the drift regions: the leading drift applies only
-#'   before the sigmoid reaches `A + (1 - drift_frac) * (B - A)` (at
+#'   before the sigmoid reaches `A + (1 - drift_fraction) * (B - A)` (at
 #'   `texc_A`), the trailing drift only after it reaches
-#'   `A + drift_frac * (B - A)` (at `texc_B`).
+#'   `A + drift_fraction * (B - A)` (at `texc_B`).
 #' @param shape Character; the sigmoidal shape. One of `"symmetric"`
 #'   (*default*; [logistic()]), `"gompertz"` ([gompertz()]), or
 #'   `"gompertz_left"` ([gompertz_left()]).
@@ -27,8 +27,8 @@
 #' exactly zero up to `texc_B`. The cutoffs never overlap
 #' (`texc_A < xmid < texc_B`), so the two drifts are independent.
 #'
-#' The cutoffs are where the sigmoid reaches the `1 - drift_frac` and
-#' `drift_frac` fractions of its amplitude (`p = 1 - drift_frac`):
+#' The cutoffs are where the sigmoid reaches the `1 - drift_fraction` and
+#' `drift_fraction` fractions of its amplitude (`p = 1 - drift_fraction`):
 #'
 #' - `shape = "symmetric"`: `k = 4 * slope / (B - A)`;
 #'   `texc_A = xmid - log((1 - p) / p) / k`,
@@ -54,14 +54,14 @@
 #' t <- 1:120
 #' x <- sigmoidal_drift(
 #'     t, A = 10, B = 100, xmid = 40, slope = 4,
-#'     slope_A = 0.3, slope_B = -0.4, drift_frac = 0.95
+#'     slope_A = 0.3, slope_B = -0.4, drift_fraction = 0.95
 #' ) + rnorm(length(t), 0, 2)
 #' data <- data.frame(t, x)
 #'
 #' ## the cutoff fraction is held constant in the formula
 #' model <- nls(
 #'     x ~ SSsigmoidal_drift(
-#'         t, A, B, xmid, slope, slope_A, slope_B, drift_frac = 0.95
+#'         t, A, B, xmid, slope, slope_A, slope_B, drift_fraction = 0.95
 #'     ),
 #'     data = data,
 #'     algorithm = "port",
@@ -89,11 +89,11 @@ sigmoidal_drift <- function(
     slope,
     slope_A,
     slope_B,
-    drift_frac,
+    drift_fraction,
     shape = c("symmetric", "gompertz", "gompertz_left")
 ) {
     shape <- match.arg(shape)
-    cut <- sigdrift_cutoffs(A, B, xmid, slope, drift_frac, shape)
+    cut <- sigdrift_cutoffs(A, B, xmid, slope, drift_fraction, shape)
     ## primary sigmoid + hinge-linear drifts outside the cutoffs
     S <- switch(
         shape,
@@ -110,7 +110,7 @@ sigmoidal_drift <- function(
 #' Drift cutoff times of the sigmoidal-drift model
 #'
 #' The times at which a sigmoid of the given `shape` reaches the
-#' `1 - drift_frac` and `drift_frac` fractions of its amplitude, by the
+#' `1 - drift_fraction` and `drift_fraction` fractions of its amplitude, by the
 #' analytic inverse of each shape (see [sigmoidal_drift()]).
 #'
 #' @inheritParams sigmoidal_drift
@@ -118,8 +118,8 @@ sigmoidal_drift <- function(
 #' @returns A named numeric vector `c(texc_A, texc_B)`.
 #'
 #' @keywords internal
-sigdrift_cutoffs <- function(A, B, xmid, slope, drift_frac, shape) {
-    p <- 1 - drift_frac
+sigdrift_cutoffs <- function(A, B, xmid, slope, drift_fraction, shape) {
+    p <- 1 - drift_fraction
     cut <- switch(
         shape,
         symmetric = {
@@ -181,7 +181,7 @@ sigdrift_init <- function(mCall, data, LHS, ...) {
 #' @keywords internal
 sigdrift_start <- function(x, t, fixed = list(), shape = "symmetric") {
     ## `[[` throughout: `$` would partial-match `slope` to `slope_A`
-    p <- fixed[["drift_frac"]] %||% 0.95
+    p <- fixed[["drift_fraction"]] %||% 0.95
     ab <- init_asymptotes(x)
 
     ## a tail's residual regressed on time from its cutoff: the intercept
@@ -251,7 +251,7 @@ sigdrift_start <- function(x, t, fixed = list(), shape = "symmetric") {
         slope = s$slope,
         slope_A = s$slope_A,
         slope_B = s$slope_B,
-        drift_frac = p
+        drift_fraction = p
     ))
 }
 
@@ -261,19 +261,19 @@ sigdrift_start <- function(x, t, fixed = list(), shape = "symmetric") {
 #' Creates initial coefficient estimates for a `selfStart` wrapper around
 #' [sigmoidal_drift()], for use with [stats::nls()]: a 4-parameter sigmoid
 #' (`A`, `B`, `xmid`, `slope`) with linear drifts `slope_A` and `slope_B`
-#' at its asymptotes, outside the cutoff fraction `drift_frac`.
+#' at its asymptotes, outside the cutoff fraction `drift_fraction`.
 #'
 #' @usage
-#' SSsigmoidal_drift(t, A, B, xmid, slope, slope_A, slope_B, drift_frac,
+#' SSsigmoidal_drift(t, A, B, xmid, slope, slope_A, slope_B, drift_fraction,
 #'     shape = "symmetric")
 #'
 #' @inheritParams sigmoidal_drift
 #'
 #' @details
 #' `x ~ SSsigmoidal_drift(t, A, B, xmid, slope, slope_A, slope_B,
-#' drift_frac = 0.95, shape = "gompertz")`
+#' drift_fraction = 0.95, shape = "gompertz")`
 #'
-#' `drift_frac` should be written as a constant, and `shape` is a string
+#' `drift_fraction` should be written as a constant, and `shape` is a string
 #' constant (`"symmetric"` when omitted); neither is estimated. The hinges
 #' at the cutoffs are not differentiable, so `algorithm = "port"` with
 #' `control = nls.control(warnOnly = TRUE)` is recommended.
@@ -283,7 +283,7 @@ sigdrift_start <- function(x, t, fixed = list(), shape = "symmetric") {
 #' Any parameter may be held constant by writing a value in place of its
 #'   name in the formula, e.g.
 #'   `x ~ SSsigmoidal_drift(t, A = 0, B, xmid, slope, slope_A, slope_B,
-#'   drift_frac = 0.95)` holds the starting asymptote at `0`. Fixed
+#'   drift_fraction = 0.95)` holds the starting asymptote at `0`. Fixed
 #'   parameters are excluded from estimation and are not returned by
 #'   [stats::coef()].
 #'
@@ -299,14 +299,14 @@ sigdrift_start <- function(x, t, fixed = list(), shape = "symmetric") {
 #' t <- 1:120
 #' x <- sigmoidal_drift(
 #'     t, A = 10, B = 100, xmid = 40, slope = 4,
-#'     slope_A = 0.3, slope_B = -0.4, drift_frac = 0.95, shape = "gompertz"
+#'     slope_A = 0.3, slope_B = -0.4, drift_fraction = 0.95, shape = "gompertz"
 #' ) + rnorm(length(t), 0, 2)
 #' data <- data.frame(t, x)
 #'
 #' model <- nls(
 #'     x ~ SSsigmoidal_drift(
 #'         t, A, B, xmid, slope, slope_A, slope_B,
-#'         drift_frac = 0.95, shape = "gompertz"
+#'         drift_fraction = 0.95, shape = "gompertz"
 #'     ),
 #'     data = data,
 #'     algorithm = "port",
@@ -319,7 +319,7 @@ SSsigmoidal_drift <- selfStart(
     model = sigmoidal_drift,
     initial = init_fixed(
         sigdrift_init,
-        c("A", "B", "xmid", "slope", "slope_A", "slope_B", "drift_frac")
+        c("A", "B", "xmid", "slope", "slope_A", "slope_B", "drift_fraction")
     ),
     parameters = c(
         "A",
@@ -328,7 +328,7 @@ SSsigmoidal_drift <- selfStart(
         "slope",
         "slope_A",
         "slope_B",
-        "drift_frac"
+        "drift_fraction"
     )
 )
 
@@ -341,12 +341,12 @@ SSsigmoidal_drift <- selfStart(
 #' single *"mnirs"* data frame. See [analyse_kinetics()] for user-facing
 #' documentation.
 #'
-#' @param drift_frac A numeric fraction of the amplitude in `(0.5, 1)`
+#' @param drift_fraction A numeric fraction of the amplitude in `(0.5, 1)`
 #'   bounding the drift regions (*default* `0.95`): the leading drift
-#'   applies below `A + (1 - drift_frac) * (B - A)` and the trailing drift
-#'   above `A + drift_frac * (B - A)`. Always held constant. Applied to
+#'   applies below `A + (1 - drift_fraction) * (B - A)` and the trailing drift
+#'   above `A + drift_fraction * (B - A)`. Always held constant. Applied to
 #'   every channel, or per-channel as a list keyed by channel name, e.g.
-#'   `drift_frac = list(smo2 = 0.9)`.
+#'   `drift_fraction = list(smo2 = 0.9)`.
 #' @param fix An *optional* named list of model parameters (`A`, `B`,
 #'   `xmid`, `slope`, `slope_A`, `slope_B`) to hold constant during fitting,
 #'   e.g. `fix = list(A = 0)`. Applied to every channel, or per-channel as
@@ -359,7 +359,7 @@ SSsigmoidal_drift <- selfStart(
 #'
 #' @returns A `data.frame` with one row per `nirs_channel` and columns
 #'   `nirs_channels`, `A`, `B`, `xmid`, `slope`, `slope_A`, `slope_B`,
-#'   `drift_frac`, `texc_A`, `texc_B`, `xmid_fitted`. `texc_A` and `texc_B`
+#'   `drift_fraction`, `texc_A`, `texc_B`, `xmid_fitted`. `texc_A` and `texc_B`
 #'   are the drift cutoff times (see [sigmoidal_drift()]).
 #'   Per-channel metadata are attached as attributes:
 #'   - `"model"`: an [nls][stats::nls] model object, or `NULL` for channels
@@ -380,7 +380,7 @@ analyse_sigmoidal_drift <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     shape = c("symmetric", "gompertz", "gompertz_left"),
-    drift_frac = 0.95,
+    drift_fraction = 0.95,
     fix = NULL,
     control = NULL,
     start_time = NULL,
@@ -403,7 +403,7 @@ analyse_sigmoidal_drift <- function(
         enquo(time_channel),
         # fmt: skip
         arg_list = mget(c(
-            "shape", "drift_frac", "fix", "control", "start_time",
+            "shape", "drift_fraction", "fix", "control", "start_time",
             "direction", "end_window"
         )),
         choices = list(
@@ -419,14 +419,14 @@ analyse_sigmoidal_drift <- function(
     time_channel <- setup$time_channel
     ## NA scaffold (method columns only) for convergence failure
     na_cols <- kinetics_coef_cols$sigmoidal_drift
-    params <- c("A", "B", "xmid", "slope", "slope_A", "slope_B", "drift_frac")
+    params <- c("A", "B", "xmid", "slope", "slope_A", "slope_B", "drift_fraction")
     fn <- quote(SSsigmoidal_drift)
 
     ## method-specific fit: self-starting sigmoidal-drift via nls
     sigdrift_fit <- function(.nirs, x_fit, t_fit, .a, valid) {
         ## the cutoff fraction is always held constant; the shape rides in
         ## the formula as a string constant beside the fixed parameters
-        .a$fix <- c(.a$fix, list(drift_frac = .a$drift_frac))
+        .a$fix <- c(.a$fix, list(drift_fraction = .a$drift_fraction))
         fix_all <- c(.a$fix, list(shape = .a$shape))
         free <- setdiff(params, names(.a$fix))
         ## columns carry the channel names so the model predicts on them
@@ -513,7 +513,7 @@ analyse_sigmoidal_drift <- function(
             coefs[["B"]],
             coefs[["xmid"]],
             coefs[["slope"]],
-            coefs[["drift_frac"]],
+            coefs[["drift_fraction"]],
             .a$shape
         )
         xmid_fitted <- as.numeric(
@@ -531,7 +531,7 @@ analyse_sigmoidal_drift <- function(
                 slope = coefs[["slope"]],
                 slope_A = coefs[["slope_A"]],
                 slope_B = coefs[["slope_B"]],
-                drift_frac = coefs[["drift_frac"]],
+                drift_fraction = coefs[["drift_fraction"]],
                 texc_A = cut[[1L]],
                 texc_B = cut[[2L]],
                 xmid_fitted = xmid_fitted

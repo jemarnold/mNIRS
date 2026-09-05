@@ -25,7 +25,7 @@ analyse_kinetics(
   zero_time = FALSE,
   verbose = TRUE,
   ...,
-  fraction = 0.5,
+  response_fraction = 0.5,
   width = NULL,
   span = NULL,
   align = c("centre", "left", "right"),
@@ -33,7 +33,7 @@ analyse_kinetics(
   na.rm = FALSE,
   use_TD = TRUE,
   shape = c("symmetric", "gompertz", "gompertz_left"),
-  drift_frac = NULL,
+  drift_fraction = NULL,
   fix = NULL
 )
 
@@ -76,7 +76,7 @@ used.
 Additional arguments must be specified for each method. See \emph{Details}.
 \describe{
 \item{\code{"response_time"}}{Fractional (e.g. 50\%, 63.2\%, 90\%) response
-time. Additional arguments: \code{fraction}. See \code{\link[=response_time]{response_time()}}.}
+time. Additional arguments: \code{response_fraction}. See \code{\link[=response_time]{response_time()}}.}
 \item{\code{"peak_slope"}}{Peak rolling linear regression slope. Additional
 arguments: \code{width} or \code{span}, \code{align}, \code{partial}, \code{na.rm}. See
 \code{\link[=peak_slope]{peak_slope()}}.}
@@ -88,13 +88,13 @@ fit via \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_T
 \code{control}. See \code{\link[=biexponential]{biexponential()}}.}
 \item{\code{"exponential_drift"}}{Monoexponential curve with a secondary
 linear drift, fit via \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{use_TD},
-\code{drift_frac}, \code{fix}, \code{control}. See \code{\link[=exponential_drift]{exponential_drift()}}.}
+\code{drift_fraction}, \code{fix}, \code{control}. See \code{\link[=exponential_drift]{exponential_drift()}}.}
 \item{\code{"sigmoidal"}}{Logistic or Gompertz-family curve fit via
 \code{\link[stats:nls]{stats::nls()}}. Additional arguments: \code{shape}, \code{fix}, \code{control}.
 See \code{\link[=logistic]{logistic()}}.}
 \item{\code{"sigmoidal_drift"}}{Logistic or Gompertz-family curve with
 linear drifts at both asymptotes, fit via \code{\link[stats:nls]{stats::nls()}}. Additional
-arguments: \code{shape}, \code{drift_frac}, \code{fix}, \code{control}. See
+arguments: \code{shape}, \code{drift_fraction}, \code{fix}, \code{control}. See
 \code{\link[=sigmoidal_drift]{sigmoidal_drift()}}.}
 }}
 
@@ -144,10 +144,10 @@ Applied globally to every channel and interval. \code{warnOnly = FALSE} turns
 a non-converged bounded fit into a fit failure (\code{NA} coefficients with a
 warning).}
 
-\item{fraction}{\strong{response_time}: A numeric vector of values in the range
+\item{response_fraction}{\strong{response_time}: A numeric vector of values in the range
 \verb{[0, 1]} specifying the fractional response amplitude(s) to detect.
 Defaults to \code{0.5} (50\% response, i.e. half-response time). Multiple
-values (e.g. \code{c(0.5, 0.632)}) return one coefficient row per fraction.}
+values (e.g. \code{c(0.5, 0.632)}) return one coefficient row per response_fraction.}
 
 \item{width}{\strong{peak_slope}: An integer defining the local window in
 number of samples around \code{idx} in which to perform the operation,
@@ -187,16 +187,16 @@ sigmoidal shape to fit. One of \code{"symmetric"} (\emph{default}; calls
 or \code{"gompertz_left"} (late-inflection; calls \code{\link[=SSgompertz_left]{SSgompertz_left()}}). For
 \strong{sigmoidal_drift} the shape is passed to \code{\link[=SSsigmoidal_drift]{SSsigmoidal_drift()}}.}
 
-\item{drift_frac}{\strong{exponential_drift, sigmoidal_drift}: A numeric
+\item{drift_fraction}{\strong{exponential_drift, sigmoidal_drift}: A numeric
 fraction of the primary amplitude in \verb{(0.5, 1)} bounding the drift
 regions. For \strong{exponential_drift} the linear drift begins where the
-primary response reaches \code{A + drift_frac * (B - A)}, at
-\code{TD - tau * log(1 - drift_frac)}. For \strong{sigmoidal_drift} the leading
-drift applies only below \code{A + (1 - drift_frac) * (B - A)} (before
-\code{texc_A}) and the trailing drift only above \code{A + drift_frac * (B - A)}
+primary response reaches \code{A + drift_fraction * (B - A)}, at
+\code{TD - tau * log(1 - drift_fraction)}. For \strong{sigmoidal_drift} the leading
+drift applies only below \code{A + (1 - drift_fraction) * (B - A)} (before
+\code{texc_A}) and the trailing drift only above \code{A + drift_fraction * (B - A)}
 (after \code{texc_B}). The default \code{0.95} is always held constant. Specify
 per-channel as a list keyed by channel name, e.g.
-\code{drift_frac = list(smo2 = 0.9)}. See \emph{Details}.}
+\code{drift_fraction = list(smo2 = 0.9)}. See \emph{Details}.}
 
 \item{fix}{\strong{monoexponential, biexponential, exponential_drift,
 sigmoidal, sigmoidal_drift}: An \emph{optional}
@@ -444,15 +444,15 @@ Aliases:
 A non-parametric approach (estimated directly from the observed data without
 assuming a specific mathematical shape) to estimate the response time at
 which a signal reaches a specified fraction of its total response amplitude
-relative to the baseline. e.g. \emph{half-response time} (\code{fraction = 0.5}) is
+relative to the baseline. e.g. \emph{half-response time} (\code{response_fraction = 0.5}) is
 the time from response onset to attain 50\% of the total amplitude change
 and approximates the inflection point (\code{xmid} of a symmetrical sigmoid
-function). \code{fraction = 0.632} approximates the time constant (\code{tau};
+function). \code{response_fraction = 0.632} approximates the time constant (\code{tau};
 \eqn{\tau}) parameter from a monoexponential function, or the inflection
-point (\code{xmid}) of an asymmetrical left-Gompertz function. \code{fraction = 0.368}
+point (\code{xmid}) of an asymmetrical left-Gompertz function. \code{response_fraction = 0.368}
 approximates \code{xmid} of a right-Gompertz function.
 
-The target response value is: \code{fitted = A + (B - A) * fraction}
+The target response value is: \code{fitted = A + (B - A) * response_fraction}
 
 Where \code{A} is the mean baseline value (\code{time_channel <= start_time}) and \code{B}
 is the first local extreme (peak or trough) value with no greater extreme
@@ -576,12 +576,12 @@ a secondary linear drift beginning near the primary asymptote.
 
 Model equation:
 
-\code{A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) + slope * pmax(t - TD + tau * log(1 - drift_frac), 0)}
+\code{A + (B - A) * (1 - exp(-pmax(t - TD, 0) / tau)) + slope * pmax(t - TD + tau * log(1 - drift_fraction), 0)}
 
 \code{A}, \code{B}, \code{tau}, \code{TD}, and the derived \code{k}, \code{MRT}, and \code{HRT} are as for
 \emph{"monoexponential"}. \code{slope} is the linear drift rate \code{dx/dt}. The drift
-onset is fixed where the primary response reaches \code{drift_frac} of its
-amplitude, \code{TD - tau * log(1 - drift_frac)} (\emph{default} \code{0.95};
+onset is fixed where the primary response reaches \code{drift_fraction} of its
+amplitude, \code{TD - tau * log(1 - drift_fraction)} (\emph{default} \code{0.95};
 \code{TD + 3 * tau}). The excursion point \code{texc} is where the
 drift rate overtakes the decaying primary rate,
 \verb{TD + tau * log(|B - A| / (|slope| * tau))}, floored at the drift onset:
@@ -598,7 +598,7 @@ fails or the drift amplitude over the record from the drift onset,
 \verb{|slope| * (t_end - onset)}, is below twice the fit RMSE, with a warning
 recorded in \code{warnings}. The \code{model} coefficient column names the method
 each row comes from; monoexponential rows report \code{texc}, \code{slope},
-\code{drift_frac}, and \code{texc_fitted} as \code{NA}.
+\code{drift_fraction}, and \code{texc_fitted} as \code{NA}.
 
 \code{A}, \code{B}, \code{tau}, \code{slope}, and \code{TD} may be held constant with \code{fix}, as
 above.
@@ -657,9 +657,9 @@ Model equation:
 \code{slope_A} and \code{slope_B} are the linear drift rates \code{dx/dt} at the
 asymptotes \code{A} and \code{B}. Each drift is a hinge line anchored at zero at
 its cutoff: the leading drift applies only before \code{texc_A}, where the
-sigmoid reaches \code{1 - drift_frac} (\emph{default} \code{0.95}; 5\%) of its
+sigmoid reaches \code{1 - drift_fraction} (\emph{default} \code{0.95}; 5\%) of its
 amplitude, and the trailing drift only after \code{texc_B}, where it reaches
-\code{drift_frac} (95\%). The cutoffs are the analytic inverse of each
+\code{drift_fraction} (95\%). The cutoffs are the analytic inverse of each
 \code{shape} (see \code{\link[=sigmoidal_drift]{sigmoidal_drift()}}), so a Gompertz form places its cutoff
 further out on its slow side. The drift regions never overlap, so the
 two drifts are fitted independently. \code{texc_A} and \code{texc_B} are reported
@@ -672,7 +672,7 @@ drift amplitudes over their support, \verb{|slope_A| * (texc_A - t_start)} and
 \verb{|slope_B| * (t_end - texc_B)}, are below twice the fit RMSE, with a
 warning recorded in \code{warnings}. One supported drift keeps the full
 model. The \code{model} coefficient column names the method each row comes
-from; sigmoidal rows report \code{slope_A}, \code{slope_B}, \code{drift_frac}, \code{texc_A},
+from; sigmoidal rows report \code{slope_A}, \code{slope_B}, \code{drift_fraction}, \code{texc_A},
 and \code{texc_B} as \code{NA}.
 
 \code{A}, \code{B}, \code{xmid}, \code{slope}, \code{slope_A}, and \code{slope_B} may be held constant

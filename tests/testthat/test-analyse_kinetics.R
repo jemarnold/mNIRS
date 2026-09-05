@@ -1917,14 +1917,14 @@ create_response_time_data <- function(
     )
 }
 
-test_that("analyse_kinetics.response_time forwards fraction argument", {
+test_that("analyse_kinetics.response_time forwards response_fraction argument", {
     data <- create_response_time_data()
 
     result_25 <- analyse_kinetics(
         data,
         nirs_channels = "smo2",
         method = "response_time",
-        fraction = 0.25,
+        response_fraction = 0.25,
         direction = "positive",
         verbose = FALSE
     )
@@ -1932,18 +1932,18 @@ test_that("analyse_kinetics.response_time forwards fraction argument", {
         data,
         nirs_channels = "smo2",
         method = "response_time",
-        fraction = 0.5,
+        response_fraction = 0.5,
         direction = "positive",
         verbose = FALSE
     )
 
-    ## response_time monotonic in fraction
+    ## response_time monotonic in response_fraction
     expect_lt(
         result_25$coefficients$response_time,
         result_50$coefficients$response_time
     )
 
-    ## fitted = A + (B - A) * fraction
+    ## fitted = A + (B - A) * response_fraction
     A <- result_50$coefficients$A
     B <- result_50$coefficients$B
     expect_equal(result_25$coefficients$fitted, A + (B - A) * 0.25)
@@ -2345,13 +2345,13 @@ test_that("analyse_kinetics.monoexponential names only the failing interval", {
 
 ## analyse_kinetics.exponential_drift ==================================
 ## helper: create exponential-drift test data with known parameters; the
-## drift starts at the onset TD - tau * log(1 - drift_frac) = 36.3
+## drift starts at the onset TD - tau * log(1 - drift_fraction) = 36.3
 create_expdrift_data <- function(
     A = 70,
     B = 40,
     tau = 8,
     slope = 0.2,
-    drift_frac = 0.98,
+    drift_fraction = 0.98,
     TD = 5,
     n = 120,
     sample_rate = 1,
@@ -2361,7 +2361,7 @@ create_expdrift_data <- function(
 ) {
     set.seed(seed)
     t <- seq(0, (n - 1) / sample_rate, length.out = n)
-    x <- exponential_drift(t, A, B, tau, slope, drift_frac, TD) +
+    x <- exponential_drift(t, A, B, tau, slope, drift_fraction, TD) +
         rnorm(n, 0, noise_sd)
 
     df <- setNames(
@@ -2372,7 +2372,7 @@ create_expdrift_data <- function(
         for (ch in channels[-1]) {
             # fmt: skip
             df[[ch]] <- exponential_drift(
-                t, A + 5, B + 5, tau, slope, drift_frac, TD
+                t, A + 5, B + 5, tau, slope, drift_fraction, TD
             ) +
                 rnorm(n, 0, noise_sd)
         }
@@ -2400,7 +2400,7 @@ test_that("analyse_kinetics.exponential_drift dispatches to the method", {
     expect_s3_class(result, "mnirs_kinetics")
     expect_equal(result$method, "exponential_drift")
     expect_true(all(
-        c("tau", "MRT", "slope", "drift_frac", "texc", "texc_fitted") %in%
+        c("tau", "MRT", "slope", "drift_fraction", "texc", "texc_fitted") %in%
             names(result$coefficients)
     ))
     expect_named(
@@ -2463,20 +2463,20 @@ test_that("analyse_kinetics.exponential_drift passes use_TD and fix", {
     )
 })
 
-test_that("analyse_kinetics.exponential_drift passes drift_frac", {
+test_that("analyse_kinetics.exponential_drift passes drift_fraction", {
     data <- create_expdrift_data()
 
     result <- analyse_kinetics(
         data,
         nirs_channels = "smo2",
         method = "exponential_drift",
-        drift_frac = 0.85,
+        drift_fraction = 0.85,
         verbose = FALSE
     )
 
     coefs <- result$coefficients
-    expect_false("drift_frac" %in% names(coef(result$model[[1L]]$smo2)))
-    expect_equal(coefs$drift_frac, 0.85)
+    expect_false("drift_fraction" %in% names(coef(result$model[[1L]]$smo2)))
+    expect_equal(coefs$drift_fraction, 0.85)
     ## texc is the turning point past the drift onset
     expect_gt(coefs$texc, expdrift_onset(coefs$tau, 0.85, coefs$TD))
 })
@@ -2606,14 +2606,14 @@ test_that("analyze_kinetics matches analyse_kinetics for peak_slope", {
     expect_equal(result_us$call[[4L]], "peak_slope")
 })
 
-test_that("analyze_kinetics forwards method = 'response_time' and fraction", {
+test_that("analyze_kinetics forwards method = 'response_time' and response_fraction", {
     data <- create_response_time_data()
 
     result <- analyze_kinetics(
         data,
         nirs_channels = "smo2",
         method = "response time",
-        fraction = 0.5,
+        response_fraction = 0.5,
         direction = "positive",
         verbose = FALSE
     )
@@ -2624,7 +2624,7 @@ test_that("analyze_kinetics forwards method = 'response_time' and fraction", {
     expect_equal(result$call[[4L]], "response_time")
     expect_true("response_time" %in% names(result$coefficients))
 
-    ## fraction was forwarded: fitted = A + (B - A) * 0.5
+    ## response_fraction was forwarded: fitted = A + (B - A) * 0.5
     A <- result$coefficients$A
     B <- result$coefficients$B
     expect_equal(result$coefficients$fitted, A + (B - A) * 0.5)

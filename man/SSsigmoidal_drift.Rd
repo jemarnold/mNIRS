@@ -4,7 +4,7 @@
 \alias{SSsigmoidal_drift}
 \title{Self-starting sigmoidal-drift model}
 \usage{
-SSsigmoidal_drift(t, A, B, xmid, slope, slope_A, slope_B, drift_frac,
+SSsigmoidal_drift(t, A, B, xmid, slope, slope_A, slope_B, drift_fraction,
     shape = "symmetric")
 }
 \arguments{
@@ -26,11 +26,11 @@ variable at the inflection \code{xmid}.}
 \code{dx/dt} at the starting asymptote \code{A} and the ending asymptote \code{B}, in
 response units per unit of the predictor variable \code{t}.}
 
-\item{drift_frac}{A numeric fraction of the amplitude \code{B - A} in
+\item{drift_fraction}{A numeric fraction of the amplitude \code{B - A} in
 \verb{(0.5, 1)} bounding the drift regions: the leading drift applies only
-before the sigmoid reaches \code{A + (1 - drift_frac) * (B - A)} (at
+before the sigmoid reaches \code{A + (1 - drift_fraction) * (B - A)} (at
 \code{texc_A}), the trailing drift only after it reaches
-\code{A + drift_frac * (B - A)} (at \code{texc_B}).}
+\code{A + drift_fraction * (B - A)} (at \code{texc_B}).}
 
 \item{shape}{Character; the sigmoidal shape. One of \code{"symmetric"}
 (\emph{default}; \code{\link[=logistic]{logistic()}}), \code{"gompertz"} (\code{\link[=gompertz]{gompertz()}}), or
@@ -44,12 +44,12 @@ predictor variable \code{t}.
 Creates initial coefficient estimates for a \code{selfStart} wrapper around
 \code{\link[=sigmoidal_drift]{sigmoidal_drift()}}, for use with \code{\link[stats:nls]{stats::nls()}}: a 4-parameter sigmoid
 (\code{A}, \code{B}, \code{xmid}, \code{slope}) with linear drifts \code{slope_A} and \code{slope_B}
-at its asymptotes, outside the cutoff fraction \code{drift_frac}.
+at its asymptotes, outside the cutoff fraction \code{drift_fraction}.
 }
 \details{
-\code{x ~ SSsigmoidal_drift(t, A, B, xmid, slope, slope_A, slope_B, drift_frac = 0.95, shape = "gompertz")}
+\code{x ~ SSsigmoidal_drift(t, A, B, xmid, slope, slope_A, slope_B, drift_fraction = 0.95, shape = "gompertz")}
 
-\code{drift_frac} should be written as a constant, and \code{shape} is a string
+\code{drift_fraction} should be written as a constant, and \code{shape} is a string
 constant (\code{"symmetric"} when omitted); neither is estimated. The hinges
 at the cutoffs are not differentiable, so \code{algorithm = "port"} with
 \code{control = nls.control(warnOnly = TRUE)} is recommended.
@@ -57,7 +57,7 @@ at the cutoffs are not differentiable, so \code{algorithm = "port"} with
 
 Any parameter may be held constant by writing a value in place of its
 name in the formula, e.g.
-\code{x ~ SSsigmoidal_drift(t, A = 0, B, xmid, slope, slope_A, slope_B, drift_frac = 0.95)} holds the starting asymptote at \code{0}. Fixed
+\code{x ~ SSsigmoidal_drift(t, A = 0, B, xmid, slope, slope_A, slope_B, drift_fraction = 0.95)} holds the starting asymptote at \code{0}. Fixed
 parameters are excluded from estimation and are not returned by
 \code{\link[stats:coef]{stats::coef()}}.
 }
@@ -68,14 +68,14 @@ set.seed(13)
 t <- 1:120
 x <- sigmoidal_drift(
     t, A = 10, B = 100, xmid = 40, slope = 4,
-    slope_A = 0.3, slope_B = -0.4, drift_frac = 0.95, shape = "gompertz"
+    slope_A = 0.3, slope_B = -0.4, drift_fraction = 0.95, shape = "gompertz"
 ) + rnorm(length(t), 0, 2)
 data <- data.frame(t, x)
 
 model <- nls(
     x ~ SSsigmoidal_drift(
         t, A, B, xmid, slope, slope_A, slope_B,
-        drift_frac = 0.95, shape = "gompertz"
+        drift_fraction = 0.95, shape = "gompertz"
     ),
     data = data,
     algorithm = "port",

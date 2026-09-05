@@ -45,15 +45,15 @@ method_aliases <- c(
 # fmt: skip
 kinetics_dispatch <- list(
     common = c("start_time", "direction", "end_window"),
-    response_time = c("fraction"),
+    response_time = c("response_fraction"),
     peak_slope = c("width", "span", "align", "partial", "na.rm"),
     monoexponential = c("use_TD", "fix", "control"),
     biexponential = c(
         "use_TD", "fix", "tau_flex", "TD_flex", "A_flex", "control"
     ),
-    exponential_drift = c("use_TD", "drift_frac", "fix", "control"),
+    exponential_drift = c("use_TD", "drift_fraction", "fix", "control"),
     sigmoidal = c("shape", "fix", "control"),
-    sigmoidal_drift = c("shape", "drift_frac", "fix", "control")
+    sigmoidal_drift = c("shape", "drift_fraction", "fix", "control")
 )
 
 
@@ -87,7 +87,7 @@ kinetics_coef_cols <- list(
     ),
     exponential_drift = c(
         "A", "B", "TD", "tau", "k", "MRT", "HRT", "texc", "slope",
-        "drift_frac", "MRT_fitted", "HRT_fitted", "texc_fitted"
+        "drift_fraction", "MRT_fitted", "HRT_fitted", "texc_fitted"
     ),
     biexponential = c(
         "A", "B", "TD", "tau", "MRT", "texc", 
@@ -96,7 +96,7 @@ kinetics_coef_cols <- list(
     sigmoidal = c("A", "B", "xmid", "slope", "xmid_fitted"),
     sigmoidal_drift = c(
         "A", "B", "xmid", "slope", "slope_A", "slope_B", 
-        "drift_frac", "texc_A", "texc_B", "xmid_fitted"
+        "drift_fraction", "texc_A", "texc_B", "xmid_fitted"
     )
 )
 
@@ -146,7 +146,7 @@ kinetics_fallbacks <- list(
             ## drift amplitude over the record from the drift onset
             # fmt: skip
             onset <- expdrift_onset(
-                cf$tau, cf$drift_frac, if (is.finite(cf$TD)) cf$TD
+                cf$tau, cf$drift_fraction, if (is.finite(cf$TD)) cf$TD
             )
             first_reason(
                 "Fit failed." = is.na(cf$A),
@@ -1180,19 +1180,19 @@ setup_kinetics_worker <- function(
 }
 
 
-## resolve each channel's `drift_frac` for the drift models: a channel
+## resolve each channel's `drift_fraction` for the drift models: a channel
 ## omitted from a per-channel map takes the default; the fraction must
 ## leave a primary response ahead of the drift region
 resolve_drift_frac <- function(per_channel, env = rlang::caller_env()) {
     return(lapply(per_channel, \(.a) {
-        drift_frac <- .a$drift_frac %||% 0.95
+        drift_fraction <- .a$drift_fraction %||% 0.95
         validate_numeric(
-            drift_frac, 1, c(0.5, 1), FALSE,
+            drift_fraction, 1, c(0.5, 1), FALSE,
             msg1 = "one-element",
             msg2 = "between 0.5 and 1 (exclusive).",
             env = env
         )
-        .a$drift_frac <- drift_frac
+        .a$drift_fraction <- drift_fraction
         .a
     }))
 }
@@ -1300,7 +1300,7 @@ analyse_kinetics_channels <- function(
                         ## expand the single-row data frame
                         paste(deparse(.x), collapse = "")
                     } else if (length(.x) > 1L) {
-                        ## collapse vector args (e.g. multiple `fraction`
+                        ## collapse vector args (e.g. multiple `response_fraction`
                         ## values) to fit the single-row data frame
                         paste(.x, collapse = ", ")
                     } else {
@@ -1457,9 +1457,9 @@ validate_kinetics_args <- function(
                 msg1 = "one-element positive", env = env
             )
         }
-        if (!is.null(.a$fraction)) {
+        if (!is.null(.a$response_fraction)) {
             validate_numeric(
-                .a$fraction, Inf, c(0, 1),
+                .a$response_fraction, Inf, c(0, 1),
                 msg2 = "between {col_blue('[0, 1]')}.", env = env
             )
         }

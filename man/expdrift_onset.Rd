@@ -4,16 +4,16 @@
 \alias{expdrift_onset}
 \title{Drift onset time of the exponential-drift model}
 \usage{
-expdrift_onset(tau, drift_frac, TD = NULL)
+expdrift_onset(tau, drift_fraction, TD = NULL)
 }
 \arguments{
 \item{tau}{A numeric parameter for the time constant \code{tau} (\eqn{\tau})
 of the exponential curve, in units of the predictor variable \code{t}.}
 
-\item{drift_frac}{A numeric fraction of the amplitude \code{B - A} in
+\item{drift_fraction}{A numeric fraction of the amplitude \code{B - A} in
 \verb{(0.5, 1)} at which the linear drift begins: the drift onset is where
-the primary response reaches \code{A + drift_frac * (B - A)}, at
-\code{TD - tau * log(1 - drift_frac)} (\code{TD = 0} when absent).}
+the primary response reaches \code{A + drift_fraction * (B - A)}, at
+\code{TD - tau * log(1 - drift_fraction)} (\code{TD = 0} when absent).}
 
 \item{TD}{A numeric parameter for the time delay before the onset of
 exponential response, in units of the predictor variable \code{t}. If \code{NULL}
@@ -23,8 +23,8 @@ exponential response, in units of the predictor variable \code{t}. If \code{NULL
 A numeric vector of onset times, \code{TD = 0} when \code{NULL}.
 }
 \description{
-The time at which a monoexponential response reaches the \code{drift_frac}
+The time at which a monoexponential response reaches the \code{drift_fraction}
 fraction of its amplitude, by the analytic inverse
-\code{TD - tau * log(1 - drift_frac)} (see \code{\link[=exponential_drift]{exponential_drift()}}).
+\code{TD - tau * log(1 - drift_fraction)} (see \code{\link[=exponential_drift]{exponential_drift()}}).
 }
 \keyword{internal}

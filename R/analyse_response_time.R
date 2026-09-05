@@ -8,10 +8,10 @@
 #' @param start_time A numeric value specifying the start of the kinetics
 #'   response in units of `t`. Observations where `t <= start_time` define the
 #'   baseline window. Defaults to `0`.
-#' @param fraction A numeric vector of values in the range `[0, 1]` specifying
+#' @param response_fraction A numeric vector of values in the range `[0, 1]` specifying
 #'   the fractional response amplitude(s) to detect. Defaults to `0.5` (50%
 #'   response, i.e. half-response time). Multiple values (e.g.
-#'   `c(0.5, 0.632)`) return one result per fraction.
+#'   `c(0.5, 0.632)`) return one result per response_fraction.
 #' @param ... Additional arguments.
 #' @inheritParams replace_invalid
 #' @inheritParams find_kinetics_idx
@@ -22,7 +22,7 @@
 #'
 #' The target response value is computed as:
 #'
-#' `response_fitted = A + (B - A) * fraction`
+#' `response_fitted = A + (B - A) * response_fraction`
 #'
 #' where `A` is the mean baseline (`t <= start_time`) and `B` is the extreme
 #' (peak or trough) value after `start_time`. The response time is the elapsed
@@ -48,11 +48,11 @@
 #'   \item{`A`}{Mean baseline value (mean of `x` where `t <= start_time`).}
 #'   \item{`B`}{Extreme value (maximum or minimum) after `start_time`.}
 #'   \item{`response_time`}{Elapsed time from `start_time` to the fractional
-#'   response, in units of `t`; one element per `fraction`.}
+#'   response, in units of `t`; one element per `response_fraction`.}
 #'   \item{`response_value`}{The observed signal value at the response index;
-#'   one element per `fraction`.}
+#'   one element per `response_fraction`.}
 #'   \item{`fitted`}{The predicted fractional response value
-#'   (`A + (B - A) * fraction`); one element per `fraction`.}
+#'   (`A + (B - A) * response_fraction`); one element per `response_fraction`.}
 #'   \item{`baseline_idx`}{Integer indices where `t <= start_time`.}
 #'   \item{`response_idx`}{Integer index at each `response_value`.}
 #'   \item{`extreme_idx`}{Integer index at the extreme value (`B`).}
@@ -65,7 +65,7 @@
 #' x <- monoexponential(t, A = 20, B = 60, tau = 8, TD = 10) + rnorm(length(t), 0, 1)
 #'
 #' ## half-response time (0.5) and mean response time (0.632 ~= tau)
-#' RT <- response_time(x, t, start_time = 10, fraction = c(0.5, 0.632))
+#' RT <- response_time(x, t, start_time = 10, response_fraction = c(0.5, 0.632))
 #'
 #' plot(t, x, type = "l", col = "grey60", xlab = "t", ylab = "x")
 #' ## baseline mean across baseline_idx
@@ -74,7 +74,7 @@
 #'     t[max(RT$baseline_idx)], RT$A,
 #'     col = "red", lwd = 2
 #' )
-#' ## fraction = 0.5 (red) and 0.632 (blue): response_value, and extreme
+#' ## response_fraction = 0.5 (red) and 0.632 (blue): response_value, and extreme
 #' points(t[RT$response_idx], RT$response_value, col = c("red", "blue"), pch = 19)
 #' points(t[RT$extreme_idx], RT$B, col = "red", pch = 19)
 #'
@@ -83,7 +83,7 @@ response_time <- function(
     x,
     t = seq_along(x),
     start_time = 0,
-    fraction = 0.5,
+    response_fraction = 0.5,
     direction = c("auto", "positive", "negative"),
     verbose = TRUE,
     ...
@@ -92,7 +92,7 @@ response_time <- function(
     ## as coming from the user-facing function
     env <- list(...)$env %||% environment()
     validate_numeric(
-        fraction, Inf, c(0, 1), msg2 = "between {col_blue('[0, 1]')}.",
+        response_fraction, Inf, c(0, 1), msg2 = "between {col_blue('[0, 1]')}.",
         env = env
     )
     direction <- match.arg(direction)
@@ -147,7 +147,7 @@ response_time <- function(
 
     A <- mean(x[baseline_idx], na.rm = TRUE)
     B <- x[extreme_idx]
-    response_fitted <- A + (B - A) * fraction
+    response_fitted <- A + (B - A) * response_fraction
     compare_fn <- if (direction == "positive") `>=` else `<=`
     ## first sample reaching each fractional response value
     response_idx <- vapply(response_fitted, \(.f) {
@@ -188,8 +188,8 @@ response_time <- function(
 #' @inheritParams analyse_kinetics
 #' @inheritParams response_time
 #'
-#' @returns A `data.frame` with one row per `nirs_channel` per `fraction`
-#'   and columns `nirs_channels`, `fraction`, `A`, `B`, `response_time`,
+#' @returns A `data.frame` with one row per `nirs_channel` per `response_fraction`
+#'   and columns `nirs_channels`, `response_fraction`, `A`, `B`, `response_time`,
 #'   `response_value`, `fitted`, `idx`. Per-channel metadata are attached
 #'   as attributes:
 #'   - `"model"`: `NULL` (no parametric model is fitted).
@@ -209,7 +209,7 @@ analyse_response_time <- function(
     nirs_channels = NULL,
     time_channel = NULL,
     start_time = NULL,
-    fraction = 0.5,
+    response_fraction = 0.5,
     direction = c("auto", "positive", "negative"),
     end_window = Inf,
     verbose = TRUE,
@@ -230,7 +230,7 @@ analyse_response_time <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = mget(c("start_time", "fraction", "direction", "end_window")),
+        arg_list = mget(c("start_time", "response_fraction", "direction", "end_window")),
         choices = list(direction = c("auto", "positive", "negative")),
         verbose = verbose,
         env = env
@@ -253,9 +253,9 @@ analyse_response_time <- function(
         ## `response_time()` indexes the fit window; map the response sample
         ## back to its original data frame row, which differs whenever
         ## non-finite samples were dropped. NA idx maps to NA
-        ## one row per fraction; scalar A/B recycle across rows
+        ## one row per response_fraction; scalar A/B recycle across rows
         coefs <- data.frame(
-            fraction = .a$fraction,
+            response_fraction = .a$response_fraction,
             A = response$A,
             B = response$B,
             response_time = response$response_time,

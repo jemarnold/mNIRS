@@ -376,17 +376,17 @@ plot.mnirs_kinetics <- function(
                     replace(trail, is.na(trail), 0)
                 cd$comp2 <- ifelse(
                     t_rel <= g("texc_A"),
-                    g("A") + (1 - g("drift_frac")) * amp + lead,
+                    g("A") + (1 - g("drift_fraction")) * amp + lead,
                     NA_real_
                 )
                 cd$comp3 <- ifelse(
                     t_rel >= g("texc_B"),
-                    g("A") + g("drift_frac") * amp + trail,
+                    g("A") + g("drift_fraction") * amp + trail,
                     NA_real_
                 )
             } else {
                 cd$comp1 <- monoexponential(t_rel, g("A"), g("B"), g("tau"), TD)
-                onset <- expdrift_onset(g("tau"), g("drift_frac"), TD)
+                onset <- expdrift_onset(g("tau"), g("drift_fraction"), TD)
                 cd$comp2 <- ifelse(
                     model == "biexponential",
                     monoexponential(t_rel, g("B"), g("B2"), g("tau2"), TD),
@@ -566,10 +566,10 @@ kinetics_annotations <- function(x) {
             response_time = list(
                 offset = "response_time",
                 y = "fitted",
-                ## fraction-specific labels, e.g. "50% response = 7.9 s";
+                ## response_fraction-specific labels, e.g. "50% response = 7.9 s";
                 ## outer sprintf resolves the percentage, leaving `%s` for line()
                 label = label(line(
-                    sprintf("%g%%%% response = %%s s", coefs$fraction * 100),
+                    sprintf("%g%%%% response = %%s s", coefs$response_fraction * 100),
                     coefs$response_time
                 ))
             ),

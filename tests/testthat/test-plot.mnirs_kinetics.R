@@ -636,7 +636,7 @@ test_that("components draws the exponential_drift drift line from the drift onse
     expect_lt(nrow(d2), nrow(d1))
     t_rel <- d2$time - x$interval_times$start_times[[1L]]
     cf <- x$coefficients
-    onset <- expdrift_onset(cf$tau, cf$drift_frac, if (is.finite(cf$TD)) cf$TD)
+    onset <- expdrift_onset(cf$tau, cf$drift_fraction, if (is.finite(cf$TD)) cf$TD)
     expect_true(all(t_rel >= onset))
     expect_equal(diff(d2$comp2), rep(x$coefficients$slope, nrow(d2) - 1L))
 })
