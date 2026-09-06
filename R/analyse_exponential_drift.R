@@ -224,7 +224,9 @@ expdrift_model <- function(t, A, B, tau, slope, drift_fraction, TD = NULL) {
         grad <- cbind(
             A = e,
             B = 1 - e,
-            tau = -(B - A) * e * ts / tau^2 + slope * log1p(-drift_fraction) * on,
+            # fmt: skip
+            tau = -(B - A) * e * ts / tau^2 +
+                slope * log1p(-drift_fraction) * on,
             slope = h,
             drift_fraction = -slope * tau / (1 - drift_fraction) * on,
             TD = if (has_TD) -(t > TD) * (B - A) * e / tau - slope * on
@@ -497,7 +499,11 @@ analyse_exponential_drift <- function(
         ## primary rate, |B - A| / tau * exp(-(t - TD) / tau) = |slope|; the
         ## turning point when the phases oppose. never before the drift
         ## onset
-        onset <- expdrift_onset(coefs[["tau"]], coefs[["drift_fraction"]], TD_arg)
+        onset <- expdrift_onset(
+            coefs[["tau"]],
+            coefs[["drift_fraction"]],
+            TD_arg
+        )
         r <- abs(coefs[["B"]] - coefs[["A"]]) /
             (abs(coefs[["slope"]]) * coefs[["tau"]])
         texc_val <- max(

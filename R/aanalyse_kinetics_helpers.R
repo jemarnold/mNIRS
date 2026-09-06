@@ -25,7 +25,9 @@ method_aliases <- c(
     monoexp_drift = "exponential_drift",
     monoexp_linear = "exponential_drift",
     logistic = "sigmoidal",
+    sig = "sigmoidal",
     gompertz = "sigmoidal",
+    gomp = "sigmoidal",
     xmid = "sigmoidal",
     sigmoidal_drift = "sigmoidal_drift",
     sigmoid_drift = "sigmoidal_drift",
@@ -37,7 +39,9 @@ method_aliases <- c(
     sig_linear = "sigmoidal_drift",
     sig_lin = "sigmoidal_drift",
     logistic_linear = "sigmoidal_drift",
-    gompertz_linear = "sigmoidal_drift"
+    gompertz_linear = "sigmoidal_drift",
+    gomp_linear = "sigmoidal_drift",
+    gomp_lin = "sigmoidal_drift"
 )
 
 
@@ -60,8 +64,8 @@ kinetics_dispatch <- list(
 ## coefficients reported as time points elapsed from `start_time`
 # fmt: skip
 kinetics_time_coefs <- c(
-    "response_time", "peak_slope_time", "TD", "MRT", "HRT", 
-    "texc", "xmid", "texc_A", "texc_B"
+    "response_time", "peak_slope_time", "TD", "MRT", "HRT",
+    "texc", "xmid"
 )
 
 
@@ -95,8 +99,8 @@ kinetics_coef_cols <- list(
     ),
     sigmoidal = c("A", "B", "xmid", "slope", "xmid_fitted"),
     sigmoidal_drift = c(
-        "A", "B", "xmid", "slope", "slope_A", "slope_B", 
-        "drift_fraction", "texc_A", "texc_B", "xmid_fitted"
+        "A", "B", "xmid", "slope", "texc", "slope_B",
+        "drift_fraction", "xmid_fitted", "texc_fitted"
     )
 )
 
@@ -165,19 +169,17 @@ kinetics_fallbacks <- list(
         fix_keep = c("A", "B", "xmid", "slope"),
         args = list(),
         trigger = \(cf, rmse, span, t_end) {
-            ## each drift's amplitude over its support: from the first
-            ## fitted time to the leading cutoff, and from the trailing
-            ## cutoff to the last. one supported drift keeps the model
-            amp_A <- abs(cf$slope_A) * max(cf$texc_A - (t_end - span), 0)
-            amp_B <- abs(cf$slope_B) * max(t_end - cf$texc_B, 0)
+            ## drift amplitude over the record from the excursion point;
+            ## the onset needs the shape, and texc is never before it, so
+            ## the gate is equal or stricter for a weak drift
             first_reason(
                 "Fit failed." = is.na(cf$A),
                 !!paste0(
-                    "Drift amplitudes are below ",
+                    "Drift amplitude is below ",
                     cli::col_blue(fallback_gate),
                     " RMSE."
-                ) := !all(is.finite(c(amp_A, amp_B))) ||
-                    max(amp_A, amp_B) < fallback_gate * rmse
+                ) := !is.finite(cf$slope_B) ||
+                    abs(cf$slope_B) * (t_end - cf$texc) < fallback_gate * rmse
             )
         }
     )

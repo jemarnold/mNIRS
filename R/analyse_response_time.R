@@ -230,7 +230,9 @@ analyse_response_time <- function(
         data,
         enquo(nirs_channels),
         enquo(time_channel),
-        arg_list = mget(c("start_time", "response_fraction", "direction", "end_window")),
+        arg_list = mget(
+            c("start_time", "response_fraction", "direction", "end_window")
+        ),
         choices = list(direction = c("auto", "positive", "negative")),
         verbose = verbose,
         env = env

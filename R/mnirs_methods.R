@@ -112,7 +112,7 @@ print.mnirs_kinetics <- function(x, ...) {
         exponential_drift = "Exponential-Linear Drift Two-Phase Kinetics",
         biexponential = "Biexponential Two-Phase Kinetics",
         sigmoidal = "Sigmoidal Inflection Kinetics",
-        sigmoidal_drift = "Sigmoidal-Linear Drift Three-Phase Kinetics"
+        sigmoidal_drift = "Sigmoidal-Linear Drift Two-Phase Kinetics"
     )
 
     cat("\n")

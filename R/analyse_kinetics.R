@@ -29,7 +29,7 @@
 #'      [stats::nls()]. Additional arguments: `shape`, `fix`, `control`.
 #'      See [logistic()].}
 #'      \item{`"sigmoidal_drift"`}{Logistic or Gompertz-family curve with
-#'      linear drifts at both asymptotes, fit via [stats::nls()]. Additional
+#'      a secondary linear drift, fit via [stats::nls()]. Additional
 #'      arguments: `shape`, `drift_fraction`, `fix`, `control`. See
 #'      [sigmoidal_drift()].}
 #'   }
@@ -109,14 +109,12 @@
 #'   values. Specify per-channel as a list of lists keyed by channel name, e.g.
 #'   `fix = list(smo2 = list(A = 0))`. See *Details*.
 #' @param drift_fraction **exponential_drift, sigmoidal_drift**: A numeric
-#'   fraction of the primary amplitude in `(0.5, 1)` bounding the drift
-#'   regions. For **exponential_drift** the linear drift begins where the
-#'   primary response reaches `A + drift_fraction * (B - A)`, at
-#'   `TD - tau * log(1 - drift_fraction)`. For **sigmoidal_drift** the leading
-#'   drift applies only below `A + (1 - drift_fraction) * (B - A)` (before
-#'   `texc_A`) and the trailing drift only above `A + drift_fraction * (B - A)`
-#'   (after `texc_B`). The default `0.95` is always held constant. Specify
-#'   per-channel as a list keyed by channel name, e.g.
+#'   fraction of the primary amplitude in `(0.5, 1)` at which the linear
+#'   drift begins, where the primary response reaches
+#'   `A + drift_fraction * (B - A)`: at `TD - tau * log(1 - drift_fraction)`
+#'   for **exponential_drift**, or the analytic inverse of the sigmoid
+#'   `shape` for **sigmoidal_drift**. The default `0.95` is always held
+#'   constant. Specify per-channel as a list keyed by channel name, e.g.
 #'   `drift_fraction = list(smo2 = 0.9)`. See *Details*.
 #' @inheritParams validate_mnirs
 #' @inheritParams find_kinetics_idx
@@ -495,39 +493,39 @@
 #' Aliases: `method = c("sigmoid_drift", "sig_drift", "logistic_drift",
 #' "gompertz_drift", "sigmoidal_linear")`.
 #'
-#' A parametric approach fitting a three-phase curve using [stats::nls()]
+#' A parametric approach fitting a two-phase curve using [stats::nls()]
 #' with [SSsigmoidal_drift()]: a *"sigmoidal"* primary response of the
-#' given `shape` plus independent linear drifts at the leading and trailing
-#' asymptotes.
+#' given `shape` plus a secondary linear drift beginning near the ending
+#' asymptote.
 #'
 #' Model equation:
 #'
-#' `S(t) + slope_A * pmin(t - texc_A, 0) + slope_B * pmax(t - texc_B, 0)`
+#' `S(t) + slope_B * pmax(t - onset, 0)`
 #'
 #' `S(t)` and `A`, `B`, `xmid`, and `slope` are as for *"sigmoidal"*.
-#' `slope_A` and `slope_B` are the linear drift rates `dx/dt` at the
-#' asymptotes `A` and `B`. Each drift is a hinge line anchored at zero at
-#' its cutoff: the leading drift applies only before `texc_A`, where the
-#' sigmoid reaches `1 - drift_fraction` (*default* `0.95`; 5%) of its
-#' amplitude, and the trailing drift only after `texc_B`, where it reaches
-#' `drift_fraction` (95%). The cutoffs are the analytic inverse of each
-#' `shape` (see [sigmoidal_drift()]), so a Gompertz form places its cutoff
-#' further out on its slow side. The drift regions never overlap, so the
-#' two drifts are fitted independently. `texc_A` and `texc_B` are reported
-#' elapsed from `start_time` (the same frame as `xmid`).
+#' `slope_B` is the linear drift rate `dx/dt` at the asymptote `B`. The
+#' drift is a hinge line anchored at zero at its onset, where the sigmoid
+#' reaches `drift_fraction` (*default* `0.95`) of its amplitude, by the
+#' analytic inverse of each `shape` (see [sigmoidal_drift()]); a
+#' `"gompertz"` form places its onset furthest past `xmid`. The excursion
+#' point `texc` is where the drift rate overtakes the decaying sigmoid
+#' rate, `|S'(t)| = |slope_B|`, floored at the drift onset: the turning
+#' point of the curve when the phases oppose, or where the linear trend
+#' takes over a monotonic response. It is reported elapsed from
+#' `start_time` (the same frame as `xmid`) with the fitted value
+#' `texc_fitted`.
 #'
-#' The drifts are kept only when the data support them. A channel falls
-#' back to the *"sigmoidal"* model (same `shape` and window, with `A`, `B`,
-#' `xmid`, and `slope` carried over from `fix`) when the fit fails or both
-#' drift amplitudes over their support, `|slope_A| * (texc_A - t_start)` and
-#' `|slope_B| * (t_end - texc_B)`, are below twice the fit RMSE, with a
-#' warning recorded in `warnings`. One supported drift keeps the full
-#' model. The `model` coefficient column names the method each row comes
-#' from; sigmoidal rows report `slope_A`, `slope_B`, `drift_fraction`, `texc_A`,
-#' and `texc_B` as `NA`.
+#' The drift is kept only when the data support it. A channel falls back
+#' to the *"sigmoidal"* model (same `shape` and window, with `A`, `B`,
+#' `xmid`, and `slope` carried over from `fix`) when the fit fails or the
+#' drift amplitude over the record from the excursion point,
+#' `|slope_B| * (t_end - texc)`, is below twice the fit RMSE, with a
+#' warning recorded in `warnings`. The `model` coefficient column names the
+#' method each row comes from; sigmoidal rows report `texc`, `slope_B`,
+#' `drift_fraction`, and `texc_fitted` as `NA`.
 #'
-#' `A`, `B`, `xmid`, `slope`, `slope_A`, and `slope_B` may be held constant
-#' with `fix`, as above.
+#' `A`, `B`, `xmid`, `slope`, and `slope_B` may be held constant with
+#' `fix`, as above.
 #'
 #' ## Recursive analysis
 #'

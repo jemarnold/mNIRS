@@ -337,8 +337,8 @@ plot.mnirs_kinetics <- function(
     ## primary monoexponential; comp2 is the secondary term: the
     ## biexponential slow phase (B to B2) clocked from the onset, or the
     ## exponential_drift linear drift from the drift onset.
-    ## for sigmoidal_drift, comp1 is the primary sigmoid and comp2/comp3
-    ## the leading/trailing drift lines outside the cutoffs
+    ## for sigmoidal_drift, comp1 is the primary sigmoid and comp2 the
+    ## linear drift from the drift onset
     comp_methods <- c("biexponential", "exponential_drift", "sigmoidal_drift")
     if (isTRUE(list(...)[["components"]]) && x$method %in% comp_methods) {
         p <- p +
@@ -365,23 +365,24 @@ plot.mnirs_kinetics <- function(
             model <- co$model %||% rep(x$method, nrow(co))
             g <- \(.nm) co[[.nm]] %||% NA_real_
             if (x$method == "sigmoidal_drift") {
-                ## the sigmoid is the fit less its drift terms (none on a
-                ## sigmoidal fallback row); each drift line starts from
-                ## the sigmoid height at its cutoff
-                amp <- g("B") - g("A")
-                lead <- g("slope_A") * pmin(t_rel - g("texc_A"), 0)
-                trail <- g("slope_B") * pmax(t_rel - g("texc_B"), 0)
-                cd$comp1 <- d[[fcol]] -
-                    replace(lead, is.na(lead), 0) -
-                    replace(trail, is.na(trail), 0)
-                cd$comp2 <- ifelse(
-                    t_rel <= g("texc_A"),
-                    g("A") + (1 - g("drift_fraction")) * amp + lead,
-                    NA_real_
+                ## the sigmoid is the fit less its drift term (none on a
+                ## sigmoidal fallback row); the drift line starts from the
+                ## sigmoid height at the onset, which needs each row's
+                ## shape from the resolved channel args
+                ca <- x$channel_args[x$channel_args$nirs_channels == .ch, ]
+                shape <- ca$shape[
+                    if (faceted) match(d$interval, ca$interval) else 1L
+                ]
+                onset <- mapply(
+                    sigdrift_onset,
+                    g("A"), g("B"), g("xmid"), g("slope"), g("drift_fraction"),
+                    shape
                 )
-                cd$comp3 <- ifelse(
-                    t_rel >= g("texc_B"),
-                    g("A") + g("drift_fraction") * amp + trail,
+                drift <- g("slope_B") * pmax(t_rel - onset, 0)
+                cd$comp1 <- d[[fcol]] - replace(drift, is.na(drift), 0)
+                cd$comp2 <- ifelse(
+                    t_rel >= onset,
+                    g("A") + g("drift_fraction") * (g("B") - g("A")) + drift,
                     NA_real_
                 )
             } else {
@@ -486,7 +487,11 @@ plot.mnirs_kinetics <- function(
                             after_scale = darken(colour)
                         )
                     ),
-                    ann[which(ann$xval >= rng[1L, i] & ann$xval <= rng[2L, i]), , drop = FALSE],
+                    ann[
+                        which(ann$xval >= rng[1L, i] & ann$xval <= rng[2L, i]),
+                        ,
+                        drop = FALSE
+                    ],
                     inherit.aes = FALSE
                 )
         }
@@ -569,10 +574,15 @@ kinetics_annotations <- function(x) {
             response_time = list(
                 offset = "response_time",
                 y = "fitted",
-                ## response_fraction-specific labels, e.g. "50% response = 7.9 s";
-                ## outer sprintf resolves the percentage, leaving `%s` for line()
+                ## response_fraction-specific labels,
+                ## e.g. "50% response = 7.9 s";
+                ## outer sprintf resolves the percentage,
+                ## leaving `%s` for line()
                 label = label(line(
-                    sprintf("%g%%%% response = %%s s", coefs$response_fraction * 100),
+                    sprintf(
+                        "%g%%%% response = %%s s",
+                        coefs$response_fraction * 100
+                    ),
                     coefs$response_time
                 ))
             ),
@@ -610,17 +620,18 @@ kinetics_annotations <- function(x) {
                 )
             },
             ## the sigmoidal models share `xmid` and `slope`; the drift
-            ## rates read NA on a sigmoidal row and their lines are dropped
+            ## rate and `texc` read NA on a sigmoidal row and are dropped
             sigmoidal = ,
             sigmoidal_drift = {
                 g <- \(.nm) coefs[[.nm]] %||% NA_real_
+                offset <- intersect(c("xmid", "texc"), names(coefs))
                 list(
-                    offset = "xmid",
-                    y = "xmid_fitted",
+                    offset = offset,
+                    y = paste0(offset, "_fitted"),
                     label = label(
                         line("slope = %s /s", g("slope"), decimals = Inf),
                         line("xmid = %s s", g("xmid")),
-                        line("slope_A = %s /s", g("slope_A"), decimals = Inf),
+                        line("texc = %s s", g("texc")),
                         line("slope_B = %s /s", g("slope_B"), decimals = Inf)
                     )
                 )
